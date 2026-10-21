@@ -2064,11 +2064,12 @@ def test_validate_agents_rejects_generated_target_omission_and_leakage(
     assert expected in errors
 
 
-@pytest.mark.parametrize("field", ("skills", "mcp_servers"))
+@pytest.mark.parametrize("field", ("skills", "mcp_servers", "sandbox_mode"))
 def test_validate_agents_rejects_codex_agent_local_override(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str
 ) -> None:
-    """Codex agents inherit skills and MCP configuration instead of overriding it."""
+    """Codex agents inherit skills, MCP configuration, and the sandbox instead of
+    overriding them; Codex ignores `sandbox_mode` in a custom agent file."""
     target_root = tmp_path / "multi-agent"
     shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
     agent_path = target_root / ".codex" / "agents" / "coder.toml"

@@ -520,6 +520,7 @@ These protections are enforced by target-native hook adapters that call shared s
 
 Also blocked in pre-tool hooks:
 - Dangerous git commands: `git push --force`, `git push -f`, `git reset --hard`, `git branch -D main/master`, `git clean -fd`
+- Agent definition files (each client's `agents/` folder under its native config folder), the protected hook folders as whole folders, and `*.code-workspace` files inside the repository: an edit asks on Claude Code and GitHub Copilot and is denied on Codex and Antigravity. Change the source (`shared/agents/`) and reinstall instead.
 
 When asked to edit protected files or run blocked git commands, stop and explain why it is protected.
 

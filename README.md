@@ -376,6 +376,26 @@ surprise an operator, plus practical notes worth knowing before you refresh:
   state-sync checkpoint untracks `settings.local.json` in the nested `ai-state`
   repository (the local file stays); `docs/runtime-checks.md` describes the
   copy-and-restore behavior and the recovery after a killed sync.
+- **Protected agent files, hook folders, and workspace files.** An agent edit
+  of an agent definition file (under `.claude/agents/`, `.codex/agents/`,
+  `.github/agents/`, or `.agents/agents/`), a protected hook folder, or a
+  `*.code-workspace` file inside the repository asks (Claude, Copilot) or is
+  denied (Codex, Antigravity), and so do `rm -rf`, `mv`, and `ln -s` on a
+  whole protected folder. Any command outside the guard's read-only list
+  that merely names one of them is denied on all four clients, for example
+  `ls`, `find`, `diff`, or `cmp` on an agent file. The `git -C` and `cd`
+  forms of unmodelled Git commands ask on Claude and Copilot and deny on
+  Codex and Antigravity, but only when no path in the command is also
+  protected as written from the repository root. Plain forms, and commands
+  with an absolute path such as `git -C .claude restore <repo>/.claude/hooks/x`,
+  are denied on all four clients. Read with `cat`, a native read
+  tool, or `rg --files`, and compare with `git diff --no-index` or
+  `uv run python scripts/check_runtime.py`. Change agents in `shared/agents/`
+  and regenerate, or re-run the installer in a consumer. The guard also scans
+  heredoc bodies, so write findings JSON and PR text that name a protected
+  path with the native Write tool and pass `--findings-json <file>` or
+  `--body-file <file>`. Generated Codex agent files no longer carry
+  `sandbox_mode`, which Codex ignores there.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
 - **Root-owned tracked files.** A tracked file owned by `root` is a container

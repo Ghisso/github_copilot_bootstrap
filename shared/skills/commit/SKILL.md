@@ -106,18 +106,23 @@ under that authority. For final closeout, every phase must be terminal:
 `complete` or fully evidenced as `cancelled`, with at least one completed phase
 and one commit per completed phase.
 
-PR creation stays user-requested and must target `dev`:
+PR creation stays user-requested and must target `dev`.
 
-```bash
-gh pr create --base dev --title "type: description" --body "$(cat <<'EOF'
+Write the body to a scratch file with the native Write tool, then pass it with
+`--body-file`. The shell guard scans inline bodies, so a body that names a
+protected path would be denied. The file holds the body, for example:
+
+```markdown
 ## Summary
 - change 1
 - change 2
 
 ## Test Plan
 - [ ] tests pass
-EOF
-)"
+```
+
+```bash
+gh pr create --base dev --title "type: description" --body-file <file>
 ```
 
 ## Phase 6: Merge (human)

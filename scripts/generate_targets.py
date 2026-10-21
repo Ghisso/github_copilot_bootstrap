@@ -928,14 +928,6 @@ def toml_string(value: str) -> str:
     return json.dumps(value)
 
 
-def codex_sandbox_mode(capabilities: list[str]) -> str | None:
-    if not capabilities:
-        return None
-    if "edit" not in capabilities and "execute" not in capabilities:
-        return "read-only"
-    return None
-
-
 def codex_agent_metadata_header(agent: dict[str, Any]) -> str:
     """Return the stable generated metadata header for one Codex agent."""
     capabilities = agent.get("capabilities", [])
@@ -1730,7 +1722,6 @@ def render_claude_agents(target_root: Path) -> None:
 
 def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     codex_name = agent["id"]
-    capabilities = agent.get("capabilities", [])
     prompt_body = codex_agent_prompt_body(agent)
     instructions = (
         f"{codex_agent_metadata_header(agent)}\n\n"
@@ -1752,9 +1743,6 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
             agent_lines.append(f"model = {toml_string(model)}")
         if effort and effort != "inherit":
             agent_lines.append(f"model_reasoning_effort = {toml_string(effort)}")
-    sandbox_mode = codex_sandbox_mode(capabilities)
-    if sandbox_mode:
-        agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
     agent_lines.append(f"developer_instructions = {toml_string(instructions)}")
     return "\n".join(agent_lines) + "\n"
 

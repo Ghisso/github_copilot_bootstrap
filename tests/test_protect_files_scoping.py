@@ -113,6 +113,23 @@ _LITERAL_MUST_MATCH = (
         ".github/copilot/settings.local.json",
         id="copilot-local-settings",
     ),
+    pytest.param(".claude/agents/coder.md", ".claude/agents/coder.md", id="agent-file"),
+    pytest.param(".claude/agents", ".claude/agents", id="agent-folder-bare"),
+    pytest.param(
+        "/repo/.agents/agents/coder/agent.md",
+        "/repo/.agents/agents/coder/agent.md",
+        id="antigravity-agent-directory-prefix",
+    ),
+    pytest.param(".claude/hooks", ".claude/hooks", id="hook-folder-bare"),
+    pytest.param("team.code-workspace", "team.code-workspace", id="workspace-file"),
+    pytest.param(
+        "Team.CODE-WORKSPACE", "Team.CODE-WORKSPACE", id="workspace-file-mixed-case"
+    ),
+    pytest.param(
+        "/repo/team.code-workspace",
+        "/repo/team.code-workspace",
+        id="workspace-file-directory-prefix",
+    ),
 )
 
 
@@ -134,6 +151,12 @@ _LITERAL_MUST_NOT_MATCH = (
     pytest.param("my-.mcp.json", id="mcp-left-boundary-hyphen"),
     pytest.param("vscode/mcp.json", id="vscode-mcp-needs-leading-dot"),
     pytest.param("other.vscode/settings.json", id="vscode-settings-left-boundary"),
+    pytest.param("shared/agents/coder/prompt.md", id="bootstrap-source-agents"),
+    pytest.param(".claude/agents-old/x.md", id="agents-right-boundary-hyphen"),
+    pytest.param(".claude/agentsx", id="agents-right-boundary-word"),
+    pytest.param("x.claude/agents/y.md", id="agents-left-boundary"),
+    pytest.param(".agents/skills/ponytail/SKILL.md", id="skill-folder"),
+    pytest.param("team.code-workspaces", id="workspace-right-boundary"),
 )
 
 
@@ -153,6 +176,10 @@ def test_protected_path_literal_rejects_embedded_near_misses(text: str) -> None:
         ".vscode/settings.json",
         ".github/copilot/settings.json",
         ".github/copilot/settings.local.json",
+        ".claude/agents/coder.md",
+        ".agents/agents/coder/agent.md",
+        "team.code-workspace",
+        "Team.CODE-WORKSPACE",
     ),
 )
 def test_protect_files_finds_hook_and_server_configs_in_opaque_shell_text(
@@ -223,6 +250,14 @@ _CONTROL_PLANE_RELATIVE_PATHS = (
     pytest.param(".vscode/settings.json", id="vscode-settings"),
     pytest.param(".github/copilot/settings.json", id="copilot-settings"),
     pytest.param(".github/copilot/settings.local.json", id="copilot-local-settings"),
+    pytest.param(".claude/agents/coder.md", id="claude-agent"),
+    pytest.param(".codex/agents/reviewer.toml", id="codex-agent"),
+    pytest.param(".github/agents/planner.agent.md", id="copilot-agent"),
+    pytest.param(".agents/agents/coder/agent.md", id="antigravity-agent"),
+    pytest.param(".claude/agents", id="claude-agents-folder"),
+    pytest.param(".claude/hooks", id="claude-hooks-folder"),
+    pytest.param("team.code-workspace", id="workspace-file"),
+    pytest.param("Team.CODE-WORKSPACE", id="workspace-file-mixed-case"),
 )
 
 

@@ -153,7 +153,6 @@ CODEX_AGENT_ALLOWED_FIELDS = {
     "developer_instructions",
     "model",
     "model_reasoning_effort",
-    "sandbox_mode",
 }
 PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
     "orchestrator's evidence packet",
@@ -3727,6 +3726,32 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "ask",
             "github-copilot",
         ),
+        (
+            # BF-D1: each client's agent folder is protected in the generated
+            # copy: Claude Code and Copilot ask, Codex and Antigravity deny.
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".claude/agents/reviewer.md",
+            "ask",
+            "claude-code",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".codex/agents/reviewer.toml",
+            "deny",
+            "openai-codex",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".github/agents/reviewer.agent.md",
+            "ask",
+            "github-copilot",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".agents/agents/reviewer/agent.md",
+            "deny",
+            "google-antigravity",
+        ),
     )
     for script, protected_path, expected_decision, target_id in hook_cases:
         patch = f"*** Begin Patch\n*** Update File: {protected_path}\n@@\n x\n*** End Patch\n"
@@ -3756,6 +3781,9 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             '"permissionDecision":"ask"',
         ),
         ("read_file", {"filePath": ".mcp.json"}, ""),
+        # The Copilot wrappers read `.claude/agents/<id>.md`, so a read stays
+        # allowed even though an edit of the file asks.
+        ("read_file", {"filePath": ".claude/agents/reviewer.md"}, ""),
     ):
         returncode, stdout, stderr = run_hook(
             copilot_protect_files,

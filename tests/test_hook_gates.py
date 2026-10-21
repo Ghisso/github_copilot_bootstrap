@@ -2724,8 +2724,8 @@ def test_protect_files_denies_glued_command_name_mutation(command: str) -> None:
         ),
         (
             "touch .claude/hooks/scripts/new.sh<<EOF\nx\nEOF",
-            "Editing hook files is blocked because PreToolUse cannot request "
-            "approval: .claude/hooks/scripts/new.sh",
+            "Editing agent, hook, or server configuration is blocked because "
+            "PreToolUse cannot request approval: .claude/hooks/scripts/new.sh",
         ),
         # Redirect-target gluing: `cat > .env<<'EOF'` is valid bash where
         # ".env" is `>`'s target and `<<'EOF'` is a separate stdin redirect.
@@ -3247,6 +3247,26 @@ HOOK_AND_SERVER_CONFIGS = (
     ".github/copilot/settings.json",
     ".github/copilot/settings.local.json",
 )
+# Agent definition files in every client's agent folder, and a VS Code workspace
+# file (in a multi-root workspace it holds the hook switches).
+AGENT_DEFINITION_PATHS = (
+    ".claude/agents/coder.md",
+    ".codex/agents/reviewer.toml",
+    ".github/agents/planner.agent.md",
+    ".agents/agents/coder/agent.md",
+    "team.code-workspace",
+    "Team.CODE-WORKSPACE",
+)
+PROTECTED_CONFIG_PATHS = HOOK_AND_SERVER_CONFIGS + AGENT_DEFINITION_PATHS
+CONTROL_PLANE_FOLDERS = (
+    ".github/hooks",
+    ".claude/hooks",
+    ".codex/hooks",
+    ".claude/agents",
+    ".codex/agents",
+    ".github/agents",
+    ".agents/agents",
+)
 CLIENT_CONFIG_DECISIONS = (
     pytest.param("claude-code", "ask", id="claude-code"),
     pytest.param("openai-codex", "deny", id="openai-codex"),
@@ -3296,7 +3316,7 @@ def _antigravity_bridge_repo(repo_root: Path) -> Path:
 
 
 @pytest.mark.parametrize("operation", ("edit", "redirect"))
-@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
 @pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
 def test_protect_files_gates_hook_and_server_configs_per_client(
     tmp_path: Path, target_id: str, expected: str, relative_path: str, operation: str
@@ -3315,7 +3335,7 @@ def test_protect_files_gates_hook_and_server_configs_per_client(
 
 
 @pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
-@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
 def test_pretool_bash_guard_gates_hook_and_server_config_redirects(
     tmp_path: Path, target_id: str, relative_path: str
 ) -> None:
@@ -3335,7 +3355,7 @@ def test_pretool_bash_guard_gates_hook_and_server_config_redirects(
     assert _protect_decision(process) == expected, process.stdout
 
 
-@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
 @pytest.mark.parametrize("operation", ("write_to_file", "run_command"))
 def test_antigravity_bridge_denies_hook_and_server_config_writes(
     tmp_path: Path, relative_path: str, operation: str
@@ -3357,7 +3377,7 @@ def test_antigravity_bridge_denies_hook_and_server_config_writes(
     assert relative_path in response["reason"]
 
 
-@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
 @pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
 def test_protect_files_allows_reading_hook_and_server_configs(
     tmp_path: Path, target_id: str, expected: str, relative_path: str
@@ -3377,6 +3397,9 @@ def test_protect_files_allows_reading_hook_and_server_configs(
         pytest.param("ls .mcp.json", ".mcp.json", id="ls"),
         pytest.param(
             "test -f .vscode/settings.json", ".vscode/settings.json", id="test"
+        ),
+        pytest.param(
+            "ls .claude/agents/coder.md", ".claude/agents/coder.md", id="ls-agent"
         ),
     ),
 )
@@ -3399,7 +3422,7 @@ def test_protect_files_denies_a_command_that_only_names_a_hook_config(
     assert _protect_decision(read) == "allow", read.stdout
 
 
-@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
 def test_antigravity_bridge_allows_reading_hook_and_server_configs(
     tmp_path: Path, relative_path: str
 ) -> None:
@@ -3448,6 +3471,301 @@ def test_antigravity_bridge_allows_the_self_install_command_line(
 
     assert process.returncode == 0, process.stderr
     assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+# --------------------------------------------------------------------------
+# BF-D2: each protected folder is protected as a whole, and an unmodelled Git
+# subcommand or a `cd` resolves its paths against the directory it runs in.
+# --------------------------------------------------------------------------
+
+WHOLE_FOLDER_COMMANDS = (
+    pytest.param("rm -rf {folder}", id="rm"),
+    pytest.param("mv {folder} /tmp/x", id="mv"),
+    pytest.param("ln -s /tmp/x {folder}", id="ln"),
+)
+FOLDER_FROM_WORKING_DIRECTORY_COMMANDS = (
+    pytest.param("git -C .claude rm -r -q hooks", id="git-rm"),
+    pytest.param(
+        "git -C .claude checkout HEAD~5 -- hooks/scripts/protect-files.py",
+        id="git-checkout",
+    ),
+    pytest.param("cd .claude && rm -rf hooks", id="cd-rm"),
+)
+# Unmodelled Git commands with a path that is protected from the repository
+# root keep the uncertain deny on every client. The `-C` and `cd` resolution
+# must not add a confirmed hit for them: `emit()` prefers a confirmed hit and
+# would turn the deny into ask on Claude Code and Copilot. `{repo}` is the
+# repository root.
+GIT_COMMANDS_THAT_STAY_DENIED = (
+    pytest.param("git restore .claude/hooks", id="restore-folder"),
+    pytest.param("git stash push -- .claude/agents/coder.md", id="stash-agent-file"),
+    pytest.param(
+        "git -C .claude restore {repo}/.claude/hooks/x", id="dash-C-absolute-path"
+    ),
+    pytest.param("cd shared && git restore .claude/hooks/x", id="cd-relative-overlap"),
+    pytest.param(
+        "git -C .claude restore hooks/x {repo}/.claude/hooks/y", id="mixed-tokens"
+    ),
+)
+# Any uncertain protected hit denies on every client, even when another part of
+# the command confirms the same or a different path. Before this phase the
+# first four were deny; the last two were ask.
+UNCERTAIN_HIT_BESIDE_CONFIRMED_COMMANDS = (
+    pytest.param(
+        "git restore .claude/hooks/x && git -C .claude restore hooks/y",
+        id="git-restore-then-git-dash-C",
+    ),
+    pytest.param(
+        "git restore .claude/hooks/x && rm -rf .claude/agents",
+        id="git-restore-then-rm-folder",
+    ),
+    pytest.param(
+        "git restore .claude/hooks/x && git -C .claude restore hooks/x",
+        id="git-restore-then-git-dash-C-same-path",
+    ),
+    pytest.param(
+        "git restore .claude/hooks/x && cd .claude && git restore hooks/x",
+        id="git-restore-then-cd-git-restore-same-path",
+    ),
+    pytest.param(
+        "git restore .claude/settings.json && rm .mcp.json",
+        id="git-restore-then-rm-other-config",
+    ),
+    pytest.param(
+        "git restore .claude/settings.json && rm .claude/settings.json",
+        id="git-restore-then-rm-same-config",
+    ),
+)
+# A redirect is only a confirmed target, even for a command the guard does not
+# model: its target is not also scanned as an uncertain argument.
+REDIRECT_COMMANDS_THAT_ASK = (
+    pytest.param("echo x > .claude/settings.json", id="redirect"),
+    pytest.param("echo x >> .mcp.json", id="append-redirect"),
+    pytest.param("printf x 2> .claude/agents/coder.md", id="fd-redirect"),
+    pytest.param("git stash list > .claude/settings.json", id="git-redirect"),
+    pytest.param("> .claude/settings.json", id="leading-redirect"),
+    pytest.param(">> .mcp.json", id="leading-append"),
+    pytest.param("&> .claude/settings.json", id="leading-both-streams"),
+    pytest.param(">| .claude/settings.json", id="leading-clobber"),
+    pytest.param(">.claude/settings.json", id="leading-glued"),
+    pytest.param(">.claude/settings.json echo x", id="leading-then-command"),
+    pytest.param("echo x 2>&1 > .claude/settings.json", id="fd-dup-then-redirect"),
+    pytest.param(": > .claude/settings.json", id="colon-redirect"),
+)
+# A confirmed hook-config hit never softens the secret-file deny: a command
+# that also names `.env` stays denied on every client, as it was before this
+# phase named the agent and workspace paths.
+SECRET_BESIDE_HOOK_CONFIG_COMMANDS = (
+    pytest.param("cp .env .claude/agents/x.md", id="cp-agent-file"),
+    pytest.param("rm .env .claude/hooks", id="rm-hook-folder"),
+    pytest.param("rm .env .mcp.json", id="rm-server-config"),
+    pytest.param("rm .env && git -C .claude rm -r hooks", id="rm-then-git-dash-C"),
+)
+# A secret-shaped name inside a protected folder is a secret first: it denies on
+# every client, and a read tool is denied too. In the agent folders this keeps
+# the deny from before this phase. In the older hook folders it is a deliberate
+# tightening: HEAD asked on Claude Code and Copilot for an edit and allowed a
+# read tool, because the hook-folder name hid the secret name.
+SECRET_NAMES_IN_PROTECTED_FOLDERS = (
+    ".claude/agents/.env",
+    ".codex/agents/credentials.json",
+    ".agents/agents/x/uv.lock",
+    ".claude/agents/x.key",
+    ".claude/hooks/.env",
+    ".github/hooks/credentials.json",
+)
+# Reads, the editable bootstrap source, and a parent folder (the nested
+# checkpoint is `git -C .claude add -A`) stay allowed for every client.
+UNPROTECTED_COMMANDS = (
+    pytest.param("cat .claude/agents/coder.md", id="cat-agent-file"),
+    pytest.param("git -C .claude add -A", id="git-add-parent-folder"),
+    pytest.param("ls .claude", id="ls-parent-folder"),
+    pytest.param("rg --files .claude/agents", id="rg-files-agents"),
+    pytest.param(
+        "git diff --no-index .claude/agents/reviewer.md"
+        " dist/multi-agent/.claude/agents/reviewer.md",
+        id="git-diff-no-index",
+    ),
+    pytest.param("echo x > shared/agents/coder/prompt.md", id="write-shared-agents"),
+)
+UNPROTECTED_EDIT_PATHS = (
+    "shared/agents/coder/prompt.md",
+    ".claude/skills/ponytail/SKILL.md",
+    ".agents/skills/ponytail/SKILL.md",
+    ".claude/agents-old/x.md",
+    "team.code-workspaces",
+)
+
+
+@pytest.mark.parametrize("command", WHOLE_FOLDER_COMMANDS)
+@pytest.mark.parametrize("folder", CONTROL_PLANE_FOLDERS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_gates_a_whole_protected_folder(
+    tmp_path: Path, target_id: str, expected: str, folder: str, command: str
+) -> None:
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command.format(folder=folder)),
+        tmp_path,
+        target_id,
+    )
+
+    reason = {
+        "ask": "Editing agent, hook, or server configuration requires approval: ",
+        "deny": "Editing agent, hook, or server configuration is blocked because "
+        "PreToolUse cannot request approval: ",
+    }[expected]
+    assert _protect_decision(process) == expected, process.stdout
+    assert reason + folder in process.stdout
+
+
+@pytest.mark.parametrize("folder", CONTROL_PLANE_FOLDERS)
+@pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
+def test_protect_files_denies_interpreter_removal_of_a_whole_protected_folder(
+    tmp_path: Path, target_id: str, folder: str
+) -> None:
+    """The literal matcher finds a folder name with no path after it."""
+    command = f"python3 -c \"import shutil; shutil.rmtree('{folder}')\""
+
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+@pytest.mark.parametrize("command", FOLDER_FROM_WORKING_DIRECTORY_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_resolves_paths_against_the_git_or_cd_directory(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == expected, process.stdout
+
+
+@pytest.mark.parametrize("command", GIT_COMMANDS_THAT_STAY_DENIED)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_keeps_denying_git_paths_visible_from_the_repository_root(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command.format(repo=tmp_path)),
+        tmp_path,
+        target_id,
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+@pytest.mark.parametrize("command", UNCERTAIN_HIT_BESIDE_CONFIRMED_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_an_uncertain_hit_beside_a_confirmed_one(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients. The
+    confirmed-only cases keep asking on Claude Code and Copilot in
+    ``test_protect_files_gates_a_whole_protected_folder`` and
+    ``test_protect_files_resolves_paths_against_the_git_or_cd_directory``."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "could not determine whether the command may modify" in process.stdout
+
+
+@pytest.mark.parametrize("command", REDIRECT_COMMANDS_THAT_ASK)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_gates_a_redirect_as_a_confirmed_target_only(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == expected, process.stdout
+
+
+@pytest.mark.parametrize("command", SECRET_BESIDE_HOOK_CONFIG_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_a_secret_file_beside_a_hook_config(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize("operation", ("edit", "rm"))
+@pytest.mark.parametrize("relative_path", SECRET_NAMES_IN_PROTECTED_FOLDERS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_a_secret_file_inside_a_protected_folder(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str, operation: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients."""
+    payload = (
+        _client_edit_payload(target_id, relative_path)
+        if operation == "edit"
+        else _client_bash_payload(target_id, f"rm {relative_path}")
+    )
+
+    process = _run_protect_files(payload, tmp_path, target_id)
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert f"Protected file blocked by policy: {relative_path}" in process.stdout
+
+
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_a_protected_folder_symlink_to_a_secret(
+    tmp_path: Path, target_id: str, expected: str
+) -> None:
+    """``expected`` is unused. The link's own name is a protected name, but its
+    target is a secret, and the secret deny must win on every client."""
+    (tmp_path / ".env").write_text("SECRET=1\n", encoding="utf-8")
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "link").symlink_to(tmp_path / ".env")
+
+    process = _run_protect_files(
+        _client_edit_payload(target_id, ".claude/agents/link"), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "Protected file blocked by policy" in process.stdout
+
+
+@pytest.mark.parametrize("command", UNPROTECTED_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_allows_commands_outside_the_protected_names(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: none of these commands is protected."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("relative_path", UNPROTECTED_EDIT_PATHS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_allows_edits_outside_the_protected_names(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str
+) -> None:
+    """``expected`` is unused. The bootstrap source, the skill folders, and a
+    name that only starts like a protected one are not protected."""
+    process = _run_protect_files(
+        _client_edit_payload(target_id, relative_path), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
 
 
 # --------------------------------------------------------------------------
@@ -3612,7 +3930,9 @@ def test_protect_files_does_not_read_a_command_key_of_a_non_terminal_tool(
     assert _protect_decision(process) == "allow", process.stdout
 
 
-@pytest.mark.parametrize("relative_path", (".vscode/settings.json", ".mcp.json"))
+@pytest.mark.parametrize(
+    "relative_path", (".vscode/settings.json", ".mcp.json", ".claude/agents/coder.md")
+)
 @pytest.mark.parametrize("tool_name, path_key", READ_ONLY_TOOL_INPUTS)
 def test_protect_files_allows_copilot_read_tools_on_hook_configs(
     tmp_path: Path, tool_name: str, path_key: str, relative_path: str
@@ -3642,7 +3962,9 @@ def test_protect_files_read_exemption_covers_every_name_even_with_a_path_key(
 
 
 @pytest.mark.parametrize(
-    "secret_path", (".env", ".env.local", "keys/server.pem", "uv.lock")
+    "secret_path",
+    (".env", ".env.local", "keys/server.pem", "uv.lock")
+    + SECRET_NAMES_IN_PROTECTED_FOLDERS,
 )
 def test_protect_files_still_denies_a_copilot_read_of_a_secret_file(
     tmp_path: Path, secret_path: str

@@ -35,6 +35,22 @@ HOOK_CONFIGS = {
     ".github/copilot/settings.json",
     ".github/copilot/settings.local.json",
 }
+# Folders whose files, and the folders themselves, are protected: hook scripts
+# and agent definitions (an agent file sets instructions and, in some clients,
+# tools, hooks, MCP servers, and permission mode). Not the parent folders
+# `.claude`, `.github`, `.codex`, `.agents` (that would block the nested
+# checkpoint `git -C .claude add -A`), skill folders, or `shared/agents/`.
+# `protected()` and `PROTECTED_PATH_LITERAL` both read this tuple, so they
+# cannot drift. A `*.code-workspace` file is protected by name in both too.
+CONTROL_PLANE_DIRS: tuple[str, ...] = (
+    ".github/hooks",
+    ".claude/hooks",
+    ".codex/hooks",
+    ".claude/agents",
+    ".codex/agents",
+    ".github/agents",
+    ".agents/agents",
+)
 # Tools whose input is a shell command line (`tool_input.command`). A name that
 # ends in `bash` or an empty name is also treated as a shell command in `main`.
 TERMINAL_TOOLS = {"bash", "shell", "run_in_terminal", "send_to_terminal"}
@@ -113,7 +129,8 @@ QUOTED_VARIABLE_MARKER = re.compile(
 # or following identifier character (letter, digit, `_`, `.`, `-`), so
 # `os.environ` no longer yields `.env` and `myuv.lock` no longer yields
 # `uv.lock`, while `.env.local` and `foo/.env.production` still match in
-# full. The two control-plane alternatives (hooks-dir paths and the
+# full. The three control-plane alternatives (`CONTROL_PLANE_DIRS` folders
+# with or without a path after them, `*.code-workspace` files, and the
 # `HOOK_CONFIGS` filenames) additionally capture the **whole** path token
 # via an explicit, optional `(?:[^\s'\"]*/)?` directory-prefix group, rather
 # than only the fixed repository-relative-looking tail: `/tmp/scratch/
@@ -125,7 +142,10 @@ PROTECTED_PATH_LITERAL = re.compile(
     r"(?<![\w.-])uv\.lock(?![\w.-])|"
     r"(?<![\w.-])credentials[-_.][\w.-]+|"
     r"[^\s/'\"]+\.(?:pem|key)(?![\w.-])|"
-    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:"
+    + "|".join(map(re.escape, CONTROL_PLANE_DIRS))
+    + r")(?:/[^\s'\"]*)?(?![\w.-])|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?[^\s/'\"]*\.code-workspace(?![\w.-])|"
     r"(?<![\w./-])(?:[^\s'\"]*/)?(?:"
     + "|".join(map(re.escape, sorted(HOOK_CONFIGS)))
     + r"))",
@@ -322,27 +342,35 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
         )
     else:
         normalized_paths.append((resolved.replace("\\", "/"), resolved))
+    forms = []
     for normalized, source in normalized_paths:
         normalized = posixpath.normpath(normalized).removeprefix("./")
-        is_control_plane_name = (
-            normalized in HOOK_CONFIGS
-            or any(normalized.endswith("/" + name) for name in HOOK_CONFIGS)
-            or normalized.startswith(
-                (".github/hooks/", ".claude/hooks/", ".codex/hooks/")
-            )
-            or "/.claude/hooks/" in normalized
-            or "/.github/hooks/" in normalized
-            or "/.codex/hooks/" in normalized
-        )
-        if is_control_plane_name and _control_plane_in_repo_root(source, repo_root):
-            return normalized, True
-        base = posixpath.basename(normalized).lower()
+        forms.append((normalized, source, posixpath.basename(normalized).lower()))
+    # A secret-shaped name is tested first, in both forms, so a control-plane
+    # name (a protected folder, a workspace file, or a path whose symlink
+    # target is a secret) never softens the secret-file deny to ask or allow.
+    for normalized, _source, base in forms:
         if (
             base in {".env", ".env.local", "uv.lock"}
             or base.startswith((".env.", "credentials"))
             or base.endswith((".pem", ".key"))
         ):
             return normalized, False
+    for normalized, source, base in forms:
+        is_control_plane_name = (
+            normalized in HOOK_CONFIGS
+            or any(normalized.endswith("/" + name) for name in HOOK_CONFIGS)
+            or any(
+                normalized == folder
+                or normalized.startswith(folder + "/")
+                or normalized.endswith("/" + folder)
+                or "/" + folder + "/" in normalized
+                for folder in CONTROL_PLANE_DIRS
+            )
+            or base.endswith(".code-workspace")
+        )
+        if is_control_plane_name and _control_plane_in_repo_root(source, repo_root):
+            return normalized, True
     return None
 
 
@@ -871,6 +899,11 @@ def command_name(
     return tokens[index], index + 1, prefix_assignments
 
 
+def is_redirect(token: str) -> bool:
+    """True for a redirection operator; the next token is its target."""
+    return token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit())
+
+
 def operands(tokens: list[str], value_options: set[str]) -> list[str]:
     """Return command operands, omitting redirections and option values."""
     result: list[str] = []
@@ -878,7 +911,7 @@ def operands(tokens: list[str], value_options: set[str]) -> list[str]:
     options_done = False
     while index < len(tokens):
         token = tokens[index]
-        if token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit()):
+        if is_redirect(token):
             index += 2
             continue
         if token == "--":
@@ -890,6 +923,24 @@ def operands(tokens: list[str], value_options: set[str]) -> list[str]:
             pass
         else:
             result.append(token)
+        index += 1
+    return result
+
+
+def without_redirects(tokens: list[str]) -> list[str]:
+    """Return tokens without redirection operators and their targets.
+
+    `segment_targets` already reports each redirect target as confirmed, so an
+    unmodelled command's argument scan must not list it a second time as
+    uncertain.
+    """
+    result: list[str] = []
+    index = 0
+    while index < len(tokens):
+        if is_redirect(tokens[index]):
+            index += 2
+            continue
+        result.append(tokens[index])
         index += 1
     return result
 
@@ -1154,7 +1205,7 @@ def segment_targets(
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit()):
+        if is_redirect(token):
             index += 1
             if index == len(tokens) or tokens[index] in REDIRECTS:
                 raise AmbiguousCommand("redirection has no target")
@@ -1185,6 +1236,12 @@ def segment_targets(
         return
     command, start, prefix_assignments = command_info
     args = tokens[start:]
+    # Redirect targets are confirmed above, so the argument scans below skip
+    # them. A leading redirect (`> file echo x`) makes the operator the command
+    # name, so its target is still the first of `args`.
+    plain_args = without_redirects(
+        tokens[start - 1 :] if is_redirect(command) else args
+    )
 
     for token in args:
         entry = heredocs.get(token)
@@ -1334,14 +1391,28 @@ def segment_targets(
         }:
             # For unmodelled mutating Git commands, inspect path-shaped
             # arguments only. Do not scan commit messages or other prose.
-            uncertain.extend(token for token in args if protected(token, repo_root))
+            uncertain.extend(
+                token for token in plain_args if protected(token, repo_root)
+            )
+            # Git reads its paths from the `-C` directory (or the `cd`
+            # directory), not the repository root, so resolve them there too,
+            # as `git mv` does. A path found only that way is new coverage and
+            # a confirmed target (ask on Claude Code and Copilot); a path
+            # visible from the repository root is uncertain above, and any
+            # uncertain hit denies in `emit()`.
+            offset_roots = [
+                root for root in git_roots if root != os.path.normpath(repo_root)
+            ]
+            confirmed.extend(
+                resolve_from_directories(plain_args, offset_roots, repo_root)
+            )
     elif command not in READ_ONLY:
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
         # Explicit paths remain covered by native edits and known mutators.
-        uncertain.extend(token for token in args if protected(token, repo_root))
-        uncertain.extend(protected_path_literals(" ".join(args)))
-        uncertain.extend(opaque_write_paths(" ".join(args)))
+        uncertain.extend(token for token in plain_args if protected(token, repo_root))
+        uncertain.extend(protected_path_literals(" ".join(plain_args)))
+        uncertain.extend(opaque_write_paths(" ".join(plain_args)))
 
 
 def classify_command(
@@ -1469,14 +1540,18 @@ def emit(
     uncertain_hits = sorted(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
     )
-    if hooks:
+    # A secret-file hit or any uncertain hit denies on every client, so a
+    # confirmed hook hit elsewhere in the command must not turn that deny into
+    # ask.
+    if hooks and not sensitive and not uncertain_hits:
         decision = (
             "deny" if target_id in {"openai-codex", "google-antigravity"} else "ask"
         )
         reason = (
-            "Editing hook files is blocked because PreToolUse cannot request approval: "
+            "Editing agent, hook, or server configuration is blocked because "
+            "PreToolUse cannot request approval: "
             if decision == "deny"
-            else "Editing hook files requires approval: "
+            else "Editing agent, hook, or server configuration requires approval: "
         ) + ", ".join(hooks)
     elif sensitive:
         decision, reason = (
