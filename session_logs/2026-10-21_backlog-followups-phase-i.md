@@ -125,6 +125,28 @@ the user runs them (BF-I1 to BF-I7).
   reading `bash -c`, `sh -c`, and `eval` scripts as command lines (added
   by the coder in round 1, beyond the plan's list) is kept, because it
   closes `bash -c 'cd .claude && tee settings.json'`.
+- **Coder round 2 fixes** - 57 new probe cases reproduced first (9
+  bypasses, 17 failed expectations, including one `eval 'alias'`
+  regression from round 1); now 183 cases, 0 and 0, 7 recorded gaps.
+  Earlier-values mechanism deleted; a second, different assignment to a
+  tracked name fails closed ("assigned twice"); an assignment's value is
+  read before the name is marked, so `PORT=${PORT:-8080}` and
+  `export PATH="${PATH:-/usr/bin}:..."` are allowed again; the two edited
+  scoping tests are restored and pass for the right reason. `perl` flag
+  clusters parsed and script text always scanned; `bash -O dotglob` and
+  `zsh -o glob_dots` fail closed; `eval` read in the current shell;
+  wrappers matched by base name; any command's `-C`/`--chdir`/
+  `--directory` adds a folder; `git notes add -m` and `git stash push -m`
+  join the message exemption. File now 3,437 lines. Sweep: 727 snippets x
+  30 = 21,810 commands; gaps original 8,004, Phase H 9,517, now 234, all
+  recorded (computed `cd`, whole-word and `xargs` names, loop variables,
+  one-character tails). Differential vs Phase H: 0 under-protected; vs
+  round 2: 293 looser, none writes. Bash cases, scanner oracle, and the
+  three Python versions all agree. New over-block to raise with the user:
+  counters (`i=$((i+1))`) and `if`/`else` branches that set one name both
+  ways now fail closed. Regenerated, self-installed;
+  `validate_targets.py` and `check_runtime.py` PASS. Docs third pass
+  started.
 
 ## [LEARN] Entries
 
