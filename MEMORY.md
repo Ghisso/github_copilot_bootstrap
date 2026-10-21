@@ -1598,3 +1598,19 @@
   the MCP `openwiki` skill. Fix stamps with a second `update` run scoped to
   the stamped pages with a link-only purpose (each pass strips old stamps
   first), never by hand (backlog-followups Phase G: 63 links, 10 pages).
+- [LEARN:review] Before reviewing a change to how a guard parses shell
+  text, sweep every construct that can hold an unbalanced delimiter
+  (`case` patterns, `${ }`, quotes inside double-quoted `${ }`, arithmetic,
+  `[[ ]]`, extended globs, heredocs, backticks, arrays) in every context
+  (top level, `$( )`, `<( )`, arrays, groups, heredoc bodies), running each
+  through plain Bash, `bash --posix`, and dash with a harmless stand-in.
+  Without it, backlog-followups Phase H took six review rounds, each
+  finding one more instance.
+- [LEARN:security] A differential check (old guard against new) proves
+  only what its generators produce. When a review finds a new shape, add
+  its class to the generators and the substitution set before fixing, and
+  count a fail-closed exit as its own result.
+- [LEARN:tooling] A hook whose timeout lets the command through must bound
+  its own time. In `protect-files.py`, `signal.alarm` with `SIGALRM` reset
+  to `SIG_DFL` first ends the process even inside a regex; on Python 3.9 a
+  Python-level alarm handler waited 70 s for a regex to return.

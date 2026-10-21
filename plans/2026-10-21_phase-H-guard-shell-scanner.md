@@ -3,8 +3,8 @@ name: 2026-10-21_phase-H-guard-shell-scanner
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 8
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-21_backlog-followups-phase-h.md
 ---
 
 # Small Plan: Guard Shell Scanner
@@ -44,7 +44,7 @@ apply.
 
 ## Steps
 
-- [ ] **1. Replace `shlex` with a Bash scanner (BF-H1).**
+- [x] **1. Replace `shlex` with a Bash scanner (BF-H1).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/protect-files.py`
   (`split_segments`; the quote handling in `_find_unquoted_heredoc`,
@@ -133,7 +133,7 @@ apply.
   command list; add a dependency or an option; use syntax that the Python
   3.9 hook-compatibility job in `.github/workflows/validate.yml` rejects.
 
-- [ ] **2. Prove no decision loosened (BF-H2).**
+- [x] **2. Prove no decision loosened (BF-H2).**
   **Owner:** coder; the orchestrator records the result.
   Save the old guard (`git show HEAD:shared/hooks/scripts/protect-files.py`)
   in the session scratch folder. Run old and new over the same inputs on
@@ -149,7 +149,7 @@ apply.
   or allow) one by one with Bash's reading; each must be a step 1 allow
   case or the same class. Any other looser change is a defect.
 
-- [ ] **3. Document the change (BF-H3).**
+- [x] **3. Document the change (BF-H3).**
   **Owner:** documenter, after review of steps 1 and 2.
   **Files:** `docs/runtime-checks.md` (the shell-parsing paragraph near
   line 255), `docs/smoke-tests.md` (the `protect-files.sh` bullets near
@@ -166,7 +166,7 @@ apply.
   L32-L123), or leave those claims to Phase J's refresh. Do not edit dated
   records.
 
-- [ ] **4. Regenerate, self-install, verify, review, close out.**
+- [x] **4. Regenerate, self-install, verify, review, close out.**
   **Owner:** orchestrator; fresh reviewer.
   Run `uv run python scripts/generate_targets.py --all` and
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
@@ -211,11 +211,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

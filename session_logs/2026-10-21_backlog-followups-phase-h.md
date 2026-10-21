@@ -18,9 +18,9 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   reopened with Phases H, I, and J after the user's decisions
   (big plan "Decisions recorded" item 7). No planner: the plan was drafted
   by the orchestrator and challenged by a devil's-advocate subagent.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
-- [ ] COMMIT
-- [ ] PUSH
+- [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] COMMIT
+- [x] PUSH
 
 ## Work Log
 
@@ -248,14 +248,64 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   all accepted classes. Regenerated, self-installed;
   `validate_targets.py` and `check_runtime.py` PASS.
 
+## Review
+
+- Six rounds by one reviewer (profiles code, architecture, security,
+  tests, ponytail, documentation). Rounds 1 to 5 failed or warned, each
+  on a shape the differential had not generated: words after `$( )`, then
+  minor items, then `case` inside `$( )`, then `)` inside `${ }`, then a
+  quote inside a double-quoted `${ }` that POSIX shells read differently.
+  Round 6: Gate Result PASS, 0 critical, 0 major, 1 minor (a docs sentence
+  claimed more than the sweep shows), fixed by the orchestrator: "For the
+  forms its tests check, where Bash and POSIX `sh` read the same text
+  differently, the guard either denies or fails closed."
+- Every finding the orchestrator could reproduce was checked with the full
+  hook (old against new) and with real shells before it went back to the
+  coder.
+
+## Requirement Evidence
+
+| ID | Outcome | Evidence |
+| --- | --- | --- |
+| BF-H1 | Done | `tests/test_protect_files_scoping.py` (753 passed, 5 xfailed; new cases fail on the earlier guards); 277 cases agree with plain Bash, `bash --posix`, and dash; scanner against Bash, 30,000 random commands per round, 0 disagreements; `paren-sweep.txt`, 3,228 commands under three readings, 0 gaps outside the accepted classes |
+| BF-H2 | Done, with the accepted exception (big plan item 8) | Differential against HEAD: 99 commands that some reading writes and the guard allows, 77 minimal causes, all backtick, grouped operator, `$(` in double quotes, or the stand-in artifact; against the round-4 guard, 0 looser in every set; substitution set, 0 differences over 432,852 inputs |
+| BF-H3 | Done | `docs/runtime-checks.md` shell-parsing block, `docs/smoke-tests.md` bullet, `docs/target-mapping.md` parity row with caveat and the secret-read follow-up |
+
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:review] A guard that parses shell text needs a sweep of every
+  construct that can hold an unbalanced delimiter, run through real
+  shells, before review. Here reviewers found one instance per round
+  (`case`, `${ }`, a quote in a double-quoted `${ }`) until a sweep of 186
+  snippets in 13 contexts under three readings ended it (saved to
+  `MEMORY.md`).
+- [LEARN:security] A differential check proves only what its generators
+  produce. When a review finds a new shape, add that shape class to the
+  generator and the substitution set first, then fix (saved to
+  `MEMORY.md`).
+- [LEARN:tooling] A hook whose timeout lets the command through must bound
+  its own time: a `signal.alarm` with `SIG_DFL` set first ends the process
+  even inside a regex on Python 3.9, where a Python handler does not run
+  until the regex returns (saved to `MEMORY.md`).
 
 ## Verification
 
-To be written at closeout.
+Optional items:
+
+- optional 1: PASS
+- Differential recorded each round in the session scratch folder
+  (`phase-h/diff-*`, `prev*-vs-new*`), with input counts per set, changes
+  by direction, and every looser change with Bash's reading; summaries are
+  in the Work Log and Requirement Evidence above.
+- optional 2: PASS
+- Claude Code in this repository with the final installed guard ran
+  `printf 'x|y\n' | grep '|' | head -1` and a multi-line command with a
+  `#` comment line and a blank line; both were allowed.
+
+Required items (summary lines from `verify.py closeout`):
 
 ## Open Questions / Next Steps
 
 - Phase I and Phase J follow.
+- Phase I carries the accepted exception classes, R9, R10 (zsh glob
+  qualifiers that run code), and the must-allow commit-message case.
