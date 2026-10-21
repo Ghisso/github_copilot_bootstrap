@@ -189,6 +189,18 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   `case` refusal never reaches quoted heredoc bodies in commit messages.
   Regenerated, self-installed; `validate_targets.py` and `check_runtime.py`
   PASS.
+- **Docs fourth pass** - pattern, runner, and `case` rule lines and the
+  over-block sentence; cited wiki text now at 725-757. `verify.py phase`
+  PASS (3753 passed, 1 skipped, 5 xfailed).
+- **Review round 4** - Gate Result FAIL on one major with the same root
+  cause as round 3: a `)` inside `${ }` closes an unquoted `$( )` early, so
+  `cat $(tee ${x//)/} .env)`, the `git status` form, and `x=$(tee ${x:-)}
+  .env)` went from deny (HEAD) to allow. Confirmed with the full hook and
+  Bash. Asked the coder for the principled fix (a `${ }` span read as one
+  unit everywhere the scanner skips literals) and a systematic sweep of
+  every Bash construct that can hold an unbalanced parenthesis, each
+  checked against real Bash, so later rounds stop finding one instance at
+  a time.
 
 ## [LEARN] Entries
 
