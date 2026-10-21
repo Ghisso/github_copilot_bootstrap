@@ -86,6 +86,26 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   to the coder; docs to be redone after. Pre-existing gaps the review
   listed as information (shell functions or aliases, `$IFS` splitting,
   heredoc delimiters read short) were added to Phase I.
+- **Coder review fixes** - unquoted `$( )` and `$(( ))` are now part of
+  their word (`extract_substitutions`, inner command classified
+  recursively; a substitution glued to a name counts as empty, so
+  `tee .env$(true)` is denied); `\r` is a word character; the
+  context-blind `protect_quoted_globs` rewrite is deleted and the scanner
+  marks quoted glob, brace, and variable text itself (`rm 'credentials*'`
+  is now an over-block); `$"..."` is read as `"..."`; one work budget per
+  command replaces the step cap and cache (the reviewer's 100 KB input now
+  fails closed in about 0.03 s; the worst crafted input 0.77 s on 3.9);
+  `_skip_double_quoted` split out; tests use `match=`, budget assertions,
+  and `xfail(strict=True)` for the grouped-operator cases Phase I flips.
+  169 cases agree with Bash; 60,000 more scanner commands, 0
+  disagreements; 3.9, 3.12, and 3.13 decisions identical. Differential with
+  a new grammar set for the review's shapes: the 169 under-protected
+  looser commands reduce, by a minimiser, to 125 minimal causes, each in
+  an accepted class; nothing else. The coder also found a pre-existing
+  timeout fail-open: the `.pem`/`.key` alternative of
+  `PROTECTED_PATH_LITERAL` is quadratic (80 KB word 8 s, 160 KB over 30 s;
+  the hook timeout is 10 s). Asked the coder to apply its linear form in
+  this phase.
 
 ## [LEARN] Entries
 
