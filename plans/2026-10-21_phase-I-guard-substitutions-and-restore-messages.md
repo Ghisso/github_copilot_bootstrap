@@ -90,6 +90,11 @@ full review profiles apply.
     `shopt -s dotglob` (a glob that then matches `.env`) and expansion
     operators whose result depends on the variable (`${!x}`,
     `${x/#/.env}`); handle them like the other BF-I7 forms.
+  - Shell model (finding R10): Claude Code on macOS usually runs commands
+    in zsh, and some clients may use POSIX `sh`. zsh glob qualifiers can
+    run code (`cat *(e:'touch .env':)` is allowed today); fail closed on
+    qualifier forms that run code (`e`, `+`) glued after a glob, and
+    record any other zsh or `sh` reading the guard cannot follow.
   - Must allow: `echo "$X"`, `echo "${X:-default}"`, and the usual
     `git commit -m "$(cat <<'EOF' ... EOF)"` form, including a message
     body whose prose contains the word `case` (Phase H refuses an unquoted

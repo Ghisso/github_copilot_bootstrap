@@ -218,6 +218,20 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   against HEAD: 89 under-protected, 66 minimal causes, all accepted
   classes. Regenerated, self-installed; `validate_targets.py` and
   `check_runtime.py` PASS.
+- **Docs fifth pass** - `${ }` rules, default words, extended globs, the
+  final not-yet-checked list, and over-blocks; cited wiki text at 728-760.
+  `verify.py phase` PASS (3882 passed, 1 skipped, 5 xfailed).
+- **Review round 5** - Gate Result FAIL on one major: `_matching_brace`
+  reads a `'` inside a double-quoted `${ }` as a quote, so
+  `cat "${x:-'}" ; tee .env ; echo "'}"` became one word and was allowed
+  (HEAD denied it). The orchestrator's check: plain Bash 5.2 does not run
+  the middle command (the guard matches it), but `bash --posix` and dash
+  do. Since shells disagree, the coder is to fail closed on `'` or `$'`
+  inside a double-quoted `${ }`, sweep those forms under plain Bash,
+  `bash --posix`, and dash, rerun the whole sweep under the two POSIX
+  readings, and split `_read_word`. New finding R10 (shell model): zsh
+  glob qualifiers that run code (`cat *(e:'touch .env':)`, allowed before
+  and after) go to Phase I.
 
 ## [LEARN] Entries
 

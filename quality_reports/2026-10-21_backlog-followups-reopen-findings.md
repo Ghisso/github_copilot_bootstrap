@@ -170,6 +170,17 @@ return before `#`, a quoted variable next to `(` or `)`
 and shell functions or aliases that hide a write, `$IFS` word splitting,
 and heredoc delimiters read short, left to Phase I.
 
+### R10 - MAJOR (security): the guard models Bash, but some clients run other shells
+
+The guard reads command text as non-POSIX Bash 5.2 reads it. POSIX `sh`
+(dash) and `bash --posix` read a single quote inside a double-quoted
+`${ }` differently: `echo "${x:-'}" ; echo RAN ; echo "'}"` runs `RAN`
+there but not in plain Bash. Phase H fails closed on that form. Claude
+Code on macOS usually runs commands in zsh, whose glob qualifiers can run
+code: `cat *(e:'touch .env':)` is allowed by the original and the new
+guard. Phase I handles the zsh qualifiers and records any other reading
+the guard cannot follow.
+
 ### Outside this plan
 
 Bash reads of secret-shaped files (`cat .env`) are allowed while native
