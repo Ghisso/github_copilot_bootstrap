@@ -15,9 +15,9 @@ the plan's boundaries held (BF-G2).
 
 - [x] PRE-FLIGHT: Phase F committed (`f05c3b3`) and pushed; Phase G is the
   current and last phase. No planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
-- [ ] COMMIT
-- [ ] PUSH
+- [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] COMMIT
+- [x] PUSH
 
 ## Work Log
 
@@ -168,6 +168,11 @@ commit. Each phase's own session log carries its detailed evidence.
 - Also acted on two informational notes: `knowledge-refresh` now says the
   `post` output is read once the user has run it, and
   `openwiki/INSTRUCTIONS.md` tells page authors to write relative links.
+  Regenerated, self-installed, `validate_targets.py` PASS, `verify.py
+  phase` PASS (3270 passed, 1 skipped).
+- Round 2 (same reviewer, same six profiles, the round-two edits only):
+  Gate Result PASS; 0 findings; the round-one minor is resolved and no
+  cited wiki claim range moved. Recorded gate: PASS, no open request.
 
 ## [LEARN] Entries
 
@@ -180,7 +185,22 @@ commit. Each phase's own session log carries its detailed evidence.
 
 ## Verification
 
-To be written at closeout.
+Optional items:
+
+- OpenWiki completion: run `d1f285b5-4468-4e5a-89b6-d8acb60ab1fc`, finish
+  `complete`, 8 pages (`architecture/agents-and-skills.md`,
+  `architecture/hooks-and-guardrails.md`,
+  `architecture/source-generated-consumer-layout.md`,
+  `operations/deterministic-verification.md`,
+  `operations/git-backed-ai-state-sync.md`,
+  `operations/install-ownership-and-runtime-checks.md`,
+  `workflows/lifecycle-and-task-lanes.md`, `quickstart.md`). Run
+  `0aaf238f-257e-4752-baa9-553be66988af`, finish `complete`, 10 pages
+  (the same 8 plus `operations/context-mode-dispatcher.md` and
+  `operations/sidecar-overlay.md`), links only. Every page diff was read;
+  the reviewer checked every relative link target.
+
+Required items (summary lines from `verify.py closeout`):
 
 ## Open Questions / Next Steps
 
