@@ -129,12 +129,22 @@ GIT_READ_ONLY_SUBCOMMANDS = {
 GIT_GLOBAL_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree"}
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
+# The start of an array assignment: `NAME=` or `NAME+=` right before a `(`.
+ARRAY_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
+# A glob character: in a quoted word, the word may be a pattern (see
+# `QUOTED_PATTERN_PREFIX`). A brace list is not one: `find -name '{a,b}'` never
+# expands it.
+QUOTED_GLOB = re.compile(r"[?*[]")
 # Quoted text that must not be expanded again: a glob, a brace list, or a
 # variable reference (`$NAME`, `${NAME}`). A word holding such a quoted part is
 # returned by the scanner with `QUOTED_VALUE_PREFIX`.
-ARRAY_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
-QUOTED_GLOB = re.compile(r"[?*[]|(?<!\$)\{[^{}]+\}")
-QUOTED_MAGIC = re.compile(QUOTED_GLOB.pattern + r"|\$\{?[A-Za-z_]")
+QUOTED_MAGIC = re.compile(QUOTED_GLOB.pattern + r"|(?<!\$)\{[^{}]+\}|\$\{?[A-Za-z_]")
+# The word `case` followed by a blank, as a word of its own. Any such word is
+# taken for the start of a case statement, wherever it stands: Bash reads `case`
+# as one after `!`, `time`, `coproc`, `function NAME`, a reserved word, and an
+# operator, and a list of those places is a list that can miss one. Searched in
+# text with its quotes removed.
+CASE_WORD = re.compile(r"(?:^|[\s;&|(){}!])case(?=[ \t\n])")
 # Every alternative below is a *candidate* generator for `protected()`, not
 # the decider (see `protected_path_literals`'s docstring). Each one carries
 # word/token boundaries so it cannot extract a false-positive fragment out of
@@ -251,10 +261,21 @@ WRAPPER_NO_VALUE_FLAGS: dict[str, set[str]] = {
     "command": {"-p", "-v", "-V"},
 }
 QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
-# A word that is one quoted glob or brace list (`'*.pem'`) is a pattern, not a
-# file name: `find` and `ls` match it, they do not write to it. It starts with
+# A word that is one quoted glob (`'*.pem'`) is a pattern, not a file name:
+# `find` and `ls` match it, they do not write to it. It starts with
 # `QUOTED_VALUE_PREFIX`, so every check for that prefix also finds it.
 QUOTED_PATTERN_PREFIX = QUOTED_VALUE_PREFIX + "PATTERN__"
+# Commands that run their arguments, or hand them to another command, so a
+# quoted word after them is text they interpret, never a pattern for them to
+# match: `bash -c '{rm,.env}'` expands the list and runs `rm`.
+RUNNERS = frozenset(
+    (
+        "bash sh zsh dash ksh ash fish csh tcsh busybox eval exec source . builtin "
+        "command xargs env sudo doas nohup timeout time nice ionice setsid stdbuf "
+        "watch perl ruby node nodejs php awk gawk mawk lua tclsh deno bun"
+    ).split()
+)
+RUNNER_PATTERN = re.compile(r"python[0-9.]*")
 # Text a pattern word cannot hold: a quoted word with a space, an operator
 # character, or a quote is a script or a sentence (`bash -c 'cmd > f; echo *'`),
 # which must still be read for what it names.
@@ -720,6 +741,38 @@ def _matching_paren(text: str, open_index: int) -> int:
     return -1
 
 
+def _refuse_case_statement(inner: str) -> None:
+    """Fail closed when the text of a substitution holds the word `case`.
+
+    A case pattern ends with an unmatched `)` (`case a in a) tee f;; esac`), so
+    `_matching_paren` closes the substitution there, and the rest of the
+    statement would be read as arguments of the outer command. Following
+    `case ... esac` the way Bash does would take a second parser that must agree
+    with Bash; refusing is smaller and cannot be wrong in the open direction.
+    The price is an over-block for a harmless `case` word (`$(grep case f)`).
+    Quoted text, escapes, and comments are not searched. The text may be the part
+    up to that first `)`, which still holds the `case` word.
+    """
+    text = inner.replace("\\\n", "")
+    _charge(len(text))
+    parts: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        end = _skip_literal(text, index)
+        if end == index:
+            parts.append(text[index])
+            index += 1
+            continue
+        if end == -1:
+            break
+        if text[index] != "#":  # a comment is dropped; a quoted word is one word
+            parts.append("x")
+        index = end
+    if CASE_WORD.search("".join(parts)):
+        raise UnparseableCommand("a case statement inside a substitution")
+
+
 def extract_substitutions(command: str) -> tuple[str, dict[str, str]]:
     """Replace every unquoted `$( )`, `$(( ))`, `<( )`, and `>( )` with an inert
     placeholder, returning the new text and a placeholder -> inner-command
@@ -762,6 +815,7 @@ def extract_substitutions(command: str) -> tuple[str, dict[str, str]]:
         if end == -1:
             raise UnparseableCommand("unbalanced substitution")
         inner = command[index + 2 : end - 1]
+        _refuse_case_statement(inner)
         if (
             opener == "$("
             and inner.startswith("(")
@@ -933,6 +987,7 @@ def heredoc_command_substitutions(body: str) -> list[str]:
             end = _matching_paren(body, index + 1)
             if end == -1:
                 raise UnparseableCommand("unbalanced command substitution")
+            _refuse_case_statement(body[index + 2 : end - 1])
             inner_commands.append(body[index + 2 : end - 1])
             index = end
             continue
@@ -955,9 +1010,9 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
 
     A quoted part holding a glob, a brace list, or a variable reference
     (`QUOTED_MAGIC`) must not be expanded again, so the word gets
-    `QUOTED_VALUE_PREFIX`, or `QUOTED_PATTERN_PREFIX` when the word is only that
-    one quoted glob or brace list; a part glued to a name or to `=` (`NAME='*'`,
-    `--opt="$X"`) leaves the word as it is.
+    `QUOTED_VALUE_PREFIX`, or `QUOTED_PATTERN_PREFIX` when the word is only one
+    quoted glob (a brace list does not count); a part glued to a name or to `=`
+    (`NAME='*'`, `--opt="$X"`) leaves the word as it is.
 
     A `(` right after `NAME=` or `NAME+=` opens an array assignment: the list
     and what is glued after its `)` stay in the word (`a=(x)b`). Bash keeps a
@@ -968,7 +1023,7 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
     parts: list[str] = []
     quoted = False
     magic = False
-    glob = False  # a magic part holds a glob or a brace list
+    glob = False  # a magic part holds a glob character
     before = ""  # the last character of the word so far
     length = len(command)
     while index < length:
@@ -1738,9 +1793,16 @@ def segment_targets(
         # because their source or prose contains a sensitive-looking word.
         # Explicit paths remain covered by native edits and known mutators. A
         # word that is one quoted glob is a pattern for the command to match
-        # (`find . -name '*.pem'`), not a file it writes, so it is not scanned.
+        # (`find . -name '*.pem'`), not a file it writes, so it is not scanned,
+        # unless the command runs its arguments (see `RUNNERS`).
+        runs_arguments = (
+            posixpath.basename(command) in RUNNERS
+            or RUNNER_PATTERN.fullmatch(posixpath.basename(command)) is not None
+        )
         scanned = [
-            token for token in plain_args if not token.startswith(QUOTED_PATTERN_PREFIX)
+            token
+            for token in plain_args
+            if runs_arguments or not token.startswith(QUOTED_PATTERN_PREFIX)
         ]
         uncertain.extend(token for token in scanned if protected(token, repo_root))
         uncertain.extend(protected_path_literals(" ".join(scanned)))

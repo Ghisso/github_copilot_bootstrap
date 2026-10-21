@@ -86,7 +86,10 @@ full review profiles apply.
     `tee "${X:-.env}"`, `touch $'\x2eenv'`, `echo ${x:- #}; tee .env`, and
     a `tee .env` line inside a heredoc body inside `"$( )"`.
   - Must allow: `echo "$X"`, `echo "${X:-default}"`, and the usual
-    `git commit -m "$(cat <<'EOF' ... EOF)"` form.
+    `git commit -m "$(cat <<'EOF' ... EOF)"` form, including a message
+    body whose prose contains the word `case` (Phase H refuses an unquoted
+    `case` inside `$( )`; that refusal must not reach quoted heredoc
+    bodies when this phase classifies double-quoted substitutions).
   - Must keep today's result: `cat $(tee .env)` (deny), and every Phase H
     case.
   Check each expected value against Bash's own reading with a harmless
