@@ -26,6 +26,38 @@ the plan's boundaries held (BF-G2).
   upgrade to `0.7.2`. Started the read-only stale-claims sweep with a
   research agent meanwhile (report in the session scratch folder,
   `phase-g/audit.md`).
+- **Step 1** - Audit fixes applied (see the next section). Regenerated and
+  refreshed the self-install before the refresh, so the verifier's
+  provenance check matched the edited sources.
+- **Step 2, refresh** - After `/mcp` reconnected the server on `0.7.2`, ran
+  one managed `update` run (`d1f285b5-4468-4e5a-89b6-d8acb60ab1fc`): 8
+  planned pages (agents and skills, hooks and guardrails, layout,
+  deterministic verification, state sync, install and ownership,
+  lifecycle, quickstart, in that queue order), each with its claims
+  revised or added through `openwiki_submit_page`. `openwiki_finish`
+  returned `complete`. One submission was rejected for evidence past the
+  end of a file (`#L184-L260` on a 259-line test) and passed with
+  `#L184-L259`. All six required corrections landed: no generated page
+  restates the parity table, and the hooks page lists `.claude/hooks` in
+  `CONTROL_PLANE_DIRS`; the commit-gate sentence is scoped to phase
+  completion; the quickstart "refresh this wiki" row names
+  `openwiki-guard.sh`; the Phase B consumer-state and `setup` text; the
+  Phase D protected set and `sandbox_mode` text; the Phase E Ponytail
+  text.
+- **Step 2, link stamps** - The `0.7.2` finalizer
+  (`dist/agent/wiki-link-validator.js`) stamped 63 root-absolute wiki
+  links (`/openwiki/...`) in 10 pages with `<!-- openwiki: broken internal
+  link ... -->` comments. Its host prompt asks for page-relative links,
+  and each pass strips old stamps before validating. Rather than
+  hand-edit, ran a second `update` run
+  (`0aaf238f-257e-4752-baa9-553be66988af`) scoped to those 10 pages with
+  a link-only purpose: each page's links were rewritten relative to its
+  folder and the stamps removed, with no claim changes. `openwiki_finish`
+  returned `complete`; no stamp or root-absolute link remains, `AGENTS.md`
+  and `CLAUDE.md` are unchanged, and `openwiki/.run.json` is gone.
+- **Verify** - `generate_targets.py --all`, self-install refresh,
+  `check_runtime.py` (all PASS), and `verify.py phase` PASS (3270 passed,
+  1 skipped).
 
 ## Stale-claims surfaces checked
 

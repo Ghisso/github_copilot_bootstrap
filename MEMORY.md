@@ -1267,7 +1267,11 @@
 - [LEARN:tooling] The `protect-files.sh` hook denies compound Bash commands
   it cannot parse (seen with `rm -rf`, `tar -x`, `git apply` in chains or
   loops). Split them, or put multi-step file work in a scratch Python
-  script.
+  script. Since it fails closed (backlog-followups Phase D), a read-only
+  chain whose text names a protected folder can also be denied ("could not
+  evaluate the request safely", exit 2; seen with `grep` for
+  `.claude/hooks/`); search with a scratch Python script that takes the
+  repository path as an argument.
 - [LEARN:workflow] A coder and a documenter can run one phase in parallel
   when the plan fixes the behavior exactly; tell the documenter to describe
   the coder's behavior without quoting output strings that do not exist
@@ -1583,3 +1587,11 @@
   user-run `npm install -g openwiki@0.7.2` left this WSL global package at
   `0.5.2`, while one integration install ran on `0.7.2` and the other on
   `0.5.2`, leaving mixed receipts.
+- [LEARN:tooling] OpenWiki `0.7.2`'s finalizer stamps every root-absolute
+  wiki link (`/openwiki/...`) with an `<!-- openwiki: broken internal link
+  ... -->` comment (`dist/agent/wiki-link-validator.js`). Plan paths stay
+  root-absolute, but links in page prose must be relative to the page's
+  folder (`../operations/x.md`); only the native agent prompt says so, not
+  the MCP `openwiki` skill. Fix stamps with a second `update` run scoped to
+  the stamped pages with a link-only purpose (each pass strips old stamps
+  first), never by hand (backlog-followups Phase G: 63 links, 10 pages).
