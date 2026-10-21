@@ -147,6 +147,13 @@ the user runs them (BF-I1 to BF-I7).
   ways now fail closed. Regenerated, self-installed;
   `validate_targets.py` and `check_runtime.py` PASS. Docs third pass
   started.
+- **Docs third pass** - the "assigned twice" rule replaces the
+  earlier-values text; perl, `eval`/`bash -c`, wrappers, folder options,
+  fail-closed limits, over-blocks, and the not-yet-checked list updated;
+  the `docs/target-mapping.md` caveat lists the allowed mention contexts,
+  and a new recorded follow-up asks to split or shrink the 3,400-line
+  hook. Phase G cited text now at 773-805. `verify.py phase` PASS (4628
+  passed, 1 skipped). Review round 3 requested.
 
 ## [LEARN] Entries
 
