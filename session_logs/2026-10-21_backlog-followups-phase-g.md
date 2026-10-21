@@ -29,7 +29,70 @@ the plan's boundaries held (BF-G2).
 
 ## Stale-claims surfaces checked
 
-To be written after the audit.
+Audit by a read-only research agent (report in the session scratch folder,
+`phase-g/audit.md`), fixes applied by a documenter (outer repository) and
+the orchestrator (nested `.claude` state). Every live-advice surface and
+its outcome:
+
+- Root `CLAUDE.md`, `AGENTS.md`, `README.md`: no stale claim.
+- `docs/architecture.md`: fixed K2 (the manual `openwiki-guard.sh post`
+  restore is the user's, because the guard denies an agent command naming
+  the hook script); added that no test checks whether models follow the
+  merged Ponytail rules. Its scope passage near line 397 is not an
+  exhaustive protected-set list, so it was left unchanged.
+- `docs/runtime-checks.md`: fixed C2 (only running a checkpoint script, not
+  reading it, is denied); the path-coverage sentence now names agent
+  definition paths and `*.code-workspace` files.
+- `docs/smoke-tests.md`, `docs/native-client-acceptance.md`, and the
+  undated sections of `docs/sidecar-provider-contract.md`: no stale claim
+  (`docs/smoke-tests.md` already lists agent paths and workspace files).
+- `docs/target-mapping.md`: fixed T1 (the finished decision-6 behavior moved
+  from "Recorded follow-ups" into the backlog-followups parity paragraph;
+  one short follow-up bullet on newly denied mixed commands remains) and T2
+  (new follow-up: the Codex re-probe of the OpenWiki guard was not run).
+  The three carried follow-ups stay listed (Copilot SDK/CLI key casing,
+  `create_and_run_task`, the five-profile rule); Phase D's finished items
+  are gone; Phase E was not cancelled, so A2 is not added.
+- Dated records left unchanged: `docs/plan-deterministic-commit-gate.md`,
+  `docs/2026-*`, `docs/evidence/**`, closed plans, closed session logs,
+  dated explorations.
+- `shared/policies/workflow.instructions.md`: fixed W1 (secret files denied
+  everywhere; hook, server, agent, and workspace configs ask on Claude Code
+  and Copilot and are denied on Codex and Antigravity) and K3 (the restore
+  must be run by hand); CLOSEOUT step 4 now says to pass findings that name
+  a protected path as `--findings-json <file>` written with the Write tool.
+- The other nine policy files: no stale claim (OpenWiki version, upgrade
+  rule, and `init` wording already matched Phase F).
+- `shared/skills/knowledge-refresh/SKILL.md`: fixed K1 (the HIGH finding:
+  the skill told the agent to run a restore command the guard denies on
+  every client, both now and on `dev`). `shared/skills/commit/SKILL.md`:
+  fixed C1.
+- The other 53 skills (including `ponytail`, `ponytail-review`,
+  `caveman-compress`, `onboard`, `setup-project`, `create-feature`): no
+  stale claim.
+- `shared/templates` (6), `shared/agents` (8), `shared/review-profiles`
+  (10): no stale claim.
+- State READMEs (`.claude/plans`, `session_logs`, `quality_reports` —
+  byte-identical to their `shared/` sources — `.claude/explorations`, the
+  four sidecar state READMEs), `shared/MEMORY.md`,
+  `shared/third_party/ponytail/UPSTREAM.md`: no stale claim.
+- `openwiki/INSTRUCTIONS.md` (human-authored brief): fixed B1 (the sidecar
+  has two profiles, `skills` and `workflow`).
+- `.claude/instructions/project-context.instructions.md`: fixed S1 (two
+  parity tables), S2 (OpenWiki `0.7.2`), S3 (Ponytail partially merged from
+  `v5.3.2`), S4 (status paragraph names this plan and the new pins), S5
+  (the installer fills each generated `**Project:**` line).
+- `.claude/MEMORY.md`: corrected in place M1 (CLOSEOUT step 2 sets
+  `status: complete` before findings and receipts), M2 (current
+  `state-sync.sh` names: `reconcile_committed_state`, `cmd_publish`), M3
+  (OpenWiki `0.7.2` queue order and evidence rule, checked in the package
+  source), M4 (`sandbox_mode` no longer written), M5 (`git -C .claude
+  ls-files -s` for probes), M6 (running, not reading, a hook script is
+  refused), M7 (the `0.7.2` `noop` conditions of `openwiki_begin`), M8 (cite
+  the Ponytail pin check by name). Both Ponytail pin entries had already
+  been corrected in Phase E. Every backticked identifier in `MEMORY.md` was
+  checked against source; only `commit_and_reconcile` was missing.
+- Generated `openwiki/**` pages: left to the managed refresh (step 2).
 
 ## [LEARN] Entries
 
