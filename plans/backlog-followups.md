@@ -1,7 +1,7 @@
 ---
 name: backlog-followups
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: backlog-followups_implementation
 started_at: 2026-10-20T14:54:11Z
@@ -16,7 +16,7 @@ phases:
   - 2026-10-21_phase-H-guard-shell-scanner
   - 2026-10-21_phase-I-guard-substitutions-and-restore-messages
   - 2026-10-21_phase-J-guard-hardening-knowledge-refresh
-current_phase: 2026-10-21_phase-J-guard-hardening-knowledge-refresh
+current_phase: 
 ---
 
 # Big Plan: Backlog Follow-ups
