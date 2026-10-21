@@ -163,6 +163,26 @@ the user runs them (BF-I1 to BF-I7).
   and a heredoc run by `source`; an in-place `perl` edit of a config now
   denied everywhere instead of asking like `sed -i`. Code items sent to the
   coder; docs to follow.
+- **Coder round 3 fixes** - `_protected_candidate` tracks an assignment
+  value with a default or unresolved expansion when a candidate names a
+  protected file (`y=${z:-.env}; tee "$y"` denied; `PORT=${PORT:-8080}`
+  allowed). `_perl_command_line` replaces `_perl_in_place`: with `-i` the
+  file operands are confirmed write targets (config edits ask on Claude
+  Code and Copilot, deny on Codex and Antigravity, like `sed -i`) and only
+  the `-e`/`-E`/`-M`/`-m` text is scanned. Orchestrator decision: accept
+  the coder's deviation to keep scanning every operand without `-i`,
+  because a perl program can write to a file it only gets as an argument
+  (`perl -e 'open(F,">",$ARGV[0]) ...' victim.txt` writes it); the
+  over-block `perl -ne 'print' .env` is recorded. `source`/`.` of
+  `/dev/stdin` (and `/dev/fd/0`, `/proc/self/fd/0`) with a heredoc,
+  `source <(cat <<'EOF' ...)`, and `eval "$(cat <<'EOF' ...)"` are read in
+  the current shell. Recorded gaps: a variable read when a same-line
+  function is called, and `source`/`eval` of text another command prints.
+  217 probe cases, 0 bypass; sweep gaps 291, all recorded; differential vs
+  Phase H 0 under-protected, vs round 3 56 looser (all perl in-place
+  config edits now ask/deny); Bash cases, scanner oracle, three Python
+  versions agree. Regenerated, self-installed; `validate_targets.py` and
+  `check_runtime.py` PASS. Docs fourth pass started.
 
 ## [LEARN] Entries
 
