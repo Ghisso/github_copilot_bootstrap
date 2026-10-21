@@ -154,6 +154,15 @@ the user runs them (BF-I1 to BF-I7).
   and a new recorded follow-up asks to split or shrink the 3,400-line
   hook. Phase G cited text now at 773-805. `verify.py phase` PASS (4628
   passed, 1 skipped). Review round 3 requested.
+- **Review round 3** - Gate Result FAIL, 2 major and 1 minor; every
+  round-2 item verified fixed and nothing looser than Phase H. A bare
+  assignment whose value holds a default or unresolved expansion was not
+  tracked (`y=${z:-.env}; tee "$y"` allowed while the direct form is
+  denied); the docs said `time` is not unwrapped (it is) and missed other
+  unwrapped runners, a variable read when a same-line function is called,
+  and a heredoc run by `source`; an in-place `perl` edit of a config now
+  denied everywhere instead of asking like `sed -i`. Code items sent to the
+  coder; docs to follow.
 
 ## [LEARN] Entries
 
