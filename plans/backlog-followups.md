@@ -13,7 +13,7 @@ phases:
   - 2026-10-20_phase-E-ponytail-5-adoption
   - 2026-10-20_phase-F-openwiki-0.7-upgrade
   - 2026-10-20_phase-G-backlog-followups-knowledge-refresh
-current_phase: 2026-10-20_phase-D-agent-definition-protection
+current_phase: 2026-10-20_phase-E-ponytail-5-adoption
 ---
 
 # Big Plan: Backlog Follow-ups

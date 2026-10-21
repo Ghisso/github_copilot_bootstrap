@@ -3,7 +3,7 @@ name: 2026-10-20_phase-E-ponytail-5-adoption
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 5
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
