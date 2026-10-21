@@ -183,9 +183,6 @@ IFS_REFERENCE = re.compile(r"\$(?:IFS(?![A-Za-z0-9_])|\{IFS[^{}]*\})")
 FUNCTION_KEY = "()"
 ARRAY_KEY = "[]"
 ASSIGNED_KEY = "="
-# A tracked value that is only a guess (a default word, or what is left of a value
-# without its unresolved expansions): a second assignment does not refuse it.
-MAYBE_KEY = "~"
 SHADOWED = "(function)"
 FUNCTION_NAME = re.compile(
     r"(?:^|[\s;&|(){}])([A-Za-z_][\w.:+-]*)\s*\(\s*\)|\bfunction\s+([A-Za-z_][\w.:+-]*)"
@@ -1822,29 +1819,27 @@ def split_segments_with_operators(
     return segments, operators
 
 
-def _substituted_value(value: str, variables: dict[str, str]) -> str:
-    """`value` with the tracked variables in it replaced (`y=.$x` with `x` tracked gives
-    `.name`). An expansion that is left in it (`$`, backticks) is not known."""
+def _known_value(value: str, variables: dict[str, str]) -> str | None:
+    """`value` with the tracked variables in it replaced; None when an expansion
+    is left in it (`y=.$x` with `x` tracked is known, `y=$(pwd)/a` is not)."""
     if "$" not in value and "`" not in value:
         return value
     words = substitute([QUOTED_VALUE_PREFIX + value], variables)
-    return strip_quoted_prefix(" ".join(words))
+    text = strip_quoted_prefix(" ".join(words))
+    return None if "$" in text or "`" in text else text
 
 
 def record_assignment(token: str, variables: dict[str, str]) -> None:
     """Track a bare `NAME=value` token's literal value, if it has one.
 
     A value that still holds an expansion once the tracked variables are put in
-    (`$`, backticks) is not known. It is guessed instead: the default word of the
-    expansion (`${z:-.env}`), or what is left without it (`.en${z}v`). The guess is
-    tracked so that a later use is checked against it; a guess that is only a
-    fragment (`${z:-.e}`) is marked, and a second assignment does not refuse it
-    (`PORT=${PORT:-8080}; PORT=9090`). The value is read before the assignment, so it
-    may name the variable. A name that holds a known value and is assigned a
-    different one again (`=` or `+=`, plain, conditional, prefix, subshell, pipeline,
-    background) is refused: the guard cannot tell which assignment runs. An array
-    assignment (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing reads its
-    elements.
+    (`$`, backticks) is not known, so the variable is left unresolved rather than
+    guessed. The value is read before the assignment, so it may name the variable
+    (`PORT=${PORT:-8080}`). A name that holds a tracked value and is assigned a
+    different one again (`=` or `+=`, plain, conditional, prefix, subshell,
+    pipeline, background) is refused: the guard cannot tell which assignment runs.
+    An array assignment (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing
+    reads its elements.
     """
     match = ASSIGNMENT.match(token)
     if not match:
@@ -1859,57 +1854,34 @@ def record_assignment(token: str, variables: dict[str, str]) -> None:
         variables[ARRAY_KEY + name] = ""
         variables.pop(name, None)
         return
-    text = _substituted_value(value, variables)
-    known: str | None = None if "$" in text or "`" in text else text
-    guess = known is not None and _derived_from_a_guess(value, known, variables)
+    known = _known_value(value, variables)
     if known is None:
-        known, guess = _guess_value(text)
+        known = _protected_candidate(value)
     old = variables.get(name)
-    old_is_a_guess = (MAYBE_KEY + name) in variables
-    if old is not None and not old_is_a_guess and (plus or known != old):
+    if old is not None and (plus or known != old):
         raise UnparseableCommand(ASSIGNED_TWICE_REFUSAL)
-    if plus and old is not None and old_is_a_guess:
-        known, guess = old + (known or ""), True  # an append keeps the guess
     variables[ASSIGNED_KEY + name] = ""
-    variables.pop(MAYBE_KEY + name, None)
     if known is None:
         variables.pop(name, None)
-        return
-    variables[name] = known
-    if guess:
-        variables[MAYBE_KEY + name] = ""
+    else:
+        variables[name] = known
 
 
-def _derived_from_a_guess(value: str, known: str, variables: dict[str, str]) -> bool:
-    """True when `value` reads a variable that is only a guess and the result names no
-    protected file: it stays a guess (`PATH=x:$PATH` after `PATH=${PATH:-/usr/bin}`)."""
-    return not PROTECTED_PATH_LITERAL.search(known) and any(
-        (MAYBE_KEY + (match.group(1) or match.group(2))) in variables
-        for match in PLAIN_REFERENCE.finditer(value)
-    )
-
-
-def _guess_value(text: str) -> tuple[str | None, bool]:
-    """What a value `text` that still holds an expansion may give: (guess, only a
-    fragment). The default words (`${z:-.env}`, `${z/#/.env}`) or what is left without
-    the expansions (`.en${z}v`, `${z}.env`) are the candidates. One that names a
-    protected file is a full guess. Otherwise a non-empty one is kept as a fragment,
-    unless a command substitution is in the value: its text is not a guess."""
-    candidates = [
-        candidate
-        for candidate in dict.fromkeys(
-            (expansion_defaults(text), without_expansions(text))
-        )
-        if "$" not in candidate and "`" not in candidate
-    ]
-    for candidate in candidates:
-        if PROTECTED_PATH_LITERAL.search(candidate):
-            return candidate, False
-    if not SUBSTITUTION_PLACEHOLDER.search(text):
-        for candidate in candidates:
-            if candidate:
-                return candidate, True
-    return None, False
+def _protected_candidate(value: str) -> str | None:
+    """A value that an unresolved expansion in `value` may give and that names a
+    protected file: the default word (`${z:-.env}`, `${z/#/.env}`) or what is left
+    without the expansion (`.en${z}v`, `${z}.env`). A later use of the name is then
+    checked against it. None when neither names one (`PORT=${PORT:-8080}`)."""
+    for candidate in dict.fromkeys(
+        (expansion_defaults(value), without_expansions(value))
+    ):
+        if (
+            "$" not in candidate
+            and "`" not in candidate
+            and PROTECTED_PATH_LITERAL.search(candidate)
+        ):
+            return candidate
+    return None
 
 
 def _refuse_assigned_expansions(text: str, variables: dict[str, str]) -> None:
@@ -2588,95 +2560,34 @@ def _here_string_text(args: list[str]) -> str | None:
     return text
 
 
-def _backslash_escapes(text: str) -> str:
-    """`text` with the escapes that `echo -e` and `printf` read: `\\n`, `\\t`, `\\r`,
-    `\\\\`, `\\xHH`, `\\0NNN`."""
-
-    def one(match: re.Match[str]) -> str:
-        code = match.group(1)
-        if code[0] in "x0":
-            digits = code[1:] if code[0] == "x" else code
-            return chr(int(digits, 16 if code[0] == "x" else 8) or 32)
-        return {"n": "\n", "t": "\t", "r": "\r", "\\": "\\"}.get(code, match.group(0))
-
-    return re.sub(r"\\(x[0-9a-fA-F]{1,2}|0[0-7]{0,3}|[ntr\\\\])", one, text)
-
-
-def _printf_text(args: list[str]) -> str | None:
-    """The text `printf FORMAT ARGS` writes when every conversion is read as taking the
-    next word as it is (`%s`, `%b`, a number): the format is reused while words are
-    left. None when there is no format."""
-    if not args or args[0].startswith("-"):
-        return None
-    format_text, words = _backslash_escapes(args[0]), args[1:]
-    conversion = re.compile(r"%(?:%|[-+ #0]*[0-9]*(?:\.[0-9]+)?[a-zA-Z])")
-    out: list[str] = []
-    position = 0
-    while True:
-        consumed = 0
-
-        def take(match: re.Match[str]) -> str:
-            nonlocal consumed
-            if match.group(0) == "%%":
-                return "%"
-            word = (
-                words[position + consumed] if position + consumed < len(words) else ""
-            )
-            consumed += 1
-            return _backslash_escapes(word) if match.group(0).endswith("b") else word
-
-        out.append(conversion.sub(take, format_text))
-        position += consumed
-        if consumed == 0 or position >= len(words):
-            return "".join(out)
-
-
-def _piped_texts(
+def _cat_text(
     tokens: list[str],
     variables: dict[str, str],
     heredocs: dict[str, tuple[str, bool]],
-) -> list[str] | None:
-    """The texts that the command before a `|` writes, when it is `echo` or `printf` of
-    literal words, or `cat` of a heredoc or here-string. None for any other producer
-    (`cat file`, `curl url`, a substitution): what it writes is not known."""
+) -> str | None:
+    """The text that the command before a `|` writes, when it is `cat <<EOF` or
+    `cat <<< text`. None for any other producer (`echo`, `cat file`, `curl url`): what
+    it writes is not read."""
     try:
         words = substitute(tokens, variables)
         info = command_name(words, dict(variables), record=False)
     except (AmbiguousCommand, UnparseableCommand):
         return None
-    if info is None:
+    if info is None or posixpath.basename(strip_quoted_prefix(info[0])) != "cat":
         return None
-    command, start, _prefix = info
-    name = posixpath.basename(strip_quoted_prefix(command))
-    raw = words[start:]
-    if any(SUBSTITUTION_PLACEHOLDER.search(word) for word in raw):
-        return None
-    args = [strip_quoted_prefix(word) for word in raw]
-    if name == "cat":
-        texts = []
-        index = 0
-        while index < len(raw):
-            if raw[index] in heredocs:
-                texts.append(heredocs[raw[index]][0])
-            elif args[index] == "<<<" and index + 1 < len(args):
-                index += 1
-                texts.append(args[index] + "\n")
-            else:
-                return None  # a file, or an option, whose text is not known
+    texts: list[str] = []
+    args = words[info[1] :]
+    index = 0
+    while index < len(args):
+        if args[index] in heredocs:
+            texts.append(heredocs[args[index]][0])
+        elif strip_quoted_prefix(args[index]) == "<<<" and index + 1 < len(args):
             index += 1
-        return ["".join(texts)] if texts else None
-    if any(is_redirect(word) for word in raw):
-        return None
-    if name == "printf":
-        text = _printf_text(args)
-        return None if text is None else [text]
-    if name != "echo":
-        return None
-    while args and re.fullmatch(r"-[neE]+", args[0]):
-        args.pop(0)
-    text = " ".join(args)
-    # `echo` reads escapes in some shells and not in others: read both.
-    return [text, _backslash_escapes(text)] if "\\" in text else [text]
+            texts.append(strip_quoted_prefix(args[index]) + "\n")
+        else:
+            return None  # a file, or an option: its text is not known
+        index += 1
+    return "".join(texts) if texts else None
 
 
 def heredoc_targets(
@@ -2885,7 +2796,7 @@ def segment_targets(
     heredocs: dict[str, tuple[str, bool]],
     process_subs: dict[str, str],
     message: bool = False,
-    piped: list[str] | None = None,
+    piped: str | None = None,
 ) -> None:
     """Classify one segment's mutation targets into `confirmed` or `uncertain`.
 
@@ -3011,10 +2922,10 @@ def segment_targets(
     started = _inner_shell(command, plain_args)
     if started is not None and _heredoc_is_bare_shell(started[1], heredocs):
         # A shell with no `-c` script and no script file reads its commands from standard
-        # input: from a here-string (`bash <<< 'text'`) or a pipe (`echo text | bash`).
+        # input: from a here-string (`bash <<< 'text'`) or a pipe (`cat <<EOF | bash`).
         # It is a child shell, so it gets a copy of the folders and only the prefix
         # variables.
-        stdin_texts = list(piped or [])
+        stdin_texts = [piped] if piped else []
         here_string = _here_string_text(started[1])
         if here_string is not None:
             stdin_texts.append(here_string)
@@ -3032,10 +2943,10 @@ def segment_targets(
     if command in ("source", ".") and any(
         strip_quoted_prefix(arg) in SOURCE_STDIN for arg in plain_args
     ):
-        # `source /dev/stdin <<< text` runs the text in this shell; `echo text | source
+        # `source /dev/stdin <<< text` runs the text in this shell; `cat <<EOF | source
         # /dev/stdin` runs it in the subshell of the pipeline.
         here_string = _here_string_text(plain_args)
-        for source_text, same_shell in [(t, False) for t in piped or []] + (
+        for source_text, same_shell in [(t, False) for t in [piped] if t] + (
             [(here_string, True)] if here_string is not None else []
         ):
             classify_command(
@@ -3600,9 +3511,10 @@ def classify_command(
         # pipe or another command it may be a script for a shell, `python3 -`, `xargs`.
         message = False
     for position, segment in enumerate(segments):
-        # The text of a literal producer before a `|`: a shell after it reads it.
+        # The text of a `cat <<EOF` or `cat <<< text` before a `|`: a shell after it
+        # reads it.
         piped = (
-            _piped_texts(segments[position - 1], variables, heredocs)
+            _cat_text(segments[position - 1], variables, heredocs)
             if position and operators[position] in ("|", "|&")
             else None
         )
