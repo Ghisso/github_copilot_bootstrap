@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import fnmatch
 import glob
+import itertools
 import json
 import os
 import posixpath
@@ -136,9 +137,9 @@ ASSIGNMENT = re.compile(
     r"^([A-Za-z_][A-Za-z0-9_]*)(?:\[(-?[0-9]+)\])?(\+?)=(.*)$", re.S
 )
 VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
-# The start of an array assignment: `NAME=` or `NAME+=` right before a `(`.
+# The head of an assignment word: `NAME=`, `NAME+=`, `NAME[N]=`. An array assignment
+# has a `(` right after it.
 ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=")
-ARRAY_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 # A glob character: in a quoted word, the word may be a pattern (see
 # `QUOTED_PATTERN_PREFIX`). A brace list is not one: `find -name '{a,b}'` never
 # expands it.
@@ -176,22 +177,21 @@ ANSI_C_SIMPLE_ESCAPES = {
 }
 # An unquoted `$IFS` or `${IFS}` expands to blanks, which split the word around it.
 IFS_REFERENCE = re.compile(r"\$(?:IFS(?![A-Za-z0-9_])|\{IFS[^{}]*\})")
-# `variables` also records, under these key prefixes, a name defined as a function
-# or an alias (it then shadows a command of that name) and an array's elements
-# (joined by NUL). A key cannot clash with a variable name.
+# `variables` also records, under these key prefixes: a name defined as a function
+# or an alias (it then shadows a command of that name), a name assigned at all or
+# assigned as an array, and the earlier values of a name (joined by `EARLIER_SEPARATOR`,
+# at most `MAX_EARLIER`). A key cannot clash with a variable name.
 FUNCTION_KEY = "()"
 ARRAY_KEY = "[]"
+ASSIGNED_KEY = "="
+EARLIER_KEY = "<"
+EARLIER_SEPARATOR = "\x01"
+MAX_EARLIER = 4
+MAX_VARIANTS = 16
 SHADOWED = "(function)"
 FUNCTION_NAME = re.compile(
     r"(?:^|[\s;&|(){}])([A-Za-z_][\w.:+-]*)\s*\(\s*\)|\bfunction\s+([A-Za-z_][\w.:+-]*)"
 )
-ALIAS_COMMAND = re.compile(r"\balias\b([^;&|\n]*)")
-ALIAS_NAME = re.compile(r"(?:^|\s)([A-Za-z_][\w.:+-]*)=")
-ARRAY_REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\[([@*]|-?[0-9]+)\]\}")
-ARRAY_SLICE = re.compile(
-    r"\$\{([A-Za-z_][A-Za-z0-9_]*)\[[@*]\]:\s*(-?[0-9]+)(?::\s*(-?[0-9]+))?\}"
-)
-INDIRECT_REFERENCE = re.compile(r"\$\{!([A-Za-z_][A-Za-z0-9_]*)\}")
 # A word that starts a compound command and is followed by the command it runs.
 SHELL_KEYWORDS = {
     "if",
@@ -208,16 +208,18 @@ SHELL_KEYWORDS = {
 PLAIN_REFERENCE = re.compile(
     r"\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)\})"
 )
-# `${NAME#pat}`, `${NAME%pat}`, `${NAME/pat/word}`, `${NAME:offset:length}`, and
-# `${NAME^}` on a tracked variable, with a pattern free of quotes and expansions.
-PARAM_OPERATION = re.compile(
-    r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?:"
-    r"(?P<cut>##?|%%?)(?P<cut_pattern>[^${}'\"\\]*)"
-    r"|(?P<replace>//|/[#%]?)(?P<find>[^${}/'\"\\&]*)(?:/(?P<word>[^${}'\"\\&]*))?"
-    r"|:(?!-|=|\+|\?)\s*(?P<offset>-?\d+)(?::\s*(?P<length>-?\d+))?"
-    r"|(?P<case>\^\^?|,,?)"
-    r")\}"
+# The start of an expansion with a name, `${NAME...}` or `${!NAME...}`, and the text
+# after the name up to the closing brace.
+ASSIGNED_EXPANSION = re.compile(r"\$\{(!?)([A-Za-z_][A-Za-z0-9_]*)([^}]*)")
+TRACKED_EXPANSION_REFUSAL = (
+    "a parameter expansion on a variable assigned earlier on this command line "
+    "(an operation, an array subscript, an indirection) is not read"
 )
+DOTGLOB_REFUSAL = (
+    "a glob can match hidden files after shopt -s dotglob, GLOBIGNORE, "
+    "or setopt dotglob, which the guard cannot list"
+)
+CDPATH_REFUSAL = "CDPATH changes where cd goes, which the guard cannot follow"
 # `shopt -s dotglob`, `GLOBIGNORE=`, and zsh's `setopt glob_dots` make a glob match
 # hidden files, which the guard cannot list.
 DOTGLOB = re.compile(
@@ -236,19 +238,53 @@ FIND_READ_ONLY_COMMANDS = (READ_ONLY - {"sed"}) | set(
     "ls echo printf file du basename dirname realpath readlink md5sum sha1sum "
     "sha256sum test true false".split()
 )
-FIND_PATTERN_TESTS = {
-    "-name": "name",
-    "-iname": "name",
-    "-path": "path",
-    "-ipath": "path",
-    "-wholename": "path",
-    "-iwholename": "path",
-    "-regex": "regex",
-    "-iregex": "regex",
+# GNU sed's long options: 1 takes a value (attached or the next word), 2 only an
+# attached one, 0 none.
+SED_LONG_OPTIONS = {
+    "binary": 0,
+    "debug": 0,
+    "expression": 1,
+    "file": 1,
+    "follow-symlinks": 0,
+    "help": 0,
+    "in-place": 2,
+    "line-length": 1,
+    "null-data": 0,
+    "zero-terminated": 0,
+    "quiet": 0,
+    "posix": 0,
+    "regexp-extended": 0,
+    "sandbox": 0,
+    "separate": 0,
+    "silent": 0,
+    "unbuffered": 0,
+    "version": 0,
+}
+SCRIPT_SHELLS = {"bash", "sh", "dash", "zsh", "ksh", "ash"}
+# Folder commands: where a following relative path is read from.
+FOLDER_COMMANDS = {"cd", "pushd"}
+PUSHD_ROTATION = re.compile(r"[+-][0-9]+")
+# Builtins whose `NAME=value` arguments are assignments.
+ASSIGNING_BUILTINS = {"export", "declare", "typeset", "local", "readonly"}
+MAX_BRACE_ROUNDS = 8
+MAX_BRACE_WORDS = 256
+# The folders a `cd` may leave the shell in are all tried for each path; a command
+# that changes folder this many times is refused rather than guessed.
+MAX_WORKING_DIRECTORIES = 64
+FIND_NAME_TESTS = {"-name", "-iname"}
+# Tests on a path or a regular expression are not read: any of them can match a
+# protected file.
+FIND_UNREAD_TESTS = {
+    "-path",
+    "-ipath",
+    "-wholename",
+    "-iwholename",
+    "-regex",
+    "-iregex",
 }
 # Operators that make `find`'s expression more than a conjunction of tests.
 FIND_COMBINERS = {"-o", "-or", "!", "-not", "(", ")", "-prune"}
-# Names and paths a protected file can have, to ask whether a `find` test can match one.
+# Names a protected file can have, to ask whether a `find -name` pattern can match one.
 FIND_SAMPLE_NAMES = (
     ".env",
     ".env.local",
@@ -259,14 +295,9 @@ FIND_SAMPLE_NAMES = (
     "id.key",
     "a.code-workspace",
 ) + tuple(config.rsplit("/", 1)[-1] for config in sorted(HOOK_CONFIGS))
-FIND_CONFIG_PATHS = {
-    config.rsplit("/", 1)[-1]: config for config in sorted(HOOK_CONFIGS)
-}
-FIND_SAMPLE_PATHS = (
-    tuple("./" + name for name in FIND_SAMPLE_NAMES)
-    + tuple("./" + config for config in sorted(HOOK_CONFIGS))
-    + tuple("./" + folder + "/x.sh" for folder in CONTROL_PLANE_DIRS)
-)
+# A glob run in a `-name` pattern: a bracket class, a run of `*`, a run of `?`.
+FIND_GLOB_RUN = re.compile(r"(\[[^\]]*\]|\*+|\?+)")
+MAX_FIND_INSTANCES = 256
 # A substitution glued to text may complete a protected name (`$(echo .e)nv`).
 BUILT_NAMES = (".env", ".env.local", "uv.lock")
 BUILT_PREFIXES = (".env.", "credentials")
@@ -395,11 +426,13 @@ WRAPPER_VALUE_FLAGS: dict[str, set[str]] = {
     "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string", "-P"},
     "sudo": {"-u", "--user", "-g", "--group"},
     "command": set(),
+    "builtin": set(),
 }
 WRAPPER_NO_VALUE_FLAGS: dict[str, set[str]] = {
     "env": {"-i", "--ignore-environment", "-0", "--null"},
     "sudo": set(),
     "command": {"-p", "-v", "-V"},
+    "builtin": set(),
 }
 QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
 # A word that is one quoted glob (`'*.pem'`) is a pattern, not a file name:
@@ -640,10 +673,31 @@ def _placeholder_may_complete_a_name(text: str) -> bool:
     ):
         return True
     return (
-        len(head) >= 2 and any(p.startswith(head) and p != head for p in BUILT_PREFIXES)
-    ) or (
-        len(tail) >= 2 and any(x.endswith(tail) and x != tail for x in BUILT_SUFFIXES)
+        (
+            len(head) >= 2
+            and any(p.startswith(head) and p != head for p in BUILT_PREFIXES)
+        )
+        or (
+            len(tail) >= 2
+            and any(x.endswith(tail) and x != tail for x in BUILT_SUFFIXES)
+        )
+        or _continues_a_prefix_family(head, tail)
     )
+
+
+def _continues_a_prefix_family(head: str, tail: str) -> bool:
+    """True when `head` + something + `tail` can start with a prefix family
+    (`.env.`, `credentials`): the head is the start of the family and the tail
+    starts with what is left of it (`$(echo cred)entials`, `.$(echo env).local`). A
+    one-character rest counts only after a head, so `$(date).txt` is not flagged."""
+    for prefix in BUILT_PREFIXES:
+        if not prefix.startswith(head):
+            continue
+        for stop in range(len(head) + 1, len(prefix)):
+            rest = prefix[stop:]
+            if tail.startswith(rest) and (len(rest) >= 2 or head):
+                return True
+    return False
 
 
 def _expansion_variants(text: str) -> list[str]:
@@ -900,10 +954,7 @@ def _skip_double_quoted(text: str, cursor: int) -> int:
         elif char == "$" and text[cursor + 1 : cursor + 2] == "$":
             cursor += 2  # the process id: a `(` or `{` after it opens nothing
         elif char == "$" and text[cursor + 1 : cursor + 2] == "(":
-            # ponytail: a here-document body inside this substitution is not
-            # parsed, so an apostrophe or `)` in it makes the nesting fail and
-            # the scan falls back to the next `"` (what the old lexer did).
-            # Phase I classifies substitutions and can parse the body.
+            # A here-document body inside the substitution is read by `_matching_paren`.
             end = _matching_paren(text, cursor + 1)
             cursor = end if end != -1 else cursor + 1
         elif char == "$" and text[cursor + 1 : cursor + 2] == "{":
@@ -1079,7 +1130,8 @@ def _unquote(span: str) -> str:
     if span[0] == "'":
         return span[1:-1]
     if span.startswith("$'"):
-        return _decode_ansi_c(span[2:-1])
+        # Bash ends the string at a NUL (`$'.e\x00x'` is `.e`).
+        return _decode_ansi_c(span[2:-1]).split("\0", 1)[0]
     body = span[2:-1] if span[0] == "$" else span[1:-1]
     return re.sub(
         r"\\([$`\"\\]|\n)",
@@ -1557,7 +1609,7 @@ def _read_group_word(
     other scans in this file take a `#` after any `)` for a comment, so that form
     fails closed instead of being read two ways.
     """
-    if before == "=" and ARRAY_ASSIGNMENT.fullmatch("".join(parts)):
+    if before == "=" and ASSIGNMENT_WORD.fullmatch("".join(parts)):
         kind = "array assignment"
     elif before and (before in "@*+?" or (before == "!" and parts != ["!"])):
         kind = "extended glob"
@@ -1751,236 +1803,81 @@ def _known_value(value: str, variables: dict[str, str]) -> str | None:
     return None if "$" in text or "`" in text else text
 
 
-def _array_list(name: str, variables: dict[str, str]) -> list[str]:
-    """The tracked elements of `name`: an array's, or a scalar's one element."""
-    elements = variables.get(ARRAY_KEY + name)
-    if elements is not None:
-        return elements.split("\0") if elements else []
-    return [variables[name]] if name in variables else []
-
-
-def _store_array(name: str, items: list[str], variables: dict[str, str]) -> None:
-    """Track an array: `$name` is its first element."""
-    variables[ARRAY_KEY + name] = "\0".join(items)
-    first = items[0] if items else ""
-    if "$" in first or "`" in first:
-        variables.pop(name, None)
-    else:
-        variables[name] = first
-
-
-def _forget(name: str, variables: dict[str, str]) -> None:
-    variables.pop(ARRAY_KEY + name, None)
-    variables.pop(name, None)
-
-
 def record_assignment(token: str, variables: dict[str, str]) -> None:
     """Track a bare `NAME=value` token's literal value, if it has one.
 
     A value that still holds an expansion once the tracked variables are put in
     (`$`, backticks) is not known, so the variable is left unresolved rather than
-    guessed. `NAME+=value`, `NAME[N]=value`, and `NAME=(a b)` / `NAME+=(c)` are
-    tracked too: an array is kept as its elements, `$NAME` being the first.
+    guessed. `NAME+=value` adds to the tracked value. An array assignment
+    (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing reads its elements.
+
+    A later assignment never makes the guard forget an earlier value (it may not
+    run, or run in a subshell, a pipeline, or a prefix): the earlier values stay
+    in `variables` under `EARLIER_KEY` and each reference is checked with them too.
     """
     match = ASSIGNMENT.match(token)
     if not match:
         return
     name, index, plus, value = match.groups()
-    if index is not None:
-        known = _known_value(value, variables)
-        position = int(index)
-        items = _array_list(name, variables)
-        if position < 0:
-            position += len(items)
-        if known is None or not 0 <= position <= MAX_ARRAY_INDEX:
-            _forget(name, variables)
-            return
-        items = items + [""] * (position + 1 - len(items))
-        items[position] = items[position] + known if plus else known
-        _store_array(name, items, variables)
-        return
-    if value.startswith("(") and value.endswith(")"):
-        # An array: `$a` is its first element, `${a[N]}` and `${a[@]}` the others.
-        elements: list[str] = []
-        for word in _array_elements(value[1:-1]):
-            if "$" in word or "`" in word:
-                resolved = substitute([QUOTED_VALUE_PREFIX + word], variables)
-                elements.extend(strip_quoted_prefix(part) for part in resolved)
-            else:
-                elements.append(word)
-        _store_array(
-            name, (_array_list(name, variables) if plus else []) + elements, variables
-        )
-        return
-    known = _known_value(value, variables)
-    if plus:
-        known = (
-            variables[name] + known if known is not None and name in variables else None
-        )
-    if ARRAY_KEY + name in variables:
-        # `a=x` on an array sets its first element and keeps the others.
-        items = _array_list(name, variables)
-        _store_array(name, [value if known is None else known] + items[1:], variables)
-        return
-    if known is None:
+    variables[ASSIGNED_KEY + name] = ""
+    if value and name == "GLOBIGNORE":
+        raise UnparseableCommand(DOTGLOB_REFUSAL)
+    if value and name == "CDPATH":
+        raise UnparseableCommand(CDPATH_REFUSAL)
+    if index is not None or (value.startswith("(") and value.endswith(")")):
+        variables[ARRAY_KEY + name] = ""
         variables.pop(name, None)
         return
-    variables[name] = known
-
-
-MAX_ARRAY_INDEX = 64
-
-
-def _array_elements(inner: str) -> list[str]:
-    """The elements of the array assignment whose list is `inner`."""
-    try:
-        words = [
-            strip_quoted_prefix(text)
-            for text, is_operator in _shell_tokens(inner)
-            if not is_operator
-        ]
-    except UnparseableCommand:
-        return []
-    return [re.sub(r"^\[[^\]]*\]=", "", word) for word in words]
-
-
-def _array_value(match: re.Match[str], variables: dict[str, str]) -> str:
-    """The text of the array reference `${a[N]}`, `${a[@]}`, or `${a[*]}`."""
-    elements = variables.get(ARRAY_KEY + match.group(1))
-    if elements is None:
-        return match.group(0)
-    items = elements.split("\0") if elements else []
-    index = match.group(2)
-    if index in ("@", "*"):
-        return " ".join(items)
-    position = int(index)
-    if position < 0:
-        position += len(items)
-    return items[position] if 0 <= position < len(items) else ""
-
-
-def _array_slice(match: re.Match[str], variables: dict[str, str]) -> str:
-    """The text of the slice `${a[@]:offset:length}` of a tracked array."""
-    elements = variables.get(ARRAY_KEY + match.group(1))
-    if elements is None:
-        return match.group(0)
-    items = elements.split("\0") if elements else []
-    start = int(match.group(2))
-    if start < 0:
-        start = max(len(items) + start, 0)
-    if match.group(3) is None:
-        return " ".join(items[start:])
-    length = int(match.group(3))
-    return " ".join(
-        items[start : start + length] if length >= 0 else items[start:length]
-    )
-
-
-def _indirect_value(match: re.Match[str], variables: dict[str, str]) -> str:
-    """The value of the variable that `${!ref}` names, when both are tracked; the
-    target may be an array element (`ref='a[0]'`)."""
-    target = variables.get(match.group(1))
-    if target is None:
-        return match.group(0)
-    element = ARRAY_REFERENCE.fullmatch("${" + target + "}")
-    if element is not None:
-        return _array_value(element, variables)
-    return variables[target] if target in variables else match.group(0)
-
-
-def _replace(value: str, kind: str, find: str, word: str) -> str:
-    """`${NAME/find/word}` (also `//`, `/#`, `/%`) of `value`; the longest match wins."""
-    if not any(char in find for char in "*?["):  # a literal: no need to try every part
-        if kind == "/#":
-            return word + value[len(find) :] if value.startswith(find) else value
-        if kind == "/%":
-            return (
-                value[: len(value) - len(find)] + word
-                if value.endswith(find)
-                else value
-            )
-        return value.replace(find, word, 1 if kind == "/" else -1) if find else value
-    if kind == "/#":
-        for stop in range(len(value), -1, -1):
-            if fnmatch.fnmatchcase(value[:stop], find):
-                return word + value[stop:]
-        return value
-    if kind == "/%":
-        for begin in range(len(value) + 1):
-            if fnmatch.fnmatchcase(value[begin:], find):
-                return value[:begin] + word
-        return value
-    if not find:
-        return value
-    pieces: list[str] = []
-    begin = 0
-    while begin < len(value):
-        for stop in range(len(value), begin, -1):
-            if fnmatch.fnmatchcase(value[begin:stop], find):
-                pieces.append(word)
-                begin = stop
-                break
-        else:
-            pieces.append(value[begin])
-            begin += 1
-            continue
-        if kind == "/":
-            pieces.append(value[begin:])
-            return "".join(pieces)
-    return "".join(pieces)
-
-
-MAX_OPERATION_VALUE = 256
-
-
-def _operation_value(match: re.Match[str], variables: dict[str, str]) -> str:
-    """The value of a `${NAME op}` on a tracked variable (see `PARAM_OPERATION`);
-    the text itself when the variable is not tracked."""
-    value = variables.get(match.group(1))
-    if value is None:
-        return match.group(0)
-    pattern = match.group("cut_pattern") or match.group("find") or ""
-    if (match.group("cut") or match.group("replace")) and any(
-        char in pattern for char in "*?["
-    ):
-        # A glob is matched against every part of the value: bound the work.
-        if len(value) > MAX_OPERATION_VALUE:
-            raise UnparseableCommand("a pattern operation on a value too long to read")
-        _charge(len(value) * len(value) // 16)
-    if match.group("cut"):
-        prefix = match.group("cut")[0] == "#"
-        longest = len(match.group("cut")) == 2
-        if not any(char in pattern for char in "*?["):  # a literal
-            if prefix:
-                return value[len(pattern) :] if value.startswith(pattern) else value
-            return (
-                value[: len(value) - len(pattern)] if value.endswith(pattern) else value
-            )
-        sizes = list(range(len(value) + 1))
-        # The shortest cut first for `#`/`%`, the longest first for `##`/`%%`.
-        for size in reversed(sizes) if longest else sizes:
-            part = value[:size] if prefix else value[len(value) - size :]
-            if fnmatch.fnmatchcase(part, pattern):
-                return value[size:] if prefix else value[: len(value) - size]
-        return value
-    if match.group("replace"):
-        return _replace(
-            value,
-            match.group("replace"),
-            match.group("find"),
-            match.group("word") or "",
+    known = _known_value(value, variables)
+    old = variables.get(name)
+    if plus:
+        known = old + known if old is not None and known is not None else None
+    if old is not None and old != known:
+        earlier = variables.get(EARLIER_KEY + name, "")
+        kept = dict.fromkeys(
+            [old, *earlier.split(EARLIER_SEPARATOR)] if earlier else [old]
         )
-    if match.group("offset") is not None:
-        start = int(match.group("offset"))
-        start = max(len(value) + start, 0) if start < 0 else start
-        if match.group("length") is None:
-            return value[start:]
-        length = int(match.group("length"))
-        return value[start : start + length] if length >= 0 else value[start:length]
-    kind = match.group("case")
-    if kind.startswith("^"):
-        return value.upper() if kind == "^^" else value[:1].upper() + value[1:]
-    return value.lower() if kind == ",," else value[:1].lower() + value[1:]
+        variables[EARLIER_KEY + name] = EARLIER_SEPARATOR.join(list(kept)[:MAX_EARLIER])
+    if known is None:
+        variables.pop(name, None)
+    else:
+        variables[name] = known
+
+
+def _refuse_assigned_expansions(text: str, variables: dict[str, str]) -> None:
+    """Refuse an operation, an array subscript, or an indirection on a variable that
+    was assigned earlier on the command line (`${x#a}`, `${x/a/b}`, `${x@E}`,
+    `${a[0]}`, `${!x}`), and any reference to an array: the guard does not evaluate
+    them. Plain `$x`, `${x}`, and `${x:-word}` on an unassigned name are read."""
+    for match in ASSIGNED_EXPANSION.finditer(text):
+        indirect, name, rest = match.groups()
+        if (ASSIGNED_KEY + name) in variables and (indirect or rest):
+            raise UnparseableCommand(TRACKED_EXPANSION_REFUSAL)
+    for match in PLAIN_REFERENCE.finditer(text):
+        if ARRAY_KEY + (match.group(1) or match.group(2)) in variables:
+            raise UnparseableCommand(TRACKED_EXPANSION_REFUSAL)
+
+
+def _earlier_variants(token: str, variables: dict[str, str]) -> list[str]:
+    """`token` followed by one copy per earlier value of each variable it names, with
+    that value in place of the name: `x=.a; x=b; tee $x` checks `tee b` and `tee .a`."""
+    variants = [token]
+    for name in dict.fromkeys(
+        match.group(1) or match.group(2) for match in PLAIN_REFERENCE.finditer(token)
+    ):
+        earlier = variables.get(EARLIER_KEY + name)
+        for value in earlier.split(EARLIER_SEPARATOR) if earlier else ():
+            variants.append(_with_value(token, name, value))
+    return variants[:MAX_VARIANTS]
+
+
+def _with_value(token: str, name: str, value: str) -> str:
+    """`token` with each reference to `name` replaced by `value`."""
+
+    def replace(match: re.Match[str]) -> str:
+        return value if (match.group(1) or match.group(2)) == name else match.group(0)
+
+    return PLAIN_REFERENCE.sub(replace, token)
 
 
 def _blank_splitter(variables: dict[str, str]) -> re.Pattern[str]:
@@ -1993,22 +1890,15 @@ def _blank_splitter(variables: dict[str, str]) -> re.Pattern[str]:
 
 
 def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
-    """Replace `$NAME`/`${NAME}` references, array references, `${!NAME}`, and the
-    operations of `PARAM_OPERATION` with tracked values; `"${a[@]}"` as a whole word
-    becomes one word per element. The value of an unquoted reference splits into
-    words at blanks (and at a tracked `IFS`), as Bash does."""
+    """Replace `$NAME` and `${NAME}` with tracked values. The value of an unquoted
+    reference splits into words at blanks (and at a tracked `IFS`), as Bash does.
+    A variable that was given other values earlier adds a copy of the word per
+    earlier value (see `record_assignment`)."""
     resolved: list[str] = []
     splitter = _blank_splitter(variables)
     for token in tokens:
-        whole = ARRAY_REFERENCE.fullmatch(strip_quoted_prefix(token))
-        if (
-            whole
-            and whole.group(2) in ("@", "*")
-            and variables.get(ARRAY_KEY + whole.group(1))
-        ):
-            resolved.extend(variables[ARRAY_KEY + whole.group(1)].split("\0"))
-            continue
-        # The value of an assignment (`b=(${a[@]})`) is never split into words.
+        _refuse_assigned_expansions(strip_quoted_prefix(token), variables)
+        # The value of an assignment (`b=$a`) is never split into words.
         quoted = token.startswith((QUOTED_VALUE_PREFIX, QUOTED_PATTERN_PREFIX)) or bool(
             ASSIGNMENT_WORD.match(token)
         )
@@ -2016,33 +1906,22 @@ def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
         def mark(text: str, quoted: bool = quoted) -> str:
             return text if quoted else splitter.sub("\0", text)
 
-        token = ARRAY_SLICE.sub(
-            lambda match: mark(_array_slice(match, variables)), token
-        )
-        token = ARRAY_REFERENCE.sub(
-            lambda match: mark(_array_value(match, variables)), token
-        )
-        token = INDIRECT_REFERENCE.sub(
-            lambda match: mark(_indirect_value(match, variables)), token
-        )
-        token = PARAM_OPERATION.sub(
-            lambda match: mark(_operation_value(match, variables)), token
-        )
-        token = PLAIN_REFERENCE.sub(
-            lambda match: mark(
-                variables.get(match.group(1) or match.group(2), match.group(0))
-            ),
-            token,
-        )
-        if "\0" in token:
-            resolved.extend(word for word in token.split("\0") if word)
-        else:
-            resolved.append(token)
+        for variant in _earlier_variants(token, variables):
+            text = PLAIN_REFERENCE.sub(
+                lambda match: mark(
+                    variables.get(match.group(1) or match.group(2), match.group(0))
+                ),
+                variant,
+            )
+            if "\0" in text:
+                resolved.extend(word for word in text.split("\0") if word)
+            else:
+                resolved.append(text)
     return resolved
 
 
 def command_name(
-    tokens: list[str], variables: dict[str, str]
+    tokens: list[str], variables: dict[str, str], record: bool = True
 ) -> tuple[str, int, dict[str, str]] | None:
     """Return (command, args-start-index, prefix_assignments).
 
@@ -2064,6 +1943,9 @@ def command_name(
     Returns None for a segment consisting entirely of assignments
     (`FOO=bar`): that is valid Bash with no command to classify, not an
     ambiguity.
+
+    `record` is False when the same tokens are read again (a value split into
+    words, a brace list): an append (`x+=v`) must not be recorded twice.
     """
     prefix_assignments: dict[str, str] = {}
     index = 0
@@ -2076,18 +1958,27 @@ def command_name(
         and "=" in tokens[index]
         and not tokens[index].startswith("-")
     ):
-        record_assignment(tokens[index], variables)
+        if record:
+            record_assignment(tokens[index], variables)
         record_assignment(tokens[index], prefix_assignments)
         index += 1
     if index == len(tokens):
         return None
-    while index < len(tokens) and tokens[index] in {"sudo", "env", "command"}:
+    while index < len(tokens) and tokens[index] in WRAPPER_VALUE_FLAGS:
         wrapper = tokens[index]
         value_flags = WRAPPER_VALUE_FLAGS[wrapper]
         no_value_flags = WRAPPER_NO_VALUE_FLAGS[wrapper]
         index += 1
         while index < len(tokens) and tokens[index].startswith("-"):
             flag, _, attached_value = tokens[index].partition("=")
+            if (
+                flag not in value_flags
+                and flag[:2] in value_flags
+                and len(flag) > 2
+                and not flag.startswith("--")
+            ):
+                index += 1  # `-C.claude`, `-uNAME`: the value is attached
+                continue
             if flag in value_flags:
                 if attached_value:
                     index += 1
@@ -2111,7 +2002,8 @@ def command_name(
             and "=" in tokens[index]
             and not tokens[index].startswith("-")
         ):
-            record_assignment(tokens[index], variables)
+            if record:
+                record_assignment(tokens[index], variables)
             record_assignment(tokens[index], prefix_assignments)
             index += 1
     if index == len(tokens):
@@ -2289,6 +2181,15 @@ def _sed_script_effects(script: str) -> tuple[list[str], bool]:
     return files, executes
 
 
+def _sed_long_option(name: str) -> str | None:
+    """The long option `--NAME` stands for: the exact name, or the one option it is
+    the start of (as GNU getopt reads it); None when it is ambiguous or unknown."""
+    if name in SED_LONG_OPTIONS:
+        return name
+    matches = [option for option in SED_LONG_OPTIONS if option.startswith(name)]
+    return matches[0] if name and len(matches) == 1 else None
+
+
 def sed_effects(args: list[str]) -> tuple[list[str], bool]:
     """The files the inline scripts of a `sed` command line write, and whether
     one runs a shell command. The scripts are the `-e` and `--expression` values,
@@ -2307,17 +2208,15 @@ def sed_effects(args: list[str]) -> tuple[list[str], bool]:
             operand_words.extend(strip_quoted_prefix(word) for word in args[index:])
             break
         elif token.startswith("--"):
-            name, equals, attached = token.partition("=")
-            if len(name) >= 5 and "--expression".startswith(name):
-                if not equals and index < len(args):
-                    attached = strip_quoted_prefix(args[index])
-                    index += 1
+            name, equals, attached = token[2:].partition("=")
+            option = _sed_long_option(name)
+            if SED_LONG_OPTIONS.get(option or "") == 1 and not equals:
+                attached = strip_quoted_prefix(args[index]) if index < len(args) else ""
+                index += 1
+            if option == "expression":
                 scripts.append(attached)
-            elif len(name) >= 3 and "--file".startswith(name):
+            elif option == "file":
                 script_file = True
-                index += int(not equals)
-            elif len(name) >= 3 and "--line-length".startswith(name):
-                index += int(not equals)
         elif token.startswith("-") and len(token) > 1:
             for position, letter in enumerate(token[1:], start=1):
                 if letter in "efl":
@@ -2344,14 +2243,13 @@ def sed_effects(args: list[str]) -> tuple[list[str], bool]:
     return files, executes
 
 
-def find_targets(args: list[str]) -> list[str]:
+def find_targets(args: list[str], repo_root: str) -> list[str]:
     """A protected name that a `find` that deletes (`-delete`) or runs a command
-    that is not read-only (`-exec rm {} +`) may reach, or nothing. Tests before
-    the action narrow it (`-name '*.pyc'` cannot match a protected file, `-type d`
-    only reaches folders); a name, path, or regex test is tried against the names
-    and paths a protected file can have. Anything the reader cannot narrow, with
-    `-o`, `!`, parentheses, or `-prune`, no test at all, or a test that can match,
-    reaches a protected file."""
+    that is not read-only (`-exec rm {} +`) may reach, or nothing. A `-name` or
+    `-iname` pattern before the action narrows it when no name it can match is
+    protected (`-name '*.pyc'`), and `-type d` only reaches folders. Anything the
+    reader cannot narrow reaches a protected file: `-o`, `!`, parentheses, `-prune`,
+    a path or regular-expression test, a pattern with an expansion, no test at all."""
     words = [strip_quoted_prefix(arg) for arg in args]
     action = next(
         (
@@ -2369,35 +2267,62 @@ def find_targets(args: list[str]) -> list[str]:
     if action is None:
         return []
     tests = words[:action]
-    if any(word in FIND_COMBINERS for word in tests):
+    if any(word in FIND_COMBINERS or word in FIND_UNREAD_TESTS for word in tests):
         return [FIND_SAMPLE_NAMES[0]]
     narrowed = False
     for index, word in enumerate(tests):
-        kind = FIND_PATTERN_TESTS.get(word)
-        if kind and index + 1 < len(tests):
-            pattern = tests[index + 1]
-            fold = word.startswith("-i")
-            samples = FIND_SAMPLE_NAMES if kind == "name" else FIND_SAMPLE_PATHS
-            for sample in samples:
-                if _find_pattern_matches(kind, pattern, sample, fold):
-                    # A config name alone is not protected; its path in the repository is.
-                    return [FIND_CONFIG_PATHS.get(sample, sample)]
+        if word in FIND_NAME_TESTS and index + 1 < len(tests):
+            hit = _find_name_target(tests[index + 1], repo_root)
+            if hit:
+                return [hit]
             narrowed = True
         elif word == "-type" and tests[index + 1 : index + 2] == ["d"]:
             narrowed = True
     return [] if narrowed else [FIND_SAMPLE_NAMES[0]]
 
 
-def _find_pattern_matches(kind: str, pattern: str, sample: str, fold: bool) -> bool:
-    """True when `find`'s `kind` test with `pattern` can match `sample`."""
-    if fold:
-        pattern, sample = pattern.lower(), sample.lower()
-    if kind == "regex":
-        try:
-            return re.fullmatch(pattern, sample) is not None
-        except re.error:
-            return True
-    return fnmatch.fnmatchcase(sample, pattern)
+def _find_name_target(pattern: str, repo_root: str) -> str | None:
+    """A protected name that `find -name PATTERN` can match, or None. The pattern is
+    tried against the names a protected file can have, and each glob run in it is
+    replaced by nothing, by `x`, and by a dot (a `?` by `x` or a dot, a class by
+    each character in it) to see what names it can make. A name equal to a hook
+    config's file name stands for that config's path: `find` descends to it."""
+    if (
+        "$" in pattern
+        or "\\" in pattern
+        or SUBSTITUTION_PLACEHOLDER.search(pattern)
+        or len(pattern) > LONG_WORD
+    ):
+        return FIND_SAMPLE_NAMES[0]  # a name the reader cannot know
+    folded = pattern.lower()
+    for sample in FIND_SAMPLE_NAMES:
+        if fnmatch.fnmatchcase(sample, folded):
+            return next(
+                (c for c in sorted(HOOK_CONFIGS) if c.endswith("/" + sample)), sample
+            )
+    pieces = FIND_GLOB_RUN.split(folded)
+    options: list[list[str]] = []
+    for position, piece in enumerate(pieces):
+        if position % 2 == 0:
+            options.append([piece])
+        elif piece.startswith("["):
+            members = [char for char in piece[1:-1].lstrip("!^") if char != "-"]
+            negated = piece[1:2] in ("!", "^")
+            options.append(([] if negated else members[:8]) + ["x"])
+        elif piece.startswith("*"):
+            options.append(["", "x", "."])
+        else:
+            options.append([".", "x"])
+    total = 1
+    for choices in options:
+        total *= len(choices)
+    if total > MAX_FIND_INSTANCES:
+        return FIND_SAMPLE_NAMES[0]
+    for choice in itertools.product(*options):
+        name = "".join(choice)
+        if name and protected(name, repo_root):
+            return name
+    return None
 
 
 def target_directory(tokens: list[str]) -> str | None:
@@ -2436,6 +2361,23 @@ def git_subcommand(args: list[str]) -> str | None:
             continue
         index += 1
     return None
+
+
+def git_config_values(args: list[str]) -> list[str]:
+    """The `NAME=VALUE` words of the `-c` options before git's subcommand."""
+    values: list[str] = []
+    index = 0
+    while index < len(args):
+        token = args[index]
+        if not token.startswith("-"):
+            break
+        if token == "-c" and index + 1 < len(args):
+            values.append(args[index + 1])
+        if token in GIT_GLOBAL_VALUE_OPTIONS:
+            index += 2
+            continue
+        index += 1
+    return values
 
 
 def git_working_directory(args: list[str], shell_directory: str) -> str:
@@ -2685,12 +2627,6 @@ def _message_indices(
     return indices
 
 
-MAX_BRACE_ROUNDS = 8
-# The folders a `cd` may leave the shell in are all tried for each path; a command
-# that changes folder this many times is refused rather than guessed.
-MAX_WORKING_DIRECTORIES = 64
-
-
 def _brace_words(word: str) -> list[str]:
     """The words Bash makes of `word` by brace expansion (`a{b,c}d` is `abd acd`),
     or `[word]` when it has no comma list or is quoted."""
@@ -2707,9 +2643,6 @@ def _brace_words(word: str) -> list[str]:
         if len(words) > MAX_BRACE_WORDS:
             raise UnparseableCommand("a brace list in a command word is too long")
     return words
-
-
-MAX_BRACE_WORDS = 256
 
 
 def segment_targets(
@@ -2745,7 +2678,7 @@ def segment_targets(
     expanded = substitute(tokens, variables)
     if len(expanded) != len(tokens):
         # A value split into several words (`x="tee a"; $x`): read the command again.
-        command_info = command_name(expanded, variables)
+        command_info = command_name(expanded, variables, record=False)
     for _ in range(MAX_BRACE_ROUNDS):
         if command_info is None:
             break
@@ -2754,7 +2687,7 @@ def segment_targets(
             break
         # A command word that is a brace list (`{tee,x}`) is several words.
         expanded = expanded[: command_info[1] - 1] + words + expanded[command_info[1] :]
-        command_info = command_name(expanded, variables)
+        command_info = command_name(expanded, variables, record=False)
     tokens = expanded
     index = 0
     while index < len(tokens):
@@ -2795,6 +2728,13 @@ def segment_targets(
     if command_info is None:
         return
     command, start, prefix_assignments = command_info
+    # `env -C DIR cmd` runs `cmd` in DIR: its operands are read from there too.
+    for folder in _wrapper_folders(tokens[: start - 1]):
+        for candidate in _folders(folder, repo_root, working_directories):
+            if candidate not in working_directories:
+                if len(working_directories) >= MAX_WORKING_DIRECTORIES:
+                    raise UnparseableCommand("too many different folders to follow")
+                working_directories = working_directories + [candidate]
     args = tokens[start:]
     # Redirect targets are confirmed above, so the argument scans below skip
     # them. A leading redirect (`> file echo x`) makes the operator the command
@@ -2822,22 +2762,19 @@ def segment_targets(
                 message,
             )
 
-    if FUNCTION_KEY + command in variables:
+    if command in {"shopt", "setopt", "unsetopt", "set"} and _enables_dotglob(
+        command, args
+    ):
+        raise UnparseableCommand(DOTGLOB_REFUSAL)
+    if command in ASSIGNING_BUILTINS:
+        for arg in args:
+            if not arg.startswith("-"):
+                record_assignment(arg, variables)
+    if FUNCTION_KEY + command in variables and command not in FOLDER_COMMANDS:
         command = SHADOWED  # a function or alias of this name: not the command it names
-    if command == "cd":
-        candidates = operands(args, set())
-        if len(candidates) != 1:
-            raise AmbiguousCommand("cd must have exactly one directory")
-        directory = candidates[0]
-        candidate = os.path.normpath(
-            directory
-            if os.path.isabs(directory)
-            else os.path.join(working_directories[-1], directory)
-        )
-        if candidate not in working_directories:
-            if len(working_directories) >= MAX_WORKING_DIRECTORIES:
-                raise UnparseableCommand("too many different folders to follow")
-            working_directories.append(candidate)
+    if command in FOLDER_COMMANDS:
+        # A function named `cd` still ends in some folder: follow the operand anyway.
+        _follow_folder_change(command, args, repo_root, working_directories)
     elif command in SIMPLE_MUTATORS:
         confirmed.extend(
             resolve_from_directories(
@@ -2905,7 +2842,7 @@ def segment_targets(
                 resolve_from_directories(sed_files, working_directories, repo_root)
             )
             if sed_executes:
-                raise AmbiguousCommand("a sed script runs a shell command")
+                raise UnparseableCommand("a sed script runs a shell command")
         candidates = operands(args, OPTION_VALUES[command])
         inplace = any(
             arg == "-i"
@@ -2925,6 +2862,16 @@ def segment_targets(
                     repo_root,
                 )
             )
+        if command == "perl" and not inplace:
+            _scan_unmodelled(
+                command,
+                plain_args,
+                repo_root,
+                working_directories,
+                confirmed,
+                uncertain,
+                variables,
+            )
     elif command == "dd":
         confirmed.extend(
             resolve_from_directories(
@@ -2939,6 +2886,9 @@ def segment_targets(
         )
     elif command == "git":
         subcommand = git_subcommand(args)
+        # A `-c NAME=VALUE` can run a command (`alias.x=!cmd`, `core.pager`).
+        for value in git_config_values(args):
+            uncertain.extend(protected_path_literals(strip_quoted_prefix(value)))
         git_roots = [
             git_working_directory(args, directory) for directory in working_directories
         ]
@@ -2980,64 +2930,231 @@ def segment_targets(
             confirmed.extend(
                 resolve_from_directories(plain_args, offset_roots, repo_root)
             )
-    elif command not in READ_ONLY:
-        # Unknown commands are not interpreted as filesystem mutations merely
-        # because their source or prose contains a sensitive-looking word.
-        # Explicit paths remain covered by native edits and known mutators. A
-        # word that is one quoted glob is a pattern for the command to match
-        # (`find . -name '*.pem'`), not a file it writes, so it is not scanned,
-        # unless the command runs its arguments (see `RUNNERS`).
-        runs_arguments = (
-            posixpath.basename(command) in RUNNERS
-            or RUNNER_PATTERN.fullmatch(posixpath.basename(command)) is not None
+    elif command not in READ_ONLY or (command == "rg" and _rg_runs_a_command(args)):
+        _scan_unmodelled(
+            command,
+            plain_args,
+            repo_root,
+            working_directories,
+            confirmed,
+            uncertain,
+            variables,
+            runs_arguments=command == "rg",
         )
-        scanned = [
-            token
-            for token in plain_args
-            if runs_arguments or not token.startswith(QUOTED_PATTERN_PREFIX)
-        ]
-        if command == "find":
-            uncertain.extend(find_targets(plain_args))
-        uncertain.extend(token for token in scanned if protected(token, repo_root))
-        uncertain.extend(protected_path_literals(" ".join(scanned)))
-        uncertain.extend(opaque_write_paths(" ".join(scanned)))
-        # A command spelled as a path runs that file.
-        if "/" in command:
-            uncertain.append(command)
-        # The command reads its paths from the `cd` folder, not the repository
-        # root, so resolve them there too, as for an unmodelled Git command. A
-        # path found only that way is new coverage: a protected config gets the
-        # protected-config decision (confirmed), but a file an interpreter or a
-        # runner executes cannot be judged and denies (uncertain), like the same
-        # path spelled from the root.
-        offset_roots = [
-            root for root in working_directories if root != os.path.normpath(repo_root)
-        ]
-        if offset_roots:
-            # `--out=NAME` names a file too: its value is read from the folder.
-            names = [
-                token.partition("=")[2] if token.startswith("--") else token
-                for token in scanned + ([command] if "/" in command else [])
-                if (
-                    not token.startswith("-")
-                    or ("=" in token and token.startswith("--"))
-                )
-                and not EXTENDED_GLOB.search(token)
-            ]
-            offset_hits = resolve_from_directories(
-                [name for name in names if name], offset_roots, repo_root
-            )
-            runs_a_file = runs_arguments or "/" in command
-            (uncertain if runs_a_file else confirmed).extend(offset_hits)
 
 
-def _defined_names(text: str) -> set[str]:
+def _scan_unmodelled(
+    command: str,
+    plain_args: list[str],
+    repo_root: str,
+    working_directories: list[str],
+    confirmed: list[str],
+    uncertain: list[str],
+    variables: dict[str, str],
+    runs_arguments: bool = False,
+) -> None:
+    """Classify a command the guard does not model: a protected name among its
+    arguments, in its script text, or (after a `cd`) in a folder it was moved to."""
+    # Unknown commands are not interpreted as filesystem mutations merely
+    # because their source or prose contains a sensitive-looking word.
+    # Explicit paths remain covered by native edits and known mutators. A
+    # word that is one quoted glob is a pattern for the command to match
+    # (`find . -name '*.pem'`), not a file it writes, so it is not scanned,
+    # unless the command runs its arguments (see `RUNNERS`).
+    runs_arguments = (
+        runs_arguments
+        or posixpath.basename(command) in RUNNERS
+        or RUNNER_PATTERN.fullmatch(posixpath.basename(command)) is not None
+    )
+    scanned = [
+        token
+        for token in plain_args
+        if runs_arguments or not token.startswith(QUOTED_PATTERN_PREFIX)
+    ]
+    if runs_arguments and DOTGLOB.search(
+        " ".join(strip_quoted_prefix(token) for token in scanned)
+    ):
+        raise UnparseableCommand(DOTGLOB_REFUSAL)  # `eval 'shopt -s dotglob'`
+    script = _shell_script(command, plain_args)
+    if script is not None:
+        # The script is a command line: read it as one, in a copy of this shell's
+        # folders and variables (a `cd` in it does not leave the child shell).
+        classify_command(
+            script,
+            repo_root,
+            dict(variables),
+            list(working_directories),
+            confirmed,
+            uncertain,
+            {},
+        )
+    if command == "find":
+        uncertain.extend(find_targets(plain_args, repo_root))
+    uncertain.extend(token for token in scanned if protected(token, repo_root))
+    uncertain.extend(protected_path_literals(" ".join(scanned)))
+    uncertain.extend(opaque_write_paths(" ".join(scanned)))
+    # A command spelled as a path runs that file.
+    if "/" in command:
+        uncertain.append(command)
+    # The command reads its paths from the `cd` folder, not the repository
+    # root, so resolve them there too, as for an unmodelled Git command. A
+    # path found only that way is new coverage: a protected config gets the
+    # protected-config decision (confirmed), but a file an interpreter or a
+    # runner executes cannot be judged and denies (uncertain), like the same
+    # path spelled from the root.
+    offset_roots = [
+        root for root in working_directories if root != os.path.normpath(repo_root)
+    ]
+    if offset_roots:
+        # `--out=NAME` names a file too: its value is read from the folder.
+        names = [
+            token.partition("=")[2] if token.startswith("--") else token
+            for token in scanned + ([command] if "/" in command else [])
+            if (not token.startswith("-") or ("=" in token and token.startswith("--")))
+            and not EXTENDED_GLOB.search(token)
+        ]
+        offset_hits = resolve_from_directories(
+            [name for name in names if name], offset_roots, repo_root
+        )
+        runs_a_file = runs_arguments or "/" in command
+        (uncertain if runs_a_file else confirmed).extend(offset_hits)
+
+
+def _shell_script(command: str, args: list[str]) -> str | None:
+    """The command line that `eval ARGS` or `bash -c SCRIPT` runs, or None."""
+    name = posixpath.basename(command)
+    if name == "eval":
+        return " ".join(strip_quoted_prefix(arg) for arg in args)
+    if name not in SCRIPT_SHELLS:
+        return None
+    index = 0
+    while index < len(args):
+        word = strip_quoted_prefix(args[index])
+        index += 1
+        if word == "--":
+            return None
+        if word.startswith("-") and not word.startswith("--") and "c" in word[1:]:
+            return strip_quoted_prefix(args[index]) if index < len(args) else None
+        if word in ("-o", "+o", "-O", "+O"):
+            index += 1  # the value of an option
+    return None
+
+
+def _rg_runs_a_command(args: list[str]) -> bool:
+    """True for `rg --pre COMMAND`: ripgrep runs COMMAND on every file it searches."""
+    return any(
+        strip_quoted_prefix(arg) == "--pre"
+        or strip_quoted_prefix(arg).startswith("--pre=")
+        for arg in args
+    )
+
+
+def _enables_dotglob(command: str, args: list[str]) -> bool:
+    """True for `shopt -s ... dotglob` and zsh's `setopt glob_dots`, read from the
+    words of the command (quotes removed), so a name that only appears in text is
+    not one."""
+    words = [strip_quoted_prefix(arg) for arg in args]
+    if command == "shopt":
+        sets = any(
+            word.startswith("-") and not word.startswith("--") and "s" in word
+            for word in words
+        )
+        return sets and "dotglob" in words
+    names = (
+        ("noglobdots", "nodotglob")
+        if command == "unsetopt"
+        else ("globdots", "dotglob")
+    )
+    return any(re.sub("[_-]", "", word).lower() in names for word in words)
+
+
+def _folders(operand: str, repo_root: str, working_directories: list[str]) -> list[str]:
+    """The folders a `cd` operand can name: its glob, brace list, and symlinks are
+    read like those of any path."""
+    base = working_directories[-1]
+    root = repo_root or base
+    return [
+        os.path.normpath(os.path.join(root, display))
+        for display in resolve_operands([operand], base, repo_root)
+    ]
+
+
+def _follow_folder_change(
+    command: str, args: list[str], repo_root: str, working_directories: list[str]
+) -> None:
+    """Add the folders a `cd` or `pushd` may leave the shell in to `working_directories`.
+    `pushd` with no folder, or with `+N`/`-N`, only turns the stack over."""
+    candidates = operands(args, set())
+    if command == "pushd" and all(
+        PUSHD_ROTATION.fullmatch(word) for word in candidates
+    ):
+        return
+    if len(candidates) != 1:
+        raise AmbiguousCommand(f"{command} must have exactly one directory")
+    for candidate in _folders(candidates[0], repo_root, working_directories):
+        if candidate not in working_directories:
+            if len(working_directories) >= MAX_WORKING_DIRECTORIES:
+                raise UnparseableCommand("too many different folders to follow")
+            working_directories.append(candidate)
+
+
+def _wrapper_folders(prefix: list[str]) -> list[str]:
+    """The folders `env -C DIR` or `env --chdir=DIR` among the wrapper words before a
+    command move it to."""
+    if "env" not in prefix:
+        return []
+    folders: list[str] = []
+    for index, word in enumerate(prefix):
+        if word in ("-C", "--chdir") and index + 1 < len(prefix):
+            folders.append(prefix[index + 1])
+        elif word.startswith("--chdir="):
+            folders.append(word.partition("=")[2])
+        elif word.startswith("-C") and len(word) > 2 and not word.startswith("--"):
+            folders.append(word[2:])
+    return [strip_quoted_prefix(folder) for folder in folders if folder]
+
+
+def _function_names(text: str) -> set[str]:
     """The names this command line defines as a function (`f() { ...; }`,
-    `function f`) or as an alias (`alias f=...`). A command of that name runs the
-    definition, whatever its own name suggests (`cat() { tee "$@"; }; cat x`)."""
-    names = {a or b for a, b in FUNCTION_NAME.findall(text)}
-    for definition in ALIAS_COMMAND.findall(text):
-        names.update(ALIAS_NAME.findall(definition))
+    `function f`). A command of that name runs the definition, whatever its own name
+    suggests (`cat() { tee "$@"; }; cat x`)."""
+    return {a or b for a, b in FUNCTION_NAME.findall(text)}
+
+
+def _plain_command(segment: list[str]) -> tuple[str, list[str]] | None:
+    """The command word and the arguments of a segment, past compound keywords,
+    leading assignments, and the `builtin` and `command` wrappers; None for none."""
+    index = 0
+    while index < len(segment):
+        word = strip_quoted_prefix(segment[index])
+        if (
+            word in SHELL_KEYWORDS
+            or word in ("builtin", "command")
+            or ASSIGNMENT.match(word)
+            or (
+                index
+                and word.startswith("-")
+                and segment[index - 1] in ("builtin", "command")
+            )
+        ):
+            index += 1
+            continue
+        return word, [strip_quoted_prefix(arg) for arg in segment[index + 1 :]]
+    return None
+
+
+def _alias_names(segments: list[list[str]]) -> set[str]:
+    """The names the `alias` commands among `segments` define, read from their
+    words (quotes removed). An alias shadows a command of its name."""
+    names: set[str] = set()
+    for segment in segments:
+        found = _plain_command(segment)
+        if found and found[0] == "alias":
+            names.update(
+                arg.partition("=")[0]
+                for arg in found[1]
+                if "=" in arg and not arg.startswith("-")
+            )
     return names
 
 
@@ -3078,9 +3195,14 @@ def classify_command(
     command, found_heredocs = extract_heredocs(command, start_count=len(heredocs))
     heredocs.update(found_heredocs)
     command, process_subs = extract_substitutions(command)
-    for name in _defined_names(command):
+    segments = split_segments(command)
+    for name in _function_names(command) | _alias_names(segments):
         variables[FUNCTION_KEY + name] = ""
-    for segment in split_segments(command):
+    if len(segments) != 1:
+        # A message heredoc is text only when it is the whole substitution: with a
+        # pipe or another command it may be a script for a shell, `python3 -`, `xargs`.
+        message = False
+    for segment in segments:
         try:
             segment_targets(
                 segment,
@@ -3132,11 +3254,9 @@ def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
     global _work_left
     confirmed: list[str] = []
     uncertain: list[str] = []
-    if DOTGLOB.search(command):
-        raise UnparseableCommand(
-            "a glob can match hidden files after shopt -s dotglob, GLOBIGNORE, "
-            "or setopt dotglob, which the guard cannot list"
-        )
+    if "\0" in command:
+        # Bash drops or cuts at a NUL; `substitute` also uses one to split words.
+        raise UnparseableCommand("a NUL byte in the command is not read")
     _work_left = [WORK_PER_CHARACTER * len(command) + MINIMUM_WORK]
     try:
         classify_command(command, repo_root, {}, [repo_root], confirmed, uncertain, {})
