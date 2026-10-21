@@ -121,8 +121,8 @@ missing) — the tool never runs and nothing changes. When the call goes
 through, OpenWiki's own response says whether the refresh succeeded or
 failed.
 
-Either way, the manual `post` command above tells you what happened: one
-line naming what it restored on success, or a nonzero exit naming an
+Either way, once the user has run the manual `post` command above, its
+output says what happened: one line naming what it restored, or a nonzero exit naming an
 adapter it could not reconcile. Treat that nonzero exit as a real failure —
 report it and stop; do not hand-edit the adapter to fix it.
 
