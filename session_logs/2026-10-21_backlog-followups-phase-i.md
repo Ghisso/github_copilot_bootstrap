@@ -183,6 +183,11 @@ the user runs them (BF-I1 to BF-I7).
   config edits now ask/deny); Bash cases, scanner oracle, three Python
   versions agree. Regenerated, self-installed; `validate_targets.py` and
   `check_runtime.py` PASS. Docs fourth pass started.
+- **Docs fourth pass** - assignment-default tracking, the perl `-i`
+  rules, the `source`/`eval` heredoc line, the corrected wrapper item
+  (`time` is followed), new over-blocks, and two recorded gaps. Phase G
+  cited text now at 779-811. `verify.py phase` PASS (4727 passed, 1
+  skipped). Review round 4 requested.
 
 ## [LEARN] Entries
 
