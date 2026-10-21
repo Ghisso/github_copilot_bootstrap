@@ -22,10 +22,10 @@ sources:
     resource: repo://shared/templates/plan-small.md
   - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
     resource: repo://tests/test_validate_plan_frontmatter.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 # Task lanes and the enforced lifecycle
@@ -90,7 +90,7 @@ The policy fixes eight steps because each reads what the previous one produced.
 1. **Documentation.** Update `README.md` and `docs/` for changed public behavior; on the big plan's last phase, also run the stale-claims audit.
 2. **Final AI state.** Small plan `status: complete` with `closeout_session_log` filled and steps ticked; big-plan phase ticked; `[LEARN]` entries or the no-lessons marker in the log and `MEMORY.md`.
 3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit`. The verifier refuses to run closeout while the big plan is not retrievable from nested Git.
-4. **Stage, findings, phase receipt, closeout dry run**, in one Bash command with no `git commit`: explicit `git add` of the intended files, a `disposition` and `reason` on every surviving MINOR, `record_findings.py` with one `--profile` per reviewed profile (every profile the changed paths require, including `ponytail` for any multi-file diff), the reviewer's `--gate-result`, and one `--open-request` per open request, `verify.py phase --persist`, then `verify.py closeout --format text`, whose summary lines go into the log with `**Status:** COMPLETED`.
+4. **Stage, findings, phase receipt, closeout dry run**, in one Bash command with no `git commit`: explicit `git add` of the intended files, a `disposition` and `reason` on every surviving MINOR, `record_findings.py` with one `--profile` per reviewed profile (every profile the changed paths require, including `ponytail` for any multi-file diff), the reviewer's `--gate-result`, and one `--open-request` per open request, `verify.py phase --persist`, then `verify.py closeout --format text`, whose summary lines go into the log with `**Status:** COMPLETED`. When the findings text names a protected path, the findings JSON is written with the Write tool to a scratch file and passed as `--findings-json <file>`, because `protect-files` denies heredoc text that names a protected path.
 5. **Second nested checkpoint**, because the closeout receipt hashes the session log.
 6. **Closeout receipt.** `verify.py closeout --format json --persist`.
 7. **Commit**, in its own Bash command. The `post-commit` Git hook advances `current_phase` and publishes nested state.
@@ -150,6 +150,6 @@ Reopening defers the strict terminal gates to the new final phase; it never esca
 
 ## Related pages
 
-- [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md)
-- [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
-- [Deterministic verification: verify.py modes, receipts, and findings](/openwiki/operations/deterministic-verification.md)
+- [Agent roster, prompts, and the skill library](../architecture/agents-and-skills.md)
+- [Hook dispatcher and guardrail scripts](../architecture/hooks-and-guardrails.md)
+- [Deterministic verification: verify.py modes, receipts, and findings](../operations/deterministic-verification.md)

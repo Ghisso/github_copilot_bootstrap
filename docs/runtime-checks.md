@@ -261,11 +261,12 @@ cannot be exfiltrated through a write-bearing command. Resolve supported
 wildcards, `cd`, Git `-C`, and symlink targets without executing a shell. For
 opaque command or interpreter syntax, verify conservative high-confidence path
 coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
-paths, and protected hook configuration files; do not treat prose or ordinary
+paths, agent definition paths, `*.code-workspace` files, and protected hook
+configuration files; do not treat prose or ordinary
 source filenames containing `secret` as credentials, and do not require denial
 of unknown commands that carry none of those path literals. Within that
-coverage, the hook paths and the protected hook configuration files — the
-names that identify this repository's own guardrail setup — are scoped to
+coverage, the hook paths, agent definition paths, `*.code-workspace` files, and
+protected hook configuration files (this repository's own guardrail setup) are scoped to
 this repository only, decided on the resolved real path of the candidate; the
 four credential-shaped alternatives (`.env*`, `uv.lock`, `credentials*`,
 `.pem`/`.key`) stay protected on any path, in this repository or any other;
@@ -442,7 +443,7 @@ single-phase plan does not. `closeout --persist` now fails closed on that
 condition before writing anything, and names the checkpoint command.
 
 `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the canonical operation, used by the
-editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies any Bash command naming a `.claude/hooks/` path; the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
+editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies running it from an agent's Bash tool (any command outside the guard's read-only list that names a `.claude/hooks/` path); the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
 
 Never checkpoint or publish nested state *after* the receipts are persisted.
 That changes what they are bound to and fails the next commit closed with

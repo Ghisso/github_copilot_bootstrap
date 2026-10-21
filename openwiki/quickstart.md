@@ -18,10 +18,10 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 # Quickstart: where to look for what
@@ -47,18 +47,18 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 
 | I want to... | Read | Then open |
 | --- | --- | --- |
-| understand what lives where and why `dist/` and `.claude/` are ignored | [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md) | `README.md`, `scripts/generate_targets.py` |
-| classify a request, start a phase, close one out, or reopen a completed big plan | [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md) | `shared/policies/workflow.instructions.md`, `shared/templates/plan-small.md` |
-| understand why a commit, push, or PR was denied | [Deterministic verification](/openwiki/operations/deterministic-verification.md), then [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `docs/runtime-checks.md` |
-| add or change an agent, a review profile, or a skill | [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md) | `shared/agents/<id>/agent.yaml`, `shared/skills/<name>/SKILL.md`, `scripts/validate_targets.py` |
-| add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
-| choose an install mode, understand why a plain install refused, install or refresh a full consumer, run a batch update, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |
-| add a personal overlay to a team-owned repository, remove it with `--uninstall`, recover a preserved copy, or act on a `SKIPPED`, `RETAINED`, or `PRESERVED` report | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
-| install the sidecar's `workflow` profile (`--profile workflow`: agents, relaxed rules, review profiles, templates, and a hidden personal state folder for plans, memory, and logs), switch profiles, back up the state folder with `--backup-state`, or purge it with `--uninstall --purge-state` | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md), "What it installs" and "Profile switching" | `scripts/runtime_ownership.py`, `shared/sidecar/workflow/`, `tests/test_sidecar_workflow_scenario.py` |
-| understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
-| understand the Context Mode pin, tool filter, hook-output filter, or cache quarantine | [Context Mode dispatcher](/openwiki/operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs`, `tests/fixtures/context_mode_hook/` |
-| check which guard or capability each client (Claude Code, Codex, GitHub Copilot, Antigravity) actually gets, and the recorded gaps | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md), then [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md) | `docs/target-mapping.md` ("Gate-Repair Client Parity"), `shared/hooks/scripts/protect-files.py` |
-| refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.py` |
+| understand what lives where and why `dist/` and `.claude/` are ignored | [Source, generated output, consumer repo, and nested AI state](architecture/source-generated-consumer-layout.md) | `README.md`, `scripts/generate_targets.py` |
+| classify a request, start a phase, close one out, or reopen a completed big plan | [Task lanes and the enforced lifecycle](workflows/lifecycle-and-task-lanes.md) | `shared/policies/workflow.instructions.md`, `shared/templates/plan-small.md` |
+| understand why a commit, push, or PR was denied | [Deterministic verification](operations/deterministic-verification.md), then [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `docs/runtime-checks.md` |
+| add or change an agent, a review profile, or a skill | [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md) | `shared/agents/<id>/agent.yaml`, `shared/skills/<name>/SKILL.md`, `scripts/validate_targets.py` |
+| add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
+| choose an install mode, understand why a plain install refused, install or refresh a full consumer, run a batch update, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |
+| add a personal overlay to a team-owned repository, remove it with `--uninstall`, recover a preserved copy, or act on a `SKIPPED`, `RETAINED`, or `PRESERVED` report | [Sidecar overlay](operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
+| install the sidecar's `workflow` profile (`--profile workflow`: agents, relaxed rules, review profiles, templates, and a hidden personal state folder for plans, memory, and logs), switch profiles, back up the state folder with `--backup-state`, or purge it with `--uninstall --purge-state` | [Sidecar overlay](operations/sidecar-overlay.md), "What it installs" and "Profile switching" | `scripts/runtime_ownership.py`, `shared/sidecar/workflow/`, `tests/test_sidecar_workflow_scenario.py` |
+| understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
+| understand the Context Mode pin, tool filter, hook-output filter, or cache quarantine | [Context Mode dispatcher](operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs`, `tests/fixtures/context_mode_hook/` |
+| check which guard or capability each client (Claude Code, Codex, GitHub Copilot, Antigravity) actually gets, and the recorded gaps | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md), then [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md) | `docs/target-mapping.md` ("Gate-Repair Client Parity" and "Backlog-Followups Client Parity"), `shared/hooks/scripts/protect-files.py` |
+| refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.sh` (the hook entry point) and `shared/hooks/scripts/openwiki-guard.py` |
 
 ## Commands you will run most
 
@@ -82,12 +82,12 @@ A later phase may have reversed or refined any of them. Re-derive current behavi
 
 ## Related pages
 
-- [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
-- [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md)
-- [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md)
-- [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
-- [Deterministic verification: verify.py modes, receipts, and findings](/openwiki/operations/deterministic-verification.md)
-- [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
-- [Sidecar overlay](/openwiki/operations/sidecar-overlay.md)
-- [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md)
-- [Context Mode dispatcher: version pin, tool filter, and cache security](/openwiki/operations/context-mode-dispatcher.md)
+- [Source, generated output, consumer repo, and nested AI state](architecture/source-generated-consumer-layout.md)
+- [Task lanes and the enforced lifecycle](workflows/lifecycle-and-task-lanes.md)
+- [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md)
+- [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md)
+- [Deterministic verification: verify.py modes, receipts, and findings](operations/deterministic-verification.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](operations/install-ownership-and-runtime-checks.md)
+- [Sidecar overlay](operations/sidecar-overlay.md)
+- [Git-backed AI-state sync](operations/git-backed-ai-state-sync.md)
+- [Context Mode dispatcher: version pin, tool filter, and cache security](operations/context-mode-dispatcher.md)

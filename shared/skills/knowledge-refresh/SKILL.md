@@ -84,15 +84,19 @@ byte-for-byte after. Restore coverage differs by host:
   automatically if the tool call itself errors.
 
 Because of that gap, check `git status --porcelain -- AGENTS.md CLAUDE.md`
-right after calling `openwiki_begin`; if it is not empty, run the restore
-yourself:
+right after calling `openwiki_begin`; if it is not empty, the restore must
+run by hand. The file-protection guard denies an agent's Bash command that
+names a `.claude/hooks/` script, so ask the user to run it in their own
+shell:
 
 ```bash
 bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null
 ```
 
 This is redundant but harmless when the host already restored automatically,
-and it is the only protection on a Codex tool-call error.
+and it is the only protection on a Codex tool-call error. Until it runs, the
+commit-time check described below refuses a commit that still carries the
+managed block.
 
 The guard covers only `openwiki_begin`. OpenWiki's read-only tools
 (`openwiki_list_workspaces`, `openwiki_list_wikis`, `openwiki_search`,
@@ -117,8 +121,8 @@ missing) — the tool never runs and nothing changes. When the call goes
 through, OpenWiki's own response says whether the refresh succeeded or
 failed.
 
-Either way, the manual `post` command above tells you what happened: one
-line naming what it restored on success, or a nonzero exit naming an
+Either way, once the user has run the manual `post` command above, its
+output says what happened: one line naming what it restored, or a nonzero exit naming an
 adapter it could not reconcile. Treat that nonzero exit as a real failure —
 report it and stop; do not hand-edit the adapter to fix it.
 

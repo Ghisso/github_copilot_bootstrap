@@ -17,13 +17,15 @@ Four places hold different parts of the system. Keep them distinct:
 - **Generated build output**, produced by `scripts/generate_targets.py`,
   has two targets: `dist/multi-agent/`, the rendered, installable copy of
   `shared/` for a full install, and `dist/sidecar/`, a small personal
-  overlay (four skills and two instruction bridges). It is never
+  overlay with two profiles (`skills`: four skills and two instruction
+  bridges; `workflow`: the eligible public skills plus agents, rules,
+  review profiles, templates, and a `.ai-bootstrap/` state folder). It is never
   hand-edited, and it is gitignored in this repository.
 - **A consumer's outer repository** is any project that installs the
   generated bootstrap, in one of two modes. A full install owns the agent
   harness: it writes root entrypoint files (`AGENTS.md`, `CLAUDE.md`,
   `.mcp.json`, `.codex/**`) and a `.claude/` directory. A sidecar install
-  (`--mode sidecar`) adds only Git-ignored skill and bridge files inside a
+  (`--mode sidecar`) adds only Git-ignored files (skills and bridges, plus agents, rules, and a state folder for the `workflow` profile) inside a
   team-owned repository, keeps its manifest in the Git directory, and never
   changes a tracked file.
 - **The nested `.claude` ai-state repository** is its own separate Git
@@ -92,6 +94,9 @@ read a page once and act on it.
   is enough.
 - Close every page with a short "Related pages" list linking pages that cover
   a neighboring topic.
+- Write every link to another wiki page or repository file relative to the
+  current page's folder, such as `../operations/sidecar-overlay.md`. Never
+  start a link with `/openwiki/`; OpenWiki marks such a link as broken.
 
 **Sentences and words**
 

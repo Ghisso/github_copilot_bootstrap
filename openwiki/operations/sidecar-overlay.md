@@ -18,10 +18,10 @@ sources:
     resource: repo://tests/test_sidecar_uninstall.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-10-02T11:00:38.908Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 
@@ -38,7 +38,7 @@ uv run python scripts/install_bootstrap.py <team-repo> --backup-state
 uv run python scripts/install_bootstrap.py <team-repo> --uninstall [--purge-state]
 ```
 
-`scripts/install_bootstrap.py` detects the mode and hands the target to `install_sidecar(target, source, dry_run=..., profile=...)`, `uninstall_sidecar(target, dry_run=..., purge_state=...)`, or `backup_sidecar_state(target, dry_run=...)` in `scripts/sidecar_overlay.py`; see [Installing the bootstrap](/openwiki/operations/install-ownership-and-runtime-checks.md) for mode detection and how the profile and source are chosen.
+`scripts/install_bootstrap.py` detects the mode and hands the target to `install_sidecar(target, source, dry_run=..., profile=...)`, `uninstall_sidecar(target, dry_run=..., purge_state=...)`, or `backup_sidecar_state(target, dry_run=...)` in `scripts/sidecar_overlay.py`; see [Installing the bootstrap](install-ownership-and-runtime-checks.md) for mode detection and how the profile and source are chosen.
 
 ## What it installs and what it never touches
 
@@ -334,8 +334,8 @@ Every run ends by printing `preserved copies are in <folder>; the sidecar never 
 
 ## Related pages
 
-- [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
-- [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
-- [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md)
-- [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md)
-- [Quickstart](/openwiki/quickstart.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](install-ownership-and-runtime-checks.md)
+- [Source, generated output, consumer repo, and nested AI state](../architecture/source-generated-consumer-layout.md)
+- [Git-backed AI-state sync](git-backed-ai-state-sync.md)
+- [Agent roster, prompts, and the skill library](../architecture/agents-and-skills.md)
+- [Quickstart](../quickstart.md)

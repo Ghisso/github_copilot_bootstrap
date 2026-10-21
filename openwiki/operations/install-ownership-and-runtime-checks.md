@@ -22,17 +22,17 @@ sources:
     resource: repo://tests/test_install_bootstrap.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
 
 Source, tests, and the policies under `shared/policies/` outrank this page.
 
-The installer has two modes. A full install copies the generated target into a consumer and refreshes it later without touching what the consumer owns; what it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share. A sidecar install adds a small personal overlay to a team-owned repository, in one of two profiles (`skills` or `workflow`), and never changes a tracked file; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) covers it in full.
+The installer has two modes. A full install copies the generated target into a consumer and refreshes it later without touching what the consumer owns; what it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share. A sidecar install adds a small personal overlay to a team-owned repository, in one of two profiles (`skills` or `workflow`), and never changes a tracked file; [Sidecar overlay](sidecar-overlay.md) covers it in full.
 
 ## Install modes and mode detection
 
@@ -70,7 +70,7 @@ The two "nothing, but" rows come from `_fresh_default_refusal`, which runs only 
 
 After detection, `main` picks the profile and the source. In sidecar mode the profile is `--profile` when given, else the profile an existing manifest records (`read_sidecar_profile`; a version-1 manifest reads as `skills`), else `skills`; the source is `--source` when given, otherwise `dist/sidecar/<profile>/` (`default_sidecar_source`). In full mode the source is `--source` or `dist/multi-agent/`, and `--profile` or `--purge-state` each draw one warning (`full install ignores --profile`, `full install ignores --purge-state`). `require_source_exists` refuses a missing source; a missing default source says to run `uv run python scripts/generate_targets.py --all`, and a missing explicit `--source` names that path. A sidecar target then gets `validate_install_roots` with `allow_self=False` and no `--allow-self` hint, one warning naming any full-only option it ignores (`--commit-copilot-surface` or `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, `--allow-self`, and `--purge-state`, which only `--uninstall` reads), and a hand-off to `install_sidecar(target, source, profile=...)`. `--local-only` is accepted as a no-op there, and `--dry-run` works. No full-install step below ever runs for a sidecar target.
 
-`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full`, a target that is not a directory (`Refusing --uninstall: <target> is not a directory.`, exit 1), and any full evidence. It then warns once about ignored full-only options (`--uninstall ignores full-only option(s): ...`, naming `--source`, `--local-only`, `--state-remote` or `AI_STATE_REMOTE`, the Copilot surface flags, and `--profile`, since uninstall removes every profile's units regardless). When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0; a target that Git does not recognize as a repository instead exits 1 with `Refusing --uninstall: <target> is not a Git repository, so it cannot hold a sidecar overlay.` Otherwise it hands the target to `uninstall_sidecar(target, dry_run=..., purge_state=...)`: by default the workflow profile's state folder `.ai-bootstrap/` (and any retained legacy `.claude/ai-bootstrap/`) is kept in place and still hidden, and `--purge-state` moves each into the preserved-copy folder instead. A recognized older full install refuses here too, as full evidence. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
+`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full`, a target that is not a directory (`Refusing --uninstall: <target> is not a directory.`, exit 1), and any full evidence. It then warns once about ignored full-only options (`--uninstall ignores full-only option(s): ...`, naming `--source`, `--local-only`, `--state-remote` or `AI_STATE_REMOTE`, the Copilot surface flags, and `--profile`, since uninstall removes every profile's units regardless). When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0; a target that Git does not recognize as a repository instead exits 1 with `Refusing --uninstall: <target> is not a Git repository, so it cannot hold a sidecar overlay.` Otherwise it hands the target to `uninstall_sidecar(target, dry_run=..., purge_state=...)`: by default the workflow profile's state folder `.ai-bootstrap/` (and any retained legacy `.claude/ai-bootstrap/`) is kept in place and still hidden, and `--purge-state` moves each into the preserved-copy folder instead. A recognized older full install refuses here too, as full evidence. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](sidecar-overlay.md) describes what it removes and keeps.
 
 ## The ownership model
 
@@ -82,7 +82,7 @@ After detection, `main` picks the profile and the source. In sidecar mode the pr
 | Root adapters (`ROOT_ADAPTER_PATHS`) | `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex`, `.agents`, `.vscode/mcp.json`, `.vscode/tasks.json` | regenerated and mirrored into `.claude/bootstrap-root/` |
 | Copilot surface (`COPILOT_SURFACE_PATHS`) | `.github/agents`, `.github/hooks`, `.github/instructions`, `.github/copilot-instructions.md` | mirrored and ignored like a root adapter, unless the consumer chose `--commit-copilot-surface` |
 | Tracked authoring adapters (`TRACKED_AUTHORING_PATHS`) | `AGENTS.md`, `CLAUDE.md` when tracked by the target's outer Git | preserved byte for byte |
-| Consumer state (`CONSUMER_STATE_PATHS`) | under `.claude/`: `MEMORY.md`, `plans`, `explorations`, `session_logs`, `quality_reports`, `.cache`, `instructions/project-context.instructions.md`, `settings.local.json` | never compared, overwritten, or deleted; a seed is used only on a fresh install |
+| Consumer state (`CONSUMER_STATE_PATHS`) | under `.claude/`: `MEMORY.md`, `plans`, `explorations`, `session_logs`, `quality_reports`, `.cache`, `instructions/project-context.instructions.md`, `settings.local.json`, and the nested `.gitignore` and `.gitattributes` | never compared, overwritten, or deleted; a seed is used only on a fresh install |
 | State-directory READMEs | the `README.md` in `plans`, `explorations`, `session_logs`, `quality_reports` | regenerated even inside consumer-owned directories; siblings untouched |
 | Third-party skill bundles (`THIRD_PARTY_SKILL_PATHS`) | `skills/openwiki` under `.claude` or `.agents`, once it contains `.openwiki-install.json` | preserved, not refreshed, excluded from drift and takeover comparisons |
 
@@ -161,7 +161,9 @@ A failed target no longer stops the batch:
 - a Context Mode dispatch problem (wrong or undeterminable pinned version, filter or storage misconfiguration);
 - an unguarded `"${arr[@]}"` expansion in any hook script, which aborts under `set -u` on macOS's Bash 3.2.
 
-On success it prints `PASS` lines for optional binaries found, the Semble launcher, the Python baseline, and finally `PASS generated runtime wiring is present`. Drift checking honors the ownership model: consumer state is never compared, `.claude/.git` and the mirror are skipped, and a marker-claimed third-party bundle is exempt in both the drift and the obsolete directions.
+On success it prints `PASS` lines for optional binaries found, the Semble launcher, the Python baseline, and finally `PASS generated runtime wiring is present`. Drift checking honors the ownership model: consumer state (the nested `.gitignore` and `.gitattributes` included, through the same `is_consumer_state_path` the installer uses) is never compared, `.claude/.git` and the mirror are skipped, and a marker-claimed third-party bundle is exempt in both the drift and the obsolete directions.
+
+The nested `.gitignore` and `.gitattributes` became consumer state because `state-sync.sh` writes both and a consumer may extend them. Before that, every refresh deleted both as obsolete owned files, so a consumer's own ignore lines were lost right before the installer's `git add -A` and `bootstrap: update` commit. `state-sync.sh` now keeps both files current by appending only missing lines (see the AI-state sync page).
 
 ## Representative tests
 
@@ -171,7 +173,7 @@ On success it prints `PASS` lines for optional binaries found, the Semble launch
 
 ## Related pages
 
-- [Sidecar overlay](/openwiki/operations/sidecar-overlay.md)
-- [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
-- [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md)
-- [Deterministic verification: verify.py modes, receipts, and findings](/openwiki/operations/deterministic-verification.md)
+- [Sidecar overlay](sidecar-overlay.md)
+- [Source, generated output, consumer repo, and nested AI state](../architecture/source-generated-consumer-layout.md)
+- [Git-backed AI-state sync](git-backed-ai-state-sync.md)
+- [Deterministic verification: verify.py modes, receipts, and findings](deterministic-verification.md)

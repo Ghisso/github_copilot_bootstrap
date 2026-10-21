@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:e90d38b3b4124b690d008989914ae12db748608358bf96ec6d2bcb2d7d444a54",
+  "pageVersion": "sha256:16bb8ce4ec5bf91f26ea98038a9ee8ea3c080edd56a8658ea1915ed8c86123db",
   "claims": [
     {
       "id": "claim_0b94d0a2c25644d6912b95fd89cbe5ed",
@@ -11,7 +11,7 @@
           "version": "repo-lines-v1:sha256:edc9feeb7be69e60b6510728b19de7eb13ba2eb76f68b0f43a0c333535008d2e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU4Njc4OGRjOTUzMWE3ZjkxOGVkOWYxZDY3ODY5NGFhYTNmZWYzN2UxNjE2MDdiYTQxOWUzZThkMWEwNmJjNzgifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L3342-L3383",
+          "resource": "repo://shared/scripts/verify.py#L3458-L3499",
           "version": "repo-lines-v1:sha256:dcd6f02cbf8c2be04e0fd9f705b776a8310610b07cbbaec7afe93fb2425086a2:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhOTAwNzZjNDZhMTE0Y2VkMmNlOWQ1ODk5ZjJjZDM4MDZhYzZmODdjYzQ4MGMyMWY3OWUyNjMzMjdkM2U0OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMxYzM4YzhiODA0ZGU0MWQ2Y2JmNmUwMjdiNmZhMGE2Njc1MjIyOWQ3NmYxYWE3OWU1OGVmYjdmZTU0ZDY4MDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIzOGE4NGQ1MDcxYTdmZTM4NjA4MTgyMWQxM2FhM2NlMGJjMWQwNWRjZmY4NTU1ODZiZWM5NDNiNjI5NTJmYmQifQ"
         },
         {
@@ -25,7 +25,7 @@
       "statement": "phase mode branches on repository kind: in the bootstrap authoring repository it lints and type-checks shared, scripts, and tests and runs tests/, while in a consumer it lints the repository excluding .claude, type-checks the configured mypy scope or reports VFY-MYPY-001 UNVERIFIED with the fix, and runs pytest.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L3286-L3341",
+          "resource": "repo://shared/scripts/verify.py#L3402-L3457",
           "version": "repo-lines-v1:sha256:af94f41808a7a282101875b4f8eccfef23d73437d80675ba226be4ae126701db:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2NTcwOWNkMTU4NDAzMmJiY2I5ODFjM2Q2Y2YwMjNhYjNhNTM1N2ZlZWJmMjcyZTdmOGRjNjMxNTkzMDc5NzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiYjc3NTcxNzAxODQ2YzJmNTgxODBlYWUzNDE2YTk1MzAwNzgwZjYzNTQ2ODFkZWI4OGQzZGZhZjY5ODliYzYifQ"
         }
       ]
@@ -35,7 +35,7 @@
       "statement": "closeout mode loads the persisted phase receipt for VFY-RECEIPT-001, passes VFY-FRESH-001 only when base_ref, branch, head_sha, merge_base_sha, and content_hash equal the phase receipt's values, and passes VFY-FRESH-002 only when control-plane provenance still matches, otherwise reporting 'relevant code evidence is stale' or 'governing control-plane provenance is stale'.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L3384-L3461",
+          "resource": "repo://shared/scripts/verify.py#L3500-L3577",
           "version": "repo-lines-v1:sha256:e87767c1de388b2cbded05ed5e71a497832e6236506c4b2ecc6c5de9a522b876:eyJzZWxlY3RlZExpbmVDb3VudCI6NzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY3ZTc4MjkyZjczYmUzYTFmNGE4OTg1NzBmY2NhNTI3ZWMzZjg0MTAxMjA2NWNiOGI3ZjRjNjgzZjhhNTM2ZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlhODJlYmU5ZWQ0MDdjM2E2YmE0YjAwMzQyOTJiYWE1MmMxMWNlNWFlMjg2MTA3NDAyZGU0NzkyZWVlY2FjZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmOGJhOGExODljM2QzMThjZjcyM2Y3Nzg4YzE0ZTgxNDZhZDQzNTkyYjA2MGE5ZDEwMTYwMzM4OWM5NDAyZjEifQ"
         }
       ]
@@ -45,7 +45,7 @@
       "statement": "validate_receipt requires exactly the metadata fields generated_at, base_ref, branch, head_sha, merge_base_sha, tree_sha, phase, content_hash, tracked_state_hash, changed_paths, relevant_paths, path_discovery_ok, and control_plane_provenance, and raises 'receipt metadata control-plane provenance is invalid' when the provenance object is not bound.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L245-L305",
+          "resource": "repo://shared/scripts/verify.py#L248-L308",
           "version": "repo-lines-v1:sha256:ab2d830369cdcf05301455004507263e037aa40b709a7b15a2cfafa1a65881a5:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5NDlkMWUyNGI2ZjY0Y2Y3YjlkZGZmMTA4NWY4MDZhZDBjM2ZjYzQyOGUxYmUwOTUyY2QxYWM4ODE0OTQ5OTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiOTZjOTU2ZmFiNzU0YTM5MjlkMjQ2YmM1NTJlYmFiZmRhOTQ0NmQyOWY5Nzk2ZTI5YjY3YjIxMTFiMWFhMGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiODQ5NGM2MjJlMDdiOGEyZWRiNDU3NTA3ZGJiNjE3NzFlYjdkN2UyNWRhOTBiNGQ3NmVhMDY2YmRjNjc2YjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFhODAxYjEyNDY5OGFiMDQwYTM0NTFlYjE5YTk3Njg2ZmUwOGNiNzY1ZGRmMDk5ZGM1NmQwN2U2MzJmNWJhZWQifQ"
         }
       ]
@@ -55,7 +55,7 @@
       "statement": "control_plane_provenance binds the nested repository head, a runtime fingerprint combining the nested .claude runtime paths with the bootstrap-root fingerprint, a tracked-state fingerprint over the active plans, and digests of the active big and small plans.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L1177-L1215",
+          "resource": "repo://shared/scripts/verify.py#L1208-L1246",
           "version": "repo-lines-v1:sha256:79d444aaa03363d553cd2ea07da03cbd616a49e33445592900986091bec3ff5a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiYWQ1ODQyMmU4NTdmMzAyMDY5NzFmMWJkYmQ2OTk2YzMxYjlmN2RhZDY4YTI2ZDViYjQzYjFjNTU5OTg2ZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFjOTRhMmMwYTEyMjhiYmIxZGUyNjg5Y2NhODY3MDg1ZmFjMDllMDNmZmRjZGU1OGI3NzVkZTc0OTYzNThhZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjNmJmMDZkMTNkMzMyOTgzNTAzMTdkNTQ3MWZkNzUwNGZkZTg5MzBiYWRkMmRkOWZhNTBiMGViMmM0Nzc1OTEifQ"
         }
       ]
@@ -65,7 +65,7 @@
       "statement": "The bootstrap-root fingerprint hashes each installer-owned live root adapter listed by bootstrap-ownership.env against its mirror under .claude/bootstrap-root/, excluding marker-claimed third-party skill bundles on both sides, and yields an empty digest when an adapter is missing, symlinked, or differs from its mirror.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L800-L937",
+          "resource": "repo://shared/scripts/verify.py#L831-L968",
           "version": "repo-lines-v1:sha256:caa1693ee2a214249b88a985fb53b8b6c92e1f84dfb0d987e7ba06d5f5c983df:eyJzZWxlY3RlZExpbmVDb3VudCI6MTM4LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwYmU1YzYyOTg5ZGVjYWU4M2QzMzcyYmEyNGFkNzFjYjc1MjQzMzIwMzBlYjZjMmY2ZjhiZmZmNDQ2YmNjYTJmIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJkMmUxZjBkMzg3MDI2YTVjOTVlZmY0YzcyZTk3NjRmYjg5YjcxMzFlODQ0ODJjN2JkZjE4Y2IxNTkzYTc5ODg2IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJiM2Y3MDc0NTE3MzI2NjdlMDU5OTM2NTdjMDlmNGVmZjliZTZmNzFlM2M5YTRhZTNjOWFiYTc5MGUzMmVmOGJjIn0"
         }
       ]
@@ -75,11 +75,11 @@
       "statement": "closeout runs every required item from the plan's fenced Verification blocks itself, in order, before collecting metadata, with a 600-second per-item timeout, stops at the first non-PASS item and exits 2 without a receipt, and stores results at extensions.verification_items.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L3665-L3685",
+          "resource": "repo://shared/scripts/verify.py#L3781-L3801",
           "version": "repo-lines-v1:sha256:f77d1178597346c93a9e46bda1adb0e7dac73535e21133902b19c1cccf657eda:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3NGU1ZjBmODE0NjYwNmRiMTk1YjgzYjUzMmJhMDEzYzQ0OGRkMzhiZTIxOGRmNTVhNzExZTg3YTkzOTQ3MDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2NjU4OTM4MWZhOGI3MDQ5OGJjZDgwYmM4MTFjNDAxYjk5NDVhZDA5ODE0MDk0NTgyOTZiM2I5MzU2OWFmYzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiMTJjMzMxYTIyYjI5NDA2ZmMzNWJkYTkwNmE0ZGM3MzcyMDkxMmMwNDEzMTJkNDQ0YjA0ZDI2YjMyMGI2MmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA1MTlmOThiMzY2Yjg1YTk5MDMwOTkzNGQ2ZTVjNDQ2OWU5YTRkYTI4YWFmODk1MzQ2NWRmNjc4OTE1NDMxM2EifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L561-L639",
+          "resource": "repo://shared/scripts/verify.py#L564-L642",
           "version": "repo-lines-v1:sha256:c2ff6574cd71670cf08b9f09a692b5ef01302bad18ef70aeb9c4ac3ea654f8ec:eyJzZWxlY3RlZExpbmVDb3VudCI6NzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzZTkwZWQ3NjRlMTUyMjJmOGQ5YjAwMmZjMDJjOWY2NDAxZjkwNGFlZTNmNTgzNWM3YTFjNDg2MmU5ZGUwYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZjYmQ4ODM3MGQ3NzE2NWJmNGQ4ZmYyMDA3Y2Q2NDI3NGFhMGM0MTA3NmM2ZmIyNTcxZGUwNDQ4YzBlZDNkMTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRmMDA3OGZiY2NjMTE3M2EyNjZhZTcwZDgwOWFkNWZiNmFhYWI1MGVjMzAwNWRkNmZkMTJiZDk2ZDYzMTZlNTMifQ"
         },
         {
@@ -93,7 +93,7 @@
       "statement": "phase and closeout refuse to run when .claude is not its own Git repository, printing instructions to checkpoint nested state.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L3650-L3663",
+          "resource": "repo://shared/scripts/verify.py#L3766-L3779",
           "version": "repo-lines-v1:sha256:64e4aafe0adbe89449e2cd75ee7d4e73830cb213c2ebe4eb66a02bbfbae2366f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwNTE4ZjMxMjUzZjYzMjhlNTI0YmM1NTQyYzA3NjZjYjk1ZDU4Zjc2NGNmMzQ5YmJiZjliYTE5YmIwMGQyMzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZjJkODU0YmE2ZGEyNzhhMDEyMDE5ZWMwZWYyMTExNmRkMzQ1MTQ2Y2RhOWU2ODYxYWQ5NmY1NDYxYjBmNDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1NTM1ZjVlNjc3YmQzMTVjYjRhYTdhNWYyZWI2OGRlOWRmMjVhMzIzMTQ0YzAzNjBiMDk5YTgxOGQ3NzkwNjgifQ"
         }
       ]
@@ -103,7 +103,7 @@
       "statement": "openwiki_managed_state_violations checks three conditions with file reads and git queries only (a live OpenWiki managed block in AGENTS.md or CLAUDE.md, an untracked or newly staged openwiki-update.yml workflow, and a tracked or staged openwiki/.run.json), and generation_check fails VFY-GEN-001 on any violation before comparing the generated verifier with its source.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L2983-L3067",
+          "resource": "repo://shared/scripts/verify.py#L3065-L3149",
           "version": "repo-lines-v1:sha256:3d847f673b8ed414b62a6ba9adbd81cc9f49bbe80a8e2be196e3171ddf9cf49f:eyJzZWxlY3RlZExpbmVDb3VudCI6ODUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3NTBlM2ZlYjQ0MDI3NzE4MzM4YWY3M2U1Y2RmMTcxYjFjYzY2MTQwYzI3NDBkZDBhZWJjMmJhMzA1YzE3ZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1MTc1NDA3MGNlMWVkZmI2MWUzMGI0N2ViNGM0ZDhjZDViNDkxZDJkNWIyYjA3YzExNzA5NjFjYmRiZmYzZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEwYjMwY2E0NWEyNDJjZTU3NjMwYzZhZDJhNzExYzU5MTAyZjU3MmZiYmFmNWJmNTg0Y2ViOGJiYjcyOTE0NTEifQ"
         }
       ]
@@ -131,11 +131,11 @@
       "statement": "gate mode validates a passing closeout receipt for the given branch, phase, and head under a head relation of exact (head_sha equals HEAD and tree_sha equals the index write-tree), ancestor (receipt head is an ancestor of the pushed ref), or certified (the pushed commit is the direct child of the receipt head), and requires merge_base_sha to match the current merge base with dev.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L2011-L2065",
+          "resource": "repo://shared/scripts/verify.py#L2044-L2098",
           "version": "repo-lines-v1:sha256:3c3932e2f109e534ae09199758edf0c18d09d501a016f7ccfefd35b78dbeebc1:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5N2M1NjVjYjRmMTA3NjE4ZTY5ZjRkZTY5MTdlYjk5NjA4OTIwMjgwN2ZlOTM2NjY1ZGI1MzU1YWQ4MGI4Y2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhhNWMyYmIzMTViN2E1MGJhZGExZDkwNTFlMjU1MjcwY2I3OGQ1YjA1NDVmZWM1YTZhYmYwOTMwNjNjYWI2OGMifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L3613-L3650",
+          "resource": "repo://shared/scripts/verify.py#L3729-L3766",
           "version": "repo-lines-v1:sha256:4bc8b45be3c434771b4fe72f3deaf9da2069f885e2fe7e2aa63fbdcc1515a1a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlN2Q4NTY3YmJlYjI0NjQ5MDljMzhmOWY4ZTY3Yjg2MWQxOWYwOTBiZjkzNjJiMjNmNjUwZmU0MTA2Y2FlNTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwNTE4ZjMxMjUzZjYzMjhlNTI0YmM1NTQyYzA3NjZjYjk1ZDU4Zjc2NGNmMzQ5YmJiZjliYTE5YmIwMGQyMzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiNmZjODZiZWY3NDRhYTBjOGMzYzRiZmU2OGU0OTdiMTNiZGE4ZWFkMmJlZDFjNmMwN2YzNzY0ZWVkZjQwODIifQ"
         }
       ]
@@ -145,11 +145,11 @@
       "statement": "Under the exact head relation the gate enforces the verification-items contract with message prefixes G1 verification-results-missing, G2 verification-item-unrun, G3 verification-item-failed, and G4 optional-verification-unaccounted.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L342-L364",
+          "resource": "repo://shared/policies/workflow.instructions.md#L344-L366",
           "version": "repo-lines-v1:sha256:6b5241caf5a5a570a143e6e60a9b3495bb7c14025345d589c00b369759d6fb28:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlYmIwM2JjOTMwNDNiMWY5YzQ5ZDAyM2I5MmI1MWIwOTljNWE1Y2MyMjhkNmU4ZDY3MmI5MTI3ZGMwYmU5NDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRlNDMxZjM0NmQ1YzEzYjhkNjE2YzVkNmZhY2E5YTNlNzkxZGQ2NjBhM2EyNjU3NDdmOGE2YjQ5ZDc2ZmE1MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM4YmQ2ODhlMDVhYWNkNGE3NWZiOTRkOTM0ODdkNDNjY2ZiZDQ0ZWM3ZTJmMTIwNWNmZDJmNmM0MTRhMDE2YzEifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L1923-L2010",
+          "resource": "repo://shared/scripts/verify.py#L1956-L2043",
           "version": "repo-lines-v1:sha256:2da8d18d48aeac8c0d8403d086272373b4b7cd615f3bfa620707984485437b3e:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiYjMyMzg0YTZiYzdhYWI4NzQ4NTgxMTM1NjVlYjA3NTM3NzlkZjQ3OTBhN2U1N2E5MDMxOWVjYTNiNjRjZWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkOTFlMDM2YWNmMmQ3YTRkNjI0ZDRlMmU5MTk1MTAzYmRhNWIyNmVhNmRhMWQ5ZTRlZGI1OWI5NDE1YThhZDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzOGRmMWM4ZTI1NDI2ODdkZWQxNjg4YTU2Yzg4OWJmY2Y4Njc4NGFmNDFmMmMzN2FiOTE4NjhhNjdiOTliMTcifQ"
         }
       ]
@@ -177,15 +177,15 @@
       "statement": "The closeout session log must carry LEARN evidence as explicit [LEARN:category] entries or the exact marker '[LEARN] none - no new lessons this session' outside fenced code blocks; MEMORY.md's modification time is never a substitute, and a closeout whose diff touches no documentation needs an explicit --documentation-na reason.",
       "evidence": [
         {
-          "resource": "repo://docs/runtime-checks.md#L636-L640",
+          "resource": "repo://docs/runtime-checks.md#L706-L710",
           "version": "repo-lines-v1:sha256:c1483ac262c1142d2401f017e567b5b86d38d1ae58056226540182756848ac26:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODUwNjVjZGViMDk1OWQxMjM4OWViMTJiNTAxOWNmMTViZmZiOGYxN2M3YTE2MzAwZWVkMGI5ZWU1NDFlYTU0MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjhiZTQzNzAyMGFhMmI2ZTQ3YjA1ZDY4N2FlMjgzMDczYWRmNGM0MDU3NWJiYjhiNTVkY2FmMWRlMTEwYzZiYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjdhY2YyNjA3ODU1YWZkZTQ4YTAxMDEwYmRjNmI1MDY2NDVlOWE0OGU4Njc2YWJhZDAyZTI1YTU1ZDA2Zjg3MCJ9"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L2512-L2570",
+          "resource": "repo://shared/scripts/verify.py#L2594-L2652",
           "version": "repo-lines-v1:sha256:ba7c98f8aa92a296b580873eba14e86c5ff261a8da0a74c6ca0bef570b334ea6:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzZjg5YWIwMWFkMGVhYzk5NjQ5ZmUwN2FhZWE5MTcxN2FjYWQzYTZjNzkyZjZmMzUyNDdmNGU1YzBiNzk1ZDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI5NjZiMTUwYmRkOGNmY2NhMjA1ZGIxOGQ0NmFlMjNmMTYyOWY5Y2QwYTQzMmFmNmQxMWE2YzM2Yzk3MDc4ZWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYwYTZlMjgyMDk4MDBhODRmODNmNGQ4MmFmZjVmYjg0NGM5ZTQ1Mzc1MjZjZjVlYzgzMDA5OTNkZGM0OTIwOTQifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L3114-L3133",
+          "resource": "repo://shared/scripts/verify.py#L3217-L3236",
           "version": "repo-lines-v1:sha256:059a4dbae877cf6a8c510413af72706789c621f0e2628396670a3f2d644ecb41:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlNzE1OWM2YjNlOGM0ZmM4NjllZTUwYzNjMjg0MDU5MTczZDY2ZDE4ZTBlMjc2ZGJlMGM3NDYzMWZkNjcxZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlhODJlYmU5ZWQ0MDdjM2E2YmE0YjAwMzQyOTJiYWE1MmMxMWNlNWFlMjg2MTA3NDAyZGU0NzkyZWVlY2FjZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5YzgyN2I3NTZkOGQ1ZmNjMDg0ZWUzNGRjNTVjN2IwMjNjMDI0NjEyODM5NWZhYjkyZmE1NWE5ZWUzMTM3NWIifQ"
         }
       ]
@@ -195,11 +195,11 @@
       "statement": "historical_chain_errors walks every earlier completed phase at push or PR time, requiring each receipt's head_sha to resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches tree_sha, and re-verifying the recorded receipt, findings, and closeout-log artifact hashes; closed session logs are therefore immutable and corrections use a sibling errata file.",
       "evidence": [
         {
-          "resource": "repo://docs/runtime-checks.md#L608-L634",
+          "resource": "repo://docs/runtime-checks.md#L678-L704",
           "version": "repo-lines-v1:sha256:5afd7facef931e4692fbff42457663f8f732b05d5ed0625a49ddb79527256236:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyMzM3ZDc0Njc3Nzk1OTcwZmJlMTdkYzg4NTU4MTRiNDdjMzFhNDBjNzc2NTcwZjIyNmE1ZTlkZDViODVjYzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhYTBkMmQ5ZThkYmM2YWJmMDBlODBjNTIxNWZjMTdlNmYxMDYwODU1ZWEzZjI3NDY4ODg1MGUxMjQ2YmFmOGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA3MWU1NzZhYjNhYTA0N2VmZWYyYWZhZDAzZmM0YjliM2I4NDNhYzQ0NWZmNGUyYjE4ODc0MWY2ODAzMDJjN2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdkODk4NTdjYjk0NzMxNmZmNDdlOWE1MTU4NDkyOGRiNmRhOTkzOGUwMzU5ODIyNWExNzkxNGU1NWY4NmJkYjcifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L1751-L1894",
+          "resource": "repo://shared/scripts/verify.py#L1784-L1927",
           "version": "repo-lines-v1:sha256:fc0e83cd080d16f0f0df44bcaa54efa85213650d1e03b4b09f69dc54a2f6bcd6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQ0LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI5Y2MyOTAwZmJkM2EwMDJmNWEwYzdjNjg0NWRkOTkwYzdhMWQwYmQ1ZTAwOGJjZDg4NGQ0OWQ2ZGMzMzBmNTgwIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJlMmFlZjQyMmU0NWU0MjhhM2U3MzZhM2I1ZWRmNWZjNjczYWQ1MzBhYmRiZGM5YjNmOGNiY2RiYTljYjg4NDgzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI0YjkxYTBhMDJjYjlhYjMwZjRlZTI4YmY4NTJlMjJmNTVkMzI3ODE2YTcyYTRjMWFkZmUwZWM5ZDA3MjNlYjgwIn0"
         }
       ]
@@ -209,11 +209,11 @@
       "statement": "Each lint, type, generation, or pytest command that phase mode runs through run_process is bounded by COMMAND_TIMEOUT_SECONDS = 480, kept below the 600-second per-item budget because a required closeout item may itself be verify.py phase; a command that exceeds it is reported UNVERIFIED (for pytest: 'pytest did not run: ...'), which leaves the phase receipt unable to satisfy VFY-RECEIPT-001 at closeout.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/verify.py#L155-L164",
+          "resource": "repo://shared/scripts/verify.py#L158-L167",
           "version": "repo-lines-v1:sha256:16717f18ad405d4356d3ddaa7fc2cfb402de81f787f2ad8cd42b57b2fce3fab8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQwYzEzYWEwM2NjZWRlM2FjYzNiNGMxNzgzNmRmMjBjNjdkZDdlYzZiMDZhMjIyNjNlMmNkNzVlYzBlOTY2N2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE3OWI0NzM0NjE2OGY4ZWRlYzQxODQxYTU5Yzg5YzE2MTkxODYzMzJjMmE0YWEyODg4YjZjYWQ1N2E0MTU5YmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L2838-L2842",
+          "resource": "repo://shared/scripts/verify.py#L2920-L2924",
           "version": "repo-lines-v1:sha256:81dc20780c90702fb14850516519101d3dec919b04d242299bd497f86d556382:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkwOWE1M2E2MThkMDI4ZTFkMzAwMGMwYTdhYmNlZWNiZTVmYjM3ZjRlNTExZWZlNDY2NDNmYWQ2ZTY2ODcyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDZkMzU1ODM1NWM4MzZkZGJhYTE4MmU0YTcyNjQ2Mjc3MmQxOGRjYzA1M2IzZTBlM2Q1ZTQ5ZGUzN2JmOTlmZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGY1OGIyYWYwNmE3OTk4NmUxOTE4YmM0M2VlNWZmM2JkNTU5MGU4YTg3Nzc2MDY5ZTRjYWQzNDY0MzBkMTJhNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTg1YmZmZjRmMzQxY2YyZjUwZjZjZjVjMWFhZjA3NjE1NWQzMGExMDUxZDQ0ZWQzMzBmOWVhMzhmNzdkMDAzYyJ9"
         },
         {
@@ -224,8 +224,12 @@
     },
     {
       "id": "claim_39bd5a16c32840519c4433ffc68fbec8",
-      "statement": "required_review_profiles checks test surfaces first (tests/ prefix, test_*.py, *_test.py, conftest.py require tests) and otherwise requires code, architecture, security, tests, and ponytail for control-plane, generator, and dependency paths, using the receipt's changed_paths; the commit gate always applies the gate-result and profile rules, while the ancestor and certified push gates apply them only to reports whose schema_version is not an integer below 2.",
+      "statement": "required_review_profiles checks test surfaces first (tests/ prefix, test_*.py, *_test.py, conftest.py require tests) and otherwise requires code, architecture, security, tests, and ponytail for control-plane, generator, and dependency paths, using the receipt's changed_paths; the commit gate applies the profile rule to every commit and the gate-result rule at phase completion, while the ancestor and certified push gates apply them only to reports whose schema_version is not an integer below 2.",
       "evidence": [
+        {
+          "resource": "repo://shared/scripts/verify.py#L2277-L2286",
+          "version": "repo-lines-v1:sha256:e1e84aace6d0898f9273631aab0048c82b546ef1c44eb8b9f821c9544de22792:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMzM1MzE3M2IyNDUxMWY5NTk0YjUxN2QwM2JmYmExMDEyMDhmYThhN2VmMzJlZWRlZDgwMzdmNzViNTY0OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYTczNzYyNTcwM2VmNDYxMmJlMmZlYmQ2YmM0OTViMzdjODkyZTJkYmQ5OGM1MjMxYWVhZTRjYzg2OGM4YTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ0NDQ1NDc4Y2VkNDQ1MDk2N2RkMjQwYjNmNmYxMjFhMWY5MGVlM2I1MjU1MzYyMmZjOTBkOWIzMWYxNzVmMjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY0MDQyNmFjMTlmYmJlMWQ4NjQyYWY1ZWM2MjViYTJhZjQ2YTZiMjNjNmU2N2M4ODljOWQwYzc1OTI3MTFkYzgifQ"
+        },
         {
           "resource": "repo://shared/scripts/verify.py#L2428-L2450",
           "version": "repo-lines-v1:sha256:91a70ccd5fbce2d168ca40fc8a0410fbb99cb697db174a122b6a6299d4e30e67:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NzU1MTY2NDJhMzFiNDdhNzM3OGEwNGE5NTM2MWFiN2Y3ODYxZDJjOTUwMWY0Yjc2NDJkZWRhNjUwYTlkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyZWEyZWYwNTkyYjg1NzYxMDQ2OTI4ZWMyYzZmNTNmZDZmN2E2OTY0MTMyM2IyZDBlZjE4YjZhY2Y4MDYwMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNlZjk3YjQwYTBhYWIyYTk4NDdkNWZkMGJmZjYzZjdmNWU2YTI1MGZkMjg1MGI3MmUzODBjMzEwZmYzY2IwNDIifQ"
@@ -249,10 +253,28 @@
           "version": "repo-lines-v1:sha256:14ee8ef178f1b48707601ffaed86ab2d3ff899b348d98dbe7c0849c84e366b82:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE0ZjE5MmJiODE2MzRkNTJjZTZlZDc2YTVhNDM5MjJhYjZkYjIxNGEyYmNjYjcwZTZiNTljMmU2MmRmYWIyMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzU1NmQ3OThjZDM3Nzg1NzgwODY5NmMzMmNhMDYxNjdmYjQwNTkzNzNmYWM5ZmQ2MTE5ZDAyODdlYmRlOWQzYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzIxYzE3OTU5ZjNhODRlY2MwYjhmM2M0MzljYzQxNmY4MjNmMDdmNTRmYWZmN2E5NTQ0ZDg0OWZjNGQyMTVlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODgwMzYyOTdkNWQzZTk4MWU5NjU4ZDE1YjFjZWExYzgyYWRjYTM2MWIzMzU1OWFlNGFlMDYxZGU5YTQ0MzI2OSJ9"
         }
       ]
+    },
+    {
+      "id": "claim_3431cc2aae5446a08360c398831e8ce2",
+      "statement": "When the phase receipt, the findings report, or the closeout session log does not exist, verify.py closeout prints one 'closeout evidence is missing' line naming the path and the step that creates it, exits 2, and persists no receipt; a symlinked or non-regular artifact is still refused with a message that says which.",
+      "evidence": [
+        {
+          "resource": "repo://shared/scripts/verify.py#L3162-L3184",
+          "version": "repo-lines-v1:sha256:9b6531eff7208aedbb048a98a4b58152214299dd9b9f922a282664e508edf0c8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3OGNjMjdlZmIyZjU1ZWFkYTcyMGY4NDdkZTNlOTZlMjlmM2QzM2MxZjE0ODhiZWMwZWRkMDJmZWY5MjIxYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2ZmVlYmQzOWVhYjEwOGI3Nzg2ODQ4ZWRiZWI4ZTRjMDM3NDlkZTU0ZWUwMGFiYjcyNDgyOGY0NjY2NDI3MDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImViY2E2NjM5YmNkYzQyNWM1MDRlZGJjODYwODEzMDQwNTEyMzU1NzY1MzJhYmJmMGExZjJiMDcxOTEwNmVhZTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRhOWY2OTIwMmZlYzU2MTQzOGRkNzZiODcwNzY5ODUxODg0Mjk0NzAxN2UyNjdmMjY5MTYxZDlkNDExMDk1MmQifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L3826-L3830",
+          "version": "repo-lines-v1:sha256:bb0239515626a15efc3e6c57f327129498a7d757908fe21d9fff3f61ded16ac9:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjU2OWNiMDkyODBlZTA3ODE5NDVlNDhkNDA0MWJkMmRmYWFlNjkxYWQyZWFiZjVkM2NiYTA4NDZjNzIxNmNhYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZWFhZjAzMzcxNTYwNzczZjJiOWUzNjRjOTQyMjQ0OTJjNDdjNTU5YmJlNmQ5NTEzMjYwYmU2NDhmYjAzZTg3ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDUzOGQ2NGZlNTViMTMwYjI4ZTE1YzgwOThjN2E2YzdkNGRmNzRjZGFjZGU4MDYzODhjOTgyMTBkNmZhMzY1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjQxY2I2ZTJmZDljYmEwMWViZWRhZjcyNTM4YjdiNGVjNzUwOTFhMzg3ZmVhMmE2ZmM0ZGZlYmQ4N2E0YWNiNyJ9"
+        },
+        {
+          "resource": "repo://tests/test_verify.py#L4684-L4720",
+          "version": "repo-lines-v1:sha256:06c54658f5bd1a585945ad28698aa8a457eae1c066facf4f72e6bc9893b70979:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2NTA2NjUxMDRkZjc1YTNiMjAzYmRjYWY3YTExMjdkMzRkNTIxNDIwZDc4Zjk0YTZiMGJiNmM3ZWMxM2M1MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyZmIwYTQ2MjBlZDhjNDY4NGZlZjVhY2FjNjY2NDViZjk1OTkyOGVjMzdlMDM3Njc3NzJlOGIwMzNlZmYwZjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgzNGVmOTQ2MDkxNzJlN2RjN2VkMjJjNjc5Y2UwYzU2YmIzYTRjZmVkNzU1OTE0YTlmY2JjMGZmNTM1ZDMzMmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM1NTkxZmNiMjQ0MzVmMWJiZGY2MWE0MmJjYzc5ZDgwOWI3MzM4MjllOTNkMjZkYWE1NGQ1YjBkOWNlMGQ0MjEifQ"
+        }
+      ]
     }
   ],
   "verification": {
-    "by": "openwiki/0.5.2",
-    "at": "2026-10-17T10:13:26.159Z"
+    "by": "openwiki/0.7.2",
+    "at": "2026-10-21T02:32:20.957Z"
   }
 }
