@@ -1267,11 +1267,14 @@
 - [LEARN:tooling] The `protect-files.sh` hook denies compound Bash commands
   it cannot parse (seen with `rm -rf`, `tar -x`, `git apply` in chains or
   loops). Split them, or put multi-step file work in a scratch Python
-  script. Since it fails closed (backlog-followups Phase D), a read-only
-  chain whose text names a protected folder can also be denied ("could not
-  evaluate the request safely", exit 2; seen with `grep` for
-  `.claude/hooks/`); search with a scratch Python script that takes the
-  repository path as an argument.
+  script. Since it fails closed (backlog-followups Phase D), a quoted `|`
+  argument in the middle of a pipeline is denied too: `printf 'x|y\n' |
+  grep '|' | head -1` gets "could not evaluate the request safely"
+  (`hooks-errors.log`: "empty shell command segment"), while the same
+  quoted `|` in the last segment, or a `grep` for `.claude/hooks/`, is
+  allowed. Keep a quoted `|` in the last segment (`... | grep -c '|'`
+  passed), or use a scratch Python script. Parser bug not yet fixed
+  (found 2026-10-21).
 - [LEARN:workflow] A coder and a documenter can run one phase in parallel
   when the plan fixes the behavior exactly; tell the documenter to describe
   the coder's behavior without quoting output strings that do not exist
