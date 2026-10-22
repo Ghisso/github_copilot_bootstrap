@@ -1,7 +1,7 @@
 ---
 name: sidecar-onboard-and-validator
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: sidecar-onboard-and-validator_implementation
 started_at: 2026-10-22T12:35:06Z
@@ -9,7 +9,7 @@ phases:
   - 2026-10-22_phase-A-validator-pytest-error
   - 2026-10-22_phase-B-sidecar-onboard
   - 2026-10-22_phase-C-knowledge-refresh
-current_phase:
+current_phase: 2026-10-22_phase-A-validator-pytest-error
 ---
 
 # Big Plan: Sidecar Onboarding and Validator Error
@@ -39,7 +39,7 @@ The 2026-10-22 planning check generated the unchanged source to `/tmp/sidecar-on
 
 ## Phases
 
-- [ ] `2026-10-22_phase-A-validator-pytest-error` — give the validator an actionable missing-dependency failure and test both environments.
+- [x] `2026-10-22_phase-A-validator-pytest-error` — give the validator an actionable missing-dependency failure and test both environments.
 - [ ] `2026-10-22_phase-B-sidecar-onboard` — add the safe skill, validation, upgrade test, and sidecar docs.
 - [ ] `2026-10-22_phase-C-knowledge-refresh` — refresh OpenWiki and audit live documentation and memory for stale claims.
 
