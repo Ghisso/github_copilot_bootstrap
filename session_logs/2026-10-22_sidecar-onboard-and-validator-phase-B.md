@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-22
 **Plan:** `.claude/plans/2026-10-22_phase-B-sidecar-onboard.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -27,8 +27,13 @@ Ship a workflow-only sidecar `onboard` skill that records evidence-based project
 - Focused sidecar and validator tests: 272 passed in 78.12s, exit 0.
 - Direct `uv run python scripts/validate_targets.py`: PASS, exit 0.
 - Fast verifier: PASS (Ruff check and format, 0 violations).
+- Phase receipt: PASS; Ruff and mypy clean, generated runtime matched source, and the full suite reported 4,950 passed, 1 skipped.
 - optional 1: PASS — Claude Code 2.1.226 positive onboarding, repeat-run pointer, and tracked-file symlink refusal all matched the client fixture requirements; tracked Git status remained clean.
-- Required closeout summary lines: pending dry run.
+- `PASS        0.3s  uv run python scripts/generate_targets.py --all`
+- `PASS       79.8s  uv run pytest tests/test_sidecar_workflow_scenario.py tests/test_validate_targets.py -q --tb=short`
+- `PASS       47.7s  uv run python scripts/validate_targets.py`
+- `PASS      295.2s  uv run python .claude/scripts/verify.py phase --format text`
+- Closeout dry run: PASS.
 
 ## Open Questions / Next Steps
 

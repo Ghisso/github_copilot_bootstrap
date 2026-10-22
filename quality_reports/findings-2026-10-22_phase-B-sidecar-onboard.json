@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-10-22T14:46:58Z",
+  "branch": "sidecar-onboard-and-validator_implementation",
+  "head_sha": "7c6fdf58939d07e33d6ea4ac7edc5f3ea0029b88",
+  "base_ref": "dev",
+  "merge_base_sha": "9292776c46d679f7e8a2b1607f0368dc04e4b140",
+  "phase": "2026-10-22_phase-B-sidecar-onboard",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "2dafbab19748cbac009d0a14b3e24b37c5379284",
+  "changed_files": [
+    ".github/workflows/validate.yml",
+    "README.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "shared/sidecar/workflow/skills.txt",
+    "shared/sidecar/workflow/skills/onboard/SKILL.md",
+    "tests/test_sidecar_workflow_scenario.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
