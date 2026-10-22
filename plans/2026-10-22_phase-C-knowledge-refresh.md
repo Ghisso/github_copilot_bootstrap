@@ -3,7 +3,7 @@ name: 2026-10-22_phase-C-knowledge-refresh
 type: small-plan
 parent_plan: sidecar-onboard-and-validator
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

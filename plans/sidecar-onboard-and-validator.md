@@ -9,7 +9,7 @@ phases:
   - 2026-10-22_phase-A-validator-pytest-error
   - 2026-10-22_phase-B-sidecar-onboard
   - 2026-10-22_phase-C-knowledge-refresh
-current_phase: 2026-10-22_phase-B-sidecar-onboard
+current_phase: 2026-10-22_phase-C-knowledge-refresh
 ---
 
 # Big Plan: Sidecar Onboarding and Validator Error
