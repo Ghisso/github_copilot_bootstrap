@@ -1,7 +1,7 @@
 ---
 name: sidecar-onboard-and-validator
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: sidecar-onboard-and-validator_implementation
 started_at: 2026-10-22T12:35:06Z
@@ -9,7 +9,7 @@ phases:
   - 2026-10-22_phase-A-validator-pytest-error
   - 2026-10-22_phase-B-sidecar-onboard
   - 2026-10-22_phase-C-knowledge-refresh
-current_phase: 2026-10-22_phase-C-knowledge-refresh
+current_phase: 
 ---
 
 # Big Plan: Sidecar Onboarding and Validator Error
