@@ -6,8 +6,8 @@ originating_branch: dev
 implementation_branch: sidecar-onboard-and-validator_implementation
 started_at: 2026-10-22T12:35:06Z
 phases:
-  - 2026-10-22_phase-A-sidecar-onboard
-  - 2026-10-22_phase-B-validator-pytest-error
+  - 2026-10-22_phase-A-validator-pytest-error
+  - 2026-10-22_phase-B-sidecar-onboard
   - 2026-10-22_phase-C-knowledge-refresh
 current_phase:
 ---
@@ -22,29 +22,30 @@ The 2026-10-22 planning check generated the unchanged source to `/tmp/sidecar-on
 
 ## Goals
 
+- Replace the validator's raw missing-`pytest` traceback with a short, actionable failure while keeping the hook gate check mandatory.
 - Add a workflow-only `onboard` skill at both sidecar skill roots, with its own source text and all persistent writes under `.ai-bootstrap/`.
 - Keep the skills-only profile unchanged, and prove a real team repository upgrades by adding only the two new skill folders without changing tracked files.
-- Replace the validator's raw missing-`pytest` traceback with a short, actionable failure while keeping the hook gate check mandatory.
 - Update public documentation and refresh the enabled OpenWiki knowledge layer through its own tools.
 
 ## Constraints and Design
 
 - Use `shared/sidecar/workflow/skills/onboard/SKILL.md` as the single special case in `render_sidecar()`. Copy it in place of `shared/skills/onboard/` only for the workflow profile. Do not add a general skill override framework.
-- The skill writes `.ai-bootstrap/project-context.md` and one pointer entry in `.ai-bootstrap/MEMORY.md`. It reads the team's tracked instructions as authority, uses direct reads and `rg`, and leaves all tracked paths untouched. The installer and skill do not create another state root.
+- The skill writes `.ai-bootstrap/project-context.md` and one pointer entry in `.ai-bootstrap/MEMORY.md`. It refuses symlinked or tracked state paths and any resolved destination outside `.ai-bootstrap/` before writing. It reads the team's tracked instructions as authority, uses direct reads and `rg`, and leaves all tracked paths untouched. The installer and skill do not create another state root.
 - The validator must reject forbidden full-install references in either generated `onboard` copy, including case variants of the wiki name and the full-install memory path. Keep a test that proves the check catches a deliberately inserted forbidden reference.
 - Review the control-plane diff with `code`, `architecture`, `security`, `tests`, and `ponytail` profiles. Apply `ponytail` in full mode during implementation. Commit once per completed small plan and push normally. The user decides whether to create a pull request or merge.
+- Run required phase and closeout checks in the repository devcontainer or an environment with its full test, lint, and type-check toolchain. The isolated `uv` interpreter is an expected-failure probe for the missing-dependency message, not a closeout environment.
 - Do not change the file-protection guard on the current evidence. If a later exact payload reproduces the reported status 2, add a separately planned regression and fix that still denies uncertain writes.
 
 ## Phases
 
-- [ ] `2026-10-22_phase-A-sidecar-onboard` — add the safe skill, validation, upgrade test, and sidecar docs.
-- [ ] `2026-10-22_phase-B-validator-pytest-error` — give the validator an actionable missing-dependency failure and test both environments.
+- [ ] `2026-10-22_phase-A-validator-pytest-error` — give the validator an actionable missing-dependency failure and test both environments.
+- [ ] `2026-10-22_phase-B-sidecar-onboard` — add the safe skill, validation, upgrade test, and sidecar docs.
 - [ ] `2026-10-22_phase-C-knowledge-refresh` — refresh OpenWiki and audit live documentation and memory for stale claims.
 
 ## Verification
 
 ```bash
-uv run python scripts/validate_plan_frontmatter.py .claude/plans/sidecar-onboard-and-validator.md .claude/plans/2026-10-22_phase-A-sidecar-onboard.md .claude/plans/2026-10-22_phase-B-validator-pytest-error.md .claude/plans/2026-10-22_phase-C-knowledge-refresh.md
+uv run python scripts/validate_plan_frontmatter.py .claude/plans/sidecar-onboard-and-validator.md .claude/plans/2026-10-22_phase-A-validator-pytest-error.md .claude/plans/2026-10-22_phase-B-sidecar-onboard.md .claude/plans/2026-10-22_phase-C-knowledge-refresh.md
 ```
 
 ## Completion Evidence
