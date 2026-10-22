@@ -9055,6 +9055,57 @@ def sidecar_workflow_unit_frontmatter_errors(target_root: Path) -> list[str]:
     return errors
 
 
+def sidecar_onboard_skill_errors(target_root: Path) -> list[str]:
+    """Check both workflow onboard copies for safety and output instructions."""
+    skill_paths = [
+        target_root / write_root / "onboard" / "SKILL.md"
+        for write_root in SIDECAR_SKILL_WRITE_ROOTS
+    ]
+    if not all(path.is_file() for path in skill_paths):
+        return []  # The shared sidecar completeness check reports missing files.
+
+    skill_texts = [read(path) for path in skill_paths]
+    errors: list[str] = []
+    if skill_texts[0] != skill_texts[1]:
+        errors.append("workflow onboard skill copies differ between write roots")
+
+    for path, skill_text in zip(skill_paths, skill_texts, strict=True):
+        folded_text = skill_text.casefold()
+        for token in (*SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS, ".claude/MEMORY.md"):
+            if token.casefold() in folded_text:
+                errors.append(f"{path} still references {token!r}")
+        nested_git_path = r"(?P<quote>['\"]?)(?:\./)?\.claude(?:/[^\s'\"`]*)?(?P=quote)"
+        if re.search(
+            rf"\bgit\s+(?:-C\s+|--git-dir(?:=|\s+)){nested_git_path}(?=\s|$|`)",
+            skill_text,
+            re.IGNORECASE,
+        ) or re.search(
+            rf"\bcd\s+{nested_git_path}\s*(?:&&|;)\s*git\b",
+            skill_text,
+            re.IGNORECASE,
+        ):
+            errors.append(f"{path} references a nested .claude Git command")
+        for safeguard in ("symlink", "tracked"):
+            if not re.search(
+                rf"\brefus\w*\b[^\n]*\b{safeguard}\w*\b",
+                skill_text,
+                re.IGNORECASE,
+            ):
+                errors.append(f"{path} must refuse {safeguard} destinations")
+        if "## Team conventions" not in skill_text:
+            errors.append(f"{path} must require a ## Team conventions section")
+        if not re.search(
+            r"\bread\b\s+`?\.ai-bootstrap/project-context\.instructions\.md`?"
+            r"\s+before\s+coding\b",
+            " ".join(skill_text.split()),
+            re.IGNORECASE,
+        ):
+            errors.append(
+                f"{path} must tell later sessions to read project context before coding"
+            )
+    return errors
+
+
 def sidecar_target_errors(
     target_root: Path, profile: str = SIDECAR_DEFAULT_PROFILE
 ) -> list[str]:
@@ -9080,6 +9131,7 @@ def sidecar_target_errors(
         errors.extend(sidecar_bridge_errors(target_root))
     else:
         errors.extend(sidecar_workflow_unit_frontmatter_errors(target_root))
+        errors.extend(sidecar_onboard_skill_errors(target_root))
     return errors
 
 

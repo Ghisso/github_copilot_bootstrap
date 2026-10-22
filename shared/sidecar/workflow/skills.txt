@@ -7,7 +7,6 @@ deep-audit: audits this bootstrap repository's own instruction and skill consist
 code-review: names the full install's persisted-findings script
 run-tests: names the full install's deterministic verifier script
 code-style: names the full install's deterministic verifier script
-onboard: names Model Context Protocol tools and the generated wiki knowledge layer
 plan-decomposition: names the full install's deterministic verifier script and the generated wiki knowledge layer
 refactor: names the full install's deterministic verifier script
 documentation: names the generated wiki knowledge layer and a full-install instructions path

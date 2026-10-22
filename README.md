@@ -568,6 +568,15 @@ see `docs/sidecar-provider-contract.md`):
   (`plan-big.md`, `plan-small.md`) at `.claude/templates/`.
 - A namespaced state folder, `.ai-bootstrap/` at the repository root (not
   under `.claude/`) — see **The state folder** below.
+- An `onboard` skill at `.claude/skills/onboard/` and
+  `.agents/skills/onboard/`. It is available only in the `workflow` profile.
+  It checks the team's tracked instructions, code, tests, configuration,
+  folder layout, and recent commit subjects, then writes
+  `.ai-bootstrap/project-context.instructions.md`. Its `## Team conventions`
+  section separates written rules from patterns inferred from repeated
+  examples, cites the evidence, and yields to the team's tracked guidance.
+  The skill also adds one pointer in `.ai-bootstrap/MEMORY.md` telling later
+  sessions to read the context file before coding.
 
 Client coverage differs by unit kind (native-run evidence in
 `docs/sidecar-provider-contract.md`, "Workflow profile evidence"): Claude
@@ -576,6 +585,11 @@ and the skills; Codex gets the skills and the state folder only. No
 `.github/agents` or `.codex/agents` file ships — neither client has a
 config-free way to discover a custom agent from an ignored file. The
 workflow agents carry no `mcp__` tool grants.
+
+Claude Code's workflow rule reads the memory pointer in later sessions.
+Codex has no equivalent workflow rule in this overlay, so invoke `onboard`
+or explicitly read `.ai-bootstrap/MEMORY.md` and
+`.ai-bootstrap/project-context.instructions.md` before making a change.
 
 A skill is copied whole — its `SKILL.md`, any reference files, and any
 helper scripts — the same way at both profiles.
