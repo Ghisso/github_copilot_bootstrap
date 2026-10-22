@@ -2347,6 +2347,84 @@ def test_validate_targets() -> None:
     assert "PASS generated target is structurally valid" in result.stdout
 
 
+def test_hook_gate_regression_tests_explains_missing_pytest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing pytest reports one installation route without running the smoke test."""
+    calls: list[object] = []
+
+    def record_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess([], 0)
+
+    monkeypatch.setattr(target_validator.importlib.util, "find_spec", lambda _: None)
+    monkeypatch.setattr(target_validator.subprocess, "run", record_run)
+    errors: list[str] = []
+
+    target_validator.validate_hook_gate_regression_tests(errors)
+
+    assert errors == [
+        "tests/test_hook_gates.py requires pytest; run in the repository "
+        "devcontainer or use `uv run --with pytest python "
+        "scripts/validate_targets.py`."
+    ]
+    assert "Traceback" not in errors[0]
+    assert calls == []
+
+
+def test_hook_gate_regression_tests_runs_when_pytest_is_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Available pytest keeps the mandatory hook-gate smoke test enabled."""
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def record_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        target_validator.importlib.util, "find_spec", lambda _: object()
+    )
+    monkeypatch.setattr(target_validator.subprocess, "run", record_run)
+    errors: list[str] = []
+
+    target_validator.validate_hook_gate_regression_tests(errors)
+
+    assert errors == []
+    assert calls == [
+        (
+            ([sys.executable, str(REPO_ROOT / "tests" / "test_hook_gates.py")],),
+            {
+                "cwd": REPO_ROOT,
+                "text": True,
+                "capture_output": True,
+                "check": False,
+            },
+        )
+    ]
+
+
+def test_hook_gate_regression_tests_reports_a_failing_smoke_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A nonzero hook-gate smoke test remains a validation error."""
+    monkeypatch.setattr(
+        target_validator.importlib.util, "find_spec", lambda _: object()
+    )
+    monkeypatch.setattr(
+        target_validator.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [], 1, stdout="one hook test failed\n", stderr=""
+        ),
+    )
+    errors: list[str] = []
+
+    target_validator.validate_hook_gate_regression_tests(errors)
+
+    assert errors == ["tests/test_hook_gates.py failed:\none hook test failed\n"]
+
+
 def test_mcp_server_parity_errors_fail_independently() -> None:
     """A single drifted/missing server must fail on its own, never bundled
     with, or masked by, an unrelated server's result."""
@@ -4445,6 +4523,99 @@ def test_sidecar_target_errors_rejects_an_agent_naming_verify_py(
     )
     errors = sidecar_target_errors(tmp_path, "workflow")
     assert any("still references" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("write_root", "forbidden_text", "error_fragment"),
+    [
+        (".agents", "Call `mcp__example__search`.", "mcp__"),
+        (".claude", "Read `.claude/instructions/team.md`.", ".claude/instructions/"),
+        (".agents", "Ask OpEnWiKi for context.", "openwiki"),
+        (".claude", "Read `.claude/MEMORY.md`.", ".claude/MEMORY.md"),
+        (".agents", "Run `git -C .claude status`.", "nested .claude Git"),
+        (".agents", 'Run `git -C ".claude" status`.', "nested .claude Git"),
+        (".claude", 'Run `cd ".claude" && git status`.', "nested .claude Git"),
+        (".agents", "Run `git -C './.claude' status`.", "nested .claude Git"),
+        (".claude", 'Run `cd "./.claude" && git status`.', "nested .claude Git"),
+    ],
+)
+def test_sidecar_onboard_rejects_forbidden_references_in_either_copy(
+    tmp_path: Path, write_root: str, forbidden_text: str, error_fragment: str
+) -> None:
+    """Each generated skill copy is checked before consumers can install it."""
+    render_sidecar(tmp_path, "workflow")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+    skill_path = tmp_path / write_root / "skills" / "onboard" / "SKILL.md"
+    original = skill_path.read_text(encoding="utf-8")
+    skill_path.write_text(original + f"\n{forbidden_text}\n", encoding="utf-8")
+
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(str(skill_path) in error and error_fragment in error for error in errors)
+
+    skill_path.write_text(original, encoding="utf-8")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+
+
+def test_sidecar_onboard_rejects_divergent_copies(tmp_path: Path) -> None:
+    """The Claude and Codex discovery roots must get identical skill text."""
+    render_sidecar(tmp_path, "workflow")
+    skill_path = tmp_path / ".agents" / "skills" / "onboard" / "SKILL.md"
+    original = skill_path.read_text(encoding="utf-8")
+    skill_path.write_text(original + "\nExtra advice.\n", encoding="utf-8")
+
+    assert any(
+        "onboard skill copies differ" in error
+        for error in sidecar_target_errors(tmp_path, "workflow")
+    )
+
+    skill_path.write_text(original, encoding="utf-8")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+
+
+@pytest.mark.parametrize(
+    ("missing_contract", "pattern", "error_fragment"),
+    [
+        (
+            "symlink refusal",
+            r"^.*\brefus\w*\b[^\n]*\bsymlink\w*\b.*(?:\n|$)",
+            "refuse symlink",
+        ),
+        (
+            "tracked refusal",
+            r"^.*\brefus\w*\b[^\n]*\btracked\w*\b.*(?:\n|$)",
+            "refuse tracked",
+        ),
+        ("conventions heading", r"## Team conventions", "Team conventions"),
+        (
+            "memory pointer",
+            r"\bread\b\s+`?\.ai-bootstrap/project-context\.instructions\.md`?\s+before\s+coding\b",
+            "read project context before coding",
+        ),
+    ],
+)
+def test_sidecar_onboard_rejects_missing_contract_in_both_copies(
+    tmp_path: Path, missing_contract: str, pattern: str, error_fragment: str
+) -> None:
+    """Required instructions cannot disappear even when both copies agree."""
+    render_sidecar(tmp_path, "workflow")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+    skill_paths = [
+        tmp_path / write_root / "skills" / "onboard" / "SKILL.md"
+        for write_root in (".agents", ".claude")
+    ]
+    original = skill_paths[0].read_text(encoding="utf-8")
+    altered = re.sub(pattern, "", original, flags=re.IGNORECASE | re.MULTILINE)
+    assert altered != original, f"source skill has no {missing_contract}"
+    for skill_path in skill_paths:
+        skill_path.write_text(altered, encoding="utf-8")
+
+    assert any(
+        error_fragment in error for error in sidecar_target_errors(tmp_path, "workflow")
+    )
+
+    for skill_path in skill_paths:
+        skill_path.write_text(original, encoding="utf-8")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
 
 
 def test_real_generated_workflow_tree_has_no_retired_state_path(

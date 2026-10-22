@@ -1931,7 +1931,12 @@ def render_sidecar(target_root: Path, profile: str = SIDECAR_DEFAULT_PROFILE) ->
     for write_root in SIDECAR_SKILL_WRITE_ROOTS:
         for skill in skills:
             destination = target_root / write_root / skill
-            copy_tree(REPO_ROOT / "shared" / "skills" / skill, destination)
+            source = (
+                REPO_ROOT / "shared" / "sidecar" / "workflow" / "skills" / skill
+                if profile == "workflow" and skill == "onboard"
+                else REPO_ROOT / "shared" / "skills" / skill
+            )
+            copy_tree(source, destination)
             skill_file = destination / "SKILL.md"
             text = skill_file.read_text(encoding="utf-8")
             for old, new in SIDECAR_TEXT_REPLACEMENTS:

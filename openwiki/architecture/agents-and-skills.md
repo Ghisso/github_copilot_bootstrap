@@ -5,7 +5,7 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T23:14:28.484Z
+    at: 2026-10-22T17:57:02.699Z
 sources:
   - id: openwiki-source-5939cd6c98209174dac35ee6
     resource: repo://docs/2026-10-06-behavioral-pilot-evidence.md
@@ -61,6 +61,8 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
+  - id: openwiki-source-1c38db574c5e411bfd8c36ea
+    resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-a931d0171c8876319a735abf
     resource: repo://shared/skills/debug-investigator/SKILL.md
   - id: openwiki-source-ba0e2920665785c3ef2e2f6f
@@ -73,7 +75,7 @@ sources:
     resource: repo://shared/third_party/ponytail/UPSTREAM.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-10-21T23:14:28.484Z" }
+generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -157,6 +159,8 @@ Composition is one level deep, and `validate_prompt_composition` enforces it. Th
 
 The sidecar planner uses different status lists for big and small plans. Big plans use `planning`, `in-progress`, `complete`, or `cancelled`; small plans use `planned`, `in-progress`, `paused`, `complete`, or `cancelled`. These labels are descriptive and do not gate a sidecar commit.
 
+The workflow profile also ships its own `onboard` skill at both sidecar skill roots. It records project context in `.ai-bootstrap/project-context.instructions.md` and adds one pointer in `.ai-bootstrap/MEMORY.md`. The planner and coder prompts read that context when present, check relevant claims against source, and follow tracked team guidance when it differs. The [sidecar overlay page](../operations/sidecar-overlay.md) explains the profile boundary and private state.
+
 ## Review profiles
 
 The `reviewer` carries no checklists in its prompt. It loads one or more profiles from `shared/review-profiles/`, each with its own `## Severity` section, then runs a primary pass and a verification pass that tries to refute each finding. It repeats verification until two passes in a row change nothing, or after at most three rounds.
@@ -188,6 +192,8 @@ The [2026-10-06 behavioral pilot](../../docs/2026-10-06-behavioral-pilot-evidenc
 ## The skill library
 
 Skills live under `shared/skills/<name>/SKILL.md`. At the time of writing there are 55: 40 with `visibility: public` and 15 with `visibility: background`.
+
+The sidecar workflow `onboard` text lives separately under `shared/sidecar/workflow/skills/onboard/`. The generator selects it only for the workflow profile, so the full-install skill keeps its own state and lifecycle instructions.
 
 - Public skills are invoked by name.
 - Background skills are loaded by matching their `description`, which is why two skills may not share a description.

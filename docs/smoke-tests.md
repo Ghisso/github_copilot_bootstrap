@@ -4,8 +4,12 @@
 
 ```bash
 uv run python scripts/generate_targets.py --all
-uv run python scripts/validate_targets.py
+uv run --with pytest python scripts/validate_targets.py
 ```
+
+The validator runs the hook smoke tests with `pytest`; use the explicit
+`--with pytest` invocation above when it is not already installed in the
+environment.
 
 Expected:
 

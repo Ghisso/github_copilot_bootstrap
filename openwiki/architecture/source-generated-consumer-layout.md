@@ -22,12 +22,14 @@ sources:
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-2b53bea07579a982c3a0a847
     resource: repo://shared/mcp/servers.json
+  - id: openwiki-source-1c38db574c5e411bfd8c36ea
+    resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-10-22T17:57:02.699Z
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -97,7 +99,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 
 `render_sidecar(target_root, profile)` builds one much smaller sidecar tree from the profile constants in `scripts/runtime_ownership.py`, and refuses an unknown profile name:
 
-1. It copies each skill of the profile whole (`SIDECAR_SKILLS`, the four skills `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`, for `skills`; `SIDECAR_WORKFLOW_SKILLS`, every public skill not listed in `shared/sidecar/workflow/skills.txt`, for `workflow`) into both `SIDECAR_SKILL_WRITE_ROOTS`, `.claude/skills/` and `.agents/skills/`.
+1. It copies each skill of the profile whole (`SIDECAR_SKILLS`, the four skills `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`, for `skills`; `SIDECAR_WORKFLOW_SKILLS`, the eligible public skills plus `onboard`, for `workflow`) into both `SIDECAR_SKILL_WRITE_ROOTS`, `.claude/skills/` and `.agents/skills/`. Workflow `onboard` comes from `shared/sidecar/workflow/skills/onboard/`, while the full install keeps its separate skill under `shared/skills/onboard/`.
 2. It rewrites each copied `SKILL.md` through `SIDECAR_TEXT_REPLACEMENTS`, so no sidecar file names a bootstrap path the sidecar does not install. For the `workflow` profile it also rewrites the full install's state and policy paths to the profile's own `.ai-bootstrap/` folder and its rule file.
 3. It copies the vendored Ponytail MIT `LICENSE` into `ponytail/` and `ponytail-review/` at both roots.
 4. For `skills`, it renders each bridge in `SIDECAR_BRIDGES` from `shared/sidecar/bridge.md`, adding only that client's frontmatter: none for `.claude/rules/ai-bootstrap-sidecar.md`, and `applyTo: "**"` for `.github/instructions/ai-bootstrap-sidecar.instructions.md`.
@@ -110,7 +112,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 - the task-lane contract and the Codex model contract;
 - agents, MCP and hook wiring, the Antigravity manifest and skills, the Context Mode tool surface;
 - skills and paths;
-- both sidecar profile trees, `sidecar_target_errors(root, profile)`, and their adversarial cases per profile: only paths the profile installs (a shipped skill folder may hold any file, since a skill is copied whole; everything else must match the exact set); the exact source set, with nothing missing and nothing extra; no forbidden text token for that profile; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; for `skills`, each bridge with its client's frontmatter; for `workflow`, each single-file unit with exactly its client's frontmatter and every agent's frontmatter equal to what `sidecar_agent_frontmatter` builds;
+- both sidecar profile trees, `sidecar_target_errors(root, profile)`, and their adversarial cases per profile: only paths the profile installs (a shipped skill folder may hold any file, since a skill is copied whole; everything else must match the exact set); the exact source set, with nothing missing and nothing extra; no forbidden text token for that profile; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; for `skills`, each bridge with its client's frontmatter; for `workflow`, each single-file unit with exactly its client's frontmatter, every agent's frontmatter equal to what `sidecar_agent_frontmatter` builds, and both `onboard` copies checked for private output and destination safety instructions;
 - coverage of every `dist/multi-agent/` file by `FULL_INSTALL_ROOT_PATHS`, the list the installer uses to recognize a team-owned repository, with its adversarial cases;
 - docs parity (which owns the skill-library integrity rules);
 - memory security authority and routing-table parity;
@@ -119,7 +121,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 - devcontainer and installer, state sync, installer commit failure, local-only state sync;
 - determinism, then the presence of hook-gate regression tests.
 
-The forbidden-token lists differ by profile. `SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS` lists bootstrap-only paths such as `.claude/instructions/`, `.claude/scripts/`, `.claude/agents/`, `.claude/hooks/`, `.claude/review-profiles/`, `.claude/plans/`, `.claude/session_logs/`, `.github/hooks/`, and `third_party/`, and the literals `verify.py`, `record_findings`, `mcp__`, `ctx_`, `MEMORY.md`, and `openwiki`. `SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS` drops `MEMORY.md` and `.claude/review-profiles/`, because the workflow profile ships those, and adds `settings.json`, `core.hooksPath`, `ai-state`, `state-sync`, `.claude/quality_reports/`, `.claude/explorations/`, and the retired state root `.claude/ai-bootstrap` (`SIDECAR_LEGACY_STATE_ROOT`), the ceremony that profile deliberately leaves out and the state paths it namespaces or no longer uses.
+The forbidden-token lists differ by profile. `SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS` lists bootstrap-only paths such as `.claude/instructions/`, `.claude/scripts/`, `.claude/agents/`, `.claude/hooks/`, `.claude/review-profiles/`, `.claude/plans/`, `.claude/session_logs/`, `.github/hooks/`, and `third_party/`, and the literals `verify.py`, `record_findings`, `mcp__`, `ctx_`, `MEMORY.md`, and `openwiki`. `SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS` drops `MEMORY.md` and `.claude/review-profiles/`, because the workflow profile ships those, and adds `settings.json`, `core.hooksPath`, `ai-state`, `state-sync`, `.claude/quality_reports/`, `.claude/explorations/`, and the retired state root `.claude/ai-bootstrap` (`SIDECAR_LEGACY_STATE_ROOT`), the ceremony that profile deliberately leaves out and the state paths it namespaces or no longer uses. The workflow `onboard` check also rejects full-install memory references, nested `.claude` Git commands, and missing instructions to refuse symlinked or tracked destinations.
 
 Three rules are worth knowing on their own:
 
