@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-23
 **Plan:** `.claude/plans/2026-10-22_phase-C-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -37,8 +37,12 @@ Update live guidance for the sidecar onboarding skill and validator behavior, th
 - `uv run python scripts/validate_targets.py`: PASS.
 - `verify.py phase --format text` preview: PASS; Ruff and mypy clean, 4,950 tests passed, one skipped.
 - optional 1: PASS — rendered OpenWiki sidecar page says 25 workflow skills, identifies the workflow-only `onboard` source and private project-context output, and matches `scripts/runtime_ownership.py` and `shared/sidecar/workflow/skills/onboard/SKILL.md`.
-- Required closeout summary lines pending the closeout dry run.
+- Phase receipt: PASS; full suite 4,950 passed and one skipped, Ruff and mypy clean, generated runtime matched source.
+- `PASS        0.3s  uv run python scripts/generate_targets.py --all`
+- `PASS       50.6s  uv run python scripts/validate_targets.py`
+- `PASS      427.4s  uv run python .claude/scripts/verify.py phase --format text`
+- Closeout dry run: PASS.
 
 ## Open Questions / Next Steps
 
-- Finish canonical phase and closeout receipts, commit, and push.
+- Complete the final receipt, commit, and normal push. A pull request remains a separate user decision.
