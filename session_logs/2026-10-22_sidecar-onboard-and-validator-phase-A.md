@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-22
 **Plan:** `.claude/plans/2026-10-22_phase-A-validator-pytest-error.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -25,7 +25,10 @@ Make the validator report an actionable error without `pytest`, keep its hook sm
 - Focused validator tests: `221 passed in 71.75s`, exit 0.
 - Direct validator command with `--with pytest`: PASS, exit 0.
 - Optional isolated-interpreter probe: not run; focused regression covers the missing-dependency path without unrelated host limits.
-- Required closeout summary lines: pending closeout dry run.
+- `PASS       72.5s  uv run pytest tests/test_validate_targets.py -q --tb=short`
+- `PASS       47.8s  uv run --with pytest python scripts/validate_targets.py`
+- `PASS      296.1s  uv run python .claude/scripts/verify.py phase --format text`
+- Closeout dry run: PASS.
 
 ## Open Questions / Next Steps
 
