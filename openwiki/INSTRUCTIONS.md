@@ -17,13 +17,15 @@ Four places hold different parts of the system. Keep them distinct:
 - **Generated build output**, produced by `scripts/generate_targets.py`,
   has two targets: `dist/multi-agent/`, the rendered, installable copy of
   `shared/` for a full install, and `dist/sidecar/`, a small personal
-  overlay (four skills and two instruction bridges). It is never
+  overlay with two profiles (`skills`: four skills and two instruction
+  bridges; `workflow`: the eligible public skills plus agents, rules,
+  review profiles, templates, and a `.ai-bootstrap/` state folder). It is never
   hand-edited, and it is gitignored in this repository.
 - **A consumer's outer repository** is any project that installs the
   generated bootstrap, in one of two modes. A full install owns the agent
   harness: it writes root entrypoint files (`AGENTS.md`, `CLAUDE.md`,
   `.mcp.json`, `.codex/**`) and a `.claude/` directory. A sidecar install
-  (`--mode sidecar`) adds only Git-ignored skill and bridge files inside a
+  (`--mode sidecar`) adds only Git-ignored files (skills and bridges, plus agents, rules, and a state folder for the `workflow` profile) inside a
   team-owned repository, keeps its manifest in the Git directory, and never
   changes a tracked file.
 - **The nested `.claude` ai-state repository** is its own separate Git
@@ -36,7 +38,7 @@ Four places hold different parts of the system. Keep them distinct:
 This repository also installs its own generated output into itself, to
 develop and test the bootstrap end to end (`scripts/install_bootstrap.py
 --allow-self`). Do not describe that self-install as how a normal consumer
-project works — a normal consumer only ever receives the generated copy,
+project works. A normal consumer only ever receives the generated copy,
 never `shared/`.
 
 ## What to prioritize
@@ -44,11 +46,11 @@ never `shared/`.
 Ground every page in what the current code and tests actually do, in this
 order of authority:
 
-1. `shared/`, `scripts/`, and `tests/` — the real source and its test
+1. `shared/`, `scripts/`, and `tests/`: the real source and its test
    coverage.
-2. `README.md` and `docs/architecture.md` — maintained, current
+2. `README.md` and `docs/architecture.md`: maintained, current
    human-authored explanation.
-3. `shared/policies/*.instructions.md` and `shared/skills/*/SKILL.md` — the
+3. `shared/policies/*.instructions.md` and `shared/skills/*/SKILL.md`: the
    normative rules and reusable workflows agents follow.
 
 Cover, at minimum:
@@ -92,6 +94,9 @@ read a page once and act on it.
   is enough.
 - Close every page with a short "Related pages" list linking pages that cover
   a neighboring topic.
+- Write every link to another wiki page or repository file relative to the
+  current page's folder, such as `../operations/sidecar-overlay.md`. Never
+  start a link with `/openwiki/`; OpenWiki marks such a link as broken.
 
 **Sentences and words**
 
@@ -151,11 +156,11 @@ Treat the following as evidence of past decisions only, never as a
 description of what the code currently does. Re-derive current behavior
 from `shared/`, `scripts/`, and `tests/` instead:
 
-- `.claude/plans/` and `.claude/session_logs/` — this checkout's own
+- `.claude/plans/` and `.claude/session_logs/`: this checkout's own
   completed and in-progress plans and session logs;
-- files under `docs/` named `docs/2026-*` — dated, point-in-time spikes and
+- files under `docs/` named `docs/2026-*`: dated, point-in-time spikes and
   review records;
-- the root-level `plans/` directory — architecture decision records and
+- the root-level `plans/` directory: architecture decision records and
   historical phase plans.
 
 A plan or session log can describe a decision a later phase reversed or

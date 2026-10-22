@@ -14,10 +14,12 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+  - id: openwiki-source-7c9c9eb3a89efa00dd8df426
+    resource: repo://tests/test_verify.py
+generated: { by: "claude-code", at: "2026-10-21T23:14:28.484Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:13:26.159Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T23:14:28.484Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -96,13 +98,15 @@ A small plan's `## Verification` section holds fenced `bash` or `sh` blocks. Eve
 
 `## Optional Verification` bullets are numbered items. Each needs a `- optional <n>: PASS|FAIL|NOT RUN — <detail>` line in the closeout session log. A bullet that says "None" still counts as optional item 1.
 
+Closeout needs three files to exist first: the phase receipt, the findings report, and the closeout session log the small plan names in `closeout_session_log`. When one is missing, `verify.py closeout` prints one line such as `closeout evidence is missing: .claude/quality_reports/findings-<phase>.json; run record_findings.py to create it`, exits 2, and persists no receipt. A symlinked or non-regular artifact is still refused, with a message that says which.
+
 Closeout also requires the closeout session log to carry LEARN evidence: `[LEARN:category] ...` entries or the exact marker `[LEARN] none - no new lessons this session`, outside fenced code blocks. `MEMORY.md`'s modification time is never a substitute. When the phase is the big plan's last declared phase, the log must also contain `## Stale-claims surfaces checked`. A closeout whose diff touches no documentation needs `--documentation-na "<reason>"`.
 
 ## The OpenWiki backstop inside `VFY-GEN-001`
 
 `openwiki_managed_state_violations` checks three conditions using only file reads and Git queries:
 
-- an `AGENTS.md` or `CLAUDE.md` that still carries the `<!-- OPENWIKI:START -->` managed block (fix: `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null`);
+- an `AGENTS.md` or `CLAUDE.md` that still carries the `<!-- OPENWIKI:START -->` managed block. The failure message itself gives the fix: ask the user to run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell, because the guard denies an agent command that names a hook script;
 - an untracked or newly staged `.github/workflows/openwiki-update.yml` (init mode is forbidden; delete it);
 - a tracked or staged `openwiki/.run.json` (`git rm --cached` it and keep it ignored).
 
@@ -115,6 +119,7 @@ Any violation fails `VFY-GEN-001` and, through the same function, the commit gat
 - Each finding needs a `severity` of `CRITICAL`, `MAJOR`, or `MINOR`, a non-empty `title`, and a `profile` among the repeated `--profile` arguments.
 - The report records `schema_version: 2`, `counts`, `profiles_reviewed`, the findings, the reviewer's `gate_result` (from the required `--gate-result PASS|WARN|FAIL`), `open_requests` (from repeatable `--open-request`), and Git metadata: `branch`, `head_sha`, `merge_base_sha`, `content_hash`, `changed_files`, and `dirty: true` when any tracked change is unstaged. That is why the closeout sequence stages before recording.
 - The recorder refuses `--gate-result PASS` together with any open request, and an empty open request, and writes nothing in that case.
+- When the findings text names a protected path, write the findings JSON with the native Write tool to a scratch file and pass `--findings-json <file>`; `protect-files` denies a heredoc or inline command text that names a protected path.
 - When `ponytail` was reviewed the report carries `ponytail_reviewed: true` and `ponytail_findings`.
 
 ## What blocks a commit or push
@@ -132,7 +137,7 @@ Two more rules come from the review evidence itself:
 - **Gate result.** At phase completion the report's `gate_result` must be `PASS` and `open_requests` empty. A report without `gate_result` is refused with a message to re-record it with `--gate-result` before closeout.
 - **Required review profiles.** `required_review_profiles` maps the receipt's `changed_paths`, cumulative from the merge base, to profiles. Test surfaces are checked first: a path under `tests/` or a file named `test_*.py`, `*_test.py`, or `conftest.py` needs `tests`. Otherwise a `control-plane` or `generator` path, or a dependency file (`DEPENDENCY_FILES`, `pyproject.toml`, `requirements*.txt`, `requirements*.in`), needs `code`, `architecture`, `security`, `tests`, and `ponytail`; `.vscode/mcp.json` is a control-plane file. The gate also adds `ponytail` for a multi-file or otherwise high-risk diff. A missing profile is refused in one error, `findings report is missing required review profiles: …`, which keeps `this high-risk diff requires a fresh Ponytail review` when `ponytail` is missing.
 
-The commit gate (`exact`) always applies both rules; the profile rule applies to every commit there. The push gates (`ancestor`, `certified`) apply them only to reports with `schema_version` 2 or later, so a phase completed before these rules existed is never re-judged. A `schema_version` that is not an integer below 2 counts as 2 or later.
+The commit gate (`exact`) applies the profile rule to every commit and the gate-result rule at phase completion, which is the commit that completes a small plan. The push gates (`ancestor`, `certified`) apply them only to reports with `schema_version` 2 or later, so a phase completed before these rules existed is never re-judged. A `schema_version` that is not an integer below 2 counts as 2 or later.
 
 With the `exact` relation the gate also enforces the verification-items contract with these prefixes:
 
@@ -150,6 +155,6 @@ For pushes and pull requests, `historical_chain_errors` additionally walks every
 
 ## Related pages
 
-- [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md)
-- [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
-- [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
+- [Task lanes and the enforced lifecycle](../workflows/lifecycle-and-task-lanes.md)
+- [Hook dispatcher and guardrail scripts](../architecture/hooks-and-guardrails.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](install-ownership-and-runtime-checks.md)

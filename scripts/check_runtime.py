@@ -256,7 +256,6 @@ def runtime_drift_errors(
             relative = path.relative_to(claude_root)
             if (
                 (relative.parts and relative.parts[0] == ".git")
-                or relative == Path(".gitignore")
                 or (relative.parts and relative.parts[0] == ".cache")
                 or is_consumer_state_path(relative)
                 or _third_party_skill_owner(repo_root / ".claude", relative)

@@ -153,7 +153,6 @@ CODEX_AGENT_ALLOWED_FIELDS = {
     "developer_instructions",
     "model",
     "model_reasoning_effort",
-    "sandbox_mode",
 }
 PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
     "orchestrator's evidence packet",
@@ -258,7 +257,8 @@ REQUIRED_HOOK_SCRIPTS = (
 # and closed; a new upstream tool needs a later approved plan before it can
 # join CONTEXT_MODE_ALLOWED_TOOLS.
 CONTEXT_MODE_PINNED_VERSION = "1.0.169"
-OPENWIKI_PINNED_VERSION = "0.5.2"
+# Upgrade procedure: docs/runtime-checks.md ("Optional helpers", `openwiki`).
+OPENWIKI_PINNED_VERSION = "0.7.2"
 MERMAID_PINNED_VERSION = "11.16.0"
 JSDOM_PINNED_VERSION = "29.1.1"
 OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"
@@ -3727,6 +3727,32 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "ask",
             "github-copilot",
         ),
+        (
+            # BF-D1: each client's agent folder is protected in the generated
+            # copy: Claude Code and Copilot ask, Codex and Antigravity deny.
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".claude/agents/reviewer.md",
+            "ask",
+            "claude-code",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".codex/agents/reviewer.toml",
+            "deny",
+            "openai-codex",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".github/agents/reviewer.agent.md",
+            "ask",
+            "github-copilot",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".agents/agents/reviewer/agent.md",
+            "deny",
+            "google-antigravity",
+        ),
     )
     for script, protected_path, expected_decision, target_id in hook_cases:
         patch = f"*** Begin Patch\n*** Update File: {protected_path}\n@@\n x\n*** End Patch\n"
@@ -3756,6 +3782,9 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             '"permissionDecision":"ask"',
         ),
         ("read_file", {"filePath": ".mcp.json"}, ""),
+        # The Copilot wrappers read `.claude/agents/<id>.md`, so a read stays
+        # allowed even though an edit of the file asks.
+        ("read_file", {"filePath": ".claude/agents/reviewer.md"}, ""),
     ):
         returncode, stdout, stderr = run_hook(
             copilot_protect_files,
@@ -3810,6 +3839,30 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             f"protected-file guardrail did not deny Bash write to .env: {hook_root}",
             errors,
         )
+
+        # BF-H1: a comment line must not hide the write on the next line, a
+        # quoted operator must not split one command into two, and the words
+        # after an unquoted `$( )` belong to the same command.
+        for hidden_write in (
+            "# note\ntouch .env",
+            "tee '|' cat .env",
+            "tee $(true) .env",
+        ):
+            returncode, stdout, stderr = run_hook(
+                hook_root / "protect-files.sh",
+                {"tool_name": "Bash", "tool_input": {"command": hidden_write}},
+                target_id,
+            )
+            check(
+                returncode == 0,
+                f"Bash hidden-write guardrail failed to run: {hook_root}: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"protected-file guardrail did not deny {hidden_write!r}: {hook_root}",
+                errors,
+            )
 
         returncode, stdout, stderr = run_hook(
             hook_root / "git-protection.sh",
@@ -7935,8 +7988,8 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         # fail on an unchanged re-wrap (this cost a cycle in Phase B).
         normalized_provenance = normalized_text(provenance)
         check(
-            "v4.8.4" in provenance,
-            "Ponytail provenance must pin release v4.8.4",
+            "v5.3.2" in provenance,
+            "Ponytail provenance must pin release v5.3.2",
             errors,
         )
         check(
@@ -7952,8 +8005,8 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             errors,
         )
         check(
-            "bc9ee94" in provenance,
-            "Ponytail provenance must pin commit bc9ee94",
+            "16352ac229eb08a9598dcae48fe9f2b342567d86" in provenance,
+            "Ponytail provenance must pin commit 16352ac",
             errors,
         )
         pinned_files = {
@@ -7961,17 +8014,17 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             / "shared"
             / "skills"
             / "ponytail"
-            / "SKILL.md": "7edff0be32c88fcc92b4cef7b9c65571a43aa5436d95d5ba3925b0be608b03a1",
+            / "SKILL.md": "1e0cf9db9eda588829f2e36d40ab95c0fbf3972dca1d70cf3184f1660612ff54",
             REPO_ROOT
             / "shared"
             / "skills"
             / "ponytail-review"
-            / "SKILL.md": "0732435f3466ca7fe976812d12a13725f2e8c2739d9f0123e105931a025f12b8",
+            / "SKILL.md": "56f23aa917442947ff5caaf18027bcbd17840209c8a051b3fc3a297a867e8450",
             REPO_ROOT
             / "shared"
             / "third_party"
             / "ponytail"
-            / "LICENSE": "fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4",
+            / "LICENSE": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab",
         }
         for source, expected_hash in pinned_files.items():
             actual_hash = hashlib.sha256(source.read_bytes()).hexdigest()
@@ -9679,7 +9732,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 errors,
             )
         check(
-            "v4.8.4"
+            "v5.3.2"
             in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
             "installed Ponytail provenance must retain the pinned release",
             errors,
@@ -9781,6 +9834,14 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "quality_reports/consumer.json": b'{"consumer": true}\n',
             "instructions/project-context.instructions.md": b"consumer project context\n",
             "settings.local.json": b'{"consumerLocal": true}\n',
+            # Built from the file the first temporary install wrote, so
+            # settings.local.json stays ignored, plus one consumer line that a
+            # rebuild from the state-sync.sh template would lose.
+            ".gitignore": (temp_repo / ".claude" / ".gitignore").read_bytes()
+            + b"consumer-ignore-sentinel/\n",
+            # The union rule is already present, so state sync appends nothing
+            # and the bytes must match after a repeat install.
+            ".gitattributes": b"session_logs/*.log merge=union\n*.sentinel -diff\n",
         }
         check(
             tuple(CONSUMER_STATE_PATHS)
@@ -9798,6 +9859,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 ".cache",
                 "instructions/project-context.instructions.md",
                 "settings.local.json",
+                ".gitignore",
+                ".gitattributes",
             ),
             "consumer-state fixture must cover every ownership-contract root",
             errors,

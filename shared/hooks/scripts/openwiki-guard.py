@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Guard `openwiki_begin` and restore the two managed root adapters.
 
-OpenWiki 0.5.2 is host-driven: the coding agent calls OpenWiki's MCP tools
+OpenWiki is host-driven: the coding agent calls OpenWiki's MCP tools
 directly, and OpenWiki's server writes `openwiki/**` plus, at exactly one
 point (`openwiki_begin`), a managed `<!-- OPENWIKI:START -->...
 <!-- OPENWIKI:END -->` block into root `AGENTS.md` and `CLAUDE.md`
-(`repository-run.js:51`; insertion is `content.trimEnd() + "\n\n" + snippet +
-"\n"`, which loses the original trailing-newline shape, so a byte-exact
-restore needs a pre-snapshot rather than a generic strip). This module is
-`pre` (a PreToolUse guard invoked before `openwiki_begin` runs) and `post` (a
-PostToolUse/PostToolUseFailure restore invoked after it returns, on the hosts
-that fire those events).
+(`beginRepositoryRun` in `generation/repository-run.js` calls
+`ensureCodeModeRepoSetup` in `ingestion/code-mode.js`; insertion is
+`content.trimEnd() + "\n\n" + snippet + "\n"`, which loses the original
+trailing-newline shape, so a byte-exact restore needs a pre-snapshot rather
+than a generic strip). This module is `pre` (a PreToolUse guard invoked before
+`openwiki_begin` runs) and `post` (a PostToolUse/PostToolUseFailure restore
+invoked after it returns, on the hosts that fire those events).
 
 Residual limits, inherited from the retired subprocess-runner design because
 they still apply to a host-driven guard: a write made outside this
@@ -18,6 +19,8 @@ repository (for example to a path escaping `root`) is invisible to any
 repository-local check, this guard fingerprints only the two adapters and
 `WORKFLOW`, and it does not replace `protect-files`, which governs the
 agent's own file-editing tool calls independently of anything OpenWiki does.
+The no-snapshot strip fallback cannot restore a replaced pre-marker
+`## OpenWiki` section; the snapshot restore can.
 This guard does not run OpenWiki, take locks, or write outside its own
 snapshot directory. It also never reads or writes *through* a symlinked
 adapter or workflow path: following one at snapshot time would copy
@@ -42,6 +45,10 @@ WORKFLOW = ".github/workflows/openwiki-update.yml"
 # repository's own .cache/ entry - never committed, never drift-compared.
 SNAPSHOT_DIR_RELATIVE = os.path.join(".claude", ".cache", "openwiki-guard")
 MANIFEST_NAME = "manifest.json"
+# The restore an agent cannot run: the protect-files guard denies an agent command
+# that names a hook script, so the user runs it in their own shell.
+RESTORE_COMMAND = "bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null"
+RESTORE_WHY = "the guard denies an agent command that names a hook script"
 
 
 def _repo_root() -> str:
@@ -360,9 +367,11 @@ def _cmd_pre(payload: dict) -> int:
     if not isinstance(tool_input, dict):
         tool_input = {}
 
-    if tool_input.get("mode") == "init":
+    mode = tool_input.get("mode")
+    if mode != "update":
+        received = "missing" if mode is None else repr(mode)
         _deny(
-            'openwiki-guard: mode="init" replaces the wiki and is denied; '
+            f"openwiki-guard: mode {received} is denied; "
             'only mode="update" is allowed through this guard'
         )
         return 0
@@ -402,7 +411,11 @@ def _cmd_pre(payload: dict) -> int:
             _deny(
                 "openwiki-guard: a prior run left "
                 + ", ".join(sorted(heal.mismatches))
-                + " unresolved; run openwiki-guard.sh post to resolve before retrying"
+                + " unresolved; ask the user to run "
+                + RESTORE_COMMAND
+                + " in their own shell to resolve it before retrying ("
+                + RESTORE_WHY
+                + ")"
             )
             return 0
 
@@ -436,8 +449,11 @@ def _cmd_post(_payload: dict) -> int:
         sys.stderr.write(
             "openwiki-guard: could not restore "
             + ", ".join(sorted(result.mismatches))
-            + " - left unchanged; resolve manually, then rerun "
-            "openwiki-guard.sh post\n"
+            + " - left unchanged; resolve manually, then ask the user to rerun "
+            + RESTORE_COMMAND
+            + " in their own shell ("
+            + RESTORE_WHY
+            + ")\n"
         )
         return 2
 

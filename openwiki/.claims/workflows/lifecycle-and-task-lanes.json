@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:921b0bf2cfc507e26d9d06eb44cc2afe9b6cd5e4b5589692b1ec18312d95643e",
+  "pageVersion": "sha256:428eb397c14bbfbd29618e14bef796310bf9cb300589823350eb6becca4fba40",
   "claims": [
     {
       "id": "claim_f49518af7629414a92868ab695c5bf80",
@@ -69,7 +69,7 @@
       "statement": "A normal completion commit requires a passing verify phase and closeout receipt plus a findings report with counts.critical == 0 and counts.major == 0, a disposition and reason on every surviving MINOR, the reviewer's recorded gate_result PASS with no open request, and every review profile the changed paths require; CRITICAL and MAJOR block the completion commit itself, and the same contract is re-checked across every completed phase at push or PR time.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L82-L90",
+          "resource": "repo://shared/agents/reviewer/prompt.md#L84-L92",
           "version": "repo-lines-v1:sha256:9dc0d2d879bba52007ad83da86460ddff18a432cb1907a2eb91e0468262a899e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2YwMDRlNjkwNDFiYmY5OGI2MmMyNjgzZmY1YzYyOGQ3N2FjMzJlZjM2ZjYyYWU0NmIwZDFiMjNmNGNlNDk4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGE3Mzc2MWNkZTg4ZWQ0ZTRjNDkyN2MxM2FkMjhmYjg3NGVhMzEyN2Y4NTU3Zjg3NzdiYzFjZjM2ODVjMjVjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWFmYjIyMzdhZDQ1NTNmMTg4OTgxMDU0YWFmMTQ2ODI4NmQ0OWM1ODU5MTE1YzZmOWViM2YwYTUwODIwZjYzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzc1OWQxOGVmMDA3NzlmMmI5MTc5NDc3NjMxMTc0MDBmYzZkZjIxYmMyNTFkZTYzYjQ1Y2ZiOGNkMzBhYTEwNCJ9"
         },
         {
@@ -83,8 +83,8 @@
       "statement": "The closeout sequence has eight ordered steps and two hard rules the hooks enforce: never chain git commit with the findings or receipt steps, and never touch nested state between the receipt and the commit.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L185-L206",
-          "version": "repo-lines-v1:sha256:bb37153dd9731edaf12c0d83cf8175cf2f8097891c330ae1f7133ca597cbbf6d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjNTlkMzQ1YTA0MjU1MWE4M2JhYTc3ZGFhNzM5M2MyNWZmYmZiYTViMTUzMjk3OTljYmNkNWIyODhiMGEwYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwZGFiZDQ4ODg5ZTUwNmViZGY3MjkwYTc3MjY5OTE5NDA2YzMzMjk2OTdkNWRiYWExNzI3N2RiZGM2ZTc1NzAifQ"
+          "resource": "repo://shared/policies/workflow.instructions.md#L185-L205",
+          "version": "repo-lines-v1:sha256:4f79601b3edb225759c2e7cf7bba2e0f7b4979b470c04dc4372e154fd5161c17:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjNTlkMzQ1YTA0MjU1MWE4M2JhYTc3ZGFhNzM5M2MyNWZmYmZiYTViMTUzMjk3OTljYmNkNWIyODhiMGEwYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzNmIwMjgxZDJlZWI1NzBlYmM5NDZiZGJmYmQ0ZjY5YWM3YTc4YzM3YjcwMWI0Y2I5NjU5OGZmMjIzYzZlYjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU4MTAwNzIyOWNlZDYyMmFlYTY3MzM0YzU4MzliMzc1MmIyYmNjNmUzM2ZmNmY4YjA2MDE5Njk0NzhjNGM2NGQifQ"
         }
       ]
     },
@@ -149,7 +149,7 @@
           "version": "repo-lines-v1:sha256:a2a7bd8d1c3386353e0a51425b28e6ed51b7dc4f67891b1194476063fcd4cb4b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkOWRjODNkOTMyNTcwMGM0MjgxYjZjMDI5MTUxNTcxZDNjODZjZWViNmRkZWM2NjBmZjY2NWY0MzUzYjFjYWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhOWZjYWNiMjdjMzk3OTYyYzJmNGVlM2MyYzliNzgwNjdjZjQzYjQxZjk4MWUzOGY2ZDAxZjE0ZjNiNDhlYzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc4MDRlNDE1ZDllNDRlNmE0YTkyOThkNWZhMjQ4M2JkN2Q2ZTZkYjlkNDU5NGJlOTZiZDNiYTk3ODE2M2VmOTEifQ"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L383-L404",
+          "resource": "repo://shared/policies/workflow.instructions.md#L385-L406",
           "version": "repo-lines-v1:sha256:6f654b6a13638ae6fd2d41009dc80d7e6fbd4f36413d5ba30bc6d5d93d5f9690:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzNWI5YThiYWVjOGYyNTc1OWNkMjYxMTA0OWRmYTIzZjRjZmM1MzY1M2FkMzAyNjhiM2ExNzg0MWJiNGE1NmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzYWQ1OTgwNjc0M2Q1MzFmNzBlYjAwMTY4ZDBlYzBiYjkzNTY0YmRjMTU3OTFmMzZiZmZhMmE0NDVhNmU1ZTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU3YjYyZjU2MjNjZTJkMGQwYTBlMWVlNjVmNzM0NDNhYWEwZWUwODIxMjdmN2JjZDkxYzNlODY3NTAyMWRjM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1MTAyY2IxMjU1ZWQxZDNhYWNiNWVjZGU1OTY2ZDBkMjdkMTY0MTFlNzg5ZmFkOTQyODcwYzA0ZWM0YzBlOTYifQ"
         }
       ]
@@ -197,10 +197,20 @@
           "version": "repo-lines-v1:sha256:37e500fabfacdf8f5cef60702f13308f0d9bbfcb8bd39b83a11ce272a11f8def:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NzI2MmEzN2EwYmI4ODk0ZWNlM2M1M2EwMTFhZjU3MTBlMjNmNzA0MzJiNzU4MTNhOTE0NThhODBhYzUzOTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmNDJkOTc4Y2MxMDNhN2NmMWVkZTViZTBkNDY0YjA5YzVmZmExMTI1ZDc2ZDdhYzU4NmJkNTIxN2E3ZmVjMDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmMDQwZjAxMTAwZjA5ZTRjMDY2ZmZlOWRmN2U5Y2RkMWMzN2NlZmYxNWRlOGU2NmFkYTBlZGViNmRkNjBkMTYifQ"
         }
       ]
+    },
+    {
+      "id": "claim_9c5384ed3add495eb5fbd375a9ff1e4c",
+      "statement": "When the findings text names a protected path, the closeout sequence writes the findings JSON with the Write tool to a scratch file and passes it as --findings-json <file>, because the protect-files guard denies heredoc text that names a protected path.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L194-L194",
+          "version": "repo-lines-v1:sha256:e8d4130b2da2d754d7bae3d876443b2af1c68f132378deeb7bb0a0e87633aada:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZThkNDEzMGIyZGEyZDc1NGQ3YmFlM2Q4NzY0NDNiMmFmMWM2OGYxMzIzNzhkZWViN2JiMGEwZTg3NjMzYWFkYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZThkNDEzMGIyZGEyZDc1NGQ3YmFlM2Q4NzY0NDNiMmFmMWM2OGYxMzIzNzhkZWViN2JiMGEwZTg3NjMzYWFkYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDQwY2U5ZTU2NDQ3MGYwMTVlZGMyMjgyNjU5N2Y2YzY3MzNmOWNjMmNjNzc1NzAzMTQzMTg2NTNkOTdiOWJhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTU4Nzc5MTdiODQ1NDllMTVlMzE0ZWY2ZmIwNmMyMDY0NzM2YTU4NGUxNDIwNmJkZTE3MzQ5MmZmNjA0OTY4YiJ9"
+        }
+      ]
     }
   ],
   "verification": {
-    "by": "openwiki/0.5.2",
-    "at": "2026-10-17T10:05:00.756Z"
+    "by": "openwiki/0.7.2",
+    "at": "2026-10-21T02:32:20.957Z"
   }
 }

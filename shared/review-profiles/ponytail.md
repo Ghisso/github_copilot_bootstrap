@@ -10,6 +10,9 @@ with the normal correctness, security, test, and architecture profiles.
 
 - The change is required by the current task rather than a speculative need.
 - Existing helpers, types, and patterns are reused instead of reimplemented.
+- Each finding has a concrete case as evidence, and a `delete:` finding follows
+  a search of the whole tree (tests, fixtures, config, string or dynamic
+  references) that found no remaining use.
 - Standard-library or native-platform features replace equivalent custom code.
 - No new dependency was added for behavior already covered by a few clear
   lines or an installed dependency.
@@ -26,6 +29,7 @@ with the normal correctness, security, test, and architecture profiles.
 Prefix the title with one of:
 
 - `delete:` nothing should replace the code.
+- `reuse:` name the existing helper or component and its path.
 - `stdlib:` name the standard-library replacement.
 - `native:` name the platform feature.
 - `yagni:` name the speculative abstraction or flexibility.

@@ -341,8 +341,12 @@ def test_setup_upgrades_existing_nested_gitignore_without_overwriting_user_entri
     result = _sync(script, writer, remote, "setup")
 
     assert result.returncode == 0, result.stderr
-    assert gitignore.read_text().splitlines() == [
+    upgraded = gitignore.read_text()
+    assert upgraded.splitlines() == [
         "user-sentinel/",
+        "",
+        "# Local client settings; never synced.",
+        "settings.local.json",
         "",
         "# Derived local caches; never synced.",
         ".cache/",
@@ -351,6 +355,10 @@ def test_setup_upgrades_existing_nested_gitignore_without_overwriting_user_entri
         "(session_logs/hooks-bypass.log stays tracked).",
         "session_logs/hooks-errors.log",
     ]
+
+    second = _sync(script, writer, remote, "setup")
+    assert second.returncode == 0, second.stderr
+    assert gitignore.read_text() == upgraded
 
 
 def test_setup_activates_the_outer_git_hooks_path(script: Path, tmp_path: Path) -> None:
@@ -600,7 +608,10 @@ def test_checkpoint_untracks_previously_committed_local_settings_without_deletin
     script: Path, tmp_path: Path
 ) -> None:
     """GR-008: the nested index stops tracking ``settings.local.json`` while
-    the local file keeps its exact bytes (including CRLF and non-ASCII)."""
+    the local file keeps its exact bytes (including CRLF and non-ASCII). The
+    nested ``.gitignore`` is also left byte for byte: the file is still tracked
+    when the ignore rules are checked, and only ``--no-index`` makes git judge
+    the rules instead of reporting a tracked path as not ignored."""
     remote = _bare_remote(tmp_path)
     writer = _new_writer(script, tmp_path, remote, "tracked-local-settings")
     nested = writer / ".claude"
@@ -609,15 +620,148 @@ def test_checkpoint_untracks_previously_committed_local_settings_without_deletin
     local = nested / SETTINGS_LOCAL
     local.write_bytes('{"local": "edited é"}\r\n'.encode())
     before = local.read_bytes()
+    gitignore_before = (nested / ".gitignore").read_bytes()
 
     result = _sync(script, writer, remote, "checkpoint")
 
     assert result.returncode == 0, result.stderr
+    assert (nested / ".gitignore").read_bytes() == gitignore_before
     assert local.read_bytes() == before
     assert _git(nested, "ls-files", SETTINGS_LOCAL).stdout == ""
     assert _git(nested, "status", "--porcelain").stdout == ""
     assert _sync(script, writer, remote, "publish").returncode == 0
     assert _remote_show(remote, SETTINGS_LOCAL) == ""
+
+
+@pytest.mark.parametrize(
+    "user_text",
+    ["user-sentinel/\n", "settings.local.json\n!settings.local.json\n"],
+    ids=["line-missing", "line-negated"],
+)
+def test_checkpoint_keeps_local_settings_out_of_a_gitignore_that_stopped_ignoring_them(
+    script: Path, tmp_path: Path, user_text: str
+) -> None:
+    """BF-B1: a refresh now keeps the nested ``.gitignore`` as the consumer left
+    it, so state sync must not let ``git add -A`` commit local settings when
+    that copy lacks the line or a later line negates it. User text is kept and
+    a repeat run adds nothing."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "settings-unignored")
+    nested = writer / ".claude"
+    gitignore = nested / ".gitignore"
+    gitignore.write_text(user_text)
+    _write(writer, SETTINGS_LOCAL, '{"local": true}\n')
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0, result.stderr
+    assert gitignore.read_text().startswith(user_text)
+    ignored = _git(nested, "check-ignore", "-q", "--no-index", SETTINGS_LOCAL)
+    assert ignored.returncode == 0
+    assert _git(nested, "ls-files", SETTINGS_LOCAL).stdout == ""
+    assert (nested / SETTINGS_LOCAL).read_text() == '{"local": true}\n'
+
+    first = gitignore.read_text()
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    assert gitignore.read_text() == first
+
+
+def test_setup_adds_nothing_to_gitignore_while_git_cannot_read_the_nested_repo(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``git check-ignore`` exits 128, not 1, when the nested repository is
+    broken. That is a git failure, not "not ignored", so state sync must not
+    append a ``settings.local.json`` block on every run while it lasts."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "broken-nested-repo")
+    nested = writer / ".claude"
+    gitignore = nested / ".gitignore"
+    # Every other guard line is present, so only the settings line could change it.
+    gitignore.write_text("user-sentinel/\n.cache/\nsession_logs/hooks-errors.log\n")
+    (nested / ".git" / "HEAD").write_text("not a valid HEAD\n")
+    # The ceiling keeps git from finding a repository above the temp folder.
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    broken = _git(nested, "check-ignore", "-q", "--no-index", SETTINGS_LOCAL)
+    assert broken.returncode == 128
+
+    for _ in range(2):
+        _sync(script, writer, remote, "setup")
+        assert gitignore.read_text() == (
+            "user-sentinel/\n.cache/\nsession_logs/hooks-errors.log\n"
+        )
+
+
+UNION_RULE = "session_logs/*.log merge=union"
+
+
+def _nested_without_gitattributes(script: Path, tmp_path: Path, name: str) -> Path:
+    """Return a writer whose nested ``HEAD`` lacks ``.gitattributes``.
+
+    That matches a nested repository created before the file was written for
+    existing repositories too.
+    """
+    writer = _new_writer(script, tmp_path, _bare_remote(tmp_path), name)
+    nested = writer / ".claude"
+    assert _git(nested, "rm", "-q", ".gitattributes").returncode == 0
+    commit = _git(
+        nested,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-qm",
+        "drop attributes",
+    )
+    assert commit.returncode == 0, commit.stderr
+    assert not (nested / ".gitattributes").exists()
+    return writer
+
+
+@pytest.mark.parametrize("mode", ["setup", "checkpoint"])
+def test_existing_nested_repo_without_gitattributes_gains_the_union_rule(
+    script: Path, tmp_path: Path, mode: str
+) -> None:
+    """BF-B2: setup and checkpoint write the file once, and it ends up tracked."""
+    writer = _nested_without_gitattributes(script, tmp_path, f"attrs-{mode}")
+    nested = writer / ".claude"
+    attributes = nested / ".gitattributes"
+
+    result = _sync(script, writer, None, mode)
+
+    assert result.returncode == 0, result.stderr
+    assert attributes.read_text().splitlines().count(UNION_RULE) == 1
+
+    # Setup is local-only and commits nothing; a checkpoint tracks the file.
+    assert _sync(script, writer, None, "checkpoint").returncode == 0
+    assert _git(nested, "ls-files", "--error-unmatch", ".gitattributes").returncode == 0
+    assert attributes.read_text().splitlines().count(UNION_RULE) == 1
+    assert _git(nested, "status", "--porcelain").stdout == ""
+
+
+def test_existing_gitattributes_keeps_user_lines_and_gains_the_union_rule_once(
+    script: Path, tmp_path: Path
+) -> None:
+    """BF-B2: a user line without a trailing newline survives the append, and
+    repeat runs of every entry point change neither the file nor history."""
+    writer = _nested_without_gitattributes(script, tmp_path, "attrs-user-line")
+    nested = writer / ".claude"
+    attributes = nested / ".gitattributes"
+    attributes.write_text("*.md -diff")
+
+    assert _sync(script, writer, None, "setup").returncode == 0
+
+    lines = attributes.read_text().splitlines()
+    assert lines[0] == "*.md -diff"
+    assert lines.count(UNION_RULE) == 1
+
+    assert _sync(script, writer, None, "checkpoint").returncode == 0
+    settled = attributes.read_bytes()
+    head = _local_head(writer)
+    for mode in ("setup", "checkpoint", "setup"):
+        assert _sync(script, writer, None, mode).returncode == 0
+    assert attributes.read_bytes() == settled
+    assert _local_head(writer) == head
 
 
 def test_second_clone_keeps_its_local_settings_when_it_pulls_the_untrack_commit(

@@ -202,7 +202,9 @@ Automatic restore coverage differs by host: on Claude Code it is wired to
 both `PostToolUse` and `PostToolUseFailure`, so a failed call still
 restores; on Codex it is wired to `PostToolUse` and to the `Stop` hook, with
 no automatic restore when the tool call itself errors, so the skill has the
-agent run `openwiki-guard.sh post` manually right after `openwiki_begin`.
+agent check both adapters right after `openwiki_begin` and, if either
+changed, ask the user to run `openwiki-guard.sh post` (the file-protection
+guard denies an agent's Bash command that names a hook script).
 The guard's own module docstring documents the residual limits inherited
 from the earlier runner design: a write outside this repository is
 invisible to it, it covers only the two adapters and the workflow path, and
@@ -218,18 +220,31 @@ source, tests, or human-authored policy.
 
 ## Ponytail Integration
 
-Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
+Ponytail `v5.3.2` is vendored at the portable skill layer rather than installed
 as a per-user plugin. Every full-install target receives `.claude/skills/ponytail/`,
 `.claude/skills/ponytail-review/`, and the upstream license/provenance; the
 sidecar overlay ships the same two skills, with the same license notice, at
 its own two write roots. The
 `ponytail` skill is coder-time implementation discipline: once per coding task,
 the coder applies `full` mode, then simplifies and re-verifies the changed
-scope. It is not a standalone lifecycle phase. Minimality means fewer concepts,
+scope. Before writing, it asks the coder to find every place the change must
+reach: callers, tests, fixtures, config, and exports. It is not a standalone
+lifecycle phase. Minimality means fewer concepts,
 dependencies, abstractions, layers, paths, and behaviors; clarity and
 maintainability outrank physical line count.
 
-The separate `ponytail-review` skill is a reviewer-facing checklist. The
+The separate `ponytail-review` skill is a reviewer-facing checklist for
+unnecessary complexity only. Whoever uses it reads the code the change
+touches, not only the diff, tags reuse misses with `reuse:`, gives a concrete
+case for each finding, searches the whole tree before a `delete:` finding, and
+adds a `Not checked:` line when something mattered but could not be checked.
+The unified reviewer agent applies the same rules through the `ponytail`
+profile and reports unchecked items as Open Requests instead. This is a
+partial adoption of upstream: the full quality
+review, the `shortcut:` marker, levels, and the extra upstream skills and hooks
+are not vendored. No test checks whether a model follows the merged rules;
+the validator checks only that the skill text ships and matches its hash
+pins. The
 unified reviewer selects the `ponytail` profile when the authoritative routing
 table requires it: deterministic control-plane/high-risk, multi-file,
 dependency, script, generator, or similarly complex work, or when the reviewer
@@ -383,9 +398,9 @@ and the `gate` mode relations.
 `protect-files.sh` invokes its bundled classifier directly with `python3`;
 it does not use `uv run`, because protection must work before a project
 environment exists. `git-protection.sh` remains a Bash guard. How far the
-classifier reaches differs by rule: the hook paths and protected hook
-configuration files that identify this repository's own guardrail setup
-are scoped to this repository only, decided on the candidate's resolved
+classifier reaches differs by rule: the hook paths, agent definition paths,
+`*.code-workspace` files, and protected hook configuration files that
+identify this repository's own guardrail setup are scoped to this repository only, decided on the candidate's resolved
 real path, while the credential-shaped rules (`.env*`, `uv.lock`,
 `credentials*`, `.pem`/`.key`) reach any path, in this repository or any
 other. A candidate whose real path cannot be resolved stays protected

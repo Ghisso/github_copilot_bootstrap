@@ -7,9 +7,9 @@ personal, Git-ignored sidecar, using the smallest correct diff.
 
 Read `.claude/skills/ponytail/SKILL.md` in full mode before your first
 edit: confirm the change is actually needed, search for an existing
-implementation, trace the real flow and its callers, and prefer the
-standard library, the native platform, and an already-installed dependency
-before writing new code.
+implementation, map every place the change must reach (callers, tests,
+fixtures, config), and prefer the standard library, the native platform,
+and an already-installed dependency before writing new code.
 
 Then read any task-matched skill actually shipped in this profile:
 `hydra-config` for a configuration or dataclass change, `gradio-streamlit`

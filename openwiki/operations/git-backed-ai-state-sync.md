@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-c3f54dc63823dfff60ef659d
     resource: repo://tests/test_state_sync.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 # Git-backed AI-state sync
@@ -28,7 +28,7 @@ Source, tests, and the policies under `shared/policies/` outrank this page.
 
 In every full-install consumer, `.claude/` is a plain, self-contained Git repository with its own `.git/` directory on one branch named `ai-state`. It tracks the installed bootstrap files and the mutable AI state: `MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, and `quality_reports/**`. The outer repository ignores `.claude/` entirely, so `git branch` and `git log` at the root never show `ai-state`. Inspect it with `git -C .claude <command>`.
 
-A sidecar install (`--mode sidecar`, in either profile) has none of this. The installer hands `--backup-state` to `backup_sidecar_state`, `--uninstall` to `uninstall_sidecar`, and a sidecar target to `install_sidecar`, each before any full-install step, so no nested repository, `ai-state` branch, or state sync is created or touched. The workflow profile's personal state folder, `.ai-bootstrap/` at the repository root, is a plain Git-ignored folder, not a nested repository; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
+A sidecar install (`--mode sidecar`, in either profile) has none of this. The installer hands `--backup-state` to `backup_sidecar_state`, `--uninstall` to `uninstall_sidecar`, and a sidecar target to `install_sidecar`, each before any full-install step, so no nested repository, `ai-state` branch, or state sync is created or touched. The workflow profile's personal state folder, `.ai-bootstrap/` at the repository root, is a plain Git-ignored folder, not a nested repository; see [Sidecar overlay](sidecar-overlay.md).
 
 ## Two kinds of commit
 
@@ -60,7 +60,7 @@ sequenceDiagram
 
 | Command | What it does |
 | --- | --- |
-| `setup` | On a missing `.claude/.git`: init, configure the remote and pinned refspecs, write the nested `.gitignore` and `.gitattributes`, commit what is on disk, merge `origin/ai-state` allowing unrelated histories, restore root adapters, activate the outer Git hooks. On an existing repository it stays local and does none of that. |
+| `setup` | On a missing `.claude/.git`: init, configure the remote and pinned refspecs, write the nested `.gitignore` and `.gitattributes`, commit what is on disk, merge `origin/ai-state` allowing unrelated histories, restore root adapters, activate the outer Git hooks. On an existing repository it stays local: it only brings the nested `.gitignore` and `.gitattributes` up to date (see below) and does none of the rest. |
 | `pull` | Record local changes, reconcile with `origin/ai-state`, then restore root adapters and checkpoint. A conflict aborts cleanly and skips restoration. |
 | `checkpoint` | Commit local AI state with no remote operation. Initializes the repository first if needed. |
 | `publish` | Send already committed state only. A dirty worktree warns and preserves the uncheckpointed state. Repeated clean publication is a no-op. |
@@ -85,6 +85,8 @@ The dispatcher wraps every command in a warn-and-continue and always exits 0. Wa
 - `session_logs/hooks-bypass.log` stays tracked.
 - The `.gitattributes` gives append-only `session_logs/*.log` files Git's `merge=union` driver, so two sessions appending to the same log reconcile automatically. Plans, `MEMORY.md`, and prose keep conflict-and-abort behavior so a real divergence stops for a human.
 
+Both files belong to the consumer. `write_nested_gitignore` and `write_nested_gitattributes` write their template only when the file is missing, and otherwise only append what is absent: the `settings.local.json` line when `git check-ignore -q --no-index` says that path would not be ignored (exit status exactly 1, so a broken repository adds nothing), the `.cache/` and `hooks-errors.log` lines, and the `session_logs/*.log merge=union` line. They run in `setup` on an existing repository, in every `checkpoint` through `commit_local_state`, and on a fresh `setup`, so an older nested repository gains the union-merge rule and a consumer's own lines survive. A bootstrap refresh never deletes either file, because both are listed in `CONSUMER_STATE_PATHS` (see the install and ownership page).
+
 ## Root adapters and the bootstrap-root mirror
 
 `state-sync.sh` only checks out `.claude/`. The installer-owned files outside it (`AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.codex/**`, `.agents/**`, `.vscode/*.json`, and the Copilot surface when not committed) are carried inside the nested repository under `.claude/bootstrap-root/`:
@@ -108,7 +110,7 @@ The dispatcher wraps every command in a warn-and-continue and always exits 0. Wa
 
 ## Related pages
 
-- [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
-- [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
-- [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
-- [Sidecar overlay](/openwiki/operations/sidecar-overlay.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](install-ownership-and-runtime-checks.md)
+- [Hook dispatcher and guardrail scripts](../architecture/hooks-and-guardrails.md)
+- [Source, generated output, consumer repo, and nested AI state](../architecture/source-generated-consumer-layout.md)
+- [Sidecar overlay](sidecar-overlay.md)

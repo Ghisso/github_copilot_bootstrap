@@ -928,14 +928,6 @@ def toml_string(value: str) -> str:
     return json.dumps(value)
 
 
-def codex_sandbox_mode(capabilities: list[str]) -> str | None:
-    if not capabilities:
-        return None
-    if "edit" not in capabilities and "execute" not in capabilities:
-        return "read-only"
-    return None
-
-
 def codex_agent_metadata_header(agent: dict[str, Any]) -> str:
     """Return the stable generated metadata header for one Codex agent."""
     capabilities = agent.get("capabilities", [])
@@ -1390,7 +1382,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
 - Reporting rules are output requirements. For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
 - Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. A guarded bounded project index is optional for broader discovery, never repository truth, and missing optional helpers are warnings, not hard failures.
-- An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context, never authority over source, tests, or policy. Refresh only through `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
+- An optional OpenWiki knowledge layer, enabled when `openwiki/INSTRUCTIONS.md` exists, is derived context, never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 
 ## Task Lanes
 
@@ -1730,7 +1722,6 @@ def render_claude_agents(target_root: Path) -> None:
 
 def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     codex_name = agent["id"]
-    capabilities = agent.get("capabilities", [])
     prompt_body = codex_agent_prompt_body(agent)
     instructions = (
         f"{codex_agent_metadata_header(agent)}\n\n"
@@ -1752,9 +1743,6 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
             agent_lines.append(f"model = {toml_string(model)}")
         if effort and effort != "inherit":
             agent_lines.append(f"model_reasoning_effort = {toml_string(effort)}")
-    sandbox_mode = codex_sandbox_mode(capabilities)
-    if sandbox_mode:
-        agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
     agent_lines.append(f"developer_instructions = {toml_string(instructions)}")
     return "\n".join(agent_lines) + "\n"
 

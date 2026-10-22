@@ -3546,6 +3546,28 @@ def test_gate_flags_a_live_managed_block_under_exact(tmp_path: Path) -> None:
     assert any("openwiki-managed-state: AGENTS.md" in error for error in errors)
 
 
+def test_gate_message_for_a_live_managed_block_says_the_user_runs_the_restore(
+    tmp_path: Path,
+) -> None:
+    """An agent cannot run the restore: the guard denies a command that names a
+    hook script. The message names the exact command, says the user runs it in
+    their own shell, and says why, on one line."""
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    (message,) = [e for e in errors if "openwiki-managed-state: AGENTS.md" in e]
+    assert "\n" not in message
+    assert "still carries an OpenWiki managed block" in message
+    assert "bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null" in message
+    assert "in their own shell" in message
+    assert "the guard denies an agent command that names a hook script" in message
+
+
 def test_gate_does_not_flag_a_managed_block_under_ancestor(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4604,6 +4626,115 @@ def test_closeout_artifacts_accepts_documentation_na_unchanged(
         assert isinstance(bound, dict)
         assert bound["path"] == relative
         assert re.fullmatch(r"[0-9a-f]{64}", str(bound["sha256"]))
+
+
+# Each closeout artifact for phase "phase-one": repository-relative path and
+# the step that creates it, exactly as the missing-evidence diagnostic names it.
+_CLOSEOUT_EVIDENCE = {
+    "phase-receipt": (
+        ".claude/quality_reports/verification-phase-phase-one.json",
+        "verify.py phase --format json --persist",
+    ),
+    "findings": (
+        ".claude/quality_reports/findings-phase-one.json",
+        "record_findings.py",
+    ),
+    "closeout-log": (
+        ".claude/session_logs/phase-one-closeout.md",
+        "closeout_session_log",
+    ),
+}
+
+
+def _write_closeout_evidence(tmp_path: Path, missing: str = "") -> None:
+    """Write phase-one's plan and closeout artifacts, leaving out ``missing``."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: big\n"
+        "phase_index: 1\nstatus: complete\n"
+        f"closeout_session_log: {_CLOSEOUT_EVIDENCE['closeout-log'][0]}\n---\n",
+        encoding="utf-8",
+    )
+    for key, (relative, _step) in _CLOSEOUT_EVIDENCE.items():
+        if key != missing:
+            artifact = tmp_path / relative
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text("{}\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("missing", tuple(_CLOSEOUT_EVIDENCE))
+def test_closeout_artifacts_names_missing_evidence_and_its_creating_step(
+    tmp_path: Path, missing: str
+) -> None:
+    """A missing artifact is reported by repository-relative path with the
+    step that creates it, not as an 'outside repository' rejection."""
+    _write_closeout_evidence(tmp_path, missing)
+    relative, step = _CLOSEOUT_EVIDENCE[missing]
+    with pytest.raises(ValueError, match="missing") as caught:
+        verify.closeout_artifacts(tmp_path, _metadata(), "reason recorded")
+    message = str(caught.value)
+    assert relative in message
+    assert step in message
+    assert "outside repository" not in message
+
+
+@pytest.mark.parametrize(
+    ("kind", "reason"),
+    (("symlink", "symlink"), ("directory", "regular file")),
+)
+def test_closeout_artifacts_rejection_says_which_reason(
+    tmp_path: Path, kind: str, reason: str
+) -> None:
+    """A symlinked or non-regular artifact stays rejected, and the message
+    names that reason instead of calling it missing or outside the repo."""
+    _write_closeout_evidence(tmp_path)
+    findings = tmp_path / _CLOSEOUT_EVIDENCE["findings"][0]
+    findings.unlink()
+    if kind == "symlink":
+        real = tmp_path / "real-findings.json"
+        real.write_text("{}\n", encoding="utf-8")
+        findings.symlink_to(real)
+    else:
+        findings.mkdir()
+    with pytest.raises(ValueError, match=reason) as caught:
+        verify.closeout_artifacts(tmp_path, _metadata(), "reason recorded")
+    assert "missing" not in str(caught.value)
+    assert "outside repository" not in str(caught.value)
+
+
+def test_closeout_missing_findings_report_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A valid phase with a documentation reason but no findings report
+    exits 2 with one line naming the report and record_findings.py, and
+    persists no closeout receipt."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="phase-one")
+    _write_closeout_evidence(tmp_path, missing="findings")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--documentation-na",
+            "no documentation change needed",
+        ],
+    )
+    exit_code = verify.main()
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Traceback" not in captured.err
+    assert ".claude/quality_reports/findings-phase-one.json" in captured.err
+    assert "record_findings.py" in captured.err
+    assert len(captured.err.strip().splitlines()) == 1
+    assert not verify.receipt_path(tmp_path, "closeout", "phase-one").exists()
 
 
 def _write_terminal_precondition_repo(

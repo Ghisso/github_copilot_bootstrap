@@ -53,6 +53,13 @@ CONSUMER_STATE_PATHS = (
     # every install deleted the consumer's own settings as an obsolete owned
     # file, which is data loss, not a refresh.
     "settings.local.json",
+    # state-sync.sh writes the nested ai-state repository's .gitignore and
+    # .gitattributes, and a consumer may extend them. The generated tree has
+    # neither, so without these entries every refresh deleted both as obsolete
+    # owned files, dropping the consumer's ignore lines before the installer's
+    # `git add -A` ran.
+    ".gitignore",
+    ".gitattributes",
 )
 
 # Each of these README files is bootstrap-authored reference documentation

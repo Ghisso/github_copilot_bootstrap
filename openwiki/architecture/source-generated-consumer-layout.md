@@ -24,10 +24,10 @@ sources:
     resource: repo://shared/mcp/servers.json
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -60,7 +60,7 @@ flowchart LR
 | a consumer's outer repository, sidecar install | the team's own tracked files, untouched, plus Git-ignored sidecar files (skills and bridges, or the workflow profile's units and its `.ai-bootstrap/` state folder at the repository root) and a manifest inside the Git directory | the team owns every tracked file; the sidecar installer owns only its ignored files, and never compares the state folder |
 | the nested `.claude/` repository | a separate Git repository on branch `ai-state` with the installed basis and the mutable AI state; full installs only | hooks and the installer commit it; the outer repository ignores it |
 
-The authoring repository's root `.gitignore` states both boundaries: `dist/` is generated build output, and `.claude/` is tracked in the nested repository, not the outer one. A sidecar install creates no nested repository; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
+The authoring repository's root `.gitignore` states both boundaries: `dist/` is generated build output, and `.claude/` is tracked in the nested repository, not the outer one. A sidecar install creates no nested repository; see [Sidecar overlay](../operations/sidecar-overlay.md).
 
 ## Authoring repository versus consumer
 
@@ -72,7 +72,7 @@ Two facts about this repository do not carry over to consumers:
 ## What `shared/` contains
 
 - `shared/policies/*.instructions.md`: workflow, workspace, quality and testing, code standards, config-first design, tool routing, agent reporting, API and deployment guidance. Each has frontmatter declaring `applicability: always` or a list of path patterns.
-- `shared/agents/<id>/`: JSON metadata in `agent.yaml` plus prompt bodies. See [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md).
+- `shared/agents/<id>/`: JSON metadata in `agent.yaml` plus prompt bodies. See [Agent roster, prompts, and the skill library](agents-and-skills.md).
 - `shared/skills/<name>/SKILL.md`: the skill library, with `visibility: public|background`.
 - `shared/hooks/`: `hooks.json` for Copilot, the `scripts/` guardrails, and `git-hooks/`.
 - `shared/mcp/servers.json`: the MCP servers `semble` (through `uvx`), `context-mode` (through `context-mode-dispatch.sh server`), and `context7`.
@@ -101,7 +101,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 2. It rewrites each copied `SKILL.md` through `SIDECAR_TEXT_REPLACEMENTS`, so no sidecar file names a bootstrap path the sidecar does not install. For the `workflow` profile it also rewrites the full install's state and policy paths to the profile's own `.ai-bootstrap/` folder and its rule file.
 3. It copies the vendored Ponytail MIT `LICENSE` into `ponytail/` and `ponytail-review/` at both roots.
 4. For `skills`, it renders each bridge in `SIDECAR_BRIDGES` from `shared/sidecar/bridge.md`, adding only that client's frontmatter: none for `.claude/rules/ai-bootstrap-sidecar.md`, and `applyTo: "**"` for `.github/instructions/ai-bootstrap-sidecar.instructions.md`.
-5. For `workflow`, `render_sidecar_workflow_units` writes instead: the three rules as `.claude/rules/ai-bootstrap-<name>.md`, the Copilot file `.github/instructions/ai-bootstrap-workflow.instructions.md` with `applyTo: "**"`, the five agents from their `workflow-prompt.md` with the Claude Code frontmatter minus any `mcp__` tool grant, the review profiles and the four relaxed templates with the state-path rewrite, and the state seeds under `.ai-bootstrap/`, which sits at the repository root because Claude Code refuses agent writes anywhere under `.claude/`. The `skills` profile's output is byte-identical to the old single `dist/sidecar/` tree, which a snapshot-hash test in `tests/test_validate_targets.py` proves.
+5. For `workflow`, `render_sidecar_workflow_units` writes instead: the three rules as `.claude/rules/ai-bootstrap-<name>.md`, the Copilot file `.github/instructions/ai-bootstrap-workflow.instructions.md` with `applyTo: "**"`, the five agents from their `workflow-prompt.md` with the Claude Code frontmatter minus any `mcp__` tool grant, the review profiles and the four relaxed templates with the state-path rewrite, and the state seeds under `.ai-bootstrap/`, which sits at the repository root because Claude Code refuses agent writes anywhere under `.claude/`. The `skills` profile renders the same file set the old single `dist/sidecar/` tree had. A snapshot-hash test in `tests/test_validate_targets.py` pins its exact bytes, and every deliberate edit to one of its four shipped skills or to the vendored Ponytail LICENSE re-captures that hash.
 
 ## What the validator proves
 
@@ -143,7 +143,7 @@ Runtime loading by a real client is probed separately by `scripts/check_native_c
 
 ## Related pages
 
-- [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md)
-- [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
-- [Sidecar overlay](/openwiki/operations/sidecar-overlay.md)
-- [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md)
+- [Agent roster, prompts, and the skill library](agents-and-skills.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](../operations/install-ownership-and-runtime-checks.md)
+- [Sidecar overlay](../operations/sidecar-overlay.md)
+- [Git-backed AI-state sync](../operations/git-backed-ai-state-sync.md)

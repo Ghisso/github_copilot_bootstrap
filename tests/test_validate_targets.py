@@ -48,6 +48,7 @@ from runtime_ownership import (  # noqa: E402
     SIDECAR_LEGACY_STATE_ROOT,
     SIDECAR_PROFILE_SKILLS,
     SIDECAR_PROFILES,
+    SIDECAR_SKILLS,
     SIDECAR_STATE_ROOT,
     SIDECAR_STATE_SEED_FILES,
     SIDECAR_WORKFLOW_AGENTS,
@@ -2064,11 +2065,12 @@ def test_validate_agents_rejects_generated_target_omission_and_leakage(
     assert expected in errors
 
 
-@pytest.mark.parametrize("field", ("skills", "mcp_servers"))
+@pytest.mark.parametrize("field", ("skills", "mcp_servers", "sandbox_mode"))
 def test_validate_agents_rejects_codex_agent_local_override(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str
 ) -> None:
-    """Codex agents inherit skills and MCP configuration instead of overriding it."""
+    """Codex agents inherit skills, MCP configuration, and the sandbox instead of
+    overriding them; Codex ignores `sandbox_mode` in a custom agent file."""
     target_root = tmp_path / "multi-agent"
     shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
     agent_path = target_root / ".codex" / "agents" / "coder.toml"
@@ -3269,8 +3271,8 @@ def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
         REPO_ROOT / "shared" / "third_party" / "ponytail" / "UPSTREAM.md"
     ).read_text(encoding="utf-8")
     normalized = " ".join(text.split())
-    assert "73 lines against upstream" in normalized
-    assert "40 lines against upstream" in normalized
+    assert "85 lines against upstream" in normalized
+    assert "65 lines against upstream" in normalized
     assert "limited to formatting, the bootstrap's required" not in normalized
 
 
@@ -3309,10 +3311,13 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
 # `dist/sidecar/workflow/` split. Acceptance Criteria: "dist/sidecar/skills/
 # equals today's dist/sidecar/ byte for byte." Any edit to one of the four
 # shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
-# changes this hash and needs the same re-capture; the last one was the
-# gate-repair Phase E ponytail-review description step.
+# changes this hash and needs the same re-capture, as does the vendored
+# Ponytail LICENSE (copied into both shipped ponytail skills); the last one
+# was the backlog-followups Phase E merging Ponytail v5.3.2 into both shipped
+# Ponytail skills (the earlier one, Phase A step 8, restored that LICENSE
+# verbatim from upstream: `DietrichGebert`, one trailing newline).
 SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
-    "e646f36864fa4d86608e708ee34c81f4531938e548aee3f64a4c23096aab5867"
+    "1cb7a738bd4e3b7c331949134b91a5f37b11dfa0efb204cffb6de4fc763979c7"
 )
 
 
@@ -3336,6 +3341,48 @@ def test_sidecar_skills_profile_output_matches_pre_workflow_profile_snapshot(
     bytes today's single-profile render_sidecar(target_root) produced."""
     render_sidecar(tmp_path, "skills")
     assert _sha256_manifest_hash(tmp_path) == SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256
+
+
+def _unmatched_sidecar_anchors(skill_texts: dict[str, str]) -> list[str]:
+    """List each `SIDECAR_TEXT_REPLACEMENTS` phrase found in no skill text.
+
+    The replacement is a plain `str.replace`, and the validator rejects only a
+    leftover old phrase, so an anchor that stops matching (a re-wrapped
+    paragraph) would ship the unreplaced text without failing anything.
+    """
+    return [
+        old
+        for old, _new in target_generator.SIDECAR_TEXT_REPLACEMENTS
+        if not any(old in text for text in skill_texts.values())
+    ]
+
+
+def _sidecar_skill_texts() -> dict[str, str]:
+    return {
+        name: (REPO_ROOT / "shared" / "skills" / name / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        for name in SIDECAR_SKILLS
+    }
+
+
+def test_every_sidecar_text_replacement_anchor_matches_a_shipped_skill() -> None:
+    """Each anchor occurs, line breaks included, in a sidecar skill."""
+    assert _unmatched_sidecar_anchors(_sidecar_skill_texts()) == []
+
+
+def test_sidecar_anchor_check_fails_on_a_rewrapped_persistence_paragraph() -> None:
+    """Re-wrapping the `## Persistence` paragraph breaks its anchor, and the
+    check reports exactly that anchor."""
+    anchor = next(
+        old
+        for old, _new in target_generator.SIDECAR_TEXT_REPLACEMENTS
+        if "review profile still runs" in old
+    )
+    texts = _sidecar_skill_texts()
+    assert anchor in texts["ponytail"]
+    texts["ponytail"] = texts["ponytail"].replace(anchor, anchor.replace("\n", " "))
+    assert _unmatched_sidecar_anchors(texts) == [anchor]
 
 
 def test_sidecar_workflow_skill_set_equals_public_skills_minus_the_denylist() -> None:
@@ -3613,10 +3660,16 @@ FULL_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "under `### Open Requests` just before `### Gate Result`",
             "keep them out of the Findings JSON",
             "is closed: record it in the report as an unverified limitation",
+            "not only the diff",
         ),
     ),
     ("reviewer", "### Open Requests", ("only when a request is open",)),
     ("reviewer", "## Findings JSON", ("but only when no request is open",)),
+    (
+        "coder",
+        "## Mandatory Skills-First Rule",
+        ("callers, tests, fixtures, config",),
+    ),
     (
         "coder",
         "## Execution Rules",
@@ -3640,7 +3693,10 @@ FULL_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "code-profile",
         "## Checklist",
-        ("supplied approved requirements and scope-change records",),
+        (
+            "supplied approved requirements and scope-change records",
+            "outside the diff",
+        ),
     ),
     (
         "tests-profile",
@@ -3652,6 +3708,17 @@ FULL_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "original reproduction now behaves correctly",
         ),
     ),
+    # Ponytail 5 adoption (audit A2): the coder maps callers, tests, fixtures,
+    # and config before writing; the review skill reads the touched code, not
+    # only the diff. `reuse:` ships in the skill and the profile together.
+    (
+        "ponytail-skill",
+        "## Before you write",
+        ("callers, tests, fixtures, config",),
+    ),
+    ("ponytail-review-skill", "## Read first", ("not only the diff",)),
+    ("ponytail-review-skill", "## Findings", ("`reuse:`",)),
+    ("ponytail-profile", "## Finding Format", ("`reuse:`",)),
 )
 
 # The same guidance in the relaxed sidecar's advisory wording. The reviewer
@@ -3672,6 +3739,11 @@ SIDECAR_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "run it yourself and hand back the output",
             "you save that report yourself under `.ai-bootstrap/quality_reports/`",
         ),
+    ),
+    (
+        "coder",
+        "## Skills to load first",
+        ("callers, tests, fixtures, config",),
     ),
     (
         "coder",
@@ -3704,6 +3776,7 @@ SIDECAR_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "valid alternative way to meet a requirement is not a deviation",
             "never invent one",
             "list it at the end of your report for the caller",
+            "not only the diff",
         ),
     ),
     (
@@ -3761,6 +3834,9 @@ def _source_texts() -> dict[str, str]:
         "debug-investigator": "skills/debug-investigator/SKILL.md",
         "code-profile": "review-profiles/code.md",
         "tests-profile": "review-profiles/tests.md",
+        "ponytail-profile": "review-profiles/ponytail.md",
+        "ponytail-skill": "skills/ponytail/SKILL.md",
+        "ponytail-review-skill": "skills/ponytail-review/SKILL.md",
     }
     return {
         asset: (REPO_ROOT / "shared" / path).read_text(encoding="utf-8")
@@ -3807,9 +3883,9 @@ def test_review_guidance_check_fails_when_text_is_removed_or_moved() -> None:
 def test_generated_full_output_carries_review_guidance(
     tmp_path: Path, surface: str
 ) -> None:
-    """REQ-004/REQ-005: the generated Claude files (agents, debug skill,
-    review profiles) and the Codex agent `developer_instructions` carry the
-    same guidance as the shared source."""
+    """REQ-004/REQ-005: the generated Claude files (agents, debug and Ponytail
+    skills, review profiles) and the Codex agent `developer_instructions`
+    carry the same guidance as the shared source."""
     roles = ("orchestrator", "reviewer", "coder")
     if surface == "claude":
         target_generator.render_shared_basis(tmp_path, "multi-agent")
@@ -3829,6 +3905,15 @@ def test_generated_full_output_carries_review_guidance(
             "tests-profile": (claude / "review-profiles" / "tests.md").read_text(
                 encoding="utf-8"
             ),
+            "ponytail-profile": (claude / "review-profiles" / "ponytail.md").read_text(
+                encoding="utf-8"
+            ),
+            "ponytail-skill": (claude / "skills" / "ponytail" / "SKILL.md").read_text(
+                encoding="utf-8"
+            ),
+            "ponytail-review-skill": (
+                claude / "skills" / "ponytail-review" / "SKILL.md"
+            ).read_text(encoding="utf-8"),
         }
     else:
         agents = {agent["id"]: agent for agent, _dir in shared_agents()}

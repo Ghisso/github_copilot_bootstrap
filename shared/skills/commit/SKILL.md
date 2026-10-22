@@ -44,7 +44,7 @@ git add src/changed_file.py tests/test_changed.py
 - Review: `git diff --cached`
 - Stage only after focused/fast checks, review, documentation, final plan/log/LEARN state, and before `record_findings.py`, `verify phase --persist`, and `verify closeout --persist`.
 - Run `git commit` in its own Bash command. The commit gate hook judges the text of a command before it runs, so a chain that ends in `git commit` is denied on the old receipts and nothing in the chain executes. The full order is the numbered CLOSEOUT sequence in `.claude/instructions/workflow.instructions.md`.
-- Once every plan, log, and memory edit is final and before `record_findings.py`, checkpoint nested plan state. Use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` from an agent; `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the editor task and hooks, but the file-protection hook denies any Bash command naming a `.claude/hooks/` path. The closeout receipt binds the big plan's bytes, and the push gate can only re-derive that digest from bytes Git already holds, so a big plan left dirty through the receipt steps yields a completion commit that can never be published. Never checkpoint after the receipts are persisted: that stales them and fails the next commit closed.
+- Once every plan, log, and memory edit is final and before `record_findings.py`, checkpoint nested plan state. Use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` from an agent; `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the editor task and hooks, but the file-protection hook denies running it from an agent's Bash tool (any command outside the guard's read-only list that names a `.claude/hooks/` path). The closeout receipt binds the big plan's bytes, and the push gate can only re-derive that digest from bytes Git already holds, so a big plan left dirty through the receipt steps yields a completion commit that can never be published. Never checkpoint after the receipts are persisted: that stales them and fails the next commit closed.
 - `dirty` in the findings and receipt gates means unstaged tracked changes. Untracked files do not appear in `git diff`; stage intended files before recording findings.
 
 ## Phase 4: Commit
@@ -106,18 +106,23 @@ under that authority. For final closeout, every phase must be terminal:
 `complete` or fully evidenced as `cancelled`, with at least one completed phase
 and one commit per completed phase.
 
-PR creation stays user-requested and must target `dev`:
+PR creation stays user-requested and must target `dev`.
 
-```bash
-gh pr create --base dev --title "type: description" --body "$(cat <<'EOF'
+Write the body to a scratch file with the native Write tool, then pass it with
+`--body-file`. The shell guard scans inline bodies, so a body that names a
+protected path would be denied. The file holds the body, for example:
+
+```markdown
 ## Summary
 - change 1
 - change 2
 
 ## Test Plan
 - [ ] tests pass
-EOF
-)"
+```
+
+```bash
+gh pr create --base dev --title "type: description" --body-file <file>
 ```
 
 ## Phase 6: Merge (human)

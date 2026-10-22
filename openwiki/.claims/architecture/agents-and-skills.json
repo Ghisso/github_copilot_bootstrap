@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:35caddbf9666d3de00c10c71a7890c00cca8e459093c8a2222fd172070513a54",
+  "pageVersion": "sha256:749f87b458de10d3b25877f403f47289b802bd059777055615cb5fb7803a24ff",
   "claims": [
     {
       "id": "claim_8500496bbf8d4e7dadbeb25398321b01",
       "statement": "Each shared agent is defined once under shared/agents/<id>/ by a JSON metadata file named agent.yaml plus prompt bodies; load_shared_agents parses and validates every agent.yaml, requires unique ids, and checks prompt composition before rendering.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L828-L864",
+          "resource": "repo://scripts/generate_targets.py#L836-L872",
           "version": "repo-lines-v1:sha256:55e0159f43fe205acce5dd2c542760b148a4c725b1b025178d2a36e087c7c64c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1Yjk4NjQwN2Q5MGRiNWY2Yjk5ZGVkN2ZmODVmYTE5ZTBlYWVmZjcwZTU4NDg0OTdjYTI4NzE0ZTY2YjYwYzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkZjU5OTgyNmYwYzJjNTdmNzZkMzdiMDMzMGE1ZDQ3ZTEwZDFlYWFmZTU2YTY3MjA5OWJiYmFkYjJmNmU5MjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkYjczZmI5YWYyNWMwMzAwZWI1MWExYzA3YTIxZmM5NzdjYWIyYTM1M2ZmMTQzYmJiNmMzODQ1OWIyYmZiMTIifQ"
         },
         {
@@ -25,7 +25,7 @@
           "version": "repo-lines-v1:sha256:3583deb88f8ac3be6504b01cff81657ed70baf92ea74e9c90b48e509c6c5217b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5ODk1Mzk2YWM5ODA1N2U2ZjEyYmY5N2ViZGM4YjQwODljMjFmOTY4ZDk5MTg2Nzk2NWIwMmJlNzk1NzJmMTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiZDNlODc3MzI1ZDNjYWMwY2MzZjYxYmNiOTZlM2E1M2VlNmU0MGJmN2JiNWQ3NDFhODIzYTRkNDAxZTc4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzZjIxODMwOWY3ZmJjMTRiNjdhYTFjMGRiZWI0MjYyM2Q0NWE1MDMyM2FhYzg4NDhlOTg5MjM0YmJmOGUwNGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5YTM4OWExMjg4Yjc2Y2FkOTkxMGU1NzdkNTllYmQ5ZmM2NjY5OWE5YTM2MmQ3ZGYyZGJhM2U4MDdkMTIzYjgifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L616-L680",
+          "resource": "repo://scripts/generate_targets.py#L624-L688",
           "version": "repo-lines-v1:sha256:89197f1647ecad694bc75087cf23dbd7fdb10749b487eecb95bceee09abcd364:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2NjRhMzAwNGMwMWZkYzMyMzU1Yjg2ZWJjYTgyM2YxODg5YzNhMmUyNDJlYTE5ZTQ1ZTJjOTBlZGE3ODBhZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2ZGZiZjQ1M2Y3ZjFiZWJhYjcyODM2MWIwZjM5M2VlYjRjMWZiNjY4ZjllYTIyYjkxNmRhY2Y1ZGZmODFkODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2OTUyMzVjM2VmYTYyMDMxYmUzYjhiYmIwMDI1OGE3ZDM4OTY5OTQzMWQ1OWFlMDJmNmJjM2RmZTJhNDY5YjgifQ"
         }
       ]
@@ -35,11 +35,11 @@
       "statement": "An agent that omits targets is eligible for all four supported targets (github-copilot, claude-code, openai-codex, google-antigravity); one that lists targets renders only there.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L481-L501",
+          "resource": "repo://scripts/generate_targets.py#L489-L509",
           "version": "repo-lines-v1:sha256:d46680607577ed3898cbce847c618da4456da7ae146199acb88874f658c06359:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNlODBkOWRhZTIyMGRiMDdiMmU1MjVhM2M3MjQwY2Q0NjYzYWZkMzQ3YWZlOWFjMmE1MDVmMzlhMzAzZWU0ZjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzYjgxN2FjNWQ5NDQ1M2VkMmU1YThkZDkzMmQ4NzY3NTczNzllNjcwNWRkMTcyYmQ2ZDNkNzQxOGUwNzgyYWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjMzk2OWZmZDU4YmRiYTNkOTk5MjYyZWMwY2M3ZGUwMGM0ZGNhYWYxNDk5YzYzZGIzNTIyMWExZWQ0ZWVhNWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5ZWEzNmEwOTdlNjY4NGU5NzUyYTllY2RkOTAxY2Q0YTY5ZmIxMzMwNmMxOGVjYzQ3ZmJmMzNhYzJiOTkyNzYifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L856-L864",
+          "resource": "repo://scripts/generate_targets.py#L864-L872",
           "version": "repo-lines-v1:sha256:9bffe2b4600fbcc6e9f034baff8dfeaa13b61599a9b8d0ddfa78e39ab71ab449:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjAwMTQwODdlMWZiM2E1NGU5NmZhNDYwOGFlN2YzMTkzNzUwOGYyYzBmOWFiYzExZWU4MDVkYjU5Y2YwZDlkMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjg2YjBlMmQ3MzE4OGE0YWRlYWUyMmRlZjVkZTlmMTJjOGQ3NTdlNTJmY2M5MGNkODkwMDRlODI4OWJmNjA1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGRiNzNmYjlhZjI1YzAzMDBlYjUxYTFjMDdhMjFmYzk3N2NhYjJhMzUzZmYxNDNiYmI2YzM4NDU5YjJiZmIxMiJ9"
         }
       ]
@@ -49,7 +49,7 @@
       "statement": "Provider-specific agents (luna_coder and sol_coder for openai-codex, antigravity_flash_coder for google-antigravity) are derived from coder through prompt_base and carry only a provider supplement named prompt.openai-codex.md or prompt.google-antigravity.md.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L135-L138",
+          "resource": "repo://scripts/generate_targets.py#L142-L145",
           "version": "repo-lines-v1:sha256:1dedd4f38cd47252dd9fe3bbd84f23dc55293ef1ad64c58c82324c071e00f0ee:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGRiOWQzMjk1MDA2OGFhNDQwMTJkYjA5ZGJlOTQ2YmJjMzJjZDM5NjBlNGZmNWQwZDYwYzhjN2RmMGM0NDJmNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjAxOWI2ZGUxYzA4NTUwOTUyOGRmN2NkYTE0NGJkNjRhYzM2ZmU5YzBmNTBkNGI3NWEzMWI1OGUyZWI3YTQyOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDQ0MjA4ZDVmZjBlYTVjZjAwMjc2YjdjNDhkMDY0ZjVkMGZlNWZmMGVmYmI0Y2EyNDNkZDk1MjlkNDNkZDAyMiJ9"
         },
         {
@@ -71,7 +71,7 @@
       "statement": "Prompt composition is limited to one level: validate_prompt_composition refuses a prompt_base that self-references, points at a missing agent, or points at an agent that itself has a prompt_base, a derived agent that ships its own prompt.md, an empty supplement, a supplement containing the whole transformed base prompt, and a supplement for a provider the agent is not eligible for.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L687-L784",
+          "resource": "repo://scripts/generate_targets.py#L695-L792",
           "version": "repo-lines-v1:sha256:310abe4cf9131894f0bbeb2078a6c9d7ad33fbc9bb0d5b74e5c7f59c2e9616b1:eyJzZWxlY3RlZExpbmVDb3VudCI6OTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzZTE0NTM3ZTdiZDk2OGMzODJmOTU4OTIyNGMzODMzOTc4NWYyMTkwZTI4Y2Y1YjlhMjBhOGYwOWRkZWQ5Y2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlZGNjMjk0NDg5OGZkYmQyYjc5MDEzYmU1Y2Q3NGY0ODI5NGNjMDNjZWI0MjgxZDMzMTMzYWI2MmU1NTYxNTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjZDlkODQ4MzFjNzY5MTI4Y2U4Yzg4ODhjZGY1NTNkMTg5N2IzOTVlYzZlYjg4ODgzYTBhMjg3MDNhMWI0MmQifQ"
         }
       ]
@@ -136,11 +136,11 @@
     },
     {
       "id": "claim_075a949fbea94285863cd7e9c7325776",
-      "statement": "The Codex agent adapter is TOML carrying name, description, optional model and model_reasoning_effort from model_intent['openai-codex'], a sandbox_mode derived from capabilities, and the composed prompt as developer_instructions.",
+      "statement": "The Codex agent adapter is TOML carrying name, description, optional model and model_reasoning_effort from model_intent['openai-codex'], and the composed prompt as developer_instructions; it does not emit sandbox_mode.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1723-L1754",
-          "version": "repo-lines-v1:sha256:dad00c247a428799ba47b8a0eb7c36192df5a903a757b7ea0d48b5a4f7551d69:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2OGE3ZmI2NTQ2MGE1OGVkMGM4MDZkYTkzYmRhMzQ0MjFjMjE2N2ExOWE1ZDAyMTU4YWM0NDI3MTk4OGU1Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYjZiZmNmM2M1OWZkZTEwMTkzMDI1MzEyYmM0OWI3NTA1NmYzMjZjMWE2ODhjMTRhZDVkMDc2YjU0ODlhZWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI1N2Q0MDhiMjFjY2I3ZGUwZGQ2NDRmN2I1ZDNhZTMzMjkwMWJjMmMyZDJlZDRhZDJkOWMwNmMzNDVjNzRmN2UifQ"
+          "resource": "repo://scripts/generate_targets.py#L1723-L1747",
+          "version": "repo-lines-v1:sha256:a6d352414511c389d928382126210d025506a89a5f8f4e796430d47627154870:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2OGE3ZmI2NTQ2MGE1OGVkMGM4MDZkYTkzYmRhMzQ0MjFjMjE2N2ExOWE1ZDAyMTU4YWM0NDI3MTk4OGU1Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiNjRkOTdlMDk0NGRmYTIwNWRjZDY4NzZhZWM4MjM2NzQ3NzBkZGE1Y2JjYTBlMzIzZTgxZmEzMmUxZGVmYzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk1Y2Y4YzVjMGUxMDlkNTg5MTFlMTI4MmQ1YzIyZjMwYmY3OGY3YjQ3ZjA4MTI0NWYwYzJlOGMzZDkzZWI2NGIifQ"
         }
       ]
     },
@@ -149,7 +149,7 @@
       "statement": "The Antigravity adapter writes .agents/agents/<id>/agent.md with mainAgent: false, subagent: true for every agent except the orchestrator, the provider model, and inheritMcp: true for subagents.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1799-L1837",
+          "resource": "repo://scripts/generate_targets.py#L1795-L1833",
           "version": "repo-lines-v1:sha256:69cf3fb10e71bb627c789aae0c1573c5a5f629eea725339d6de01e264865463b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwY2I5MDJiNmU0ZmMwYTY5MDZmYzgxYjg4MmQwYzI2YzdiMGQxMWQ4MDg1ZjA2ZjBmZTFlMDQ3OGJhODMwZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY5MjFlMmEzNTAzNjllZGU1ODk3NjIzZTdkZjQwMmUzNzM2NDg1N2E5MWU2MjM5YTc3MjlmMjBkMzY0NmQxMDUifQ"
         }
       ]
@@ -159,8 +159,8 @@
       "statement": "The reviewer loads checklists from review profiles rather than carrying them in its prompt, and runs a primary pass followed by a verification pass that attempts to refute each finding, repeating verification until two passes in a row change nothing or at most 3 rounds.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L28-L45",
-          "version": "repo-lines-v1:sha256:c72fe87c945de5dc3c6e36c106c3f6e6a333830ea14bc9c18d901db210a2d0a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4YzgzZjIyMGYyMzJmNjhlYTFlNmYzMGM2YTk2MjYwMWVkYjI4ZDYyNjA4OWMwOTQyY2Q4N2FlZmQ2MDI4MTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlMzk1OTExMDEwZTdjZDFmODA2NmU3NGU1OGU1YTJkMDczZTczNDRmMWU0NWFjZTgyMzUzYjJhMDBmNGFkM2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgyZWRkMDgyOGZmZDIwZmFiMzhiZWY1NGQ0YzAxODY0OGY3NGI3NWUzZjk3NTFmNjdlYTE5NzU1Mzc1N2NhZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMTg0ZDk0N2M1NzIzNzdiMTRiYjBhYTQ0ZDQzYTFkMTY4MTk5NjEwOGE5NmZiMjNhNDU2Y2U2ZDIwMGE0ODcifQ"
+          "resource": "repo://shared/agents/reviewer/prompt.md#L28-L47",
+          "version": "repo-lines-v1:sha256:5ab66e0f765e05421145fda0ead37dca0ff21e0be1f6378ef69fd63554c285cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4YzgzZjIyMGYyMzJmNjhlYTFlNmYzMGM2YTk2MjYwMWVkYjI4ZDYyNjA4OWMwOTQyY2Q4N2FlZmQ2MDI4MTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlMzk1OTExMDEwZTdjZDFmODA2NmU3NGU1OGU1YTJkMDczZTczNDRmMWU0NWFjZTgyMzUzYjJhMDBmNGFkM2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgyZWRkMDgyOGZmZDIwZmFiMzhiZWY1NGQ0YzAxODY0OGY3NGI3NWUzZjk3NTFmNjdlYTE5NzU1Mzc1N2NhZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMTg0ZDk0N2M1NzIzNzdiMTRiYjBhYTQ0ZDQzYTFkMTY4MTk5NjEwOGE5NmZiMjNhNDU2Y2U2ZDIwMGE0ODcifQ"
         }
       ]
     },
@@ -169,7 +169,7 @@
       "statement": "Review-profile selection is governed by the single routing table in workspace.instructions.md: hooks, scripts, generators, and control-plane code always receive code, architecture, security, tests, and ponytail; Ponytail is required for every control-plane/high-risk diff, every multi-file diff, and every complexity-expanding diff, and is optional only for one low-complexity documentation or workflow-state file.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workspace.instructions.md#L121-L148",
+          "resource": "repo://shared/policies/workspace.instructions.md#L122-L149",
           "version": "repo-lines-v1:sha256:35f0c2d642dc098c3e9e3bef86572812bcbba536e30eb9202d9a411388ff2198:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjODU1ZGQ5ODMwNTY4N2FiNjM1ZGI1ZmVmYmMzN2I1NGYzZjMxMzkyMTQ1YjJkZTIxNjhmMTFlNGYzMTcyNzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyN2JhZWM2ZjE2ODlkYjg5NTkyMjU3YTBmMzliMWZhYjc5MzNiMzlmMWVlYjhhZWZhNDRlZWZhYzJiNGJkYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkZDliNGU3NmZmZDAwZDIyMGRiOWY5ZGRlOTg3NDE5MWJiMjUwMTExNWVjMzY2NWIxODZiMWNiNDE3ZWIzZTkifQ"
         }
       ]
@@ -215,7 +215,7 @@
           "version": "repo-lines-v1:sha256:e5d79bb2550a8a465c1af7c5a2262455b7684d4dc163c5075aec1bc9329e8043:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzUxYTc3ZjZmOTE2MjAyY2I5NDAyZmFkN2ZjN2MwYmE4YjJiMWJhM2U5MWNhNzliZTUxYzZjNzY4NGYxNjJlOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWI3YWQyZjZjZTg1ZGZkYmIxZDZlY2NkMTgxODVkMmJiZDIwZDQzNDBlYTQ5ZGJjYjY5NmEwMWUzN2YzZGZkMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGY3OTg0NzU0ZjY2Mjc1OWRiM2Q5ZDI0MmRlZDhkNGNmNDZjYzlmZjhjYjQzNDQxNTIzZDI0NzE1ZDE0M2I5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmJkMGYzZTY5NDNiOGFiNDM1NmU0YTIzYTQ5M2VlZjA2OTlkNDdkZDAyODlmMTBlNTkzZDA2MmUyZjBhOTI3ZCJ9"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L288-L295",
+          "resource": "repo://scripts/generate_targets.py#L296-L303",
           "version": "repo-lines-v1:sha256:34da63e23e2286781ffed196f66b047e98ad6cdfcf074780c80e5ac64a53eed1:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTg3YzgyODllOWVhYjdkZGM1Yjk1MTRlYzJlOTEzNDk4ZThiOTJmMWQyNDgwMzMwYzkwZWNkN2ExNGY0OWYyNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjAzMDU5MzQ4NTY1NDViOWNkNmNiOTcxYTgxN2EyODdjOWYxY2Y1ZDQyZWM1YjM2Y2NjZWRmYWZjYWQ0NThiZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGI4Yzk3OTcyODBhOThhODJkYjMyMjBhZTRiMThkYTAxMzhjZDNiY2Q5ODNkZmE3MzEwMmNiNzdiYTZiNTk5OSJ9"
         }
       ]
@@ -225,11 +225,11 @@
       "statement": "shared_skill_integrity_errors enforces hard skill-library rules: a root SKILL.md per directory, well-formed flat YAML frontmatter with matched delimiters, no tabs, and no duplicate keys, a frontmatter name equal to the directory name, a visibility of public or background, a non-empty unique description, and resolvable backtick-quoted repository or references/ paths.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8071-L8161",
+          "resource": "repo://scripts/validate_targets.py#L8339-L8429",
           "version": "repo-lines-v1:sha256:12166da5c247a886f82883750fdc21d82b9db4b4960a9387cfc8ccd39644a63b:eyJzZWxlY3RlZExpbmVDb3VudCI6OTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3MTg2YTIyNjFlODg1YjRiMjUyYWEyNDE5YzRmYzAwOWJhMTBiZGMwZTQ1Zjk0OWM5ZDg4ZmQyMWZlMDRjZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MDMyZTk2NGQwOTMyMzUxZTVkMTg1MjY5MjgxYjE3MWEzYTA5YjA4YjI4NmU2NjFlYTQ3MDMyM2M4MmViNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlNGQ1YTY2MTVmMzczNGRjOGI5OTk5OWI3NGI2ODIyMmQxZWE4MWUwN2FhMTUxNWVlNTNkOGJlNDExNGI4YTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L8257-L8311",
+          "resource": "repo://scripts/validate_targets.py#L8525-L8579",
           "version": "repo-lines-v1:sha256:04790d2a7a24fb6147e76add86ef8309dcbf1ac44b5ad1f758f24d3ce948335c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlMzJmYzFiYmI5NmNkNGJmNGFjNThkYTFkYWI5NThlMDgzY2I4YzAwM2I2MmViMDkyNDJiZWYzNjBjMTFhNWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwMTNiZDE4YmY3NmM2NjdkM2E3Y2Y3YmVlNmY3NTkyMDQ3NWRhZTNlMTIxYTI3ODJlMTU1M2RlOTVhZmUyOTkifQ"
         }
       ]
@@ -239,7 +239,7 @@
       "statement": "validate_skills_and_paths first rejects shipped shell lines that hide a test, lint, or verify failure, then requires the generated skill count to equal the shared count, requires the generated ponytail and ponytail-review skills to ship public with license: MIT and the upstream LICENSE and provenance, requires the target to expose only humanize and never the upstream avoid-ai-writing name, and requires the generated documenter prompt to reference humanize.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L7839-L7915",
+          "resource": "repo://scripts/validate_targets.py#L7892-L7968",
           "version": "repo-lines-v1:sha256:f7b62de77140d8569501ae4bd6e38018913e9898b17724b7de04304ab743014c:eyJzZWxlY3RlZExpbmVDb3VudCI6NzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMjNkYjRjOWMwYzMyNTQwYTkwYTU5NWFlYjYwOThmYjA0ZTE1NDljYTgwMWM0NDhmMjRiZWVmYzVlNTI1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2ZWEwZjFhYzI5MDVmMjE0NTFjZjk1NjNlZjE2ZmQ2OTFmOWE5ZmE3YzFjOGVkYjE2ZjI2ZTBmNmU1MmE1NjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkMzE0NDYzYmQ1YTY5YTMwNTk5YjAxNjVjZGZmMDA2MTVjOGJlMDY1MTVmYWMwOTI2ZDU0NWE5ZTEwZmU4ZTkifQ"
         }
       ]
@@ -249,7 +249,7 @@
       "statement": "Duplicate skill descriptions are treated as an error because background skills are loaded by description match; the skill template fixes the frontmatter shape and distinguishes shared/skills/ authoring paths from installed .claude/skills/ paths.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8296-L8311",
+          "resource": "repo://scripts/validate_targets.py#L8564-L8579",
           "version": "repo-lines-v1:sha256:a57ec1ac493c850b35d2293e899b85d10d2123e8b708555979899b4caaf7e371:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5YTI1MzQ0NjU1ZmZkNzM3OTYwNDYwNThhZjQyMDM0MDYzNjZjYWI3OWQxMWM5YjQ5MWYyM2NiYjVkMzczZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUzNjY0NWE3ODU2YjI4N2NiYzkwZWRlOTI1NTgzZjI1MWFlNjk3ZmRiNTUzZWJjODhjMDE3OTIxMTliM2U1M2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwMTNiZDE4YmY3NmM2NjdkM2E3Y2Y3YmVlNmY3NTkyMDQ3NWRhZTNlMTIxYTI3ODJlMTU1M2RlOTVhZmUyOTkifQ"
         },
         {
@@ -267,7 +267,7 @@
           "version": "repo-lines-v1:sha256:4db1f37dfb6328b18bc105033fc85eeb6ad988c715079cf7a4c556e291cb6ac0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAzMmFiZThhNTFlYTU0YmEzZjQzMjgyZGYzMGExNzBlNDQyZmQzYjNjMDZjODE3MDg4NmUzM2EwYTQ1MDllZWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM0ZmQzMTI2OTBjNDVhZmM1ZjdiODNiOTY0ZDY0NWVlMGYxZTc0MWI5ZTQ2NjA4NmIzMmUzNGM3MjFhYTc2ZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2Zjg5ODRjNDQ2MjBlNmY5ZDcyOWJhNzYwMTdhY2IzZGY1MTFlZTgwNDkxYmNkYjE2MmRkNWI0MTU2OTM5M2YifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1854-L1896",
+          "resource": "repo://scripts/generate_targets.py#L1850-L1892",
           "version": "repo-lines-v1:sha256:efce3dd2015c2545e450c2a14f1921eae369a0377077323f8054c4270e6fab13:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4YWY5MWQwNzc2MWVkY2FmZWVjYmUyYTQ2YTg5ZTBkNmYzMTIwYTEyZjgwYzM5YWE4ZGY3Mzc2NzM2NTI3NDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3MjEwOTU2OWU2YWNiY2ZjNmFkZTc2MWU0NGExY2QwZTcwOGVkODhlMjk3MzAyZTQ0MjhiMzVmODQ4YWNmNzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyYjUyN2NkZTI1NTQ1ZWU5YTc3ODEwMDYzOWQ4ZWY2ZjI2NWNhZWQxYWYyYTMzNGUyY2IyMTIyMzI0M2VkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNlZmE1N2IzMDYzMDAyZmFkMWRlZDNhNTIwZGVhM2I3ZGM2MTJkN2E0MTQ1ZWIyZjkyZGZlNzlhNmUyOWYzYzIifQ"
         },
         {
@@ -289,7 +289,7 @@
           "version": "repo-lines-v1:sha256:78124edb0e14b075d46554d6b82322ec4ad255588f027f28cf4e3fd50565c51c:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjg1NWEzMTJmYmY5ZDkzNDI4Y2IxNmNlZTY1YzQyMTZjYjI5NDAzZDI0ZTExZDY5YmJkY2JhOGNjMGRkMzJhNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmMwNjc4OGE2YTFiMjBkNjgwNzNmYTYyNmY4MTEwZWU5OTY5YTU2OTQzNzQxMThlZDVhNTMwYWU3ZmEyYmZjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDk1MDM0MzRjOTJlMWE3YjVhNDIzOWNhYTVlMWRlMjk5MWY4MTMyM2IxY2NhZjI2YWE3NjM0YzAwYWEzNmMwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdmMzcyMjJmZWM4NDNiMjQ4OGEzODE1NWRmYTVmMzk4ZjkxY2I0NmU4MmRiYTczMzRkNTc1NDAxMzRkY2Y4YSJ9"
         },
         {
-          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L47-L57",
+          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L52-L62",
           "version": "repo-lines-v1:sha256:c89b6d414bfa81c3671b2ef3b5676918da4902371f58e564a1da5157f3733b08:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2OGUwYmE3MGFjNTRkMTc2ZTA5ZTFlMTc1ZGJjZjA5NDQxMzNjMWM1MGE5ZDI0YjllNGIzYmZiNGEwYzU5ZDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMWQ1ZTE5MzNkN2RlZmJhMmJjODkwOGQ2ODdhZGRhNTc1NjdmM2U1Y2Q4ZmExOTg3ZTRmYjhlN2E2MzAyOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhZjY2NmFiZGRlNDNkMGQwOWUzYzdkZDM5MjM4ZWQxNjY1OGViNGYwNzc3YTlmNzAyMzIyYzNkODYxNGY1OTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4OGZmM2ExNTE4MjIzYzJiY2FlMWM0NGYyMDhkM2ZkMWYwNGRhNGNjOThiNjEzNjc2ZGJhNTAxMzViODM2ZDgifQ"
         }
       ]
@@ -299,8 +299,8 @@
       "statement": "The reviewer compares the diff against the supplied approved plan or spec requirements and approved scope-change records: every in-scope behavior needs an implementation and evidence, an approved scope change supersedes the requirement it changes, a valid alternative implementation is not a deviation, and missing material behavior is an ordinary finding rather than an invented requirement.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L35-L41",
-          "version": "repo-lines-v1:sha256:c0e572c9464dc32d1223cae6aeb31cd5390f07664931a9f34a2ec01f77a32994:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTU2MDIyMzUyYTgwZjJlNTQwY2U5NjQ3ZDhlNjZkNmQzZmZmNmY0Y2JkNDgyNGQ2YWU3NDMwNGU3NzQwMDVkMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFlMWJjMDJlYTA2YzcyOWExZTg2MjBkZGU2M2I3NmYyZWNlMWVlYzA3OThhM2NkNmMxZDQ4M2IxZDU5NGJjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjExZDZhOTM4ZmRiMTFmMjRmODBiZjQ0NTJlYjgxZjI1Y2VmYmJiOGU0ZTc2ZjUxZWJmYTY0NTNmZDExOTgzOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTIxY2I4YjM0YTNjMGQ5ZmZlZjhkZTUyZDYxZjc3MDI2MTBlMDQyMGY0MzQ0MGMxNmE5MTA1MTE5NGM4MDZiOSJ9"
+          "resource": "repo://shared/agents/reviewer/prompt.md#L35-L39",
+          "version": "repo-lines-v1:sha256:052907a6f15449ab43ec13c87c46f688e193cc61ce4269b66b1bc8d1e51e64b9:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTU2MDIyMzUyYTgwZjJlNTQwY2U5NjQ3ZDhlNjZkNmQzZmZmNmY0Y2JkNDgyNGQ2YWU3NDMwNGU3NzQwMDVkMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjNjYWRkMzM0YmI4ZmRiMGFmZWRlYzJkNzIwMzI2ZjkzZmNhZGMzZWQxOGZiOGMwMDdhMzFiMzQ3MjJjY2FmNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjExZDZhOTM4ZmRiMTFmMjRmODBiZjQ0NTJlYjgxZjI1Y2VmYmJiOGU0ZTc2ZjUxZWJmYTY0NTNmZDExOTgzOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjA4ZDFlZmNiNDkxZjUyNjc0ZTNkYTg4ODRmNzFhMTM3NzJjOGViOWUwMzI5MzNjMDlhZDdjYTMzNmRhMGRiMyJ9"
         },
         {
           "resource": "repo://shared/agents/reviewer/prompt.md#L9-L9",
@@ -313,15 +313,15 @@
       "statement": "Because the reviewer cannot pause to ask, it lists missing requirements or execution evidence under an optional Open Requests report section and answers WARN instead of PASS; a request answered with a stated reason closes as an unverified limitation, open requests stay out of the findings JSON, and an empty findings list is a clean signal only when no request is open.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L50-L50",
+          "resource": "repo://shared/agents/reviewer/prompt.md#L52-L52",
           "version": "repo-lines-v1:sha256:824817ad83d4ff1bdf5f361daafac17f72a79b3c88160159f2c229511cf29731:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODI0ODE3YWQ4M2Q0ZmYxYmRmNWYzNjFkYWFmYWMxN2Y3MmE3OWIzYzg4MTYwMTU5ZjJjMjI5NTExY2YyOTczMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODI0ODE3YWQ4M2Q0ZmYxYmRmNWYzNjFkYWFmYWMxN2Y3MmE3OWIzYzg4MTYwMTU5ZjJjMjI5NTExY2YyOTczMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTdjYzRjMmRiNGMzMGE1NGU4M2E3NzQ1NjE0YmZhYjIzYmM3NzJlOTcwZDM3NWZlMzgyY2UwNzQ4ZTNiZTEzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWM4ZjczNGI4YTc3M2RhMmE3YWNhNTFhMTk1YjgyZTgzNDQxNzRjMTk4NzllZDhmNjUwMTUzNDMxZWY5NWQ2NCJ9"
         },
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L74-L78",
+          "resource": "repo://shared/agents/reviewer/prompt.md#L77-L81",
           "version": "repo-lines-v1:sha256:f9ddf43f840a59d47ba98e8bd7d9044cb980b2d14b25d0fc2269320985e91c4f:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzQ1YTBjNjM5ODY5ZDczZDRlODJhZjk3NzkyNGVlMTU0YWVmNTYwM2JmMTUzZGI2OWE2OGZiNzQ4MzE3Njk1YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGUyM2Y1ZGQxODc2ZmE1NDM4NDU4ZGI0MjNkODA3MGQ3M2RjOWZjYmI1YTA4ZmY1YTIyMWEzYWRlNDg3MjliMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGJhOTJlN2I1N2ZjOWI1YzAyMGFhNjQxOWI2Y2Q3ZTIzOWZhYzg2YTMzY2E5MTcyZWU1MzIwYWE4ZDhjNDVjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDk3OTA2YTg1ZDUwYjQwMTFjNGFhMWUwYzEwNjY1MTA1YzM5OWE3ZmI2N2U5ODAzMmNmMjA1M2QyMGJlYjk4YyJ9"
         },
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L97-L97",
+          "resource": "repo://shared/agents/reviewer/prompt.md#L110-L110",
           "version": "repo-lines-v1:sha256:de097647b765451a41853ddd4546dc8298045671385887d1d926116db1f141ef:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGUwOTc2NDdiNzY1NDUxYTQxODUzZGRkNDU0NmRjODI5ODA0NTY3MTM4NTg4N2QxZDkyNjExNmRiMWYxNDFlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGUwOTc2NDdiNzY1NDUxYTQxODUzZGRkNDU0NmRjODI5ODA0NTY3MTM4NTg4N2QxZDkyNjExNmRiMWYxNDFlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDYyYTMyZTM1OGMwMThhZGNlOGI3OTJkOGZkMzAyYjJjZWY4N2E1NzZiMzc1MDk3YTFiOTlhMzkxMTYxMmI4MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGEyZTQyNmZkYWZjMGUxM2I5YzI4ZjlkNzc4YmRjNTVhMGI3MWViMDhjMDk4MTg0NjQ3YTY5YzdkNDcyMTE5ZiJ9"
         }
       ]
@@ -351,7 +351,7 @@
       "statement": "After a bug fix the coder and the debug-investigator skill rerun the original reproduction and record the outcome or why it could not be rerun, and a green test suite alone does not count as original-symptom verification.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/coder/prompt.md#L56-L57",
+          "resource": "repo://shared/agents/coder/prompt.md#L57-L58",
           "version": "repo-lines-v1:sha256:f730d7eed422586d72414caff1561b5c03cc06cb7b329492e030448d8a0884e1:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2EyZjcwMzczODM0NDhkY2IwMzhhODkxMzk5MmIwZDA1MGQzMjg3NDkwYzI2OWJlOGU3MzQ4ZGQxZjM3YmZjNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGI5MmUyN2UyM2JjNTc5YzQxZGZlOGQyMTA5ZmU3ZTQ0MTE5ZTI2YjliY2RiMWNiYWRlMDUzY2MxZjYwOGFlNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjM3OTNiOTc2ZDFkNDBlOGZhZTg0Mjc3NDk1MjUwODdiMzllZTgyNWEzNDQxYzIzMzlkMmRiNTJmZDY3MzY4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGFjNzI0NmM5NGI1Yzk5NDBhMzRjMjA5NDBhZDZmYTFjMzFlNzYzNDhlZWE3NWYyYjJkYzI4YWI2Yzk5MzkzNCJ9"
         },
         {
@@ -369,12 +369,8 @@
       "statement": "Section-scoped key-phrase tests check that the review and planning guidance ships in the shared source and in generated Claude Code, Codex, and sidecar output, and fail when a phrase is removed or moved out of its section; they check shipped text, not model behavior.",
       "evidence": [
         {
-          "resource": "repo://tests/test_validate_targets.py#L3433-L3544",
-          "version": "repo-lines-v1:sha256:0b3e2ca998f82e304acfbeed804691ecb7228332dfff4c1501c02641ffd9111b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEyLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIxNDJiZTE1NGJiNWUyNDU4NjYyZTUwODYyZmNlZGRhZGRkYjYxNGI1ZmJkYTg3ZjEyMzA4YmYzNzc4ODA1ZGU2IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI2ZjAxNjZhYWJiZWIxYjg2MzZkZWQyMzIwOGVlNGYyNDE4NWEyNDhlZjAyMDg5ZjA4OTYwZWMzNjQ2M2Y5MjY4IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI0ZmJkMDA5MzE0YmMyNzA4NDE2NzM0YTAyYWU1ZmYzOWExZTQ4YTA1MGJlOTFmNDNiMmZhYTkyMDAyYzYyYmZjIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI4MDUxNjNjNDJmZGQ5Y2I5ZWMzMDllM2IxYmZkYWVlMjQ0MDA2ZDRiN2QwNmM4ZWVlNTNiOGQ0N2MxNDczYzFmIn0"
-        },
-        {
-          "resource": "repo://tests/test_validate_targets.py#L3708-L3828",
-          "version": "repo-lines-v1:sha256:db3acae65f5acbf357b13295a0ed2db133773a1c45f35942539fd3da3f0c652d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIxLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI2M2VkZjcxOTFhMzY3ZDZmN2ExMzkwZDg4MTVjYzU1NzhhM2IzZGNmYzBlZmExNzA2MWVjY2YxNTI5MDAyODNiIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3NzNkNDZmZjI5MzZhZmUzNGMzNmZhOWNiNjMwMzI1MTVkZmJhMzk3ZTQzNzEzNjAxZTg5ZWIwZTc2ZTFiY2ExIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI4Y2M0YTdkMWNjNzk2YWJhM2U0NjcyMzMyN2Y1MTdlOWY4MTE5ODJkMjUwZjA3MDI5ODZlNGI1NzY0YWQ5NTg5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIzMDc0YWE2M2NkMzczZGNhOWVkZDk0N2U4ZmEyYjQ5NDkxMTg1NjhiNTQ3MGFlNzQxYjRmZTk5ZDVhNTU1NWQ0In0"
+          "resource": "repo://tests/test_validate_targets.py#L3609-L3964",
+          "version": "repo-lines-v1:sha256:d1fae852bec8c4af79ac804c487e69f42d7c0b42221a82645eb5635bb642310c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzU2LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI3ZjE0OTRkM2MyODAwYTI2NDBkM2QyMjI0NGYyOGUwNDg1ZjRhMTRkNmM4NjlmMDQ4MDljMTk1ZjFlNDkzMjczIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIyYTNmMWE0ZjllYzNmOTJiZDY3NmIzOWIwMjA3Nzc4OTY3NGNlYzdlYzBmM2IyYTQxNWRkOGE5M2U3N2JkZDE4IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhZWQ0ZTNmMDUzMTkyN2VjMzQwYTU3MzQwMzkzYTM1NzAzZWJmMjdjZDUyZmY4ZjlmOTA0MDg0YmM3YmQ5YjBmIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJhMWEzOWU5OTczMjY5ZDJhNTMyMWU4NzA0NDNmMTg5NDI2NjU4ODFlN2MyZTI2MDc3Y2E2YTg1YWE0MmY5ZDIzIn0"
         }
       ]
     },
@@ -387,24 +383,12 @@
           "version": "repo-lines-v1:sha256:aa77f1173fac0c257bdd1773eb1510b5ff1e44fdf75ba44f3e57d710549ea679:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTY3YTA4NDcyNTJlM2QxY2JhOTFjNTgzMjA0ZDFjOTkxZDBkNjJjMzc4YjEwNjI4ZDM1NGRhYTMyZjk5ZjEzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzk1NWUyZmQ0NTAxYjRhZmUxZTkwNjRlY2QxNDBhMzVmMmQwZWMxMzRkYzFjYTRjZjUxMWU2YTZiYmE5MGJhYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWU1ZWRhM2MxNzVkY2M4NWM4N2VlMGU1ODdiNzllMDUxZjA5ZmViYzk0YTcxOTRkMTEzNjVhYTY5YWI5NzY3NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDM2ZWQ4OWNjZDQ2N2QwYTI2NDY3OWQ5ODFhYTQ4MjQ5ZjkwNTc3NWFhMzkwNGM0NmFkNTQzOTE0NGE5ZmQyMiJ9"
         },
         {
-          "resource": "repo://shared/agents/coder/workflow-prompt.md#L53-L55",
-          "version": "repo-lines-v1:sha256:4b959624ff365899f099c5fd092f148e3049351d9054632f9737d360e6a868f2:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmI2NjE0MWZjNmJjOWRiMTkxZGNmZTNjNDNiNTIyYmU5NjgxZjA3ZjFhYjdkZjY5NmZjM2FlNTllODZiYTZlNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJkMGEwMjI2NGI4MGJjMWY1MGQyMDVkMWY5ZjRlNTAxZjU2MGRmZjliNTkxZTVhODcyNDQ5ZjdhNThlNGZlZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODQwMjRlYTAzYjU1YWRiZmQ2YzIzY2MwNzZlMjYwZjdjZDZhNGJlYWMwYTFiNGEwOGJjZGRmNzYxNmUwMjdkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
-        },
-        {
           "resource": "repo://shared/agents/planner/workflow-prompt.md#L24-L35",
           "version": "repo-lines-v1:sha256:fa13286554ef61af1a159fb6fe9676bf51510910b145a35ce42c515d463ec01c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1YzIxZjBkMGE0Njg5OTUyYTlmY2U1ZWQ5MTVkOThiYzM1MzU4ZDFmNzQwZmQyYjlhMGY5OTgwZTMxZGUyN2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4MDlkYTE5OGFiOWIxZmM4MGU4MjNlNTU4YTI3MzZlNzQyZGMyYzEzNDI5YzFkNTc5NDM5OWJhMzMyZmJiMGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEwYzVlYjllYTdjYWZmYWIyNmE3Y2NjY2RhMDUxNzVlYWExNWU4NDExYzVkMTlhMzBjZWI1OWJmMDZhMGNhNzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc3MzQxMWU4YTVmZTdlYjkyZThjYTMyNDhlNWE1NDViOGEyNmM4MjY1ZjkyZjhkMzEzOTZhM2E1NjA0ZWU5NzIifQ"
         },
         {
-          "resource": "repo://shared/agents/planner/workflow-prompt.md#L3-L6",
-          "version": "repo-lines-v1:sha256:0672eb41c6e34be338f0a691d238929febb75af2639ecd963ae7ab2bc493ade7:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTUxZDJmM2JhZjIzZGNhYWY3YWU1NzdjOTJiZDA3NDlmYWNlYWY2NTIzZTlkMzJiZjZiZWExYjFhM2MyMDRkNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDdiN2JjZTNhNjY3YTQ4ZDM1MTVkZmJjY2IwOTllNWMxNDljZDA0ZjhkNzAzYWZhOWJiYmU2N2UxZTZjZDQ1NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjQ3NWJjMTNlOGNmYjUzZTdiY2QzMWUxMDRiMjNkOWEwMWFkZDMwMTRmYmUwNGM4ZTg4NWY5NTE2MmVlZDZmYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDk1MDM0MzRjOTJlMWE3YjVhNDIzOWNhYTVlMWRlMjk5MWY4MTMyM2IxY2NhZjI2YWE3NjM0YzAwYWEzNmMwZSJ9"
-        },
-        {
-          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L3-L5",
-          "version": "repo-lines-v1:sha256:ea4fef99c3ae0c6764027cc3affb70ab938a15042b3aa76541e32da966835e95:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWI2YWE2OTAxM2JlNGFlMGEzNzI5NTNjNTQ4YzNkZjg0OGExOWFkNjdiNWIzNDMzNjMwYmE2MWI0OWRmYTcwZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2U1ODg1N2MxZTg1YmUyMmJkY2EzZDdkZDhjZWE3NmNlYjU0MjI4MGU5Y2M5Y2FiOGE2YWVhOGVkNzJlNzUwMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjIsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWIzNmNjMmZjOWRiZWY5ZjAzZTgxNTgwYjUwMTI3NTk5MDI2OGZiNjRiNGYxODFiZjIxMGNhOWZlYzU3OWI3NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTI1NGNlNzdiNGM5M2NmMTY2NmJmMDc4OWFiZTUwYmU1NzFmNzljNzkzODIxMTA2ZTFkMjkxZjY2ZjYwNGU4YyJ9"
-        },
-        {
-          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L9-L38",
-          "version": "repo-lines-v1:sha256:ca5444ec82b2ae2a3fcd8f93cf3a26739f13c16289a62af5f2b7348503548c77:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkZWRjN2Y2NTljOTc5MzI4Mjk5MWUxYWJmOTU5MjM0N2E5ZmRlNDRkZWFiN2FhM2QyMjBlMzRlYzQxMDNhYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1YjM4YmI5NTA1MGQ4ZmY2Mjk0YThiM2QxNGU0ZmI2MWJhZjgzNjYxZDkzOWMwZWY0YTgwMzEyOGVjOWUzMjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyNTRjZTc3YjRjOTNjZjE2NjZiZjA3ODlhYmU1MGJlNTcxZjc5Yzc5MzgyMTEwNmUxZDI5MWY2NmY2MDRlOGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5YmY4ZDEwZjNhNzRkMDNlNjRiOTQ3YmJjNjVmYmE5MzI0MTU2NzlmY2Q0OGY1ZWI0NTY0ZWI5ODUyNmQzMGUifQ"
+          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L9-L43",
+          "version": "repo-lines-v1:sha256:3d8075f56a05b283cb2520a71e9cb5a3e786ef20cf3fe185c65365cdd9dbef53:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkZWRjN2Y2NTljOTc5MzI4Mjk5MWUxYWJmOTU5MjM0N2E5ZmRlNDRkZWFiN2FhM2QyMjBlMzRlYzQxMDNhYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1YjM4YmI5NTA1MGQ4ZmY2Mjk0YThiM2QxNGU0ZmI2MWJhZjgzNjYxZDkzOWMwZWY0YTgwMzEyOGVjOWUzMjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyNTRjZTc3YjRjOTNjZjE2NjZiZjA3ODlhYmU1MGJlNTcxZjc5Yzc5MzgyMTEwNmUxZDI5MWY2NmY2MDRlOGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5YmY4ZDEwZjNhNzRkMDNlNjRiOTQ3YmJjNjVmYmE5MzI0MTU2NzlmY2Q0OGY1ZWI0NTY0ZWI5ODUyNmQzMGUifQ"
         }
       ]
     },
@@ -451,33 +435,15 @@
       ]
     },
     {
-      "id": "claim_7209955bacb44d2ea38d9068314f2a43",
-      "statement": "The Codex adapter emits a capability-derived sandbox_mode, but Codex custom agents inherit the parent session's MCP servers, sandbox, and approval policy and cannot override them, so the read-only sandbox_mode has no effect; this is a recorded follow-up.",
-      "evidence": [
-        {
-          "resource": "repo://docs/target-mapping.md#L100-L100",
-          "version": "repo-lines-v1:sha256:b0230ad57e802d1b2251b569fe65c0fcbe6de42b8dbdaecea8b1b2776aec0c2d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjAyMzBhZDU3ZTgwMmQxYjIyNTFiNTY5ZmU2NWMwZmNiZTZkZTQyYjhkYmRhZWNlYThiMWIyNzc2YWVjMGMyZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjAyMzBhZDU3ZTgwMmQxYjIyNTFiNTY5ZmU2NWMwZmNiZTZkZTQyYjhkYmRhZWNlYThiMWIyNzc2YWVjMGMyZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2EwY2QxMTI4ZTk1M2I3Mzc5NTllOGUzZTkwMjNmMTJjNzk3MzU2NTMxYzhiYjAyODQ1ZmJiNDE3YjI2MGMyYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjkzMGIwMTdmZDljNGUwODkxZmJjMTkxZmQ0YzI5NTc4MzQ1YTJlY2JkNzc3ZDhhODg1M2E2YTZhMWI1MzM3OCJ9"
-        },
-        {
-          "resource": "repo://docs/target-mapping.md#L113-L114",
-          "version": "repo-lines-v1:sha256:4f1e0e196c51dd42a73636c6c34d1aba7c33ca8a366c430071ba02b6c57a7ecb:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTBiMzAyMzA1YWE5MjVlYWMyODBjNDczN2ZmN2NmYmZhNjhmZjBkZDM5NWJhZjYxNTFlNTRlZDQ2Zjg4OWU2MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWY1NzYyOWRiNjI1OGVjZmM5M2U1OGM3MzYxMDQ2ODZkNmRhN2IxNzlmNWY0ODIxMTIyNTZmZGYyYjAxYzhhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODczZTU2NWVhYTdkMDNjODNjZjQzMzgwMGYxYTI2MTA4ZGJiZWUyMzYzNTg1ZjI3YzhlM2NjZDhkYzBlN2FhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmY1NDQ4Mjk1Y2EyZjNlZTI5ZDg1YzgzZjgzYTFiZTJlNWQ1MzVlMGVlMmQ5YzQ1NmQ4ODI5NGEyZDAzM2QwMCJ9"
-        },
-        {
-          "resource": "repo://scripts/generate_targets.py#L1731-L1760",
-          "version": "repo-lines-v1:sha256:16ef711f0a4267ee0407b3f8ecdfc9f7cec539bd9cc42f5da9f2caddd6293682:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2OGE3ZmI2NTQ2MGE1OGVkMGM4MDZkYTkzYmRhMzQ0MjFjMjE2N2ExOWE1ZDAyMTU4YWM0NDI3MTk4OGU1Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI0NmQ2ZDg1MjVmZThjMDNmODM2NDE5MGJiODRlYmIzMjJmMWYwMjY3OTBlM2Q5YmU2MzQ4OTcxMGU3ZWZlZGUifQ"
-        }
-      ]
-    },
-    {
       "id": "claim_8bdacfc697c14c19ac13ade2f7d91323",
       "statement": "The Antigravity adapter writes inheritMcp: true for subagents, but inheritMcp is not a documented Antigravity field, so Antigravity subagent MCP access is unverified.",
       "evidence": [
         {
-          "resource": "repo://docs/target-mapping.md#L117-L117",
+          "resource": "repo://docs/target-mapping.md#L122-L122",
           "version": "repo-lines-v1:sha256:bcb37887a0ccd9a3e0990ceb9fd560cb11b09b56bcb2ede6f14982a552c7134d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzc4ODdhMGNjZDlhM2UwOTkwY2ViOWZkNTYwY2IxMWIwOWI1NmJjYjJlZGU2ZjE0OTgyYTU1MmM3MTM0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzc4ODdhMGNjZDlhM2UwOTkwY2ViOWZkNTYwY2IxMWIwOWI1NmJjYjJlZGU2ZjE0OTgyYTU1MmM3MTM0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI0MDNhMDk4MzRiZDZmZDQ2Njk5YmIyZjI2NDlhN2U4YTU0NzAzNjNlYjEzMzdlOGYzZTIzZTBkZGFkNWE0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzZiOWE2YjcwMWY2ZmZlYWEyYWFjZTM4MWQ5ZDI1OGZhZTBhYzljNzQ0ZmI4OTkzYWI4YTA4MTIyNzg4OTE4MiJ9"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1807-L1823",
+          "resource": "repo://scripts/generate_targets.py#L1795-L1811",
           "version": "repo-lines-v1:sha256:de0f29bc163fa6668fefb4ecd6319f4ce604d38f11a55600dc3ba1efba6a8bd3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwY2I5MDJiNmU0ZmMwYTY5MDZmYzgxYjg4MmQwYzI2YzdiMGQxMWQ4MDg1ZjA2ZjBmZTFlMDQ3OGJhODMwZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczNzZiY2ZlN2M4ZDdlZWM4NTVlMDE5NzJjOTUwYzIyZWJmMDg4Yjc0MzE4ZDQ1MTQwYzEwZWRjOGY0MzBjZjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkYTZhZjE1MWYzZmQ5MjJjZDA3NDc4M2Y2NzQ5MzRlYjhkNjk1ZTVmZDRmMzAxYjNiOTUyNTA1ZWVkODc0MTUifQ"
         }
       ]
@@ -487,7 +453,7 @@
       "statement": "The reviewer ends with FAIL when a CRITICAL or MAJOR finding survives, WARN when a request is open, and otherwise PASS; the orchestrator records that value with record_findings.py --gate-result and open requests with --open-request, and the commit gate refuses a phase-completion commit unless the recorded result is PASS with no open request.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L82-L90",
+          "resource": "repo://shared/agents/reviewer/prompt.md#L84-L92",
           "version": "repo-lines-v1:sha256:9dc0d2d879bba52007ad83da86460ddff18a432cb1907a2eb91e0468262a899e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2YwMDRlNjkwNDFiYmY5OGI2MmMyNjgzZmY1YzYyOGQ3N2FjMzJlZjM2ZjYyYWU0NmIwZDFiMjNmNGNlNDk4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGE3Mzc2MWNkZTg4ZWQ0ZTRjNDkyN2MxM2FkMjhmYjg3NGVhMzEyN2Y4NTU3Zjg3NzdiYzFjZjM2ODVjMjVjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWFmYjIyMzdhZDQ1NTNmMTg4OTgxMDU0YWFmMTQ2ODI4NmQ0OWM1ODU5MTE1YzZmOWViM2YwYTUwODIwZjYzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzc1OWQxOGVmMDA3NzlmMmI5MTc5NDc3NjMxMTc0MDBmYzZkZjIxYmMyNTFkZTYzYjQ1Y2ZiOGNkMzBhYTEwNCJ9"
         },
         {
@@ -499,10 +465,80 @@
           "version": "repo-lines-v1:sha256:75c04cff38564cd22c4b58a27a5ef7c3792b7d42d32ab42e3382f0ee9661a66a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NzU1MTY2NDJhMzFiNDdhNzM3OGEwNGE5NTM2MWFiN2Y3ODYxZDJjOTUwMWY0Yjc2NDJkZWRhNjUwYTlkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhMWNlOTY3ZTZlMmFhODBjMzMyYTZjMzJhMzkyMzI5MDA2Zjc4MWMyYjIyYjNjMjVkZDQxMGViYWRiMThhMWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyZWEyZWYwNTkyYjg1NzYxMDQ2OTI4ZWMyYzZmNTNmZDZmN2E2OTY0MTMyM2IyZDBlZjE4YjZhY2Y4MDYwMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiYjE0Zjc5YzRkZTgwNjQwYjZiZTgzZDJjOGY0NmQ0MjViNzYzMmQ1MDg4YzFjZWRmMDg1YzlmNjJhMjJhNDUifQ"
         }
       ]
+    },
+    {
+      "id": "claim_6f47fc0f8684446db7f8fd4f7c8e245f",
+      "statement": "Codex ignores sandbox_mode in a custom agent file, so the bootstrap no longer writes it into generated Codex agents and validate_targets.py rejects it as a per-agent override; read-only Codex roles are read-only by their instructions only.",
+      "evidence": [
+        {
+          "resource": "repo://docs/target-mapping.md#L113-L113",
+          "version": "repo-lines-v1:sha256:06c2a3f7e5019895094388100918c68d250849be962268d68d574359a2a3c6de:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDZjMmEzZjdlNTAxOTg5NTA5NDM4ODEwMDkxOGM2OGQyNTA4NDliZTk2MjI2OGQ2OGQ1NzQzNTlhMmEzYzZkZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDZjMmEzZjdlNTAxOTg5NTA5NDM4ODEwMDkxOGM2OGQyNTA4NDliZTk2MjI2OGQ2OGQ1NzQzNTlhMmEzYzZkZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWFmMDhmMzFhN2U5ZWM0ZDhmZmU3MDBkYWE1MDM2MzYxMDZhZWNmMDBhYjc2MmNmNjdhZDkxZTRkMzM1NDlkZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWQzOTg4ZDdlOTZmMmM0NDY2OTdhOTQxNzk1ZTJiOTFlMGQxYWY1ZDNiZGE0NjI4ZGIwNTM3NDBkMWQwNTNlOCJ9"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L150-L156",
+          "version": "repo-lines-v1:sha256:e4bae3ee7f138f3638b238888edb29f9e0253853d4df7cecd726765cf1c31207:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWMwYWY0NjUyNjI3OGU0ZWU4NzE4ODA1MTMxOTNjYjMzMmQ3YmMzMGE0ZTgyZTYwMDRmYTIxNWVhYzExYjA4MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDRmYmVhNTFkY2MxMGEzODVhYzQxYmUwOWRiOGM1NTUwMWRmZGIzMTUwODMxMTAwNzVmNTgxMDVjZjA2MDRlOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzVlZjgzMmQ3Yzk0NzVjNWEzYTViNjJhMzJkNGI5ZjUzMWUxMzA2YmIzOTU0NTg3NGE2MzEyMGYyN2FmZmRmYSJ9"
+        },
+        {
+          "resource": "repo://tests/test_validate_targets.py#L2068-L2075",
+          "version": "repo-lines-v1:sha256:416c3243c6c943b77aeea5b84744306966e5751b167c699c8c8fb151f79ee032:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzJiOTNhZjcyZGNjZmJmYjcyNjdlMTBhNjcyMjVhMjdmNzBlMDFjNWY3MzU2YzI5YjMxN2ZmNmJkNTE0ZWQzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ3OTgxNmViMGRmYzA3ZjY4YmJhNWNhOWU3NjVkOGRlYjE4MDg1MDlhMTU4M2JiMDY5NGU0MWIzYTM3ZmI0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWM3YTkwYjY4MTE4YjQ1ODNmZmZiOGE3NGVjMzUyNWZlNTNmZGYwMmVlYzkwMDY3MDdmOGE4Yjc2ZmViOGNkZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTJhOWJjOGQzNmVjMzc0MDAzMmFlYzk0YjU3OTQ3ZmVjOTE3NDc5NjRiNjRlZWMxNDBjNDM4NWExYmJjZmY4YSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_35b493dd6e634a77a9d66d275bd187fe",
+      "statement": "The reviewer reads the code a change touches, not only the diff, and treats a caller, test, fixture, or config entry outside the diff that the change breaks or leaves stale as an ordinary finding; the coder prompt asks for the same scope before the first edit.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/coder/prompt.md#L26-L31",
+          "version": "repo-lines-v1:sha256:12a99c652333e20c4b782122cf5f2305c9f73832bf229e2d5fdbecd87ba734d8:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGM0NDBkNWRmYjZlMTc4N2YwYzJmODQ5OTJlZjFjMzNkMDk4NzQwMGRhZjhiMmFhZmNlNmI2ZTAwMDExZjk5ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTg5MDA5YWYxMGRlNjcwZDQ0ZjhlYTk2OTA2MTFlMTNhZmRkZWFkYTI2YTQyMmJkMjU2NTcxNzE4OWFjNDg2MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjJkYTYzNDMxYjM2ZDhlNmFjZjFlYjU3YzM3YmI4ODQ4NDc5ZTNiYTIwODk4MDQyNDg5MTJhYjFlM2Q2NGFlYSJ9"
+        },
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L41-L41",
+          "version": "repo-lines-v1:sha256:c00eb7f235e5e7cbcd03807401af52b7d5b8d1fd2fb1b630a5d235263f9c951a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzAwZWI3ZjIzNWU1ZTdjYmNkMDM4MDc0MDFhZjUyYjdkNWI4ZDFmZDJmYjFiNjMwYTVkMjM1MjYzZjljOTUxYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzAwZWI3ZjIzNWU1ZTdjYmNkMDM4MDc0MDFhZjUyYjdkNWI4ZDFmZDJmYjFiNjMwYTVkMjM1MjYzZjljOTUxYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGViOTUwN2Y5YjZlYjhlMTVmYzhmNjQ4YTEyYmQzZTMzZmRjMDAwMjRlMDkyY2I0MmUxNGM2Y2I4NmMyNGIxZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjBlNjAyYWFhMjUzOWRjNTFhMTBiYjYyOGIwZmMzNzlhZjFlNTI5MTMwYjhkNTViNTUwYmRkN2IxOGY4ZDg4YiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c81344c675f64911830ca9b481fa37f6",
+      "statement": "The vendored ponytail skill is a local fork partially merged from upstream v5.3.2: it adds a step to find every place a change must reach and a rule to finish the callers, tests, and fixtures a change breaks, while keeping the fork's seven-rung ladder.",
+      "evidence": [
+        {
+          "resource": "repo://shared/skills/ponytail/SKILL.md#L28-L57",
+          "version": "repo-lines-v1:sha256:cdfaea9a89d15af4920731e18ac23ea5fe8d835aba9ae0bb0eac625b83712b73:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4MDc2OTYyMzAxMTE4ODg5Y2E4Y2FhNDk1OWU0YzMwMzc1YzM5YzY3NzU5OTA4YmNmYTc2NzhlYzQyZTgwZWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkYzExNGZkYWQ4ZWY3ZWU5NjE3YzFiODgxMTkzOGViMzVkNDQzZWI1ODJlYTliZjg1ZjM5YmIzYWI4YzBmYzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc2ODVkMDBiNjQ3N2JmYzRmOGY3MTE1MjA0YmZiMTc4OWU0MTM1ZmU4ZjVlNmNhNDBkNWUzOGI3M2JkNjZhMDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRhMDkxZWI0YmY1MDVjY2QyNmZhNmQzNDM5YWFhMWJjYTY3N2RkNjkxYmNiNjY3NmU5ZWUyZmRkZWRhZTIwNTAifQ"
+        },
+        {
+          "resource": "repo://shared/third_party/ponytail/UPSTREAM.md#L56-L84",
+          "version": "repo-lines-v1:sha256:12c0946003f8c2a1987c61b4e30febd1a3aa28c82ca8882a2581a2c80433aaa2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkNzI3YTMyODM0YzMzMTViMDcxYmFmOGMyMWQ2ZTg1MWZkMWIzYTdmZjkzZjI0ZDdlMDE5NDQ0ODNmYzM0MDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMyNmZkOTFiYzY3ZGQ0YzI4M2RlNzgzNDFlMWE0YmFiNGVlMGVjZTAzOTQyOTBlZWM5MGRmZDllNGFjMGIxM2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4MzU3ZDY4ODU2MjA4ZTAzMTc0ZjhlM2JjMmVlYTE4NWM0YmUzNDk0ZDQ4ZDVkZWIzMWE3NDJjMDU2ZDkyMjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2271c63cb57c4f7999a5d0ea3028e9f9",
+      "statement": "ponytail-review stays a complexity-only review: it reads the code the diff touches, adds a reuse: tag, requires a concrete case per finding and a whole-tree search before delete:, and leaves broken callers or tests to the normal review profiles.",
+      "evidence": [
+        {
+          "resource": "repo://shared/skills/ponytail-review/SKILL.md#L17-L64",
+          "version": "repo-lines-v1:sha256:28c06c698ddcb1faf59b6b2617131c29d322b472b7f2cc921c274ffb5d24750d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3NDU2Yjc5MmQ4MDIzMjlmMjUxMzBlYjNmZjAzNGQyNDM5MzA0N2IwOTA4Zjk2OTFmZjBkMGE5NjIwNmFkODUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkMzcxZDllYTQxYjVjZjdjZDZmYTkzNzEyZTNiZDViMjlhNDUxYzVkM2E3OTU4NWFiMGUwYWQ2ZGFmMjEzNjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBiM2U1NGY0MTVlYTEzZjJlZDFhZjY5ZjRlY2E2ZjBlMmZhM2Y5OGFmOTcwZmRiNjllNzY0YTU1MzFlNTY0ZjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_df3c3d66aa70481a8f52a8e7a214c448",
+      "statement": "validate_targets.py pins the two vendored Ponytail skill files and the LICENSE by SHA-256 and requires the same hashes in UPSTREAM.md, so an edit without a provenance update fails validation.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L8012-L8036",
+          "version": "repo-lines-v1:sha256:55166267c5dbaba6da17c30b4bd5816f951c98c19aa6894aad77a77b6a1d5dd6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5OTExZTEyMWIxODhmOGVjODMxYTg2MGEyZGIxMWFhMDY3NDI1YzExNGQyMWRlMWZiM2FiODBkOGMwZTNhNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MDMyZTk2NGQwOTMyMzUxZTVkMTg1MjY5MjgxYjE3MWEzYTA5YjA4YjI4NmU2NjFlYTQ3MDMyM2M4MmViNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhmNDIzNjMyOWVkZDRmODNlYzcxNTEyZTY2M2Q4Mjg0ZGI4YmE3NDhhYjUyZGM5MDk0NDhlMmY4ZTViNDc4NzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4M2MzMGNhMTJjOGFiZWM5YWRhNDgxNGU4NGIwM2VlYThhNTU5MmU4NDdmNWU2OGE0Y2Q4OTE2MDdjMmNmZjYifQ"
+        },
+        {
+          "resource": "repo://shared/third_party/ponytail/UPSTREAM.md#L36-L40",
+          "version": "repo-lines-v1:sha256:42c886f42c40f47a27d5e9f8ef7d414b4b594434838a9681c3d0c84626dbfff5:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjU1NjQyMmJiOGM4ZGVmMWY5YTQ3YTFkMmY1MzQ5YTQ5NmE1ZTdlYzgxNGQ2ZGEyOWE2MmU4ZDhiNTk4YWI0NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2E1ZDc3ZWM0NmY3YWYwNjFkNGQxZjg3Y2M3ZDYzMzgyYjA2MGJmMmI1MzQ2NWEwZjNjYWJiMGM4N2E5OWUxNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTMwMTc0NDc4YzkzZWM3MjgxM2RkNDcyODg0YWU1NzUzYzEwZDRiMWJlYWFkZGM5NWZmYmYzY2ZhYzY3OGE2ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGEwYWUzNGEzYmU1MGJjYzE1ZDcwZWU1MWU3ZTg4OWIwZTg5YzkzNDMyZmExODQxNmM0YWU1MTllMDA2NWFlOCJ9"
+        }
+      ]
     }
   ],
   "verification": {
-    "by": "openwiki/0.5.2",
-    "at": "2026-10-17T10:05:00.756Z"
+    "by": "openwiki/0.7.2",
+    "at": "2026-10-21T23:14:28.484Z"
   }
 }

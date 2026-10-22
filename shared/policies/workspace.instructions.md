@@ -97,10 +97,11 @@ Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/
 
 Before writing, adding, fixing, refactoring, or designing code, read
 `.claude/skills/ponytail/SKILL.md` and apply it once in `full` mode during
-IMPLEMENT. Search for reusable code and trace the real flow before editing;
-then prefer YAGNI, existing helpers, the standard library, native platform
-features, installed dependencies, and the minimum correct conceptual diff, in
-that order. Re-check the changed scope after simplification.
+IMPLEMENT. Search for reusable code and map every place the change must reach
+(callers, tests, fixtures, config) before editing; then prefer YAGNI, existing
+helpers, the standard library, native platform features, installed
+dependencies, and the minimum correct conceptual diff, in that order. Re-check
+the changed scope after simplification.
 
 Ponytail never removes required validation, data-loss protection, security,
 accessibility, root-cause investigation, or the smallest meaningful regression

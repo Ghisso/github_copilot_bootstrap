@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:2337b482dd1bb9f2efd5a44551a465677b0bf7781b81f544d70e558a8fe0a674",
+  "pageVersion": "sha256:511e0890a5482e4bda91c2ffd42fee89b3645caa8428bd86375a05769df85f7d",
   "claims": [
     {
       "id": "claim_577776e0370d47099f04fb101b4060e5",
@@ -41,7 +41,7 @@
       "statement": "context-mode-dispatch.sh --self-check prints PASS context-mode-dispatch lines for required-version, resolved-path, observed-version, launcher, version-contract (pinned-direct-binary or pinned-via-npx), filter, storage-root, storage, and nested-ignore, and check_runtime.py consumes this self-check.",
       "evidence": [
         {
-          "resource": "repo://scripts/check_runtime.py#L349-L382",
+          "resource": "repo://scripts/check_runtime.py#L348-L381",
           "version": "repo-lines-v1:sha256:8197b6210d1eae2fff1a6f0a34b47c87020f7f2263ba2cfebe390f704c70fa79:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0MDdjNDVmOWQ5YTg5ZTcwZTZjYTNiYmJhNmIwMTRhZDljYjhkN2ZhMDYwNTAyNzUwNWZjMDU1MWMwZjZiZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI1ZTcxZjY1ZDJjNDcyZWY4ZTFhNTA4ZTUyMThlY2YyZTgwNGVlOGMwNGY0ZTEzNDVjMWExN2U1ZmE5ZmQ5NTAifQ"
         },
         {
@@ -73,7 +73,7 @@
       "statement": "Guarded ctx_index accepts only content, path, and source; exactly one of content or path is required; path must exist, be a regular file or directory, not a symbolic link, and resolve inside the repository; directory-policy arguments such as include, exclude, maxDepth, maxFiles, extensions, respectGitignore, and followSymlinks are rejected.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L50-L85",
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L92-L127",
           "version": "repo-lines-v1:sha256:165312e0637f6cc8cab6b5e677c4121c743899b7eedcf92a190d67211ee2e644:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0NDFjN2QwZmUxZDBjMzJhOTUwZTQ0NGNlODk0MTU3Yzg4N2ZiZjM2MWU0OGEyOTk1YjcyYWExZGM1MTkzZTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiNDFlOTNmNjkzOWM2OTU3ZWUyMDU1MWE3MGNhYTZjNmY0YjUyN2U1MmQ2ZGQyNDA1NzMyYjc4NDYyZTJiZTAifQ"
         }
       ]
@@ -125,7 +125,7 @@
           "version": "repo-file-v1:sha256:39d83f20d6318c3fc831742df719e78893a856fb5e1500db9dd9e6f3cbbbde1d"
         },
         {
-          "resource": "repo://scripts/runtime_ownership.py#L87-L118",
+          "resource": "repo://scripts/runtime_ownership.py#L348-L379",
           "version": "repo-lines-v1:sha256:b7fa0f3217e54acba05ee19cc1f360445609bdbc674e3c79ca0dba420fb5ad91:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4NmU4N2JiMjBhOTNmYTEyMjVkNjBiMGZkMGYyMzMwZTgyNjkzYTljYTMzMDBjYjQwN2ExNjQyMTA5MWQwMzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlZmRlYWJjYTMzYTdmY2EyMWRjZjcyNjQyZDc2NTk3YzkwZDgxYmRkMWI5ODliZjQwNjI2NjhkMzQxYWFiNjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4NjRlMDQ2YWJhMWIxNTVlNWUzMGQzM2NiOGYyMGQ0MzczZTQzYWNlZTNlMzZlZThiNjFhNjcyNjNlMGY4NGMifQ"
         }
       ]
@@ -170,7 +170,7 @@
     }
   ],
   "verification": {
-    "by": "openwiki/0.5.2",
-    "at": "2026-10-17T10:05:00.756Z"
+    "by": "openwiki/0.7.2",
+    "at": "2026-10-21T02:32:20.957Z"
   }
 }

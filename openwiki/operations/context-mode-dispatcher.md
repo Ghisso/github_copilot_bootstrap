@@ -20,10 +20,10 @@ sources:
     resource: repo://tests/test_context_mode_dispatch.py
   - id: openwiki-source-1cc03a6e7c67d535ae1d0cac
     resource: repo://tests/test_context_mode_mcp_filter.py
-generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-10-17T10:05:00.756Z
+  - by: openwiki/0.7.2
+    at: 2026-10-21T02:32:20.957Z
 ---
 
 # Context Mode dispatcher: version pin, tool filter, and cache security
@@ -108,7 +108,7 @@ The consequence for lifecycle evidence is simple. No cache is ever searched or c
 
 - The tool allowlist and the four-tool contract are also stated in `shared/policies/tool-routing.instructions.md`, and `validate_targets.py`'s Context Mode tool-surface check keeps the generated configuration in agreement.
 - This repository's own tracked root adapters (`.mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`) also start the server only through the dispatcher; `validate_targets.py` checks each one's `context-mode` entry. A user-level Context Mode plugin enabled in a person's own client settings brings its own unfiltered server and hooks, which the repository cannot govern.
-- Hook wiring per host is in `scripts/generate_targets.py`; see [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md).
+- Hook wiring per host is in `scripts/generate_targets.py`; see [Hook dispatcher and guardrail scripts](../architecture/hooks-and-guardrails.md).
 
 ## Representative tests
 
@@ -117,5 +117,5 @@ The consequence for lifecycle evidence is simple. No cache is ever searched or c
 
 ## Related pages
 
-- [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
-- [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
+- [Hook dispatcher and guardrail scripts](../architecture/hooks-and-guardrails.md)
+- [Source, generated output, consumer repo, and nested AI state](../architecture/source-generated-consumer-layout.md)

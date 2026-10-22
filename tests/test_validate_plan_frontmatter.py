@@ -1661,9 +1661,20 @@ def test_phase_a_fixture_fails_l2_on_its_step_bullet_sentence(tmp_path: Path) ->
         "2026-07-18_phase-B-configure-codex-gpt-5.6.md",
     ],
 )
-def test_pre_contract_july_in_progress_plans_pass_unchanged(name: str) -> None:
-    """Both plans predate ``VERIFICATION_CONTRACT_SINCE``, so the new lint
-    must leave their existing ``in-progress`` status alone."""
-    plan = REPO_ROOT / ".claude" / "plans" / name
+def test_pre_contract_july_bodies_pass_the_lint_because_of_their_date(
+    tmp_path: Path, name: str
+) -> None:
+    """Both plans are ``complete`` on disk, which already skips the lint. Force
+    a copy back to ``in-progress`` so the status cannot skip it; the filename
+    date, which predates ``VERIFICATION_CONTRACT_SINCE``, is then what exempts
+    these live-status bodies from the verification-contract rules.
+    """
+    source = REPO_ROOT / ".claude" / "plans" / name
+    text = source.read_text(encoding="utf-8").replace(
+        "status: complete", "status: in-progress", 1
+    )
+    assert "\nstatus: in-progress\n" in text
+    plan = tmp_path / name
+    plan.write_text(text, encoding="utf-8")
 
     assert validation_errors(plan) == []

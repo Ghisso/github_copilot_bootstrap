@@ -244,7 +244,8 @@ before replacing bootstrap-controlled files and creating its distinct
 commit to the nested `ai-state` remote.
 
 Files that exist only in the consumer repo — `MEMORY.md`, plans, session logs,
-quality reports, explorations — are never touched by the file-copy step. They
+quality reports, explorations, and the nested `.gitignore` and
+`.gitattributes` — are never touched by the file-copy step. They
 are state, tracked in git history rather than files a bucket pull could
 silently overwrite, so there is no backup/restore step to run around them.
 The generated `MEMORY.md` is a fresh-install seed only: if the consumer already
@@ -375,6 +376,42 @@ surprise an operator, plus practical notes worth knowing before you refresh:
   state-sync checkpoint untracks `settings.local.json` in the nested `ai-state`
   repository (the local file stays); `docs/runtime-checks.md` describes the
   copy-and-restore behavior and the recovery after a killed sync.
+- **Protected agent files, hook folders, and workspace files.** An agent edit
+  of an agent definition file (under `.claude/agents/`, `.codex/agents/`,
+  `.github/agents/`, or `.agents/agents/`), a protected hook folder, or a
+  `*.code-workspace` file inside the repository asks (Claude, Copilot) or is
+  denied (Codex, Antigravity), and so do `rm -rf`, `mv`, and `ln -s` on a
+  whole protected folder. Any command outside the guard's read-only list
+  that merely names one of them is denied on all four clients, for example
+  `ls`, `find`, `diff`, or `cmp` on an agent file. The `git -C` and `cd`
+  forms of unmodelled Git commands ask on Claude and Copilot and deny on
+  Codex and Antigravity, but only when no path in the command is also
+  protected as written from the repository root. Plain forms, and commands
+  with an absolute path such as `git -C .claude restore <repo>/.claude/hooks/x`,
+  are denied on all four clients. Read with `cat`, a native read
+  tool, or `rg --files`, and compare with `git diff --no-index` or
+  `uv run python scripts/check_runtime.py`. Change agents in `shared/agents/`
+  and regenerate, or re-run the installer in a consumer. The guard also scans
+  heredoc bodies, so write findings JSON and PR text that name a protected
+  path with the native Write tool and pass `--findings-json <file>` or
+  `--body-file <file>`. Generated Codex agent files no longer carry
+  `sandbox_mode`, which Codex ignores there.
+- **Shell parsing in the file-protection guard.** The guard now reads shell
+  text with its own scanner that follows Bash's rules for quotes, escapes,
+  comments, line breaks, substitutions, and parameter expansions, instead of
+  Python's `shlex`. A comment line, a blank line, or a quoted or escaped
+  operator no longer hides a write to a protected file. Some commands that
+  were denied before are now allowed, for example
+  `printf 'x|y\n' | grep '|' | head -1`,
+  `find . -exec grep x {} \; | head -1`, and `echo $(date) && ls`. Some
+  commands that were allowed are now denied or fail closed. Examples are a
+  variable assigned two different values on one line (`x=a; x=b`, a counter
+  `i=$((i+1))`), an operation on a variable assigned earlier on the same line
+  (`x=a.md; echo ${x%.md}`), `shopt -s dotglob`, a `case` statement inside
+  `$( )`, and a single quote inside a double-quoted `${ }`. These are denied
+  with no approval prompt: rewrite such a command (for example, put the work
+  in a script file) or run it in your own shell. `docs/runtime-checks.md` lists every rule, the commands it blocks
+  by mistake, and the forms it still does not check.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
 - **Root-owned tracked files.** A tracked file owned by `root` is a container
