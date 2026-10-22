@@ -138,7 +138,7 @@ SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
 # and state only; no ``.github/agents`` or ``.codex/agents`` unit ships.
 SIDECAR_PROFILES = ("skills", "workflow")
 SIDECAR_DEFAULT_PROFILE = "skills"
-# The 24 public skills whose text names nothing the profile does not ship;
+# The 25 public skills whose text names nothing the profile does not ship;
 # shared/sidecar/workflow/skills.txt records why the others are denied.
 SIDECAR_WORKFLOW_SKILLS = (
     "add-dependency",
@@ -156,6 +156,7 @@ SIDECAR_WORKFLOW_SKILLS = (
     "hydra-config",
     "literature-review",
     "md-to-pdf",
+    "onboard",
     "pdf",
     "pipeline-patterns",
     "ponytail",
