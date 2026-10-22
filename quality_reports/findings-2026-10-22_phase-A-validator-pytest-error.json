@@ -1,0 +1,37 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-10-22T13:34:39Z",
+  "branch": "sidecar-onboard-and-validator_implementation",
+  "head_sha": "9292776c46d679f7e8a2b1607f0368dc04e4b140",
+  "base_ref": "dev",
+  "merge_base_sha": "9292776c46d679f7e8a2b1607f0368dc04e4b140",
+  "phase": "2026-10-22_phase-A-validator-pytest-error",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "d2eb8135cee71407a8cf58ef7b30d07934571eb8",
+  "changed_files": [
+    ".github/workflows/validate.yml",
+    "docs/smoke-tests.md",
+    "scripts/validate_targets.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

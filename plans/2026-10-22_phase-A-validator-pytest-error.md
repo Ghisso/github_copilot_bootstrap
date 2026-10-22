@@ -4,7 +4,7 @@ type: small-plan
 parent_plan: sidecar-onboard-and-validator
 phase_index: 1
 status: complete
-closeout_session_log: 2026-10-22_sidecar-onboard-and-validator-phase-A.md
+closeout_session_log: .claude/session_logs/2026-10-22_sidecar-onboard-and-validator-phase-A.md
 ---
 
 # Small Plan: Actionable Validator Dependency Error
