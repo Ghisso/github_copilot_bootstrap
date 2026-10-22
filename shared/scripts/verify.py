@@ -1,0 +1,3879 @@
+#!/usr/bin/env python3
+"""Fail-closed deterministic verification evidence and gate receipts.
+
+The deterministic command owns verification evidence and emits the authoritative
+per-phase closeout receipt consumed by lifecycle gates. ``fast`` is focused
+feedback, ``phase`` persists reusable evidence, and ``closeout`` proves that
+phase evidence remains fresh before binding the final state and child artifacts.
+
+Usage:
+    uv run python .claude/scripts/verify.py fast --format json
+    uv run python .claude/scripts/verify.py phase --format json --persist
+    uv run python .claude/scripts/verify.py closeout --format json --persist
+"""
+
+from __future__ import annotations
+
+import argparse
+import configparser
+import fnmatch
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+
+_VERIFIER_PATH = Path(__file__).resolve()
+_AUTHORING_VERIFIER_PATH = (
+    _VERIFIER_PATH.parents[2] / "shared" / "scripts" / "verify.py"
+)
+_OWNERSHIP_PATH = (
+    _VERIFIER_PATH.parents[2] / "scripts" / "runtime_ownership.py"
+    if _VERIFIER_PATH == _AUTHORING_VERIFIER_PATH
+    else _VERIFIER_PATH.with_name("runtime_ownership.py")
+)
+_ownership_spec = importlib.util.spec_from_file_location(
+    "runtime_ownership", _OWNERSHIP_PATH
+)
+if _ownership_spec is None or _ownership_spec.loader is None:
+    raise ImportError(f"missing runtime ownership authority: {_OWNERSHIP_PATH}")
+_ownership = importlib.util.module_from_spec(_ownership_spec)
+_ownership_spec.loader.exec_module(_ownership)
+owned_bootstrap_root_paths = _ownership.bootstrap_root_paths
+install_mode_from_manifest = _ownership.install_mode_from_manifest
+is_third_party_skill_dir = _ownership.is_third_party_skill_dir
+
+
+SCHEMA_VERSION = 4
+CHECK_STATES = frozenset({"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"})
+MODES = frozenset({"fast", "phase", "closeout"})
+CHECK_IDS = (
+    "VFY-RUFF-001",
+    "VFY-MYPY-001",
+    "VFY-PYTEST-001",
+    "VFY-FRESH-001",
+    "VFY-FRESH-002",
+    "VFY-GEN-001",
+    "VFY-RECEIPT-001",
+)
+# Budget for one lint, type, generation, or pytest command. This
+# repository's own suite takes about 190 seconds (2,225 tests, many real-Git,
+# after sidecar Phase L), so the earlier 180-second budget made `verify.py
+# phase` UNVERIFIED on an idle machine. Keep it below
+# VERIFICATION_ITEM_TIMEOUT_SECONDS by at least the lint and type time.
+COMMAND_TIMEOUT_SECONDS = 480
+# Separate from COMMAND_TIMEOUT_SECONDS because a required item may itself be
+# `verify.py phase`, which already spends up to COMMAND_TIMEOUT_SECONDS on
+# one pytest run.
+VERIFICATION_ITEM_TIMEOUT_SECONDS = 600
+PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase-{phase}.json")
+CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout-{phase}.json")
+ARTIFACT_KEYS = (
+    "phase_receipt",
+    "findings",
+    "closeout_log",
+    "documentation",
+)
+AUTHORITATIVE_RECEIPT_FIELDS = {
+    "schema_version",
+    "mode",
+    "status",
+    "checks",
+    "metadata",
+    "artifacts",
+}
+RECEIPT_EXTENSIONS_FIELD = "extensions"
+PHASE_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+CONTROL_PLANE_PREFIXES = (
+    ".claude/",
+    ".codex/",
+    ".agents/",
+    ".github/",
+    ".devcontainer/",
+)
+CONTROL_PLANE_FILES = {"AGENTS.md", "CLAUDE.md", ".mcp.json", ".vscode/mcp.json"}
+# OpenWiki managed-state backstop (Phase G, Step G2): the same marker
+# openwiki-guard.py restores on "post"; a live block here means openwiki_begin
+# ran without the guard cleaning up after it.
+MANAGED_START = "<!-- OPENWIKI:START -->"
+OPENWIKI_ADAPTERS = ("AGENTS.md", "CLAUDE.md")
+OPENWIKI_WORKFLOW = ".github/workflows/openwiki-update.yml"
+OPENWIKI_RUN_JSON = "openwiki/.run.json"
+CONFIG_SUFFIXES = {".cfg", ".ini", ".json", ".toml", ".yaml", ".yml"}
+DEPENDENCY_FILES = {
+    "Cargo.lock",
+    "Cargo.toml",
+    "Pipfile",
+    "Pipfile.lock",
+    "go.mod",
+    "go.sum",
+    "package-lock.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "uv.lock",
+    "yarn.lock",
+}
+HIGH_RISK_REVIEW_PROFILES = frozenset(
+    {"code", "architecture", "security", "tests", "ponytail"}
+)
+AUTHORING_RUNTIME_MARKERS = (
+    "shared/scripts/verify.py",
+    "shared/policies/workspace.instructions.md",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+)
+MYPY_CONFIG_FILES = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg")
+MYPY_SCOPE_OPTIONS = ("files", "packages", "modules")
+CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION = 1
+CONTROL_PLANE_PROVENANCE_FIELDS = {
+    "schema_version",
+    "nested_head",
+    "runtime_fingerprint",
+    "tracked_state_fingerprint",
+    "big_plan_digest",
+    "small_plan_digest",
+}
+NESTED_MUTABLE_STATE_ROOTS = frozenset(
+    {
+        "MEMORY.md",
+        "plans",
+        "explorations",
+        "session_logs",
+        "quality_reports",
+        ".cache",
+        "settings.local.json",
+    }
+)
+NESTED_MUTABLE_STATE_PATHS = frozenset({"instructions/project-context.instructions.md"})
+
+
+def run_process(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run one bounded local tool invocation."""
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+
+
+def check(
+    check_id: str, status: str, summary: str, applicable: bool = True
+) -> dict[str, object]:
+    """Build a strict check record from deterministic applicability."""
+    if check_id not in CHECK_IDS:
+        raise ValueError(f"unknown check ID: {check_id}")
+    if status not in CHECK_STATES:
+        raise ValueError(f"unknown check status: {status}")
+    if not applicable and status != "NOT_APPLICABLE":
+        raise ValueError("inapplicable checks must use NOT_APPLICABLE")
+    if applicable and status == "NOT_APPLICABLE":
+        raise ValueError("NOT_APPLICABLE requires deterministic inapplicability")
+    return {
+        "id": check_id,
+        "status": status,
+        "summary": summary,
+        "applicable": applicable,
+    }
+
+
+def aggregate_status(checks: list[dict[str, object]]) -> str:
+    """Return the fail-closed aggregate state for check records."""
+    statuses = {str(item["status"]) for item in checks}
+    if "FAIL" in statuses:
+        return "FAIL"
+    if "UNVERIFIED" in statuses:
+        return "UNVERIFIED"
+    if "PASS" in statuses:
+        return "PASS"
+    return "NOT_APPLICABLE"
+
+
+def validate_receipt(receipt: object) -> dict[str, object]:
+    """Validate the versioned receipt contract and return its typed mapping."""
+    if not isinstance(receipt, dict):
+        raise ValueError("receipt must be an object")
+    required = {"schema_version", "mode", "status", "checks", "metadata"}
+    missing = sorted(required - receipt.keys())
+    if missing:
+        raise ValueError(f"receipt missing required fields: {', '.join(missing)}")
+    if receipt["schema_version"] != SCHEMA_VERSION:
+        raise ValueError("receipt has an unsupported schema_version")
+    if receipt["mode"] not in MODES:
+        raise ValueError("receipt has an unknown mode")
+    if receipt["status"] not in CHECK_STATES:
+        raise ValueError("receipt has an unknown status")
+    unknown = set(receipt) - AUTHORITATIVE_RECEIPT_FIELDS - {RECEIPT_EXTENSIONS_FIELD}
+    if unknown:
+        raise ValueError("receipt has unknown authoritative fields")
+    if RECEIPT_EXTENSIONS_FIELD in receipt and not isinstance(
+        receipt[RECEIPT_EXTENSIONS_FIELD], dict
+    ):
+        raise ValueError("receipt extensions must be an object")
+    checks = receipt["checks"]
+    if not isinstance(checks, list) or len(checks) != len(CHECK_IDS):
+        raise ValueError("receipt must contain every required check exactly once")
+    found_ids: set[str] = set()
+    typed_checks: list[dict[str, object]] = []
+    for item in checks:
+        if not isinstance(item, dict):
+            raise ValueError("receipt check must be an object")
+        if set(item) != {"id", "status", "summary", "applicable"}:
+            raise ValueError("receipt check has malformed fields")
+        check_id = item["id"]
+        status = item["status"]
+        applicable = item["applicable"]
+        if not isinstance(check_id, str) or check_id not in CHECK_IDS:
+            raise ValueError("receipt check has an unknown ID")
+        if check_id in found_ids:
+            raise ValueError("receipt has duplicate check IDs")
+        if status not in CHECK_STATES:
+            raise ValueError("receipt check has an unknown status")
+        if not isinstance(item["summary"], str) or not isinstance(applicable, bool):
+            raise ValueError("receipt check has invalid field types")
+        if (status == "NOT_APPLICABLE") != (not applicable):
+            raise ValueError("NOT_APPLICABLE must come from applicability logic")
+        found_ids.add(check_id)
+        typed_checks.append(item)
+    if found_ids != set(CHECK_IDS):
+        raise ValueError("receipt is missing a required check")
+    if receipt["status"] != aggregate_status(typed_checks):
+        raise ValueError("receipt aggregate status does not match checks")
+    metadata = receipt["metadata"]
+    if not isinstance(metadata, dict):
+        raise ValueError("receipt metadata must be an object")
+    metadata_fields = {
+        "generated_at",
+        "base_ref",
+        "branch",
+        "head_sha",
+        "merge_base_sha",
+        "tree_sha",
+        "phase",
+        "content_hash",
+        "tracked_state_hash",
+        "changed_paths",
+        "relevant_paths",
+        "path_discovery_ok",
+        "control_plane_provenance",
+    }
+    if set(metadata) != metadata_fields:
+        raise ValueError("receipt metadata has unknown or missing authoritative fields")
+    for field in (
+        "generated_at",
+        "base_ref",
+        "branch",
+        "head_sha",
+        "merge_base_sha",
+        "tree_sha",
+        "phase",
+        "content_hash",
+        "tracked_state_hash",
+    ):
+        if not isinstance(metadata.get(field), str):
+            raise ValueError(f"receipt metadata is missing {field}")
+    for field in ("changed_paths", "relevant_paths"):
+        if not isinstance(metadata.get(field), list) or not all(
+            isinstance(path, str) for path in metadata[field]
+        ):
+            raise ValueError(f"receipt metadata is missing {field}")
+    if not isinstance(metadata.get("path_discovery_ok"), bool):
+        raise ValueError("receipt metadata is missing path_discovery_ok")
+    if not has_control_plane_provenance(metadata):
+        raise ValueError("receipt metadata control-plane provenance is invalid")
+    if not is_utc_timestamp(metadata["generated_at"]):
+        raise ValueError("receipt metadata generated_at must be a UTC timestamp")
+    if receipt["mode"] in {"phase", "closeout"}:
+        for field in (
+            "generated_at",
+            "branch",
+            "head_sha",
+            "merge_base_sha",
+            "tree_sha",
+            "phase",
+            "content_hash",
+            "tracked_state_hash",
+        ):
+            if not metadata[field]:
+                raise ValueError(f"receipt metadata {field} must be non-empty")
+        if metadata["base_ref"] != "dev" or not PHASE_SLUG.fullmatch(metadata["phase"]):
+            raise ValueError("receipt metadata base_ref or phase is invalid")
+    artifacts = receipt.get("artifacts")
+    if receipt["mode"] == "closeout":
+        validate_artifact_references(artifacts)
+    elif artifacts is not None:
+        raise ValueError("only closeout receipts may contain artifacts")
+    validate_mode_applicability(receipt["mode"], typed_checks, metadata)
+    return receipt
+
+
+def validate_artifact_references(artifacts: object) -> None:
+    """Reject ambiguous or unsafe closeout artifact references."""
+    if not isinstance(artifacts, dict) or set(artifacts) != set(ARTIFACT_KEYS):
+        raise ValueError("closeout receipt must contain every artifact reference")
+    for key in ARTIFACT_KEYS:
+        artifact = artifacts[key]
+        if key == "documentation":
+            validate_documentation_evidence(artifact)
+            continue
+        if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"}:
+            raise ValueError(f"closeout artifact {key} is malformed")
+        path, digest = artifact["path"], artifact["sha256"]
+        if (
+            not isinstance(path, str)
+            or not is_safe_relative_path(path)
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", digest)
+        ):
+            raise ValueError(f"closeout artifact {key} is invalid")
+
+
+def validate_documentation_evidence(evidence: object) -> None:
+    """Validate the compact canonical documentation disposition."""
+    if not isinstance(evidence, dict) or set(evidence) not in (
+        {"status", "reason"},
+        {"status", "paths"},
+    ):
+        raise ValueError("closeout documentation evidence is malformed")
+    status = evidence.get("status")
+    if status == "NOT_APPLICABLE":
+        if (
+            not isinstance(evidence.get("reason"), str)
+            or not evidence["reason"].strip()
+        ):
+            raise ValueError("closeout documentation N/A needs a reason")
+    elif status == "UPDATED":
+        paths = evidence.get("paths")
+        if (
+            not isinstance(paths, list)
+            or not paths
+            or not all(
+                isinstance(path, str) and is_safe_relative_path(path) for path in paths
+            )
+        ):
+            raise ValueError("closeout documentation update paths are invalid")
+    else:
+        raise ValueError("closeout documentation status is unknown")
+
+
+def is_utc_timestamp(value: object) -> bool:
+    """Return whether a value is a real canonical UTC second timestamp."""
+    if not isinstance(value, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value
+    ):
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
+
+
+def is_safe_relative_path(value: str) -> bool:
+    """Return whether a receipt reference stays inside the repository root."""
+    path = Path(value)
+    return bool(value and not path.is_absolute() and ".." not in path.parts)
+
+
+def confined_path(root: Path, value: str, *, regular: bool = False) -> Path:
+    """Resolve an existing repo path while rejecting symlink traversal."""
+    root = root.resolve(strict=True)
+    raw = Path(value)
+    candidate = raw if raw.is_absolute() else root / raw
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError as error:
+        raise ValueError("path is outside repository") from error
+    if ".." in relative.parts:
+        raise ValueError("path traversal is not allowed")
+    current = root
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            raise ValueError("symlink path components are not allowed")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError) as error:
+        raise ValueError("path is missing or outside repository") from error
+    if regular and (not resolved.is_file() or resolved.is_symlink()):
+        raise ValueError("path is not a regular file")
+    return resolved
+
+
+def plan_verification_items(text: str) -> tuple[list[str], list[str]]:
+    """Extract required and optional verification items from a plan's text.
+
+    Required items are normalized shell commands from every fenced code
+    block opened with ``bash`` or ``sh`` under the ``## Verification``
+    heading. Optional items are the top-level ``- `` bullets under the
+    ``## Optional Verification`` heading, with indented continuation lines
+    joined in; fenced code blocks in that section are ignored. Each H2
+    section runs from its own heading to the next ``^## `` heading or the
+    end of the text; a missing section yields an empty list.
+
+    Mirrored byte-for-byte between ``scripts/validate_plan_frontmatter.py``
+    and ``shared/scripts/verify.py`` (an equality test in both suites
+    guards drift); neither file may import the other, so both copies stay
+    stdlib-only and self-contained.
+    """
+
+    def section_body(heading: str) -> str | None:
+        match = re.search(
+            rf"^## {re.escape(heading)}[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        return match.group("body") if match is not None else None
+
+    def normalize(line: str) -> str:
+        # Quote-aware scan: a "#" only opens a trailing comment when it is
+        # whitespace-bounded on both sides and outside any open quote span,
+        # so `git commit -m "Fix bug # 123"` is never truncated mid-string.
+        # A backslash only escapes a quote inside a double-quoted span,
+        # matching POSIX shell quoting; single quotes have no escape.
+        quote = ""
+        cut = len(line)
+        index = 0
+        while index < len(line):
+            char = line[index]
+            if quote:
+                if quote == '"' and char == "\\" and index + 1 < len(line):
+                    index += 2
+                    continue
+                if char == quote:
+                    quote = ""
+                index += 1
+                continue
+            if char in "'\"":
+                quote = char
+                index += 1
+                continue
+            if (
+                char == "#"
+                and index > 0
+                and line[index - 1].isspace()
+                and index + 1 < len(line)
+                and line[index + 1].isspace()
+            ):
+                cut = index
+                break
+            index += 1
+        return re.sub(r"\s+", " ", line[:cut]).strip()
+
+    required: list[str] = []
+    verification_body = section_body("Verification")
+    if verification_body is not None:
+        for fence in re.finditer(
+            r"^[ \t]*(?P<mark>`{3,}|~{3,})[ \t]*(?P<lang>\S*)[ \t]*\r?\n"
+            r"(?P<body>.*?)^[ \t]*(?P=mark)[ \t]*\r?$",
+            verification_body,
+            re.MULTILINE | re.DOTALL,
+        ):
+            if fence.group("lang") not in ("bash", "sh"):
+                continue
+            joined: list[str] = []
+            buffer = ""
+            for raw_line in fence.group("body").split("\n"):
+                buffer += raw_line
+                if buffer.endswith("\\"):
+                    buffer = buffer[:-1]
+                    continue
+                joined.append(buffer)
+                buffer = ""
+            if buffer:
+                joined.append(buffer)
+            for line in joined:
+                if line.lstrip()[:1] == "#":
+                    continue
+                item = normalize(line)
+                if item:
+                    required.append(item)
+
+    optional: list[str] = []
+    optional_body = section_body("Optional Verification")
+    if optional_body is not None:
+        stripped: list[str] = []
+        in_fence = False
+        for raw_line in optional_body.split("\n"):
+            if re.match(r"^[ \t]*(?:`{3,}|~{3,})", raw_line):
+                in_fence = not in_fence
+                continue
+            if not in_fence:
+                stripped.append(raw_line)
+        for bullet in re.finditer(
+            r"^- [ \t]*(?P<rest>.*(?:\n[ \t]+\S.*)*)",
+            "\n".join(stripped),
+            re.MULTILINE,
+        ):
+            item = re.sub(r"\s+", " ", bullet.group("rest")).strip()
+            if item:
+                optional.append(item)
+
+    return required, optional
+
+
+def _shell_flatten(item: str) -> str:
+    """Remove quote characters, then collapse a backslash-escaped character
+    into itself, so a quoted or backslash-broken decoy (``clos\\eout``,
+    ``"closeout"``) cannot hide from a literal pattern match.
+    """
+    text = item.replace("'", "").replace('"', "")
+    return re.sub(r"\\(.)", r"\1", text)
+
+
+def _names_closeout(item: str) -> bool:
+    """Return whether a normalized item's text names ``verify.py closeout``.
+
+    Uses ``_shell_flatten`` so ``verify.py "closeout"``, ``clos""eout``,
+    ``clos\\eout``, or ``--format json closeout`` (mode given after
+    options) cannot hide the nesting from a literal substring match.
+
+    ponytail: this cannot see through a ``$VAR`` shell expansion that only
+    resolves to "closeout" at runtime - bash still executes it, and the
+    resulting recursive ``verify.py closeout`` run fails on the same plan
+    it is trying to close out, which is a loud failure, not a silent pass.
+    """
+    return re.search(r"verify\.py\b.*\bcloseout\b", _shell_flatten(item)) is not None
+
+
+def _process_text(value: object) -> str:
+    """Coerce a subprocess text/bytes/``None`` stream capture to ``str``."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value if isinstance(value, str) else ""
+
+
+def _output_tail(text: str) -> str:
+    """Return the last 20 lines of process output, capped at 2000 characters."""
+    tail = "\n".join(text.splitlines()[-20:])
+    return tail[-2000:]
+
+
+def run_verification_items(root: Path, phase: str) -> list[dict[str, object]]:
+    """Run a completing phase's required verification items and record each.
+
+    Reads the plan through ``confined_path`` under ``.claude/plans/``,
+    extracts its required items with ``plan_verification_items``, and runs
+    each one in order from the repository root - never from the command
+    line or the environment. Stops at the first non-``PASS`` item, since a
+    later item may depend on an earlier one (for example
+    ``validate_targets.py`` after ``generate_targets.py --all``); the
+    remaining items are recorded ``NOT RUN``. An item naming
+    ``verify.py closeout`` is refused unexecuted - closeout may not list
+    itself.
+    """
+    plan_path = confined_path(root, f".claude/plans/{phase}.md", regular=True)
+    required, _optional = plan_verification_items(plan_path.read_text(encoding="utf-8"))
+    results: list[dict[str, object]] = []
+    blocked = False
+    for item in required:
+        if blocked:
+            results.append(
+                {
+                    "item": item,
+                    "status": "NOT RUN",
+                    "exit_code": None,
+                    "duration_seconds": 0.0,
+                    "output_tail": "",
+                }
+            )
+            continue
+        if _names_closeout(item):
+            results.append(
+                {
+                    "item": item,
+                    "status": "FAIL",
+                    "exit_code": None,
+                    "duration_seconds": 0.0,
+                    "output_tail": "closeout may not list itself",
+                }
+            )
+            blocked = True
+            continue
+        start = time.monotonic()
+        try:
+            completed = subprocess.run(
+                ["bash", "-c", item],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=VERIFICATION_ITEM_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as error:
+            results.append(
+                {
+                    "item": item,
+                    "status": "TIMEOUT",
+                    "exit_code": None,
+                    "duration_seconds": time.monotonic() - start,
+                    "output_tail": _output_tail(
+                        _process_text(error.stdout) + _process_text(error.stderr)
+                    ),
+                }
+            )
+            blocked = True
+            continue
+        status = "PASS" if completed.returncode == 0 else "FAIL"
+        results.append(
+            {
+                "item": item,
+                "status": status,
+                "exit_code": completed.returncode,
+                "duration_seconds": time.monotonic() - start,
+                "output_tail": _output_tail(completed.stdout + completed.stderr),
+            }
+        )
+        if status != "PASS":
+            blocked = True
+    return results
+
+
+def validate_mode_applicability(
+    mode: object, checks: list[dict[str, object]], metadata: dict[str, object]
+) -> None:
+    """Reject caller-selected N/A states using fixed mode applicability."""
+    inapplicable = {
+        "fast": {
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-FRESH-001",
+            "VFY-FRESH-002",
+            "VFY-GEN-001",
+            "VFY-RECEIPT-001",
+        },
+        "phase": {"VFY-RECEIPT-001"},
+        "closeout": {
+            "VFY-RUFF-001",
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-GEN-001",
+        },
+    }[str(mode)]
+    # Checks a mode does measure but that can honestly resolve to
+    # NOT_APPLICABLE depending on the repository under test (a test-less
+    # consumer has no pytest evidence to collect), unlike `inapplicable`,
+    # which a mode never measures at all.
+    conditionally_applicable = {
+        "fast": set(),
+        "phase": {"VFY-PYTEST-001"},
+        "closeout": set(),
+    }[str(mode)]
+    if mode == "fast" and not any(
+        Path(path).suffix == ".py"
+        for path in metadata_paths(metadata, "relevant_paths")
+    ):
+        inapplicable.add("VFY-RUFF-001")
+    for item in checks:
+        if item["id"] in conditionally_applicable:
+            continue
+        if item["applicable"] is not (item["id"] not in inapplicable):
+            raise ValueError(f"{item['id']} has invalid applicability for {mode} mode")
+
+
+def git_output(args: list[str], root: Path) -> str:
+    """Return Git output or an empty string when the repository is unavailable."""
+    try:
+        result = run_process(["git", *args], root)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def git_paths(root: Path, base_ref: str) -> list[str]:
+    """Return tracked changed paths relative to the branch base and worktree."""
+    merge_base = git_output(["merge-base", base_ref, "HEAD"], root)
+    paths: set[str] = set()
+    for args in (
+        ["diff", "--name-only", "-z", f"{base_ref}...HEAD"],
+        ["diff", "--name-only", "-z"],
+        ["diff", "--cached", "--name-only", "-z"],
+        ["ls-files", "--others", "--exclude-standard", "-z"],
+    ):
+        if not merge_base and base_ref in args[-1]:
+            continue
+        try:
+            result = run_process(["git", *args], root)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise ValueError(f"Git path discovery failed: {error}") from error
+        if result.returncode != 0:
+            raise ValueError(f"Git path discovery exited {result.returncode}")
+        paths.update(path for path in result.stdout.split("\0") if path)
+    return sorted(paths)
+
+
+def classify_path(path: str) -> str:
+    """Classify the small, canonical freshness scope for one tracked path."""
+    if path in CONTROL_PLANE_FILES or path.startswith(CONTROL_PLANE_PREFIXES):
+        return "control-plane"
+    if path.startswith(("scripts/", "shared/scripts/")):
+        return "generator"
+    if path.startswith("shared/"):
+        return "control-plane"
+    name = Path(path).name
+    if (
+        name in DEPENDENCY_FILES
+        or name.startswith("requirements")
+        or name.startswith("Dockerfile")
+    ):
+        return "config"
+    suffix = Path(path).suffix.lower()
+    if suffix in CONFIG_SUFFIXES:
+        return "config"
+    if path.startswith("tests/"):
+        return "test"
+    if suffix == ".py":
+        return "code"
+    if path.startswith("docs/") or suffix in {".md", ".rst"}:
+        return "documentation-only"
+    return "code"
+
+
+def scoped_paths(paths: list[str]) -> list[str]:
+    """Select evidence-relevant paths; ordinary documentation stays reusable."""
+    return [path for path in paths if classify_path(path) != "documentation-only"]
+
+
+def required_review_profiles(paths: list[str]) -> frozenset[str]:
+    """Return the review profiles the changed paths require.
+
+    Test surfaces are checked first and require only ``tests``. Control-plane,
+    generator, and dependency paths require the full high-risk set. Anything
+    else, including documentation, requires none; the multi-file Ponytail rule
+    is applied separately by the commit and push gates.
+    """
+    required: set[str] = set()
+    for path in paths:
+        name = Path(path).name
+        if (
+            path.startswith("tests/")
+            or (name.startswith("test_") and name.endswith(".py"))
+            or name.endswith("_test.py")
+            or name == "conftest.py"
+        ):
+            required.add("tests")
+        elif (
+            classify_path(path) in {"control-plane", "generator"}
+            or name in DEPENDENCY_FILES
+            or name == "pyproject.toml"
+            or (name.startswith("requirements") and name.endswith((".txt", ".in")))
+        ):
+            required |= HIGH_RISK_REVIEW_PROFILES
+    return frozenset(required)
+
+
+def existing_paths(root: Path, paths: list[str]) -> list[str]:
+    """Narrow a changed-path list to files a tool can actually open.
+
+    A deleted path is a legitimate changed path for hashing, freshness, and
+    documentation bookkeeping - the receipt's ``changed_paths`` and
+    ``relevant_paths`` metadata must record it. It is never a valid target
+    for a tool (Ruff, Mypy, ...) that opens each path directly, so callers
+    that hand a path list straight to such a tool must filter through this
+    first, keeping the persisted metadata itself unfiltered and honest.
+    """
+    return [path for path in paths if (root / path).is_file()]
+
+
+def hash_paths(root: Path, paths: list[str]) -> str:
+    """Hash current path names and bytes, including deletions and untracked files."""
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.encode("utf-8") + b"\0")
+        candidate = root / path
+        try:
+            info = candidate.lstat()
+        except FileNotFoundError:
+            digest.update(b"<deleted>")
+        else:
+            digest.update(
+                f"{stat.S_IFMT(info.st_mode):o}:{stat.S_IMODE(info.st_mode):o}".encode()
+            )
+            if stat.S_ISLNK(info.st_mode):
+                digest.update(b":link:" + os.readlink(candidate).encode("utf-8"))
+            elif stat.S_ISREG(info.st_mode):
+                digest.update(b":file:" + candidate.read_bytes())
+            else:
+                digest.update(b":other")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def nested_runtime_paths(root: Path) -> list[str] | None:
+    """Return static nested runtime paths, excluding mutable consumer evidence."""
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return None
+    paths: list[str] = []
+    try:
+        for path in nested.rglob("*"):
+            relative = path.relative_to(nested)
+            if not is_relevant_nested_path(relative.as_posix()):
+                continue
+            if path.is_file() or path.is_symlink():
+                paths.append(relative.as_posix())
+    except OSError:
+        return None
+    return sorted(paths)
+
+
+def manifest_bootstrap_root_paths(root: Path) -> tuple[str, ...] | None:
+    """Return the finite installer-owned root adapters from its manifest."""
+    manifest = root / ".claude" / "bootstrap-ownership.env"
+    try:
+        info = manifest.lstat()
+        if not stat.S_ISREG(info.st_mode) or manifest.is_symlink():
+            return None
+        text = manifest.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+
+    mode = install_mode_from_manifest(text)
+    return owned_bootstrap_root_paths(mode) if mode is not None else None
+
+
+def confined_adapter_path(root: Path, relative: str) -> Path | None:
+    """Return one adapter path only when every component is a non-symlink."""
+    if not is_safe_relative_path(relative):
+        return None
+    candidate = root
+    try:
+        for component in Path(relative).parts:
+            candidate /= component
+            if candidate.is_symlink():
+                return None
+            candidate.lstat()
+    except OSError:
+        return None
+    return candidate
+
+
+def regular_tree_fingerprint_diagnostic(path: Path) -> tuple[bytes | None, str | None]:
+    """Fingerprint one adapter and identify a safe, content-free failure kind."""
+    try:
+        info = path.lstat()
+        if path.is_symlink():
+            return None, "missing-or-unsafe"
+        if stat.S_ISREG(info.st_mode):
+            try:
+                return b"file\0" + hashlib.sha256(path.read_bytes()).digest(), None
+            except OSError:
+                return None, "unreadable-bytes"
+        if not stat.S_ISDIR(info.st_mode):
+            return None, "unsupported-file-type"
+        digest = hashlib.sha256()
+        digest.update(b"directory\0")
+        excluded_dirs: list[Path] = []
+        for descendant in sorted(path.rglob("*")):
+            if any(
+                excluded == descendant or excluded in descendant.parents
+                for excluded in excluded_dirs
+            ):
+                continue
+            relative = descendant.relative_to(path).as_posix().encode("utf-8")
+            child_info = descendant.lstat()
+            if descendant.is_symlink():
+                return None, "missing-or-unsafe"
+            if stat.S_ISDIR(child_info.st_mode):
+                if is_third_party_skill_dir(descendant):
+                    # OpenWiki's own installer owns this bundle once it
+                    # writes its marker inside it; exclude it (and
+                    # everything nested under it) from both the live and
+                    # the mirror fingerprint so drift inside it never
+                    # invalidates control-plane provenance. Parents sort
+                    # before their descendants, so this list is complete by
+                    # the time a nested path is checked above.
+                    excluded_dirs.append(descendant)
+                    continue
+                digest.update(b"directory\0" + relative + b"\0")
+            elif stat.S_ISREG(child_info.st_mode):
+                try:
+                    content_digest = hashlib.sha256(descendant.read_bytes()).digest()
+                except OSError:
+                    return None, "unreadable-bytes"
+                digest.update(b"file\0" + relative + b"\0" + content_digest)
+            else:
+                return None, "unsupported-file-type"
+        return b"directory\0" + digest.digest(), None
+    except OSError:
+        return None, "unreadable-bytes"
+
+
+def bootstrap_root_fingerprint_diagnostics(
+    root: Path,
+) -> tuple[str, tuple[dict[str, str], ...]]:
+    """Return the legacy digest and safe path-level adapter validation failures."""
+    paths = manifest_bootstrap_root_paths(root)
+    if paths is None:
+        return "", (
+            {
+                "path": ".claude/bootstrap-ownership.env",
+                "side": "manifest",
+                "category": "missing-or-invalid",
+            },
+        )
+    digest = hashlib.sha256()
+    diagnostics: list[dict[str, str]] = []
+    for relative in paths:
+        live_path = confined_adapter_path(root, relative)
+        mirror_path = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
+        if live_path is None:
+            diagnostics.append(
+                {"path": relative, "side": "live", "category": "missing-or-unsafe"}
+            )
+        if mirror_path is None:
+            diagnostics.append(
+                {"path": relative, "side": "mirror", "category": "missing-or-unsafe"}
+            )
+        if live_path is None or mirror_path is None:
+            continue
+        live, live_error = regular_tree_fingerprint_diagnostic(live_path)
+        mirror, mirror_error = regular_tree_fingerprint_diagnostic(mirror_path)
+        if live_error is not None:
+            diagnostics.append(
+                {"path": relative, "side": "live", "category": live_error}
+            )
+        if mirror_error is not None:
+            diagnostics.append(
+                {"path": relative, "side": "mirror", "category": mirror_error}
+            )
+        if live is None or mirror is None:
+            continue
+        if live != mirror:
+            diagnostics.append(
+                {"path": relative, "side": "pair", "category": "content-difference"}
+            )
+            continue
+        digest.update(relative.encode("utf-8") + b"\0" + live + b"\0")
+    if diagnostics:
+        return "", tuple(diagnostics)
+    return digest.hexdigest(), tuple(diagnostics)
+
+
+def bootstrap_root_fingerprint(root: Path) -> str:
+    """Bind each installer-owned live adapter to its canonical nested mirror."""
+    return bootstrap_root_fingerprint_diagnostics(root)[0]
+
+
+def regular_tree_layout(path: Path) -> tuple[tuple[str, str], ...] | None:
+    """Return an adapter tree's safe shape without exposing names below its root."""
+    try:
+        info = path.lstat()
+        if path.is_symlink():
+            return None
+        if stat.S_ISREG(info.st_mode):
+            return (("", "file"),)
+        if not stat.S_ISDIR(info.st_mode):
+            return None
+        layout = [("", "directory")]
+        for descendant in path.rglob("*"):
+            child_info = descendant.lstat()
+            if descendant.is_symlink():
+                return None
+            if stat.S_ISDIR(child_info.st_mode):
+                kind = "directory"
+            elif stat.S_ISREG(child_info.st_mode):
+                kind = "file"
+            else:
+                return None
+            layout.append((descendant.relative_to(path).as_posix(), kind))
+        return tuple(sorted(layout))
+    except OSError:
+        return None
+
+
+def adapter_destination_is_replaceable(root: Path, relative: str) -> bool:
+    """Return whether restoration can replace this untracked adapter exactly."""
+    mirror = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
+    if mirror is None:
+        return False
+    candidate = root
+    parts = Path(relative).parts
+    try:
+        for component in parts[:-1]:
+            candidate /= component
+            try:
+                info = candidate.lstat()
+            except FileNotFoundError:
+                # A wholly missing intermediate parent directory (not just the
+                # leaf adapter) is still replaceable: restore-root-adapters.sh's
+                # ensure_destination_parent() creates missing parents, and a
+                # missing parent implies the destination itself cannot already
+                # exist.
+                return True
+            if candidate.is_symlink() or not stat.S_ISDIR(info.st_mode):
+                return False
+        candidate /= parts[-1]
+        try:
+            candidate.lstat()
+        except FileNotFoundError:
+            return True
+    except OSError:
+        return False
+    if candidate.is_symlink() or git_output(["ls-files", "--", relative], root):
+        return False
+    live_layout = regular_tree_layout(candidate)
+    mirror_layout = regular_tree_layout(mirror)
+    if live_layout is None or mirror_layout is None:
+        return False
+    # restore-root-adapters.sh only adds and overwrites files from the mirror;
+    # it never deletes. A live tree missing entries the mirror has is still
+    # exactly replaceable (restoration fills the gap), but extra live entries
+    # the mirror lacks would survive restoration untouched, so only a subset
+    # relation — not equality — is safe here.
+    return set(live_layout) <= set(mirror_layout)
+
+
+def root_adapter_diagnostic_detail(
+    root: Path, diagnostics: tuple[dict[str, str], ...]
+) -> str:
+    """Format safe provenance diagnostics and recovery advice for human output."""
+    if not diagnostics:
+        return ""
+    detail = "; ".join(
+        f"{item['path']}: {item['side']} {item['category']}" for item in diagnostics
+    )
+    recoverable_live = all(
+        (item["side"], item["category"])
+        in {("live", "missing-or-unsafe"), ("pair", "content-difference")}
+        for item in diagnostics
+    ) and all(
+        adapter_destination_is_replaceable(root, item["path"]) for item in diagnostics
+    )
+    if recoverable_live:
+        detail += "; recover with: bash .claude/hooks/scripts/restore-root-adapters.sh"
+    return detail
+
+
+def is_relevant_nested_path(
+    path: str, active_plan_paths: frozenset[str] = frozenset()
+) -> bool:
+    """Return whether one nested path governs runtime behavior rather than evidence."""
+    relative = Path(path)
+    return bool(
+        relative.parts
+        and ".git" not in relative.parts
+        and (
+            relative.as_posix() in active_plan_paths
+            or (
+                relative.parts[0] not in NESTED_MUTABLE_STATE_ROOTS
+                and relative.as_posix() not in NESTED_MUTABLE_STATE_PATHS
+            )
+        )
+    )
+
+
+def nested_state_repository(root: Path) -> bool:
+    """Return whether ``.claude`` is genuinely its own Git repository.
+
+    ``nested_git_head`` cannot answer this: ``git -C .claude rev-parse HEAD``
+    walks *up* the directory tree when ``.claude`` has no ``.git`` of its own,
+    so it resolves to the outer repository's HEAD instead of failing. A
+    consumer whose ``.claude`` is a plain tracked directory - the documented
+    ``migrate-from-hf`` state - must not be treated as having nested state.
+    """
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return False
+    return (nested / ".git").exists()
+
+
+def plan_bytes_matching_digest(
+    root: Path, revision: str, relative: str, recorded_digest: object
+) -> bytes | None:
+    """Return a revision's plan bytes only when they hash to ``recorded_digest``.
+
+    This is the one comparison the terminal publication contract turns on, so
+    both the push predicate and the persist-time precondition derive it here
+    rather than repeating it.
+    """
+    source = nested_revision_file(root, revision, relative)
+    if source is None or hashlib.sha256(source).hexdigest() != recorded_digest:
+        return None
+    return source
+
+
+def nested_git_head(root: Path) -> str:
+    """Return the nested AI-state HEAD only when it is available.
+
+    Never walks up to the outer repository's HEAD: when ``.claude`` is not
+    its own Git repository, this returns ``""`` instead.
+    """
+    nested = root / ".claude"
+    if not nested_state_repository(root):
+        return ""
+    return git_output(["-C", str(nested), "rev-parse", "--verify", "HEAD"], root)
+
+
+def nested_tracked_state_fingerprint(
+    root: Path, active_plan_paths: frozenset[str]
+) -> str:
+    """Hash relevant nested Git index and dirty state without mutable evidence."""
+    nested = root / ".claude"
+    if not nested_state_repository(root):
+        return ""
+    try:
+        index = run_process(["git", "ls-files", "--stage", "-z"], nested)
+        status = run_process(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            nested,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if index.returncode != 0 or status.returncode != 0:
+        return ""
+    digest = hashlib.sha256()
+    for record in index.stdout.split("\0"):
+        _, separator, path = record.partition("\t")
+        if separator and is_relevant_nested_path(path, active_plan_paths):
+            digest.update(b"index\0" + record.encode("utf-8") + b"\0")
+    records = status.stdout.split("\0")
+    position = 0
+    while position < len(records):
+        record = records[position]
+        position += 1
+        if not record:
+            continue
+        state, separator, path = record[:2], record[2:3], record[3:]
+        paths = [path] if separator == " " else []
+        if "R" in state or "C" in state:
+            if position >= len(records):
+                return ""
+            paths.append(records[position])
+            position += 1
+        if any(
+            is_relevant_nested_path(candidate, active_plan_paths) for candidate in paths
+        ):
+            digest.update(b"status\0" + record.encode("utf-8") + b"\0")
+            for candidate in paths[1:]:
+                digest.update(candidate.encode("utf-8") + b"\0")
+    return digest.hexdigest()
+
+
+def digest_file(path: Path) -> str:
+    """Return a SHA-256 file digest, or an empty value when it is unreadable."""
+    try:
+        if not path.is_file() or path.is_symlink():
+            return ""
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
+def active_big_plan_path(root: Path, branch: str) -> Path | None:
+    """Return the active implementation plan path when the branch names one."""
+    if not branch.endswith("_implementation"):
+        return None
+    slug = branch.removesuffix("_implementation")
+    if not PHASE_SLUG.fullmatch(slug):
+        return None
+    return root / ".claude/plans" / f"{slug}.md"
+
+
+def active_plan_paths(root: Path, branch: str, phase: str) -> frozenset[str]:
+    """Return every declared active-plan path, including future phase plans."""
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None:
+        return frozenset()
+    paths = {big_plan.relative_to(root / ".claude").as_posix()}
+    if PHASE_SLUG.fullmatch(phase):
+        paths.add(f"plans/{phase}.md")
+    try:
+        match = re.match(
+            r"\A---\n(?P<body>.*?)\n---",
+            big_plan.read_text(encoding="utf-8"),
+            re.DOTALL,
+        )
+    except OSError:
+        return frozenset(paths)
+    if match is None:
+        return frozenset(paths)
+    phases = frontmatter_phases(match.group("body"))
+    if phases is not None:
+        paths.update(f"plans/{item}.md" for item in phases)
+    return frozenset(paths)
+
+
+def control_plane_provenance(
+    root: Path, branch: str, phase: str, *, root_fingerprint: str | None = None
+) -> dict[str, object]:
+    """Bind the nested runtime and active plans without hashing mutable evidence."""
+    active_paths = active_plan_paths(root, branch, phase)
+    runtime_paths = nested_runtime_paths(root)
+    nested_fingerprint = (
+        hash_paths(root / ".claude", runtime_paths) if runtime_paths is not None else ""
+    )
+    if root_fingerprint is None:
+        root_fingerprint = bootstrap_root_fingerprint(root)
+    runtime_fingerprint = (
+        hashlib.sha256(
+            b"nested\0"
+            + nested_fingerprint.encode("ascii")
+            + b"\0root\0"
+            + root_fingerprint.encode("ascii")
+        ).hexdigest()
+        if nested_fingerprint and root_fingerprint
+        else ""
+    )
+    nested_head = nested_git_head(root)
+    big_plan = active_big_plan_path(root, branch)
+    small_plan = (
+        root / ".claude/plans" / f"{phase}.md"
+        if big_plan is not None and PHASE_SLUG.fullmatch(phase)
+        else None
+    )
+    tracked_state_fingerprint = nested_tracked_state_fingerprint(root, active_paths)
+    return {
+        "schema_version": CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+        "nested_head": nested_head,
+        "runtime_fingerprint": runtime_fingerprint,
+        "tracked_state_fingerprint": tracked_state_fingerprint,
+        "big_plan_digest": digest_file(big_plan) if big_plan is not None else "",
+        "small_plan_digest": digest_file(small_plan) if small_plan is not None else "",
+    }
+
+
+def has_control_plane_provenance(metadata: dict[str, object]) -> bool:
+    """Return whether required nested state was recorded for this branch."""
+    provenance = metadata.get("control_plane_provenance")
+    if (
+        not isinstance(provenance, dict)
+        or set(provenance) != CONTROL_PLANE_PROVENANCE_FIELDS
+    ):
+        return False
+    if provenance.get("schema_version") != CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION:
+        return False
+    nested_head = provenance.get("nested_head")
+    if not isinstance(nested_head, str) or not re.fullmatch(
+        r"[0-9a-f]{40,64}", nested_head
+    ):
+        return False
+    for field in ("runtime_fingerprint", "tracked_state_fingerprint"):
+        if not isinstance(provenance.get(field), str) or not re.fullmatch(
+            r"[0-9a-f]{64}", str(provenance[field])
+        ):
+            return False
+    branch = metadata.get("branch")
+    if isinstance(branch, str) and branch.endswith("_implementation"):
+        return all(
+            isinstance(provenance.get(field), str)
+            and re.fullmatch(r"[0-9a-f]{64}", str(provenance[field]))
+            for field in ("big_plan_digest", "small_plan_digest")
+        )
+    return all(
+        isinstance(provenance.get(field), str)
+        for field in ("big_plan_digest", "small_plan_digest")
+    )
+
+
+def control_plane_provenance_matches(
+    recorded: dict[str, object], current: dict[str, object]
+) -> bool:
+    """Compare governing bytes while allowing evidence-only nested HEAD advances."""
+    if not has_control_plane_provenance(recorded) or not has_control_plane_provenance(
+        current
+    ):
+        return False
+    recorded_provenance = recorded["control_plane_provenance"]
+    current_provenance = current["control_plane_provenance"]
+    assert isinstance(recorded_provenance, dict) and isinstance(
+        current_provenance, dict
+    )
+    return all(
+        recorded_provenance.get(field) == current_provenance.get(field)
+        for field in CONTROL_PLANE_PROVENANCE_FIELDS - {"nested_head"}
+    )
+
+
+def indexed_nested_file(root: Path, relative: str) -> bytes | None:
+    """Read one tracked nested-state file from the Git index."""
+    nested = root / ".claude"
+    if not nested_state_repository(root) or not is_safe_relative_path(relative):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "show", f":{relative}"],
+            cwd=nested,
+            capture_output=True,
+            check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def nested_revision_file(root: Path, revision: str, relative: str) -> bytes | None:
+    """Read one nested-state file from a recorded immutable Git revision."""
+    nested = root / ".claude"
+    if (
+        not nested_state_repository(root)
+        or not re.fullmatch(r"[0-9a-f]{40,64}", revision)
+        or not is_safe_relative_path(relative)
+    ):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"],
+            cwd=nested,
+            capture_output=True,
+            check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def relevant_nested_status_changes(
+    root: Path, active_plan_paths: frozenset[str]
+) -> list[tuple[str, list[str]]] | None:
+    """Return only dirty nested state that contributes to provenance."""
+    nested = root / ".claude"
+    if not nested_state_repository(root):
+        return None
+    try:
+        status = run_process(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            nested,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if status.returncode != 0:
+        return None
+    changes: list[tuple[str, list[str]]] = []
+    records = status.stdout.split("\0")
+    position = 0
+    while position < len(records):
+        record = records[position]
+        position += 1
+        if not record:
+            continue
+        state, separator, path = record[:2], record[2:3], record[3:]
+        paths = [path] if separator == " " else []
+        if "R" in state or "C" in state:
+            if position >= len(records):
+                return None
+            paths.append(records[position])
+            position += 1
+        relevant = [
+            candidate
+            for candidate in paths
+            if is_relevant_nested_path(candidate, active_plan_paths)
+        ]
+        if relevant:
+            changes.append((state, relevant))
+    return changes
+
+
+def terminal_big_plan_bytes(indexed: bytes, phase: str) -> bytes | None:
+    """Return the sole final-plan mutation the post-commit hook may make."""
+    try:
+        text = indexed.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    body = frontmatter.group("body")
+
+    def replace_scalar(key: str, expected: str, replacement: str) -> str | None:
+        pattern = re.compile(
+            rf"^{key}:[ \t]*(?P<value>[^\r\n#]*?)[ \t]*$", re.MULTILINE
+        )
+        matches = list(pattern.finditer(body))
+        if len(matches) != 1 or matches[0].group("value").strip() != expected:
+            return None
+        match = matches[0]
+        return body[: match.start()] + f"{key}: {replacement}" + body[match.end() :]
+
+    completed = replace_scalar("status", "in-progress", "complete")
+    if completed is None:
+        return None
+    original_body = body
+    body = completed
+    current_pattern = re.compile(
+        r"^current_phase:[ \t]*(?P<value>[^\r\n#]*?)[ \t]*$", re.MULTILINE
+    )
+    matches = list(current_pattern.finditer(body))
+    if len(matches) != 1 or matches[0].group("value").strip() != phase:
+        return None
+    match = matches[0]
+    body = body[: match.start()] + "current_phase: " + body[match.end() :]
+    phases = frontmatter_phases(original_body)
+    if phases is None or phase not in phases:
+        return None
+    return ("---\n" + body + "\n---" + text[frontmatter.end() :]).encode("utf-8")
+
+
+def frontmatter_phases(frontmatter: str) -> list[str] | None:
+    """Read one complete, unambiguous ``phases:`` list from frontmatter."""
+    phases: list[str] = []
+    capture = False
+    found = False
+    for line in frontmatter.splitlines():
+        if re.fullmatch(r"phases:[ \t]*", line):
+            if found:
+                return None
+            found = True
+            capture = True
+            continue
+        if not capture:
+            continue
+        item = re.fullmatch(r"[ \t]*-[ \t]*([^\s#]+)[ \t]*", line)
+        if item is not None:
+            candidate = item.group(1)
+            if not PHASE_SLUG.fullmatch(candidate) or candidate in phases:
+                return None
+            phases.append(candidate)
+            continue
+        if re.fullmatch(r"[ \t]*(?:#.*)?", line):
+            continue
+        if re.fullmatch(r"[A-Za-z0-9_.-]+[ \t]*:.*", line):
+            break
+        return None
+    return phases if found and phases else None
+
+
+def terminal_plan_paths(source: bytes, relative: str) -> frozenset[str] | None:
+    """Return the complete active plan set only for valid terminal frontmatter."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    phases = frontmatter_phases(frontmatter.group("body"))
+    if phases is None:
+        return None
+    return frozenset({relative, *(f"plans/{item}.md" for item in phases)})
+
+
+def terminal_later_phases(source: bytes, phase: str) -> list[str] | None:
+    """Return only cancelled phases a terminal hook may skip after ``phase``."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    phases = frontmatter_phases(frontmatter.group("body"))
+    return (
+        phases[phases.index(phase) + 1 :]
+        if phases is not None and phase in phases
+        else None
+    )
+
+
+def small_plan_frontmatter(source: bytes) -> dict[str, str] | None:
+    """Parse a small plan's scalar frontmatter without permissive YAML coercion."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    values: dict[str, str] = {}
+    for line in frontmatter.group("body").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = re.fullmatch(r"([A-Za-z_]+):[ \t]*([^\r\n#]*?)[ \t]*", line)
+        if match is None:
+            return None
+        key, value = match.groups()
+        if key in values:
+            return None
+        values[key] = value.strip()
+    return values
+
+
+def is_cancelled_small_plan(
+    root: Path, source: bytes, phase: str, parent_plan: str
+) -> bool:
+    """Return whether an identified later small plan is terminally cancelled."""
+    values = small_plan_frontmatter(source)
+    if not (
+        values
+        and values.get("name") == phase
+        and values.get("type") == "small-plan"
+        and values.get("parent_plan") == parent_plan
+        and values.get("status") == "cancelled"
+        and re.fullmatch(r"[0-9]+", values.get("phase_index", ""))
+        and is_utc_timestamp(values.get("cancelled_at"))
+    ):
+        return False
+    reason = values.get("cancelled_reason", "").strip()
+    evidence = values.get("cancelled_evidence", "")
+    if (
+        not reason
+        or reason in {"''", '""'}
+        or reason.startswith(("[", "{", "- ", "#"))
+        or not is_safe_relative_path(evidence)
+    ):
+        return False
+    try:
+        return bool(
+            re.search(
+                r"^\*\*Status:\*\*[ \t]+CANCELLED\b",
+                confined_path(root, evidence, regular=True).read_text(encoding="utf-8"),
+                re.MULTILINE,
+            )
+        )
+    except (OSError, UnicodeError, ValueError):
+        return False
+
+
+def is_complete_small_plan(source: bytes, phase: str, parent_plan: str) -> bool:
+    """Return whether the authoritative current small plan is complete and valid."""
+    values = small_plan_frontmatter(source)
+    return (
+        values is not None
+        and values.get("name") == phase
+        and values.get("type") == "small-plan"
+        and values.get("parent_plan") == parent_plan
+        and values.get("status") == "complete"
+        and bool(re.fullmatch(r"[0-9]+", values.get("phase_index", "")))
+        and bool(values.get("closeout_session_log"))
+        and is_safe_relative_path(values["closeout_session_log"])
+    )
+
+
+def terminal_current_small_plan_matches(
+    root: Path, phase: str, parent_plan: str, recorded: dict[str, object], source: bytes
+) -> bool:
+    """Require the current completed small plan to be unchanged after receipt authority."""
+    relative = f"plans/{phase}.md"
+    if hashlib.sha256(source).hexdigest() != recorded.get(
+        "small_plan_digest"
+    ) or not is_complete_small_plan(source, phase, parent_plan):
+        return False
+    indexed = indexed_nested_file(root, relative)
+    plan = root / ".claude" / relative
+    return indexed == source and bool(digest_file(plan)) and plan.read_bytes() == source
+
+
+def has_only_terminal_big_plan_change(
+    root: Path, branch: str, phase: str, metadata: dict[str, object]
+) -> bool:
+    """Accept the exact unstaged final-plan mutation made by closeout hooks."""
+    recorded = metadata.get("control_plane_provenance")
+    if not isinstance(recorded, dict) or not branch.endswith("_implementation"):
+        return False
+    slug = branch.removesuffix("_implementation")
+    relative = f"plans/{slug}.md"
+    indexed = indexed_nested_file(root, relative)
+    plan = root / ".claude" / relative
+    if indexed is None or digest_file(plan) == "":
+        return False
+    if hashlib.sha256(indexed).hexdigest() != recorded.get("big_plan_digest"):
+        return False
+    expected = terminal_big_plan_bytes(indexed, phase)
+    if expected is None or plan.read_bytes() != expected:
+        return False
+    source_small = indexed_nested_file(root, f"plans/{phase}.md")
+    if source_small is None or not terminal_current_small_plan_matches(
+        root, phase, slug, recorded, source_small
+    ):
+        return False
+    later_phases = terminal_later_phases(indexed, phase)
+    if later_phases is None:
+        return False
+    for later_phase in later_phases:
+        later = indexed_nested_file(root, f"plans/{later_phase}.md")
+        if later is None or not is_cancelled_small_plan(root, later, later_phase, slug):
+            return False
+
+    plan_paths = terminal_plan_paths(indexed, relative)
+    if plan_paths is None:
+        return False
+    changes = relevant_nested_status_changes(root, plan_paths)
+    return changes == [(" M", [relative])]
+
+
+def has_only_checkpointed_terminal_big_plan_change(
+    root: Path, branch: str, phase: str, metadata: dict[str, object]
+) -> bool:
+    """Accept a receipt-bound completed small-plan checkpoint and exact terminal big-plan transition."""
+    recorded = metadata.get("control_plane_provenance")
+    if not isinstance(recorded, dict) or not branch.endswith("_implementation"):
+        return False
+    slug = branch.removesuffix("_implementation")
+    relative = f"plans/{slug}.md"
+    recorded_head = recorded.get("nested_head")
+    if not isinstance(recorded_head, str):
+        return False
+    source = plan_bytes_matching_digest(
+        root, recorded_head, relative, recorded.get("big_plan_digest")
+    )
+    indexed = indexed_nested_file(root, relative)
+    plan = root / ".claude" / relative
+    if source is None or indexed is None or digest_file(plan) == "":
+        return False
+    expected = terminal_big_plan_bytes(source, phase)
+    if expected is None or indexed != expected or plan.read_bytes() != expected:
+        return False
+    source_small = indexed_nested_file(root, f"plans/{phase}.md")
+    if source_small is None or not terminal_current_small_plan_matches(
+        root, phase, slug, recorded, source_small
+    ):
+        return False
+    later_phases = terminal_later_phases(source, phase)
+    if later_phases is None:
+        return False
+    for later_phase in later_phases:
+        later = nested_revision_file(root, recorded_head, f"plans/{later_phase}.md")
+        if later is None or not is_cancelled_small_plan(root, later, later_phase, slug):
+            return False
+    active_plan_paths = terminal_plan_paths(source, relative)
+    if active_plan_paths is None:
+        return False
+    if relevant_nested_status_changes(root, active_plan_paths) != []:
+        return False
+    current_head = nested_git_head(root)
+    if not current_head:
+        return False
+    try:
+        diff = run_process(
+            ["git", "diff", "--name-only", "-z", recorded_head, current_head],
+            root / ".claude",
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if diff.returncode != 0:
+        return False
+    changed = [path for path in diff.stdout.split("\0") if path]
+    allowed_checkpoint_paths = {relative, f"plans/{phase}.md"}
+    return all(
+        not is_relevant_nested_path(path, active_plan_paths)
+        or path in allowed_checkpoint_paths
+        for path in changed
+    )
+
+
+def terminal_control_plane_provenance_matches(
+    root: Path,
+    branch: str,
+    phase: str,
+    recorded_metadata: dict[str, object],
+    current_metadata: dict[str, object],
+) -> bool:
+    """Allow only the terminal big-plan change made after a successful commit."""
+    if not has_control_plane_provenance(
+        recorded_metadata
+    ) or not has_control_plane_provenance(current_metadata):
+        return False
+    recorded = recorded_metadata["control_plane_provenance"]
+    current = current_metadata["control_plane_provenance"]
+    assert isinstance(recorded, dict) and isinstance(current, dict)
+    unchanged = CONTROL_PLANE_PROVENANCE_FIELDS - {
+        "nested_head",
+        "tracked_state_fingerprint",
+        "big_plan_digest",
+    }
+    return all(recorded.get(field) == current.get(field) for field in unchanged) and (
+        has_only_terminal_big_plan_change(root, branch, phase, recorded_metadata)
+        or has_only_checkpointed_terminal_big_plan_change(
+            root, branch, phase, recorded_metadata
+        )
+    )
+
+
+def current_phase(root: Path, branch: str) -> str:
+    """Read the active phase for an implementation branch without YAML parsing."""
+    if not branch.endswith("_implementation"):
+        return ""
+    plan = root / ".claude/plans" / f"{branch.removesuffix('_implementation')}.md"
+    try:
+        text = plan.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = re.search(r"^current_phase:[ \t]*([^\s#]+)[ \t]*$", text, re.MULTILINE)
+    return match.group(1) if match else ""
+
+
+def state_metadata(
+    root: Path,
+    base_ref: str,
+    phase: str = "",
+    *,
+    adapter_diagnostics: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    """Capture Git metadata and whole/scoped content bindings."""
+    merge_base = git_output(["merge-base", base_ref, "HEAD"], root)
+    try:
+        paths = git_paths(root, base_ref)
+    except ValueError:
+        paths = []
+        path_discovery_ok = False
+    else:
+        path_discovery_ok = True
+    relevant = scoped_paths(paths)
+    branch = git_output(["rev-parse", "--abbrev-ref", "HEAD"], root)
+    root_fingerprint, diagnostics = bootstrap_root_fingerprint_diagnostics(root)
+    if adapter_diagnostics is not None:
+        adapter_diagnostics.extend(diagnostics)
+    return {
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "base_ref": base_ref,
+        "branch": branch,
+        "phase": phase or current_phase(root, branch),
+        "head_sha": git_output(["rev-parse", "HEAD"], root),
+        "merge_base_sha": merge_base,
+        "tree_sha": git_output(["write-tree"], root),
+        "content_hash": hash_paths(root, relevant),
+        # Informational only: the gates never compare this value. ``tree_sha``
+        # (git write-tree) is the binding check for staged changes.
+        "tracked_state_hash": hash_paths(root, paths),
+        "changed_paths": paths,
+        "relevant_paths": relevant,
+        "path_discovery_ok": path_discovery_ok,
+        "control_plane_provenance": control_plane_provenance(
+            root,
+            branch,
+            phase or current_phase(root, branch),
+            root_fingerprint=root_fingerprint,
+        ),
+    }
+
+
+def artifact_reference_errors(
+    root: Path, phase: str, key: str, artifact: object
+) -> tuple[list[str], Path | None]:
+    """Verify one closeout artifact reference's expected path, safety, and hash.
+
+    Shared by the terminal closeout gate and the historical receipt chain so
+    both apply identical tamper checks to the same ``ARTIFACT_KEYS`` shape.
+    """
+    if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"}:
+        return [f"closeout receipt artifact {key} is malformed"], None
+    path_value = artifact.get("path")
+    if not isinstance(path_value, str) or not is_safe_relative_path(path_value):
+        return [f"closeout receipt artifact {key} has an unsafe path"], None
+    expected = {
+        "phase_receipt": receipt_path(root, "phase", phase)
+        .relative_to(root)
+        .as_posix(),
+        "findings": f".claude/quality_reports/findings-{phase}.json",
+    }.get(key)
+    if expected is not None and path_value != expected:
+        return [f"closeout receipt {key} path is invalid"], None
+    try:
+        path = confined_path(root, path_value, regular=True)
+        actual_digest = file_digest(path)
+    except ValueError:
+        return [f"closeout receipt artifact {key} is missing or unsafe"], None
+    if artifact.get("sha256") != actual_digest:
+        return [f"closeout receipt artifact {key} was tampered with"], None
+    return [], path
+
+
+def historical_chain_errors(
+    root: Path, *, branch: str, phase: str, receipt_head: str
+) -> list[str]:
+    """Validate every completed phase before the terminal ``phase``.
+
+    ``phase``/``receipt_head`` identify the terminal completed phase already
+    checked by the caller with current-state freshness rules. This instead
+    walks the big plan's declared phase order backwards from ``phase`` and
+    applies ancestor/tree/artifact-chain semantics to each earlier completed
+    phase, per the design rule that current-state checks apply only to the
+    terminal receipt. Each historical receipt's ``head_sha`` is the *parent*
+    of the commit it certifies (receipts are generated before their
+    completion commit), so the tree check resolves the certified commit via
+    the ancestry path to the next completed phase rather than comparing
+    against ``head_sha``'s own tree. A missing or unreadable big plan is
+    treated as having no historical chain to validate, since the caller
+    already fails closed on that condition through its own required-file
+    checks.
+    """
+    if not branch.endswith("_implementation"):
+        return []
+    slug = branch.removesuffix("_implementation")
+    try:
+        text = (root / ".claude/plans" / f"{slug}.md").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    phases = frontmatter_phases(frontmatter.group("body")) if frontmatter else None
+    if phases is None or phase not in phases:
+        return ["historical receipt chain needs a valid big-plan phase order"]
+
+    errors: list[str] = []
+    chain_head = receipt_head
+    for earlier in reversed(phases[: phases.index(phase)]):
+        try:
+            source = (root / ".claude/plans" / f"{earlier}.md").read_bytes()
+        except OSError:
+            errors.append(f"historical phase {earlier} is missing its plan file")
+            break
+        if is_cancelled_small_plan(root, source, earlier, slug):
+            continue
+        if not is_complete_small_plan(source, earlier, slug):
+            errors.append(
+                f"historical phase {earlier} is neither complete nor cancelled"
+            )
+            break
+        try:
+            receipt = load_receipt(receipt_path(root, "closeout", earlier))
+        except ValueError as error:
+            errors.append(f"historical phase {earlier} receipt is invalid: {error}")
+            break
+        metadata = receipt.get("metadata")
+        if (
+            receipt.get("mode") != "closeout"
+            or receipt.get("status") != "PASS"
+            or not isinstance(metadata, dict)
+            or metadata.get("branch") != branch
+            or metadata.get("phase") != earlier
+        ):
+            errors.append(
+                f"historical phase {earlier} receipt is not a valid completion"
+            )
+            break
+        earlier_head = metadata.get("head_sha")
+        if not isinstance(earlier_head, str) or not earlier_head:
+            errors.append(f"historical phase {earlier} receipt is missing head_sha")
+            break
+        if not git_output(
+            ["rev-parse", "--verify", "--quiet", f"{earlier_head}^{{commit}}"], root
+        ):
+            errors.append(
+                f"historical phase {earlier} receipt head_sha does not resolve to a commit"
+            )
+            break
+        if not git_is_ancestor(root, earlier_head, chain_head):
+            errors.append(
+                f"historical phase {earlier} receipt head_sha is not an ancestor of "
+                "the next completed phase"
+            )
+            break
+        # Receipts are generated before their completion commit (stage, then
+        # report, then commit), so head_sha is the *parent* of the commit the
+        # receipt certifies, not that commit itself. The certified commit is
+        # head_sha's immediate child on the ancestry path toward chain_head;
+        # its tree - not head_sha's own tree - must match tree_sha. The
+        # implementation branch is assumed linear, so a well-formed range
+        # has exactly one commit whose parent set contains earlier_head.
+        # Selecting by list position alone cannot tell that assumption apart
+        # from a merge that gave earlier_head two divergent, reconverging
+        # children, so the candidate is proven by parentage, not position;
+        # zero or more than one candidate fails closed rather than guessing.
+        ancestry_path = git_output(
+            [
+                "rev-list",
+                "--ancestry-path",
+                "--reverse",
+                "--parents",
+                f"{earlier_head}..{chain_head}",
+            ],
+            root,
+        )
+        candidates: list[str] = []
+        for line in ancestry_path.splitlines():
+            parts = line.split()
+            if parts and earlier_head in parts[1:]:
+                candidates.append(parts[0])
+        if not candidates:
+            errors.append(
+                f"historical phase {earlier} receipt head_sha has no ancestry path "
+                "to the next completed phase"
+            )
+            break
+        if len(candidates) > 1:
+            errors.append(
+                f"historical phase {earlier} receipt head_sha has more than one "
+                "candidate certified completion commit on the ancestry path to the "
+                "next completed phase"
+            )
+            break
+        certified_commit = candidates[0]
+        expected_tree = git_output(["rev-parse", f"{certified_commit}^{{tree}}"], root)
+        if not expected_tree or metadata.get("tree_sha") != expected_tree:
+            errors.append(
+                f"historical phase {earlier} receipt tree_sha does not match the "
+                "tree introduced by its certified completion commit"
+            )
+            break
+        artifacts = receipt.get("artifacts")
+        if not isinstance(artifacts, dict):
+            errors.append(f"historical phase {earlier} receipt artifacts are malformed")
+            break
+        chain_errors: list[str] = []
+        for key in ("phase_receipt", "findings", "closeout_log"):
+            key_errors, _ = artifact_reference_errors(
+                root, earlier, key, artifacts.get(key)
+            )
+            chain_errors.extend(key_errors)
+        if chain_errors:
+            errors.extend(chain_errors)
+            break
+        chain_head = earlier_head
+    return errors
+
+
+def log_verification_outcomes(text: str) -> dict[int, tuple[str, str]]:
+    """Parse each optional item's outcome from a closeout log's own
+    ``## Verification`` section - the only session-log parsing this
+    contract performs. Required items are proven by
+    ``run_verification_items`` running the plan itself, never by trusting
+    what a log claims.
+    """
+    section = re.search(
+        r"^## Verification[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if section is None:
+        return {}
+    outcomes: dict[int, tuple[str, str]] = {}
+    for match in re.finditer(
+        r"^- optional (?P<n>\d+): (?P<status>PASS|FAIL|NOT RUN)"
+        r"(?: — (?P<detail>.+))?[ \t]*$",
+        section.group("body"),
+        re.MULTILINE,
+    ):
+        outcomes[int(match.group("n"))] = (
+            match.group("status"),
+            (match.group("detail") or "").strip(),
+        )
+    return outcomes
+
+
+def verification_items_errors(
+    root: Path, phase: str, receipt: dict[str, object]
+) -> list[str]:
+    """Prove the closeout receipt against what the plan actually required.
+
+    Guarded by the caller to run only for an ``exact`` head relation; never
+    for ``ancestor`` or ``certified``, where a receipt predating this
+    contract (no ``extensions``) must still load and pass.
+    """
+    plan_path = root / ".claude/plans" / f"{phase}.md"
+    receipt_display = receipt_path(root, "closeout", phase)
+    try:
+        plan_text = confined_path(
+            root, plan_path.relative_to(root).as_posix(), regular=True
+        ).read_text(encoding="utf-8")
+    except (ValueError, OSError) as error:
+        return [
+            f"{plan_path}: {receipt_display}: verification plan is unreadable: {error}"
+        ]
+    required, optional = plan_verification_items(plan_text)
+
+    extensions = receipt.get(RECEIPT_EXTENSIONS_FIELD)
+    verification_items = (
+        extensions.get("verification_items") if isinstance(extensions, dict) else None
+    )
+    if not isinstance(verification_items, list):
+        return [
+            f"{plan_path}: {receipt_display}: G1 verification-results-missing: "
+            "the closeout receipt has no extensions.verification_items; rerun "
+            "verify.py closeout so it runs the plan's required items itself"
+        ]
+
+    results_by_item: dict[str, dict[str, object]] = {
+        result["item"]: result
+        for result in verification_items
+        if isinstance(result, dict) and isinstance(result.get("item"), str)
+    }
+
+    errors: list[str] = []
+    for item in required:
+        result = results_by_item.get(item)
+        if result is None:
+            errors.append(
+                f"{plan_path}: {receipt_display}: G2 verification-item-unrun: "
+                f"{item!r} has no result in the receipt; rerun verify.py "
+                "closeout so it runs every required item"
+            )
+            continue
+        if result.get("status") != "PASS":
+            errors.append(
+                f"{plan_path}: {receipt_display}: G3 verification-item-failed: "
+                f"{item!r} recorded {result.get('status')!r}, not PASS; fix "
+                "the command and rerun verify.py closeout"
+            )
+
+    if optional:
+        try:
+            log_text = closeout_log_path(root, phase).read_text(encoding="utf-8")
+        except (ValueError, OSError) as error:
+            errors.append(
+                f"{plan_path}: {receipt_display}: G4 "
+                f"optional-verification-unaccounted: closeout log is "
+                f"unreadable: {error}"
+            )
+            return errors
+        outcomes = log_verification_outcomes(log_text)
+        for index, item in enumerate(optional, start=1):
+            outcome = outcomes.get(index)
+            if outcome is None:
+                errors.append(
+                    f"{plan_path}: {receipt_display}: G4 "
+                    f"optional-verification-unaccounted: optional item "
+                    f"{index} ({item!r}) has no '- optional {index}: PASS|FAIL|"
+                    "NOT RUN' line in the closeout log's ## Verification "
+                    "section; add one"
+                )
+                continue
+            status, detail = outcome
+            if status == "NOT RUN" and not detail:
+                errors.append(
+                    f"{plan_path}: {receipt_display}: G4 "
+                    f"optional-verification-unaccounted: optional item "
+                    f"{index} ({item!r}) is NOT RUN with no reason; add a "
+                    "— detail explaining why"
+                )
+    return errors
+
+
+def gate_receipt_errors(
+    root: Path,
+    *,
+    branch: str,
+    phase: str,
+    head: str,
+    head_relation: str,
+    require_major: bool,
+    require_ponytail: bool,
+    enforce_final_state: bool,
+) -> list[str]:
+    """Validate completed closeout evidence for every native hook adapter."""
+    errors: list[str] = []
+    if not branch or not phase or not head:
+        return ["closeout receipt gate needs branch, phase, and head"]
+    try:
+        closeout_path = receipt_path(root, "closeout", phase)
+        safe_closeout_path = confined_path(
+            root, closeout_path.relative_to(root).as_posix(), regular=True
+        )
+        receipt = load_receipt(safe_closeout_path)
+    except ValueError as error:
+        return [str(error)]
+    if receipt["mode"] != "closeout" or receipt["status"] != "PASS":
+        return ["closeout receipt must be a passing closeout receipt"]
+    metadata = receipt["metadata"]
+    if not isinstance(metadata, dict):
+        return ["closeout receipt metadata is malformed"]
+    for field, expected in (("base_ref", "dev"), ("branch", branch), ("phase", phase)):
+        if metadata.get(field) != expected:
+            errors.append(f"closeout receipt {field} does not match {expected}")
+    receipt_head = metadata.get("head_sha")
+    if not isinstance(receipt_head, str) or not receipt_head:
+        errors.append("closeout receipt is missing head_sha")
+    elif head_relation == "exact" and receipt_head != head:
+        errors.append("closeout receipt head_sha is stale")
+    elif head_relation == "ancestor" and not git_is_ancestor(root, receipt_head, head):
+        errors.append("closeout receipt head_sha is not an ancestor of the pushed ref")
+    elif head_relation == "certified" and not git_is_direct_child(
+        root, receipt_head, head
+    ):
+        errors.append(
+            "closeout receipt head_sha does not directly certify the pushed commit"
+        )
+    expected_base = git_output(["merge-base", "dev", head], root)
+    if not expected_base or metadata.get("merge_base_sha") != expected_base:
+        errors.append("closeout receipt merge_base_sha is stale")
+    if metadata.get("path_discovery_ok") is not True:
+        errors.append("closeout receipt path discovery was not verified")
+    if enforce_final_state or head_relation == "certified":
+        expected_tree = (
+            git_output(["write-tree"], root)
+            if head_relation == "exact"
+            else git_output(["rev-parse", f"{head}^{{tree}}"], root)
+        )
+        if not expected_tree or metadata.get("tree_sha") != expected_tree:
+            errors.append("closeout receipt final tracked state is stale")
+    if enforce_final_state:
+        root_fingerprint, adapter_diagnostics = bootstrap_root_fingerprint_diagnostics(
+            root
+        )
+        current_provenance = control_plane_provenance(
+            root, branch, phase, root_fingerprint=root_fingerprint
+        )
+        adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
+        if not has_control_plane_provenance(
+            {**metadata, "control_plane_provenance": current_provenance}
+        ):
+            errors.append(
+                "closeout receipt governing control-plane provenance is unavailable"
+                + (f": {adapter_detail}" if adapter_detail else "")
+            )
+        elif not control_plane_provenance_matches(
+            metadata, {**metadata, "control_plane_provenance": current_provenance}
+        ) and not terminal_control_plane_provenance_matches(
+            root,
+            branch,
+            phase,
+            metadata,
+            {**metadata, "control_plane_provenance": current_provenance},
+        ):
+            errors.append(
+                "closeout receipt governing control-plane provenance is stale"
+            )
+
+    artifacts = receipt.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return errors + ["closeout receipt artifacts are malformed"]
+    loaded: dict[str, object] = {}
+    for key in ARTIFACT_KEYS:
+        artifact = artifacts.get(key)
+        if key == "documentation":
+            try:
+                validate_documentation_evidence(artifact)
+            except ValueError as error:
+                errors.append(str(error))
+            continue
+        key_errors, path = artifact_reference_errors(root, phase, key, artifact)
+        errors.extend(key_errors)
+        if path is not None:
+            loaded[key] = path
+
+    documentation = artifacts.get("documentation")
+    if isinstance(documentation, dict):
+        changed_docs = [
+            path
+            for path in metadata.get("changed_paths", [])
+            if isinstance(path, str) and classify_path(path) == "documentation-only"
+        ]
+        if changed_docs and documentation.get("status") != "UPDATED":
+            errors.append("closeout receipt must record updated documentation")
+        if (
+            documentation.get("status") == "UPDATED"
+            and documentation.get("paths") != changed_docs
+        ):
+            errors.append("closeout receipt documentation paths are stale")
+
+    phase_path = loaded.get("phase_receipt")
+    if isinstance(phase_path, Path):
+        try:
+            phase_receipt = load_receipt(phase_path)
+        except ValueError as error:
+            errors.append(f"phase receipt is invalid: {error}")
+        else:
+            if phase_receipt["mode"] != "phase" or phase_receipt["status"] != "PASS":
+                errors.append("phase receipt must be passing phase evidence")
+            phase_metadata = phase_receipt.get("metadata")
+            if (
+                not isinstance(phase_metadata, dict)
+                or any(
+                    phase_metadata.get(field) != metadata.get(field)
+                    for field in (
+                        "phase",
+                        "branch",
+                        "base_ref",
+                        "head_sha",
+                        "merge_base_sha",
+                        "content_hash",
+                    )
+                )
+                or not control_plane_provenance_matches(phase_metadata, metadata)
+            ):
+                errors.append("phase receipt does not correlate with closeout evidence")
+    findings_path = loaded.get("findings")
+    if isinstance(findings_path, Path):
+        errors.extend(
+            report_errors(
+                findings_path,
+                branch=branch,
+                phase=phase,
+                head=head,
+                head_relation=head_relation,
+                expected_base=expected_base,
+                root=root,
+                require_major=require_major,
+                require_ponytail=require_ponytail,
+                required_profiles=required_review_profiles(metadata["changed_paths"]),
+                verify_current_content=(
+                    enforce_final_state or head_relation == "certified"
+                ),
+            )
+        )
+    log_path = loaded.get("closeout_log")
+    if isinstance(log_path, Path):
+        errors.extend(closeout_log_errors(root, phase, log_path))
+    if head_relation == "exact":
+        errors.extend(verification_items_errors(root, phase, receipt))
+        errors.extend(
+            f"openwiki-managed-state: {violation}"
+            for violation in openwiki_managed_state_violations(root)
+        )
+    if isinstance(receipt_head, str) and receipt_head:
+        errors.extend(
+            historical_chain_errors(
+                root, branch=branch, phase=phase, receipt_head=receipt_head
+            )
+        )
+    return errors
+
+
+def git_is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
+    """Return whether a report parent is safely reachable from a target ref."""
+    try:
+        return (
+            run_process(
+                ["git", "merge-base", "--is-ancestor", ancestor, descendant], root
+            ).returncode
+            == 0
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
+    """Return whether ``child`` is a non-merge commit directly after ``parent``."""
+    resolved_child = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{child}^{{commit}}"], root
+    )
+    resolved_parent = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{parent}^{{commit}}"], root
+    )
+    if not resolved_child or not resolved_parent:
+        return False
+    try:
+        parents = run_process(
+            ["git", "rev-list", "--parents", "-n", "1", resolved_child], root
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if parents.returncode != 0:
+        return False
+    parts = parents.stdout.split()
+    return (
+        len(parts) == 2 and parts[0] == resolved_child and parts[1] == resolved_parent
+    )
+
+
+def report_errors(
+    path: Path,
+    *,
+    branch: str,
+    phase: str,
+    head: str,
+    head_relation: str,
+    expected_base: str,
+    root: Path,
+    require_major: bool,
+    require_ponytail: bool,
+    verify_current_content: bool,
+    required_profiles: frozenset[str] = frozenset(),
+) -> list[str]:
+    """Validate the findings report without provider-specific policy.
+
+    ``require_major`` doubles as the phase-completion signal: when set, an
+    open MAJOR finding blocks and every surviving MINOR finding must carry an
+    explicit, non-empty ``disposition``/``reason`` pair. Intermediate,
+    non-completion validation passes ``require_major=False`` and skips both
+    checks; the gate never asserts the disposition is *true*, only present.
+
+    The reviewer's ``gate_result`` (completion only) and the profiles in
+    ``required_profiles`` apply at the commit gate (``exact``) always, and at
+    the push gates only to ``schema_version >= 2`` reports, so phases recorded
+    before the upgrade are never re-judged. Both remain recorded claims.
+    """
+    label = "findings report"
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [f"{label} is malformed"]
+    if not isinstance(report, dict):
+        return [f"{label} must be an object"]
+    errors: list[str] = []
+    for field, expected in (("branch", branch), ("phase", phase), ("base_ref", "dev")):
+        if report.get(field) != expected:
+            errors.append(f"{label} {field} does not match closeout receipt")
+    report_head = report.get("head_sha")
+    if not isinstance(report_head, str) or not report_head:
+        errors.append(f"{label} is missing head_sha")
+    elif head_relation == "exact" and report_head != head:
+        errors.append(f"{label} head_sha is stale")
+    elif head_relation == "ancestor" and not git_is_ancestor(root, report_head, head):
+        errors.append(f"{label} head_sha is not an ancestor of the pushed ref")
+    elif head_relation == "certified" and not git_is_direct_child(
+        root, report_head, head
+    ):
+        errors.append(f"{label} head_sha does not directly certify the pushed commit")
+    if report.get("merge_base_sha") != expected_base:
+        errors.append(f"{label} merge_base_sha is stale")
+    if report.get("dirty") is not False:
+        errors.append(f"{label} must record dirty: false")
+    if not is_utc_timestamp(report.get("generated_at")):
+        errors.append(f"{label} generated_at must be a UTC timestamp")
+    target = report.get("target")
+    if not isinstance(target, str):
+        errors.append(f"{label} is missing target")
+    else:
+        try:
+            confined_path(root, target)
+        except ValueError:
+            errors.append(
+                f"{label} target is missing, unsafe, or outside the repository"
+            )
+    changed_files = report.get("changed_files")
+    if not isinstance(changed_files, list) or not all(
+        isinstance(item, str) for item in changed_files
+    ):
+        errors.append(f"{label} changed_files must be a list of strings")
+    if verify_current_content:
+        current_hash = content_hash_for(
+            root,
+            expected_base,
+            head if head_relation in {"ancestor", "certified"} else "",
+        )
+        if not current_hash or report.get("content_hash") != current_hash:
+            errors.append(f"{label} content_hash is stale")
+    findings = report.get("findings")
+    profiles = report.get("profiles_reviewed")
+    if (
+        not isinstance(findings, list)
+        or not isinstance(profiles, list)
+        or not profiles
+        or not all(isinstance(profile, str) and profile for profile in profiles)
+        or len(set(profiles)) != len(profiles)
+    ):
+        errors.append("findings report schema or reviewed profiles are invalid")
+        findings = []
+        profiles = []
+    observed = {"critical": 0, "major": 0, "minor": 0}
+    for finding in findings:
+        if not isinstance(finding, dict):
+            errors.append("findings report contains a malformed finding")
+            continue
+        severity = finding.get("severity")
+        profile = finding.get("profile")
+        title = finding.get("title")
+        if (
+            severity not in {"CRITICAL", "MAJOR", "MINOR"}
+            or not isinstance(profile, str)
+            or profile not in profiles
+            or not isinstance(title, str)
+            or not title.strip()
+        ):
+            errors.append(
+                "findings report finding is invalid"
+                + (f": {title}" if isinstance(title, str) and title else "")
+            )
+            continue
+        observed[str(severity).lower()] += 1
+        if require_major and severity == "MINOR":
+            disposition = finding.get("disposition")
+            disposition_reason = finding.get("reason")
+            if (
+                not isinstance(disposition, str)
+                or not disposition.strip()
+                or not isinstance(disposition_reason, str)
+                or not disposition_reason.strip()
+            ):
+                errors.append(
+                    "findings report MINOR finding needs an explicit disposition "
+                    f"and reason: {title}"
+                )
+    counts = report.get("counts")
+    if not isinstance(counts, dict) or any(
+        type(counts.get(name)) is not int or counts[name] < 0
+        for name in ("critical", "major", "minor")
+    ):
+        errors.append("findings report severity counts are invalid")
+    else:
+        if counts != observed:
+            errors.append("findings report counts do not match findings")
+        if counts["critical"] != 0:
+            titles = ", ".join(
+                str(item.get("title"))
+                for item in findings
+                if isinstance(item, dict) and item.get("severity") == "CRITICAL"
+            )
+            errors.append(
+                "findings report has CRITICAL findings"
+                + (f": {titles}" if titles else "")
+            )
+        if require_major and counts["major"] != 0:
+            titles = ", ".join(
+                str(item.get("title"))
+                for item in findings
+                if isinstance(item, dict) and item.get("severity") == "MAJOR"
+            )
+            errors.append(
+                "findings report has MAJOR findings" + (f": {titles}" if titles else "")
+            )
+    ponytail_reviewed = report.get("ponytail_reviewed")
+    ponytail_findings = report.get("ponytail_findings")
+    ponytail_selected = "ponytail" in profiles
+    observed_ponytail = sum(
+        1
+        for finding in findings
+        if isinstance(finding, dict) and finding.get("profile") == "ponytail"
+    )
+    if ponytail_selected:
+        if ponytail_reviewed is not True:
+            errors.append("Ponytail review metadata contradicts reviewed profiles")
+        if type(ponytail_findings) is not int or ponytail_findings != observed_ponytail:
+            errors.append("Ponytail finding count does not match findings")
+    elif ponytail_reviewed is not None or ponytail_findings is not None:
+        errors.append("unselected Ponytail review must omit Ponytail metadata")
+    schema_version = report.get("schema_version", 1)
+    gate_evidence_applies = head_relation == "exact" or not (
+        type(schema_version) is int and schema_version < 2
+    )
+    if gate_evidence_applies and require_major:
+        gate_error = gate_result_error(report)
+        if gate_error:
+            errors.append(gate_error)
+    required = set(required_profiles) if gate_evidence_applies else set()
+    if require_ponytail:
+        required.add("ponytail")
+    missing = sorted(required - set(profiles))
+    if missing:
+        errors.append(
+            "findings report is missing required review profiles: "
+            + ", ".join(missing)
+            + (
+                "; this high-risk diff requires a fresh Ponytail review"
+                if "ponytail" in missing
+                else ""
+            )
+        )
+    return errors
+
+
+def gate_result_error(report: dict[str, object]) -> str | None:
+    """Return why the reviewer's recorded gate result blocks completion."""
+    gate_result = report.get("gate_result")
+    if gate_result is None:
+        return (
+            "findings report has no gate_result; re-record it with "
+            "record_findings.py --gate-result before closeout"
+        )
+    open_requests = report.get("open_requests")
+    if not isinstance(open_requests, list) or not all(
+        isinstance(request, str) and request.strip() for request in open_requests
+    ):
+        return "findings report open_requests must be a list of non-empty strings"
+    if gate_result != "PASS" or open_requests:
+        requests = "; ".join(open_requests) or "none"
+        return (
+            f"findings report gate_result is {gate_result!r} (open requests: "
+            f"{requests}); phase completion needs PASS and no open request"
+        )
+    return None
+
+
+def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
+    """Compute the existing report freshness hash for worktree or pushed ref."""
+    try:
+        diff = run_process(
+            [
+                "git",
+                "diff",
+                "--no-color",
+                "--no-ext-diff",
+                merge_base,
+                *([ref] if ref else []),
+            ],
+            root,
+        )
+        if diff.returncode != 0:
+            return ""
+        hashed = subprocess.run(
+            ["git", "hash-object", "--stdin"],
+            cwd=root,
+            input=diff.stdout,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return hashed.stdout.strip() if hashed.returncode == 0 else ""
+
+
+_FENCE_OPEN_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
+_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*$")
+_LINE_BOUNDARY_RE = re.compile(r"\r\n|\r|\n")
+
+
+def _strip_fenced_code_blocks(text: str) -> str:
+    """Remove fenced code blocks from LEARN evidence scanning line by line,
+    so an illustrative example of the entry/marker format placed inside one
+    is never mistaken for real evidence.
+
+    Handles both GFM fence characters (```` ``` ```` or ``~~~``), an
+    indented fence delimiter, and an unterminated fence - which strips to
+    the end of the text rather than leaving its contents exposed to the
+    scanner, since unclosed fenced content is not evidence either way. A
+    closing fence must reuse the same character and be at least as long as
+    the opening one, matching GFM; a single regex cannot express "no
+    matching close -> swallow to end" without this line-by-line state
+    machine, which is exactly the gap an unterminated fence exploited.
+    Lines are split on any of CRLF, lone CR (classic pre-OS X Mac), or LF -
+    not just ``"\\n"`` - via an explicit alternation, deliberately not
+    ``str.splitlines()``, which also treats ``\\v``, ``\\f``,
+    ``\\x1c``-``\\x1e``, and ``\\x85``/``\\u2028``/``\\u2029`` as line
+    boundaries and would silently widen what counts as a line break in this
+    security-relevant scanner. This caller's actual input arrives pre-
+    normalized to LF via ``Path.read_text()``'s universal newlines, but the
+    shipped verifier's callers are not guaranteed to normalize first. Every
+    ``\\r`` this split consumes is part of a separator, so no line can ever
+    retain a trailing ``\\r``; the closing-delimiter suffix check needs no
+    ``\\r`` tolerance of its own as a result.
+    """
+    kept: list[str] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    for line in _LINE_BOUNDARY_RE.split(text):
+        match = _FENCE_OPEN_RE.match(line)
+        if not in_fence:
+            if match:
+                in_fence = True
+                fence_char = match.group(1)[0]
+                fence_len = len(match.group(1))
+            else:
+                kept.append(line)
+            continue
+        if (
+            match
+            and match.group(1)[0] == fence_char
+            and len(match.group(1)) >= fence_len
+            and _FENCE_CLOSE_SUFFIX_RE.match(line[match.end() :])
+        ):
+            in_fence = False
+        # else: still inside the fence (including to end of text if it is
+        # never closed) - the line stays swallowed.
+    return "\n".join(kept)
+
+
+def is_final_phase(root: Path, phase: str) -> bool:
+    """Return whether ``phase`` is the big plan's own last declared phase.
+
+    Finality is derived solely from the big plan's ``phases:`` frontmatter
+    list, reached via the small plan's own ``parent_plan`` - the same
+    source ``frontmatter_phases`` already serves elsewhere - so "final
+    phase" cannot become a second definition that drifts from the big
+    plan's own phase list. Any unreadable or malformed frontmatter returns
+    False rather than guessing, so an ambiguous state never spuriously
+    requires evidence a phase was never asked to produce.
+    """
+    if not PHASE_SLUG.fullmatch(phase):
+        return False
+    try:
+        small_plan_source = (root / ".claude/plans" / f"{phase}.md").read_bytes()
+    except OSError:
+        return False
+    values = small_plan_frontmatter(small_plan_source)
+    parent_plan = values.get("parent_plan", "") if values else ""
+    if not PHASE_SLUG.fullmatch(parent_plan):
+        return False
+    try:
+        big_plan_text = (root / ".claude/plans" / f"{parent_plan}.md").read_text(
+            encoding="utf-8"
+        )
+    except (OSError, UnicodeDecodeError):
+        return False
+    match = re.match(r"\A---\n(?P<body>.*?)\n---", big_plan_text, re.DOTALL)
+    if match is None:
+        return False
+    phases = frontmatter_phases(match.group("body"))
+    return phases is not None and bool(phases) and phases[-1] == phase
+
+
+def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
+    """Keep completed-log, LEARN, and final-phase-audit authority bound to
+    the receipt path.
+
+    LEARN evidence lives entirely inside the session log's own
+    ``## [LEARN] Entries`` section, outside any fenced code block: either
+    one or more explicit ``[LEARN...`` entries, or the exact sanctioned
+    no-lessons marker. ``MEMORY.md``'s mtime is not evidence of anything
+    here - it can still be updated as a separate persistence action, but its
+    timestamp never substitutes for a session-log section the receipt hash
+    actually binds.
+
+    When ``phase`` is the big plan's own final phase, the same log must also
+    carry a non-empty ``## Stale-claims surfaces checked`` section - the
+    heading already used by the conditional per-phase stale-claims review -
+    recording the standing documentation, memory, and LEARN audit's
+    surface list. This checks the evidence's shape only, not its judgement.
+    """
+    expected = closeout_log_path(root, phase)
+    if path.resolve() != expected.resolve():
+        return ["closeout receipt log does not match phase frontmatter"]
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ["closeout session log is unreadable"]
+    if not re.search(r"^\*\*Status:\*\*[ \t]+COMPLETED\b", text, re.MULTILINE):
+        return ["closeout session log is not completed"]
+    errors: list[str] = []
+    section = re.search(
+        r"^## \[LEARN\] Entries[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if section is None:
+        errors.append("closeout session log is missing the ## [LEARN] Entries section")
+    else:
+        prose = _strip_fenced_code_blocks(section.group("body"))
+        no_lessons = "[LEARN] none - no new lessons this session" in prose
+        has_entries = bool(re.search(r"^-[ \t]*\[LEARN[:\]]", prose, re.MULTILINE))
+        if not no_lessons and not has_entries:
+            errors.append("LEARN evidence is missing")
+    if is_final_phase(root, phase):
+        audit_section = re.search(
+            r"^## Stale-claims surfaces checked[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        if (
+            audit_section is None
+            or not _strip_fenced_code_blocks(audit_section.group("body")).strip()
+        ):
+            errors.append(
+                "final-phase closeout session log is missing a non-empty "
+                "## Stale-claims surfaces checked section recording the "
+                "standing documentation, memory, and LEARN audit"
+            )
+    return errors
+
+
+def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+    """Run one external verification tool, returning its raw result."""
+    result = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def _tool_missing_detail(tool: str) -> str:
+    """Return the one shared detail text for a tool absent from `uv`'s
+    project environment, so the literal exists exactly once."""
+    return (
+        f"{tool} is not installed in the project environment; "
+        "run uv add --dev ruff mypy pytest"
+    )
+
+
+def _missing_tool(tool: str, rc: int, stderr: str) -> tuple[str, str] | None:
+    """Return the missing-tool result when `uv run` failed to spawn `tool`
+    (`uv` itself present, `tool` absent), or None otherwise.
+
+    `uv run <tool>` never raises when `uv` is installed but `tool` is not;
+    it exits non-zero with `Failed to spawn: ...` on stderr instead. A bare
+    `FileNotFoundError` only fires when `uv` itself cannot be found.
+    """
+    if rc != 0 and "Failed to spawn" in stderr:
+        return "UNVERIFIED", _tool_missing_detail(tool)
+    return None
+
+
+def _toml_basic_string(value: str) -> str | None:
+    """Return a quoted TOML basic-string literal for value, or None when
+    value cannot round-trip through valid UTF-8 text (for example an
+    unpaired surrogate), which TOML requires and which no amount of
+    character escaping can repair."""
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
+        return None
+    named = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}
+    escaped = "".join(
+        named.get(ch, ch if 0x20 <= ord(ch) != 0x7F else f"\\u{ord(ch):04x}")
+        for ch in value
+    )
+    return f'"{escaped}"'
+
+
+def _ruff_exclude_config_args(
+    extend_exclude: list[str] | None,
+) -> tuple[list[str], str | None]:
+    """Return shared `--config extend-exclude=[...]` args for both Ruff
+    subcommands, or an error summary if a pattern is unsafe.
+
+    `ruff format` rejects the `--extend-exclude` flag that `ruff check`
+    accepts, so both use the generic `--config` override instead — one
+    construction path for both, so the two cannot diverge again.
+
+    Values are Ruff glob patterns, not literal path segments. A pattern
+    containing `[`, `]`, `\\`, `*`, `?`, `{`, or `}` may produce valid TOML
+    that Ruff accepts while matching something other than the literal path a
+    caller intended - `[1]` is a character class and `\\` escapes. The only
+    caller passes the fixed literal `.claude`, which has no glob
+    metacharacters; a future caller passing a less trivial pattern must
+    account for this. TOML-unsafe patterns are rejected above, but a
+    glob-ambiguous one cannot be distinguished from a deliberate glob here.
+    """
+    if not extend_exclude:
+        return [], None
+    literals: list[str] = []
+    for pattern in extend_exclude:
+        literal = _toml_basic_string(pattern)
+        if literal is None:
+            return [], "Ruff exclude pattern cannot be safely represented in TOML"
+        literals.append(literal)
+    return ["--config", "extend-exclude=[" + ",".join(literals) + "]"], None
+
+
+def _ruff_measurement(
+    targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure Ruff without treating failed measurement as a clean result."""
+    config_args, config_error = _ruff_exclude_config_args(extend_exclude)
+    if config_error is not None:
+        return "UNVERIFIED", config_error
+    try:
+        args = [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            *targets,
+            "--output-format=json",
+            *config_args,
+        ]
+        rc, stdout, stderr = _run(args, cwd=cwd)
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("Ruff")
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"Ruff did not run: {error}"
+    missing = _missing_tool("Ruff", rc, stderr)
+    if missing is not None:
+        return missing
+    if rc not in {0, 1}:
+        return (
+            "UNVERIFIED",
+            f"Ruff exited abnormally ({rc}): {(stderr or stdout).strip()}",
+        )
+    if not stdout.strip():
+        return "UNVERIFIED", "Ruff produced no JSON output"
+    try:
+        violations = json.loads(stdout)
+    except json.JSONDecodeError as error:
+        return "UNVERIFIED", f"Ruff produced invalid JSON: {error}"
+    if not isinstance(violations, list) or not all(
+        isinstance(item, dict) for item in violations
+    ):
+        return "UNVERIFIED", "Ruff JSON was not a violation list"
+    if rc == 0 and violations:
+        return "UNVERIFIED", "Ruff reported violations with a successful exit status"
+    if rc == 1 and not violations:
+        return "UNVERIFIED", "Ruff failed without reporting any violations"
+    if rc == 0:
+        return "PASS", "Ruff completed with 0 violations"
+    return "FAIL", f"Ruff reported {len(violations)} violation(s)"
+
+
+def _ruff_format_measurement(
+    targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure Ruff formatting compliance without treating failed measurement as a clean result."""
+    config_args, config_error = _ruff_exclude_config_args(extend_exclude)
+    if config_error is not None:
+        return "UNVERIFIED", config_error
+    try:
+        args = ["uv", "run", "ruff", "format", "--check", *targets, *config_args]
+        rc, stdout, stderr = _run(args, cwd=cwd)
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("Ruff")
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"Ruff format did not run: {error}"
+    missing = _missing_tool("Ruff", rc, stderr)
+    if missing is not None:
+        return missing
+    if rc not in {0, 1}:
+        return (
+            "UNVERIFIED",
+            f"Ruff format exited abnormally ({rc}): {(stderr or stdout).strip()}",
+        )
+    output = stdout + stderr
+    reformat_count = len(re.findall(r"^Would reformat: ", output, re.MULTILINE))
+    if rc == 0 and reformat_count:
+        return (
+            "UNVERIFIED",
+            "Ruff format reported reformattable files with a successful exit status",
+        )
+    if rc == 1 and not reformat_count:
+        return (
+            "UNVERIFIED",
+            "Ruff format failed without reporting any reformattable files",
+        )
+    if rc == 0:
+        return "PASS", "Ruff format completed with 0 files needing reformatting"
+    return "FAIL", f"Ruff format would reformat {reformat_count} file(s)"
+
+
+def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, str]:
+    """Measure mypy while distinguishing type failures from tool failures."""
+    try:
+        rc, stdout, stderr = _run(
+            [
+                "uv",
+                "run",
+                "mypy",
+                *(targets or []),
+                "--ignore-missing-imports",
+                "--explicit-package-bases",
+            ],
+            cwd=cwd,
+        )
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("mypy")
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"mypy did not run: {error}"
+    missing = _missing_tool("mypy", rc, stderr)
+    if missing is not None:
+        return missing
+    output = stdout + stderr
+    error_count = sum(1 for line in output.splitlines() if ": error:" in line)
+    if rc == 0:
+        if error_count:
+            return "UNVERIFIED", "mypy reported errors with a successful exit status"
+        return "PASS", "mypy completed with 0 errors"
+    if rc == 1 and error_count:
+        return "FAIL", f"mypy reported {error_count} type error(s)"
+    return (
+        "UNVERIFIED",
+        f"mypy exited abnormally ({rc}): {output.strip() or 'no output'}",
+    )
+
+
+def _pytest_result_summary(output: str) -> str:
+    """Return pytest's trailing result-count line (e.g. "12 passed in 0.3s"),
+    or an empty string when no such line is present."""
+    for line in reversed(output.splitlines()):
+        stripped = line.strip(" =")
+        if re.search(
+            r"\b\d+\s+(passed|failed|error|errors|skipped|deselected|xfailed|xpassed)\b",
+            stripped,
+        ):
+            return stripped
+    return ""
+
+
+_TEST_DISCOVERY_SKIP_DIRS = frozenset(
+    {
+        ".claude",
+        ".venv",
+        "venv",
+        ".git",
+        "node_modules",
+        ".tox",
+        "build",
+        "dist",
+        "site-packages",
+        "__pycache__",
+    }
+)
+
+
+def repository_has_test_files(root: Path) -> bool | None:
+    """Return whether the repository has any pytest-discoverable test file.
+
+    Returns None when the walk hit a permission (or other OS) error on a
+    subtree and found no test file elsewhere: an unreadable directory could
+    hold the only tests, so absence cannot be claimed and the caller must
+    stay UNVERIFIED rather than fail open into NOT_APPLICABLE.
+    """
+    walk_errors: list[OSError] = []
+    for current_dir, dirs, files in os.walk(root, onerror=walk_errors.append):
+        dirs[:] = [d for d in dirs if d not in _TEST_DISCOVERY_SKIP_DIRS]
+        if any(
+            fnmatch.fnmatch(name, "test_*.py") or fnmatch.fnmatch(name, "*_test.py")
+            for name in files
+        ):
+            return True
+    return None if walk_errors else False
+
+
+def _pytest_measurement(
+    cwd: str = ".", targets: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure pytest, separating test failures from infrastructure failures."""
+    try:
+        rc, stdout, stderr = _run(
+            [
+                "uv",
+                "run",
+                "pytest",
+                *(targets if targets is not None else ["tests/"]),
+                "-q",
+                "--tb=no",
+            ],
+            cwd=cwd,
+        )
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("pytest")
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"pytest did not run: {error}"
+    missing = _missing_tool("pytest", rc, stderr)
+    if missing is not None:
+        return missing
+    summary = _pytest_result_summary(stdout)
+    if rc == 0:
+        return (
+            "PASS",
+            f"pytest completed ({summary})" if summary else "pytest completed",
+        )
+    if rc == 1:
+        return (
+            "FAIL",
+            f"pytest reported test failures ({summary})"
+            if summary
+            else "pytest reported test failures",
+        )
+    if rc == 5:
+        has_tests = repository_has_test_files(Path(cwd))
+        if has_tests:
+            return (
+                "UNVERIFIED",
+                "pytest collected no tests although test files exist; "
+                "check testpaths and file naming",
+            )
+        if has_tests is None:
+            return (
+                "UNVERIFIED",
+                "pytest collected no tests and part of the repository could "
+                "not be read while looking for test files; check permissions",
+            )
+        return (
+            "NOT_APPLICABLE",
+            "pytest collected no tests and the repository has no test files yet",
+        )
+    return (
+        "UNVERIFIED",
+        f"pytest infrastructure exit ({rc}): {(stderr or stdout).strip() or 'no output'}",
+    )
+
+
+def measure_ruff(
+    root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+) -> dict[str, object]:
+    """Adapt the strict Ruff lint+format measurement into one receipt check.
+
+    Folds ``ruff format --check`` into ``VFY-RUFF-001`` instead of a separate
+    check ID. ``CHECK_IDS`` is part of the receipt schema the gate validates
+    its own history against (``validate_receipt`` requires every historical
+    receipt to contain exactly this check set), so adding an ID would
+    invalidate every already-persisted phase receipt rather than only
+    affecting new ones.
+    """
+    lint_status, lint_detail = _ruff_measurement(
+        targets, cwd=str(root), extend_exclude=extend_exclude
+    )
+    format_status, format_detail = _ruff_format_measurement(
+        targets, cwd=str(root), extend_exclude=extend_exclude
+    )
+    status = aggregate_status([{"status": lint_status}, {"status": format_status}])
+    detail = f"lint: {lint_detail} | format: {format_detail}"
+    return check("VFY-RUFF-001", status, detail)
+
+
+def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
+    """Adapt the strict mypy measurement into a receipt check."""
+    status, detail = _mypy_measurement(targets, cwd=str(root))
+    return check("VFY-MYPY-001", status, detail)
+
+
+def measure_pytest(root: Path, targets: list[str] | None = None) -> dict[str, object]:
+    """Adapt the strict pytest measurement into a receipt check."""
+    status, detail = _pytest_measurement(cwd=str(root), targets=targets)
+    if status == "NOT_APPLICABLE":
+        return not_applicable("VFY-PYTEST-001", detail)
+    return check("VFY-PYTEST-001", status, detail)
+
+
+def is_bootstrap_authoring_repository(root: Path) -> bool:
+    """Return whether the repository contains the bootstrap source ownership markers."""
+    return all((root / marker).is_file() for marker in AUTHORING_RUNTIME_MARKERS)
+
+
+def is_configured_mypy_scope(value: object) -> bool:
+    """Return whether one parsed Mypy target setting has usable values."""
+    if isinstance(value, str):
+        return bool(value.strip())
+    return bool(
+        isinstance(value, list)
+        and value
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
+def mypy_configured_scope(root: Path) -> bool | None:
+    """Read the selected native Mypy config or report an unsafe parse as unknown."""
+    for relative in MYPY_CONFIG_FILES:
+        config = root / relative
+        if not config.exists():
+            continue
+        if config.name == "pyproject.toml":
+            try:
+                import tomllib
+            except ModuleNotFoundError:  # Python 3.9-3.10 cannot inspect TOML safely.
+                return None
+            try:
+                parsed = tomllib.loads(config.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+                return None
+            tool = parsed.get("tool")
+            section = tool.get("mypy") if isinstance(tool, dict) else None
+            if not isinstance(section, dict):
+                continue
+            return any(
+                is_configured_mypy_scope(section.get(option))
+                for option in MYPY_SCOPE_OPTIONS
+            )
+        parser = configparser.ConfigParser(interpolation=None)
+        try:
+            parser.read(config, encoding="utf-8")
+        except (OSError, UnicodeDecodeError, configparser.Error):
+            return None
+        if not parser.has_section("mypy"):
+            continue
+        return any(
+            is_configured_mypy_scope(parser.get("mypy", option, fallback=""))
+            for option in MYPY_SCOPE_OPTIONS
+        )
+    return False
+
+
+def consumer_mypy_targets(root: Path) -> list[str] | None:
+    """Resolve only native configured scope or the conventional ``src`` root."""
+    configured_scope = mypy_configured_scope(root)
+    if configured_scope is True:
+        return []
+    if configured_scope is None:
+        return None
+    return ["src"] if (root / "src").is_dir() else None
+
+
+def openwiki_managed_state_violations(root: Path) -> list[str]:
+    """Return each violated OpenWiki managed-state condition, naming the
+    file and the fix.
+
+    File reads and ``git ls-files``/``git diff --cached --name-only`` only
+    - never model-backed, and never reads inside ``openwiki/`` beyond the
+    ``.run.json`` tracked-or-staged question. Shared by ``generation_check``
+    (``VFY-GEN-001``'s phase remit) and the commit-time gate, so both read
+    the same three conditions the same way.
+    """
+    violations: list[str] = []
+    for adapter in OPENWIKI_ADAPTERS:
+        try:
+            text = (root / adapter).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if MANAGED_START in text:
+            violations.append(
+                f"{adapter} still carries an OpenWiki managed block; ask the user to "
+                "run bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null "
+                "in their own shell to restore it (the guard denies an agent "
+                "command that names a hook script)"
+            )
+    workflow_staged_as_new = bool(
+        git_output(
+            [
+                "diff",
+                "--cached",
+                "--name-only",
+                "--diff-filter=A",
+                "--",
+                OPENWIKI_WORKFLOW,
+            ],
+            root,
+        )
+    )
+    if workflow_staged_as_new:
+        violations.append(
+            f"{OPENWIKI_WORKFLOW} is staged as a new file; OpenWiki init "
+            "mode is forbidden - delete it"
+        )
+    elif (root / OPENWIKI_WORKFLOW).is_file() and not git_output(
+        ["ls-files", "--", OPENWIKI_WORKFLOW], root
+    ):
+        violations.append(
+            f"{OPENWIKI_WORKFLOW} is untracked; OpenWiki init mode is "
+            "forbidden - delete it"
+        )
+    if git_output(["ls-files", "--", OPENWIKI_RUN_JSON], root):
+        violations.append(
+            f"{OPENWIKI_RUN_JSON} is tracked or staged; run git rm "
+            f"--cached {OPENWIKI_RUN_JSON} and keep it ignored"
+        )
+    return violations
+
+
+def generation_check(root: Path) -> dict[str, object]:
+    """Require the generated verifier to match its canonical source, and
+    that no OpenWiki managed state has leaked into the tree (a live
+    managed block, an init-mode workflow file, or a tracked ``.run.json``).
+    """
+    violations = openwiki_managed_state_violations(root)
+    if violations:
+        return check("VFY-GEN-001", "FAIL", "; ".join(violations))
+    source = root / "shared/scripts/verify.py"
+    generated = root / ".claude/scripts/verify.py"
+    if source.is_file():
+        if not generated.is_file():
+            return check(
+                "VFY-GEN-001", "UNVERIFIED", "generated verifier runtime is missing"
+            )
+        status = "PASS" if source.read_bytes() == generated.read_bytes() else "FAIL"
+        return check(
+            "VFY-GEN-001",
+            status,
+            "generated verifier runtime matches source"
+            if status == "PASS"
+            else "generated verifier runtime drifted from source",
+        )
+    return check(
+        "VFY-GEN-001",
+        "PASS" if Path(__file__).is_file() else "UNVERIFIED",
+        "consumer verifier is installed",
+    )
+
+
+def canonical_json(value: object) -> str:
+    """Serialize verification evidence with stable key and item ordering."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def file_digest(path: Path) -> str:
+    """Return the SHA-256 digest for one regular closeout artifact."""
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(f"artifact is not a regular file: {path}")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+class MissingArtifactError(ValueError):
+    """A closeout artifact does not exist yet; the message names its creator."""
+
+
+def relative_artifact(root: Path, path: Path, created_by: str) -> dict[str, str]:
+    """Bind one existing artifact by safe repository-relative path and bytes.
+
+    Raises ``MissingArtifactError`` when nothing exists at ``path``, naming
+    ``created_by``. A path outside the repository, a symlink, and a
+    non-regular file raise a plain ``ValueError`` that says which.
+    """
+    try:
+        relative = path.relative_to(root).as_posix()
+    except ValueError as error:
+        raise ValueError(f"artifact is outside repository: {path}") from error
+    if not os.path.lexists(path):
+        raise MissingArtifactError(
+            f"closeout evidence is missing: {relative}; {created_by}"
+        )
+    try:
+        resolved = confined_path(root, relative, regular=True)
+    except ValueError as error:
+        raise ValueError(f"artifact {relative} is rejected: {error}") from error
+    return {"path": relative, "sha256": file_digest(resolved)}
+
+
+def closeout_log_reference(root: Path, phase: str) -> str:
+    """Return the safe closeout log path selected by phase frontmatter."""
+    plan = root / ".claude/plans" / f"{phase}.md"
+    try:
+        text = plan.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValueError(f"missing phase plan: {plan}") from error
+    match = re.search(
+        r"^closeout_session_log:[ \t]*([^\s#]+)[ \t]*$", text, re.MULTILINE
+    )
+    if not match or not is_safe_relative_path(match.group(1)):
+        raise ValueError("phase plan has no safe closeout_session_log")
+    return match.group(1)
+
+
+def closeout_log_path(root: Path, phase: str) -> Path:
+    """Return the exact closeout log selected by current phase frontmatter."""
+    return confined_path(root, closeout_log_reference(root, phase), regular=True)
+
+
+def documentation_only_paths(metadata: dict[str, object]) -> list[str]:
+    """Return the changed paths that are documentation-only content."""
+    return [
+        path
+        for path in metadata_paths(metadata, "changed_paths")
+        if classify_path(path) == "documentation-only"
+    ]
+
+
+def missing_documentation_na_reason(
+    metadata: dict[str, object], documentation_na: str
+) -> str | None:
+    """Diagnose a closeout that needs ``--documentation-na`` but lacks one.
+
+    Mirrors ``closeout_artifacts``'s own requirement without changing its
+    raising contract for other callers - a genuine artifact error there
+    (missing phase plan, unsafe closeout log path, ...) still crashes
+    unchanged. This only pre-empts the one case that is a missing CLI flag,
+    not a broken plan or artifact, so it never swallows a real error.
+    """
+    if documentation_only_paths(metadata) or documentation_na.strip():
+        return None
+    return (
+        "closeout needs --documentation-na REASON: no documentation-only "
+        "path changed and no reason was given; pass --documentation-na "
+        "'<reason>' before running verify"
+    )
+
+
+def unpublishable_closeout_reason(
+    root: Path, metadata: dict[str, object]
+) -> str | None:
+    """Diagnose a closeout receipt the terminal push gate could never accept.
+
+    ``control_plane_provenance`` records ``big_plan_digest`` from the big
+    plan's working-tree bytes. The terminal push predicates
+    (``has_only_terminal_big_plan_change``,
+    ``has_only_checkpointed_terminal_big_plan_change``) can only ever accept
+    that digest if it is retrievable from a nested Git revision, so a
+    receipt persisted while the big plan is dirty in nested state binds a
+    digest no later state can ever match - persisting it anyway would only
+    destroy the prior valid receipt. Mirrors
+    ``missing_documentation_na_reason``'s persist-time precondition shape.
+    Skips when nested provenance is unavailable (no big plan bound to this
+    branch, or ``.claude`` is not its own Git repository), matching the
+    existing provenance-unavailable path for a consumer without nested state.
+    That check goes through ``nested_state_repository`` rather than
+    ``nested_git_head``, because the latter walks up to the outer repository's
+    HEAD when ``.claude`` has no ``.git``, which would refuse every closeout
+    for a consumer whose ``.claude`` is a plain tracked directory.
+    """
+    branch = metadata.get("branch")
+    if not isinstance(branch, str):
+        return None
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None:
+        return None
+    if not nested_state_repository(root):
+        return None
+    nested_head = nested_git_head(root)
+    if not nested_head:
+        return None
+    provenance = metadata.get("control_plane_provenance")
+    if not isinstance(provenance, dict):
+        return None
+    slug = branch.removesuffix("_implementation")
+    if (
+        plan_bytes_matching_digest(
+            root, nested_head, f"plans/{slug}.md", provenance.get("big_plan_digest")
+        )
+        is not None
+    ):
+        return None
+    return (
+        "closeout receipt would be unpublishable: the big plan's recorded "
+        "digest is not yet retrievable from nested Git, so the terminal "
+        "push gate could never accept it; run git -C .claude add -A && "
+        'git -C .claude commit -m "checkpoint: <reason>" (or, from a '
+        "terminal or editor task, bash .claude/hooks/scripts/state-sync.sh "
+        "checkpoint)"
+    )
+
+
+def closeout_artifacts(
+    root: Path, metadata: dict[str, object], documentation_na: str = ""
+) -> dict[str, object]:
+    """Capture the precise evidence set a completed-phase gate consumes.
+
+    Raises ``MissingArtifactError`` for evidence nobody has created yet.
+    """
+    branch = metadata.get("branch")
+    phase = metadata.get("phase")
+    if (
+        not isinstance(branch, str)
+        or not branch
+        or not isinstance(phase, str)
+        or not phase
+    ):
+        raise ValueError("closeout receipt needs branch and phase metadata")
+    documentation_paths = documentation_only_paths(metadata)
+    if not documentation_paths and not documentation_na.strip():
+        raise ValueError(
+            "closeout needs --documentation-na REASON when documentation was not updated"
+        )
+    return {
+        "phase_receipt": relative_artifact(
+            root,
+            receipt_path(root, "phase", phase),
+            "run verify.py phase --format json --persist to create it",
+        ),
+        "findings": relative_artifact(
+            root,
+            root / ".claude/quality_reports" / f"findings-{phase}.json",
+            "run record_findings.py to create it",
+        ),
+        "closeout_log": relative_artifact(
+            root,
+            root / closeout_log_reference(root, phase),
+            "create it at the path the small plan's closeout_session_log names",
+        ),
+        "documentation": (
+            {"status": "UPDATED", "paths": documentation_paths}
+            if documentation_paths
+            else {
+                "status": "NOT_APPLICABLE",
+                "reason": documentation_na.strip(),
+            }
+        ),
+    }
+
+
+def build_receipt(
+    mode: str,
+    checks: list[dict[str, object]],
+    metadata: dict[str, object],
+    artifacts: dict[str, object] | None = None,
+    extensions: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Build and validate one complete receipt."""
+    receipt = {
+        "schema_version": SCHEMA_VERSION,
+        "mode": mode,
+        "status": aggregate_status(checks),
+        "checks": checks,
+        "metadata": metadata,
+    }
+    if mode == "closeout":
+        receipt["artifacts"] = artifacts if artifacts is not None else {}
+        if extensions is not None:
+            receipt[RECEIPT_EXTENSIONS_FIELD] = extensions
+    validate_receipt(receipt)
+    return receipt
+
+
+def load_receipt(path: Path) -> dict[str, object]:
+    """Read a strictly validated persisted receipt."""
+    try:
+        return validate_receipt(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError(f"invalid receipt {path}: {error}") from error
+
+
+def not_applicable(check_id: str, reason: str) -> dict[str, object]:
+    """Record a mode-defined, rather than agent-selected, inapplicable check."""
+    return check(check_id, "NOT_APPLICABLE", reason, applicable=False)
+
+
+def metadata_paths(metadata: dict[str, object], field: str) -> list[str]:
+    """Return one validated path list stored in local receipt metadata."""
+    value = metadata.get(field)
+    if not isinstance(value, list) or not all(isinstance(path, str) for path in value):
+        raise ValueError(f"metadata field {field} must be a list of paths")
+    return value
+
+
+def metadata_is_bound(metadata: dict[str, object]) -> bool:
+    """Return whether Git and governing nested provenance are trustworthy."""
+    return bool(
+        metadata.get("head_sha")
+        and metadata.get("merge_base_sha")
+        and metadata.get("path_discovery_ok") is True
+        and has_control_plane_provenance(metadata)
+    )
+
+
+def metadata_has_outer_binding(metadata: dict[str, object]) -> bool:
+    """Return whether Git supplied the outer commit/base pair freshness needs."""
+    return bool(
+        metadata.get("head_sha")
+        and metadata.get("merge_base_sha")
+        and metadata.get("path_discovery_ok") is True
+    )
+
+
+def phase_checks(
+    root: Path,
+    metadata: dict[str, object],
+    adapter_diagnostics: tuple[dict[str, str], ...] = (),
+) -> list[dict[str, object]]:
+    """Run the complete Phase-A measurement group."""
+    outer_freshness_status = (
+        "PASS" if metadata_has_outer_binding(metadata) else "UNVERIFIED"
+    )
+    provenance_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
+    adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
+    if is_bootstrap_authoring_repository(root):
+        ruff = measure_ruff(root, ["shared", "scripts", "tests"])
+        mypy = measure_mypy(root, ["shared", "scripts", "tests"])
+        pytest = measure_pytest(root, ["tests/"])
+    else:
+        ruff = measure_ruff(root, ["."], extend_exclude=[".claude"])
+        mypy_targets = consumer_mypy_targets(root)
+        mypy = (
+            measure_mypy(root, mypy_targets)
+            if mypy_targets is not None
+            else check(
+                "VFY-MYPY-001",
+                "UNVERIFIED",
+                "mypy has no scope: add a src/ directory or set [tool.mypy] "
+                "files, packages, or modules in pyproject.toml",
+            )
+        )
+        pytest = measure_pytest(root, [])
+    checks = [
+        ruff,
+        mypy,
+        pytest,
+        check(
+            "VFY-FRESH-001",
+            outer_freshness_status,
+            "phase evidence captured relevant state"
+            if outer_freshness_status == "PASS"
+            else "Git base state was unavailable",
+        ),
+        check(
+            "VFY-FRESH-002",
+            provenance_status,
+            "phase evidence captured governing control-plane provenance"
+            if provenance_status == "PASS"
+            else "governing control-plane provenance was unavailable"
+            + (f": {adapter_detail}" if adapter_detail else ""),
+        ),
+        generation_check(root),
+        not_applicable(
+            "VFY-RECEIPT-001", "phase creates evidence; it does not reuse it"
+        ),
+    ]
+    return checks
+
+
+def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
+    """Run cheap changed-Python feedback without establishing authority."""
+    # Applicability is decided from the full, honest changed-path record (a
+    # deleted .py path still makes VFY-RUFF-001 applicable - there was a
+    # real Python change), matching validate_mode_applicability's own
+    # unfiltered check. Only the paths actually handed to Ruff are narrowed
+    # to files that still exist, since Ruff must open each target.
+    python_paths = [
+        path
+        for path in metadata_paths(metadata, "relevant_paths")
+        if Path(path).suffix == ".py"
+    ]
+    if not python_paths:
+        ruff = not_applicable("VFY-RUFF-001", "no changed Python paths")
+    else:
+        surviving_paths = existing_paths(root, python_paths)
+        ruff = (
+            measure_ruff(root, surviving_paths)
+            if surviving_paths
+            else check(
+                "VFY-RUFF-001",
+                "PASS",
+                "no surviving Python paths after filtering deleted files",
+            )
+        )
+    return [
+        ruff,
+        not_applicable("VFY-MYPY-001", "fast mode does not run global typing"),
+        not_applicable("VFY-PYTEST-001", "fast mode does not run the full test suite"),
+        not_applicable(
+            "VFY-FRESH-001", "fast mode never establishes reusable evidence"
+        ),
+        not_applicable(
+            "VFY-FRESH-002", "fast mode never establishes closeout authority"
+        ),
+        not_applicable(
+            "VFY-GEN-001", "fast mode does not validate generated ownership"
+        ),
+        not_applicable("VFY-RECEIPT-001", "fast mode does not consume evidence"),
+    ]
+
+
+def closeout_checks(
+    root: Path,
+    metadata: dict[str, object],
+    adapter_diagnostics: tuple[dict[str, str], ...] = (),
+) -> list[dict[str, object]]:
+    """Reuse validated phase evidence and bind a final full-state receipt."""
+    phase = metadata.get("phase")
+    phase_path = receipt_path(root, "phase", phase) if isinstance(phase, str) else root
+    try:
+        phase = load_receipt(phase_path)
+    except ValueError as error:
+        receipt_check = check("VFY-RECEIPT-001", "FAIL", str(error))
+        phase_metadata: dict[str, object] = {}
+    else:
+        phase_metadata = phase["metadata"]  # type: ignore[assignment]
+        status = (
+            "PASS" if phase["mode"] == "phase" and phase["status"] == "PASS" else "FAIL"
+        )
+        receipt_check = check(
+            "VFY-RECEIPT-001",
+            status,
+            "reused successful phase receipt"
+            if status == "PASS"
+            else "phase receipt was not successful",
+        )
+    if not metadata_has_outer_binding(metadata) or not metadata_has_outer_binding(
+        phase_metadata
+    ):
+        fresh_status = "UNVERIFIED"
+    elif (
+        all(
+            phase_metadata.get(field) == metadata.get(field)
+            for field in ("base_ref", "branch", "head_sha", "merge_base_sha")
+        )
+        and phase_metadata.get("content_hash") == metadata["content_hash"]
+    ):
+        fresh_status = "PASS"
+    else:
+        fresh_status = "FAIL"
+    if not metadata_is_bound(metadata) or not metadata_is_bound(phase_metadata):
+        provenance_status = "UNVERIFIED"
+    elif control_plane_provenance_matches(phase_metadata, metadata):
+        provenance_status = "PASS"
+    else:
+        provenance_status = "FAIL"
+    adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
+    return [
+        not_applicable("VFY-RUFF-001", "closeout reuses phase Ruff evidence"),
+        not_applicable("VFY-MYPY-001", "closeout reuses phase mypy evidence"),
+        not_applicable("VFY-PYTEST-001", "closeout reuses phase pytest evidence"),
+        check(
+            "VFY-FRESH-001",
+            fresh_status,
+            "phase evidence matches relevant state"
+            if fresh_status == "PASS"
+            else (
+                "relevant code evidence is stale"
+                if fresh_status == "FAIL"
+                else "Git base state was unavailable"
+            ),
+        ),
+        check(
+            "VFY-FRESH-002",
+            provenance_status,
+            "phase evidence matches governing control-plane provenance"
+            if provenance_status == "PASS"
+            else (
+                "governing control-plane provenance is stale"
+                if provenance_status == "FAIL"
+                else "governing control-plane provenance was unavailable"
+                + (f": {adapter_detail}" if adapter_detail else "")
+            ),
+        ),
+        not_applicable("VFY-GEN-001", "closeout reuses phase generation evidence"),
+        receipt_check,
+    ]
+
+
+def receipt_path(root: Path, mode: str, phase: str) -> Path:
+    """Return one immutable receipt path for the named implementation phase."""
+    if mode not in {"phase", "closeout"} or not PHASE_SLUG.fullmatch(phase):
+        raise ValueError("receipt persistence needs a safe phase slug")
+    pattern = PHASE_RECEIPT if mode == "phase" else CLOSEOUT_RECEIPT
+    return root / Path(str(pattern).format(phase=phase))
+
+
+def unresolved_phase_reason(
+    root: Path, branch: str, phase: str, *, requires_phase: bool
+) -> str | None:
+    """Diagnose an active phase that cannot be bound to real plan files.
+
+    Attempts to actually read each plan file rather than trusting a
+    file-type check, and reads the big plan itself to tell a legitimately
+    blank ``current_phase`` apart from a big plan that cannot be read or
+    parsed. Never inspects nested runtime provenance, so any other
+    provenance failure still surfaces through the normal receipt validation
+    path unchanged. Returns None when a phase is resolved - including a
+    safe explicit ``--phase`` override on a non-implementation branch, the
+    supported way to run ``phase``/``closeout`` outside this bootstrap's own
+    plan machinery; an *unsafe* override is diagnosed, not treated as
+    resolved. Also returns None when ``branch`` is not an implementation
+    branch and ``requires_phase`` is False (``fast`` never needs one).
+    """
+    if not branch.endswith("_implementation"):
+        if requires_phase and not phase:
+            return (
+                f"no active phase: branch '{branch}' does not follow the "
+                "<slug>_implementation convention and no --phase was given; "
+                "pass --phase explicitly or switch to the plan's "
+                "implementation branch before running verify"
+            )
+        if requires_phase and phase and not PHASE_SLUG.fullmatch(phase):
+            return (
+                f"active phase metadata is malformed: --phase '{phase}' is "
+                "not a safe plan slug; pass a plain identifier before "
+                "running verify"
+            )
+        return None
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None or not big_plan.is_file():
+        return (
+            "no active phase: no big plan is bound to this implementation "
+            "branch; open a plan before running verify"
+        )
+    if not phase:
+        try:
+            big_plan_text = big_plan.read_text(encoding="utf-8")
+        except OSError:
+            return (
+                f"active phase metadata is malformed: {big_plan.name} exists "
+                "but could not be read; fix file permissions before running "
+                "verify"
+            )
+        if re.match(r"\A---\n.*?\n---", big_plan_text, re.DOTALL) is None:
+            return (
+                f"active phase metadata is malformed: {big_plan.name} has no "
+                "parseable frontmatter; fix the plan file before running "
+                "verify"
+            )
+        frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", big_plan_text, re.DOTALL)
+        assert frontmatter is not None
+        body = frontmatter.group("body")
+        status = re.findall(r"^status:[ \t]*([^\s#]+)[ \t]*$", body, re.MULTILINE)
+        if status == ["complete"]:
+            phases = frontmatter_phases(body)
+            if phases is None:
+                return (
+                    "active phase metadata is malformed: the complete big plan "
+                    "has an unsafe, duplicate, or malformed phases list; fix the "
+                    "plan before running verify"
+                )
+            last_completed = ""
+            for candidate in phases:
+                small_plan = root / ".claude/plans" / f"{candidate}.md"
+                try:
+                    small_bytes = small_plan.read_bytes()
+                except OSError:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} could not be read"
+                    )
+                small = small_plan_frontmatter(small_bytes)
+                if small is None:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} is malformed"
+                    )
+                small_status = small.get("status")
+                if small_status not in {
+                    "in-progress",
+                    "paused",
+                    "complete",
+                    "cancelled",
+                }:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} has invalid status"
+                    )
+                if small_status not in {"complete", "cancelled"}:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} has nonterminal "
+                        f"status '{small_status}'"
+                    )
+                if small_status == "complete":
+                    last_completed = candidate
+            if last_completed:
+                return (
+                    "no active phase: the big plan is complete; if the "
+                    "working tree still matches the commit being certified, "
+                    "recover the receipt chain by running, in order: uv run "
+                    "python .claude/scripts/verify.py phase --persist "
+                    f"--phase {last_completed}; then uv run python "
+                    ".claude/scripts/verify.py closeout --persist --phase "
+                    f"{last_completed} (the second call rebinds the "
+                    "closeout receipt's phase_receipt hash, which the "
+                    "first call invalidates)"
+                )
+            return (
+                "active phase metadata is malformed: the complete big plan has no "
+                "completed non-cancelled phase for receipt recovery"
+            )
+        if status == ["planning"]:
+            return (
+                "no active phase: the big plan is still planning; start its "
+                "first phase before running verify"
+            )
+        return (
+            "no active phase: the big plan has no current_phase set; fix the "
+            "plan state before running verify"
+        )
+    small_plan = root / ".claude/plans" / f"{phase}.md"
+    if not PHASE_SLUG.fullmatch(phase):
+        return (
+            f"active phase metadata is malformed: current_phase '{phase}' is "
+            "not a safe plan slug; fix the plan frontmatter before running "
+            "verify"
+        )
+    try:
+        small_plan.read_bytes()
+    except OSError:
+        return (
+            f"active phase metadata is malformed: current_phase '{phase}' "
+            f"names {small_plan.name}, which could not be read; fix the plan "
+            "frontmatter or file permissions before running verify"
+        )
+    return None
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse the intentionally small public verifier interface."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("mode", choices=sorted(MODES | {"gate"}))
+    parser.add_argument("--format", choices=("json", "text"), default="text")
+    parser.add_argument("--persist", action="store_true")
+    parser.add_argument("--base-ref", default="dev")
+    parser.add_argument("--phase", default="")
+    parser.add_argument("--branch", default="")
+    parser.add_argument("--head", default="")
+    parser.add_argument(
+        "--head-relation", choices=("exact", "ancestor", "certified"), default="exact"
+    )
+    parser.add_argument("--require-major", action="store_true")
+    parser.add_argument("--require-ponytail", action="store_true")
+    parser.add_argument("--enforce-final-state", action="store_true")
+    parser.add_argument(
+        "--documentation-na",
+        default="",
+        metavar="REASON",
+        help="explain why a closeout does not require documentation changes",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    """Run one verifier mode and optionally persist its authoritative receipt."""
+    args = parse_args()
+    root = Path.cwd()
+    if args.mode == "gate":
+        errors = gate_receipt_errors(
+            root,
+            branch=args.branch,
+            phase=args.phase,
+            head=args.head,
+            head_relation=args.head_relation,
+            require_major=args.require_major,
+            require_ponytail=args.require_ponytail,
+            enforce_final_state=args.enforce_final_state,
+        )
+        print(json.dumps({"errors": errors}, separators=(",", ":")))
+        return 0 if not errors else 1
+    if not nested_state_repository(root):
+        print(
+            ".claude is not its own Git repository, so nested AI-state "
+            "provenance is unavailable and no verification receipt can be "
+            "built; run git -C .claude add -A && git -C .claude commit -m "
+            '"checkpoint: <reason>" (or, from a terminal or editor task, '
+            "bash .claude/hooks/scripts/state-sync.sh checkpoint)",
+            file=sys.stderr,
+        )
+        return 2
+    branch = git_output(["rev-parse", "--abbrev-ref", "HEAD"], root)
+    phase = args.phase or current_phase(root, branch)
+    reason = unresolved_phase_reason(
+        root, branch, phase, requires_phase=args.mode != "fast"
+    )
+    if reason is not None:
+        print(reason, file=sys.stderr)
+        return 2
+    verification_items: list[dict[str, object]] | None = None
+    if args.mode == "closeout":
+        # Runs before metadata is collected below, so any file an item
+        # rewrites (generated targets, a persisted phase receipt) is part
+        # of the tree_sha/content_hash the receipt binds.
+        verification_items = run_verification_items(root, phase)
+        if any(result["status"] != "PASS" for result in verification_items):
+            for result in verification_items:
+                tail = result["output_tail"]
+                first_line = str(tail).splitlines()[0] if tail else ""
+                print(
+                    f"{result['status']} {result['exit_code']} {first_line} "
+                    f"{result['item']}",
+                    file=sys.stderr,
+                )
+            return 2
+    adapter_diagnostics: list[dict[str, str]] = []
+    metadata = state_metadata(
+        root, args.base_ref, phase, adapter_diagnostics=adapter_diagnostics
+    )
+    if args.mode == "fast":
+        checks = fast_checks(root, metadata)
+    elif args.mode == "phase":
+        checks = phase_checks(root, metadata, tuple(adapter_diagnostics))
+    else:
+        checks = closeout_checks(root, metadata, tuple(adapter_diagnostics))
+    if args.mode == "closeout":
+        doc_na_reason = missing_documentation_na_reason(metadata, args.documentation_na)
+        if doc_na_reason is not None:
+            print(doc_na_reason, file=sys.stderr)
+            return 2
+        unpublishable_reason = unpublishable_closeout_reason(root, metadata)
+        if unpublishable_reason is not None:
+            print(unpublishable_reason, file=sys.stderr)
+            return 2
+    artifacts: dict[str, object] | None = None
+    if args.mode == "closeout":
+        try:
+            artifacts = closeout_artifacts(root, metadata, args.documentation_na)
+        except MissingArtifactError as error:
+            print(error, file=sys.stderr)
+            return 2
+    extensions: dict[str, object] | None = (
+        {"verification_items": verification_items}
+        if verification_items is not None
+        else None
+    )
+    receipt = build_receipt(args.mode, checks, metadata, artifacts, extensions)
+    if args.persist:
+        if args.mode == "fast":
+            print("fast mode never persists evidence", file=sys.stderr)
+            return 2
+        phase = metadata.get("phase")
+        if not isinstance(phase, str):
+            print("receipt persistence needs phase metadata", file=sys.stderr)
+            return 2
+        path = receipt_path(root, args.mode, phase)
+        if path.is_file() and receipt["status"] != "PASS":
+            try:
+                previous = load_receipt(path)
+            except ValueError:
+                previous = None
+            if previous is not None and previous.get("status") == "PASS":
+                print(
+                    f"refusing to persist {args.mode} receipt: the existing "
+                    f"receipt at {path} already passed and this run did "
+                    f"not ({receipt['status']}); the prior passing receipt "
+                    "was left unchanged",
+                    file=sys.stderr,
+                )
+                return 2
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(canonical_json(receipt) + "\n", encoding="utf-8")
+    if args.format == "json":
+        print(canonical_json(receipt))
+    else:
+        if verification_items is not None:
+            for result in verification_items:
+                status = result["status"]
+                duration = result["duration_seconds"]
+                if isinstance(status, str) and isinstance(duration, float):
+                    print(f"{status:<8}{duration:>7.1f}s  {result['item']}")
+        print(f"{args.mode}: {receipt['status']}")
+        for item in checks:
+            print(f"{item['id']}: {item['status']} - {item['summary']}")
+    return 0 if receipt["status"] in {"PASS", "NOT_APPLICABLE"} else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

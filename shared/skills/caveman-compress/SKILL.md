@@ -44,6 +44,8 @@ Do not use this skill on source-of-truth customization files.
 - `.github/copilot-instructions.md`
 - `shared/policies/**`
 - `.claude/skills/**/SKILL.md`
+- `shared/skills/**/SKILL.md`
+- `shared/skills/**/references/**` and `.claude/skills/**/references/**`
 - `shared/agents/**`
 - `shared/review-profiles/**`
 - `*.original.md`
@@ -59,8 +61,8 @@ Do not use this skill on source-of-truth customization files.
 
 2. If the detector rejects the file, stop and explain why.
 3. Read the target file.
-4. Refuse to continue if a sibling `.original.md` backup already exists, unless the user explicitly asks to replace it.
-5. Create `<stem>.original.md` with the untouched original text.
+4. Refuse to continue if a file already exists at the `Backup:` path the detector printed, unless the user explicitly asks to replace it.
+5. Create the backup at that `Backup:` path, with its parent folders, holding the untouched original text. The detector picks a location that a bootstrap refresh keeps, so do not choose another one.
 6. Rewrite only the prose sections in caveman style.
 7. Preserve exactly:
    - YAML frontmatter
@@ -74,16 +76,16 @@ Do not use this skill on source-of-truth customization files.
 8. Validate the result:
 
    ```bash
-   uv run python .claude/skills/caveman-compress/scripts/validate.py <original-backup> <compressed-file>
+   uv run python .claude/skills/caveman-compress/scripts/validate.py <backup-path> <compressed-file>
    ```
 
 9. If validation reports errors, patch only the broken sections and rerun validation.
-10. If validation still fails, restore the original file from the backup and report the failure.
+10. If validation still fails, restore the original file from the backup at the `Backup:` path and report the failure.
 
 ## Verification
 
 - Detector blocks protected targets before any rewrite.
-- A `.original.md` backup exists beside every compressed file.
+- A `.original.md` backup exists at the detector's `Backup:` path for every compressed file.
 - Validation passes with zero errors.
 - Only prose became shorter; protected structures stayed exact.
 

@@ -1,0 +1,4103 @@
+"""Regression coverage for shared hook gate helpers."""
+
+from __future__ import annotations
+
+import json
+import os
+import runpy
+import shlex
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_SRC = REPO_ROOT / "shared" / "hooks" / "scripts"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from generate_targets import ANTIGRAVITY_TOOL_MAP  # noqa: E402
+
+
+def _run_antigravity_pretool(
+    payload: dict, repo_root: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    root = repo_root if repo_root is not None else REPO_ROOT
+    return subprocess.run(
+        ["python3", str(SCRIPT_SRC / "antigravity-pretool.py")],
+        cwd=root,
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "REPO_ROOT": str(root)},
+    )
+
+
+def _isolated_hook_scripts_dir(repo_root: Path) -> Path:
+    """Return a `shared/hooks/scripts`-shaped path under `repo_root` whose
+    scripts still run the real `SCRIPT_SRC` bytes via a symlink.
+
+    `repo_root_from_script` (`_lib-frontmatter.sh`) derives REPO_ROOT from the
+    invoking script's own physical location, three directories up from
+    wherever `$0`/`BASH_SOURCE` says it lives. Bash's `cd`/`pwd` track that
+    location logically (through symlinks) rather than resolving it, so
+    invoking the scripts through this symlink keeps every `fail_closed`/`warn`
+    write scoped to `repo_root` instead of the live checkout, without copying
+    or editing the scripts themselves.
+    """
+    scripts_dir = repo_root / "shared" / "hooks" / "scripts"
+    if not scripts_dir.exists():
+        scripts_dir.parent.mkdir(parents=True, exist_ok=True)
+        scripts_dir.symlink_to(SCRIPT_SRC, target_is_directory=True)
+    (repo_root / ".claude" / "session_logs").mkdir(parents=True, exist_ok=True)
+    return scripts_dir
+
+
+def _run_native_protect_files(
+    payload: dict, repo_root: Path
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "python3",
+            str(SCRIPT_SRC / "protect-files.py"),
+            "google-antigravity",
+            str(repo_root),
+        ],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _bash_source(script: Path, expression: str) -> subprocess.CompletedProcess[str]:
+    command = [
+        "bash",
+        "-lc",
+        f". {shlex.quote(str(script))}; {expression}",
+    ]
+    return subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _git_targets_nested_claude(command: str, subcommand: str) -> int:
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"git_targets_nested_claude {shlex.quote(command)} {shlex.quote(subcommand)}; printf '%s' $?",
+    )
+    assert result.returncode == 0, result.stderr
+    return int(result.stdout.strip())
+
+
+def test_certified_receipt_relation_accepts_only_the_direct_completion_commit(
+    tmp_path: Path,
+) -> None:
+    """Completed-phase publication cannot authorize a later WIP commit."""
+    for args in (
+        ("git", "init", "-q", "-b", "dev"),
+        ("git", "config", "user.email", "agent@example.com"),
+        ("git", "config", "user.name", "Agent"),
+    ):
+        subprocess.run(args, cwd=tmp_path, check=True)
+    (tmp_path / "work.txt").write_text("base\n", encoding="utf-8")
+    subprocess.run(("git", "add", "work.txt"), cwd=tmp_path, check=True)
+    subprocess.run(("git", "commit", "-qm", "base"), cwd=tmp_path, check=True)
+    receipt_head = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+    (tmp_path / "work.txt").write_text("completed\n", encoding="utf-8")
+    subprocess.run(("git", "commit", "-am", "complete"), cwd=tmp_path, check=True)
+    completion = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+    verifier = runpy.run_path(str(REPO_ROOT / "shared" / "scripts" / "verify.py"))
+    is_direct_child = verifier["git_is_direct_child"]
+    assert is_direct_child(tmp_path, receipt_head, completion)
+    assert is_direct_child(tmp_path, receipt_head, "HEAD")
+    (tmp_path / "work.txt").write_text("unreviewed\n", encoding="utf-8")
+    subprocess.run(("git", "commit", "-am", "wip"), cwd=tmp_path, check=True)
+    later_commit = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+    assert not is_direct_child(tmp_path, receipt_head, later_commit)
+
+
+def test_certified_receipt_relation_rejects_a_merge_and_accepts_short_shas(
+    tmp_path: Path,
+) -> None:
+    """A merge commit never certifies; an abbreviated SHA still resolves.
+
+    The whole contract of ``git_is_direct_child`` is that exactly one
+    non-merge child qualifies, so loosening the parent count would admit a
+    merge that carries unreviewed work in from a second parent.
+    """
+    for args in (
+        ("git", "init", "-q", "-b", "dev"),
+        ("git", "config", "user.email", "agent@example.com"),
+        ("git", "config", "user.name", "Agent"),
+    ):
+        subprocess.run(args, cwd=tmp_path, check=True)
+
+    def run(*args: str) -> str:
+        return subprocess.run(
+            args,
+            cwd=tmp_path,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+
+    (tmp_path / "work.txt").write_text("base\n", encoding="utf-8")
+    run("git", "add", "work.txt")
+    run("git", "commit", "-qm", "base")
+    receipt_head = run("git", "rev-parse", "HEAD")
+
+    (tmp_path / "work.txt").write_text("completed\n", encoding="utf-8")
+    run("git", "commit", "-qam", "complete")
+    completion = run("git", "rev-parse", "HEAD")
+
+    verifier = runpy.run_path(str(REPO_ROOT / "shared" / "scripts" / "verify.py"))
+    is_direct_child = verifier["git_is_direct_child"]
+
+    # An abbreviated receipt SHA and an abbreviated pushed SHA both resolve to
+    # the same canonical commits, so neither form may deny a valid push.
+    short_receipt = run("git", "rev-parse", "--short", receipt_head)
+    short_completion = run("git", "rev-parse", "--short", completion)
+    assert short_receipt != receipt_head
+    assert is_direct_child(tmp_path, short_receipt, completion)
+    assert is_direct_child(tmp_path, receipt_head, short_completion)
+    assert is_direct_child(tmp_path, short_receipt, short_completion)
+
+    # A merge whose first parent is the certified commit still has two
+    # parents, so it brings in work the receipt never certified.
+    run("git", "checkout", "-q", "-b", "side", receipt_head)
+    (tmp_path / "side.txt").write_text("uncertified\n", encoding="utf-8")
+    run("git", "add", "side.txt")
+    run("git", "commit", "-qm", "side work")
+    run("git", "checkout", "-q", "dev")
+    run("git", "merge", "-q", "--no-ff", "-m", "merge side", "side")
+    merge_commit = run("git", "rev-parse", "HEAD")
+    assert (
+        len(run("git", "rev-list", "--parents", "-n", "1", merge_commit).split()) == 3
+    )
+    assert not is_direct_child(tmp_path, completion, merge_commit)
+    assert not is_direct_child(tmp_path, completion, "HEAD")
+
+    # An unknown parent revision cannot resolve, so it cannot certify either.
+    assert not is_direct_child(tmp_path, "does-not-exist", completion)
+
+
+def _assert_plan_frontmatter_failures(tmp_path: Path) -> list[str]:
+    """Invoke the shipped ``assert_plan_frontmatter`` gate against a fixture
+    repo root, returning its accumulated failures (empty when valid)."""
+    scripts_dir = tmp_path / ".claude" / "scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        REPO_ROOT / "scripts" / "validate_plan_frontmatter.py",
+        scripts_dir / "validate_plan_frontmatter.py",
+    )
+    expression = f"""
+failures=()
+assert_plan_frontmatter {shlex.quote(str(tmp_path))}
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def test_assert_plan_frontmatter_blocks_missing_required_field(
+    tmp_path: Path,
+) -> None:
+    """R-LIFECYCLE-04: consumers now receive a hard plan-frontmatter gate, not
+    only the authoring repo's own tooling."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\n"
+        "type: big-plan\n"
+        "status: planning\n"
+        "originating_branch: dev\n"
+        "implementation_branch: example_implementation\n"
+        "phases:\n  - phase-one\n"
+        "---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    failures = _assert_plan_frontmatter_failures(tmp_path)
+    assert any("missing required field: name" in failure for failure in failures)
+
+
+def test_assert_plan_frontmatter_blocks_small_plan_missing_phase_index(
+    tmp_path: Path,
+) -> None:
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "phase-one.md").write_text(
+        "---\n"
+        "name: phase-one\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: in-progress\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    failures = _assert_plan_frontmatter_failures(tmp_path)
+    assert any("missing required field: phase_index" in failure for failure in failures)
+
+
+def test_assert_plan_frontmatter_blocks_invalid_body_phase_inventory(
+    tmp_path: Path,
+) -> None:
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\n"
+        "name: example\n"
+        "type: big-plan\n"
+        "status: planning\n"
+        "originating_branch: dev\n"
+        "implementation_branch: example_implementation\n"
+        "phases:\n  - phase-one\n"
+        "---\n\n## Phase\n\n- `phase-two`\n",
+        encoding="utf-8",
+    )
+    failures = _assert_plan_frontmatter_failures(tmp_path)
+    assert any(
+        "body phase inventory must match frontmatter phases" in failure
+        for failure in failures
+    )
+
+
+def test_assert_plan_frontmatter_accepts_valid_plans(tmp_path: Path) -> None:
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\n"
+        "name: example\n"
+        "type: big-plan\n"
+        "status: planning\n"
+        "originating_branch: dev\n"
+        "implementation_branch: example_implementation\n"
+        "phases:\n  - phase-one\n"
+        "---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\n"
+        "name: phase-one\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "phase_index: 1\n"
+        "status: in-progress\n"
+        "---\n\n# Phase\n\n## Verification\n\n```bash\ntrue\n```\n",
+        encoding="utf-8",
+    )
+    assert _assert_plan_frontmatter_failures(tmp_path) == []
+
+
+def test_assert_plan_frontmatter_missing_validator_fails_closed(
+    tmp_path: Path,
+) -> None:
+    """No shipped validator on disk is a hard failure, not a silent skip."""
+    (tmp_path / ".claude" / "plans").mkdir(parents=True)
+    expression = f"""
+failures=()
+assert_plan_frontmatter {shlex.quote(str(tmp_path))}
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    assert "missing plan-frontmatter validator" in result.stdout
+
+
+def test_confirmed_reachable_sites_use_the_guarded_array_expansion_idiom() -> None:
+    """Phase B2 (2026-09-11_phase-B2-hook-empty-array-safety): each of the
+    seven Confirmed Reachable Instances, plus the ``expected`` site in
+    ``reporting-reminder.sh`` found while widening the regression scanner to
+    the ``[*]``/indices shapes, must use the repository's
+    ``${arr[@]+"${arr[@]}"}`` guard, not a bare ``${arr[@]}``/``${arr[*]}``/
+    ``${!arr[@]}`` form. Bash 3.2 (the declared consumer orchestration
+    baseline) aborts on every one of those bare forms with 'unbound
+    variable' under `set -u` when the array is empty. This host's newer
+    Bash cannot reproduce that abort, so the fix is pinned at the source
+    level instead of behaviorally.
+
+    Phase F3 (2026-09-19_phase-F3-hook-target-scoping) added
+    ``_git_invocation_top_level``, ``git_targets_other_repository``,
+    ``_git_invocation_created_branch`` and
+    ``branch_create_targets_other_repository`` (``_lib-frontmatter.sh``),
+    plus a ``git_command_targets_repo_root`` rewrite (``reporting-reminder.sh``)
+    that all walk a possibly-empty tokenized array the same way; every new
+    site is pinned below alongside the Phase B2 originals."""
+    frontmatter_text = (SCRIPT_SRC / "_lib-frontmatter.sh").read_text(encoding="utf-8")
+    git_protection_text = (SCRIPT_SRC / "git-protection.sh").read_text(encoding="utf-8")
+    reporting_reminder_text = (SCRIPT_SRC / "reporting-reminder.sh").read_text(
+        encoding="utf-8"
+    )
+    expectations = (
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "all_phases",
+            'for other_phase in ${all_phases[@]+"${all_phases[@]}"}; do',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "paths",
+            'for path in ${paths[@]+"${paths[@]}"}; do',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "_TOKENS",
+            'tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})',
+            5,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens",
+            '_git_invocation_targets_nested_claude ${tokens[@]+"${tokens[@]}"} || return 1',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens (parse_branch_create_command)",
+            'if branch="$(_git_invocation_created_branch ${tokens[@]+"${tokens[@]}"})"; then',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens (branch_create_targets_other_repository)",
+            'if _git_invocation_created_branch ${tokens[@]+"${tokens[@]}"} >/dev/null; then',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens (git_targets_other_repository / branch_create_targets_other_repository)",
+            'target="$(_git_invocation_top_level ${tokens[@]+"${tokens[@]}"})" || return 1',
+            2,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "forward",
+            'effective="$(git -C "$REPO_ROOT" ${forward[@]+"${forward[@]}"} rev-parse --show-toplevel 2>/dev/null || true)"',
+            1,
+        ),
+        (
+            git_protection_text,
+            "git-protection.sh",
+            "tokens",
+            'if reason="$(_git_danger_from_tokens ${tokens[@]+"${tokens[@]}"})"; then',
+            1,
+        ),
+        (
+            reporting_reminder_text,
+            "reporting-reminder.sh",
+            "expected",
+            'for index in ${expected[@]+"${!expected[@]}"}; do',
+            1,
+        ),
+        (
+            reporting_reminder_text,
+            "reporting-reminder.sh",
+            "forward",
+            'target="$(_git_invocation_top_level ${forward[@]+"${forward[@]}"})" || return 1',
+            1,
+        ),
+    )
+    for text, filename, variable, snippet, expected_count in expectations:
+        assert text.count(snippet) == expected_count, (
+            f"{filename}: expected {expected_count} guarded expansion(s) of "
+            f"{variable!r} via {snippet!r}; source drifted from the Phase B2 fix"
+        )
+
+
+def test_assert_commit_invariants_reports_missing_current_phase_without_aborting(
+    tmp_path: Path,
+) -> None:
+    """An empty ``current_phase`` must surface as its own gate failure, and
+    the cancellation sweep immediately below it must run zero iterations
+    over the still-empty ``all_phases`` rather than partially executing. On
+    Bash 3.2 an unguarded ``"${all_phases[@]}"`` there aborts with an
+    unbound-variable error before this message is ever printed; this host's
+    newer Bash cannot reproduce that abort, so this test pins the intended
+    message and confirms the sibling sweep never runs (no cancellation-
+    evidence failure for the sibling plan below, even though it is
+    cancelled and missing its evidence fields)."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\nname: example\nstatus: in-progress\ncurrent_phase:\n---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    # A sibling plan that looks cancelled-and-incomplete: if the sweep ever
+    # ran despite the empty current_phase, assert_cancellation_evidence
+    # would append failures for it.
+    (plans / "sibling.md").write_text(
+        "---\nname: sibling\nstatus: cancelled\n---\n\n# Sibling\n",
+        encoding="utf-8",
+    )
+    expression = f"""
+assert_plan_frontmatter() {{ :; }}
+assert_completed_receipt() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(tmp_path))} example_implementation
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    failures = result.stdout.splitlines()
+    assert "big plan has no current_phase" in failures
+    assert not any("evidence" in failure for failure in failures), failures
+
+
+def _write_cancelled_plan(
+    root: Path,
+    *,
+    missing_field: str = "",
+    cancelled_at: str = "2026-08-11T07:00:00Z",
+    reason: str = "The phase is no longer authorized",
+    evidence: str = "evidence.md",
+) -> Path:
+    fields = {
+        "cancelled_at": cancelled_at,
+        "cancelled_reason": reason,
+        "cancelled_evidence": evidence,
+    }
+    fields.pop(missing_field, None)
+    plan = root / "phase-cancelled.md"
+    plan.write_text(
+        "---\n"
+        "name: phase-cancelled\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "phase_index: 2\n"
+        "status: cancelled\n"
+        + "".join(f"{key}: {value}\n" for key, value in fields.items())
+        + "---\n",
+        encoding="utf-8",
+    )
+    return plan
+
+
+def _cancellation_failures(
+    root: Path, plan: Path, *, probe_override: str = ""
+) -> list[str]:
+    expression = (
+        f"repo_root={shlex.quote(str(root))}; {probe_override} failures=(); "
+        f"assert_cancellation_evidence {shlex.quote(str(plan))} phase-cancelled; "
+        'if [[ "${#failures[@]}" -gt 0 ]]; then printf \'%s\\n\' "${failures[@]}"; fi'
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.splitlines()
+
+
+def _write_paused_plan(
+    root: Path,
+    *,
+    missing_field: str = "",
+    paused_at: str = "2026-08-11T07:00:00Z",
+    reason: str = "The user requested an overnight checkpoint",
+    log: str = "pause.md",
+) -> Path:
+    fields = {
+        "paused_at": paused_at,
+        "paused_reason": reason,
+        "pause_session_log": log,
+    }
+    fields.pop(missing_field, None)
+    plan = root / "phase-paused.md"
+    plan.write_text(
+        "---\n"
+        "name: phase-paused\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "phase_index: 2\n"
+        "status: paused\n"
+        + "".join(f"{key}: {value}\n" for key, value in fields.items())
+        + "---\n",
+        encoding="utf-8",
+    )
+    return plan
+
+
+def _pause_failures(root: Path, plan: Path, *, probe_override: str = "") -> list[str]:
+    expression = (
+        f"repo_root={shlex.quote(str(root))}; {probe_override} failures=(); "
+        f"assert_pause_evidence {shlex.quote(str(plan))} phase-paused; "
+        'if [[ "${#failures[@]}" -gt 0 ]]; then printf \'%s\\n\' "${failures[@]}"; fi'
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.splitlines()
+
+
+@pytest.mark.parametrize(
+    "statuses",
+    [
+        ("cancelled", "complete"),
+        ("complete", "cancelled"),
+        ("complete", "complete"),
+    ],
+)
+def test_unique_status_reader_rejects_duplicate_keys(
+    tmp_path: Path, statuses: tuple[str, str]
+) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        f"---\nstatus: {statuses[0]}\nstatus: {statuses[1]}\n---\n",
+        encoding="utf-8",
+    )
+
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"fm_read_unique_status {shlex.quote(str(plan))}",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "__DUPLICATE_FRONTMATTER_STATUS__"
+
+
+def test_unique_status_reader_preserves_single_status(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text("---\nstatus: complete\n---\n", encoding="utf-8")
+
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"fm_read_unique_status {shlex.quote(str(plan))}",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "complete"
+
+
+def test_cancellation_evidence_accepts_complete_artifact(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "# Decision\n\n**Status:** CANCELLED\n", encoding="utf-8"
+    )
+
+    assert _cancellation_failures(tmp_path, plan) == []
+
+
+@pytest.mark.parametrize(
+    "missing_field", ("cancelled_at", "cancelled_reason", "cancelled_evidence")
+)
+def test_cancellation_evidence_names_each_missing_field(
+    tmp_path: Path, missing_field: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, missing_field=missing_field)
+    if missing_field != "cancelled_evidence":
+        (tmp_path / "evidence.md").write_text(
+            "**Status:** CANCELLED\n", encoding="utf-8"
+        )
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        f"phase-cancelled cancelled plan must set {missing_field}"
+    ]
+
+
+def test_cancellation_evidence_names_missing_file(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path, evidence="unique-missing-evidence.md")
+
+    failures = _cancellation_failures(tmp_path, plan)
+
+    assert failures == ["phase-cancelled cancelled evidence file is missing"]
+
+
+def test_cancellation_evidence_rejects_markerless_file(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "# Decision\n\n**Status:** IN-PROGRESS\n", encoding="utf-8"
+    )
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must contain exact same-line prefix: "
+        "**Status:** CANCELLED"
+    ]
+
+
+@pytest.mark.parametrize(
+    "cancelled_at", ("2026-08-11T07:00:00", "2026-02-30T07:00:00Z")
+)
+def test_cancellation_evidence_rejects_invalid_timestamp(
+    tmp_path: Path, cancelled_at: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, cancelled_at=cancelled_at)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled_at must be a real UTC timestamp in "
+        "YYYY-MM-DDTHH:MM:SSZ format"
+    ]
+
+
+@pytest.mark.parametrize(
+    "reason",
+    (
+        '"   "',
+        "|- # folded",
+        "[not, prose]",
+        "{decision: cancelled}",
+        "- list item",
+        "First line\n  continued line",
+    ),
+)
+def test_cancellation_evidence_rejects_yaml_like_reason(
+    tmp_path: Path, reason: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, reason=reason)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled_reason must be meaningful plain single-line "
+        "scalar prose"
+    ]
+
+
+@pytest.mark.parametrize("reason", ("| useful reason", ">+9 prose"))
+def test_cancellation_evidence_accepts_block_header_lookalike_prose(
+    tmp_path: Path, reason: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, reason=reason)
+    (tmp_path / "evidence.md").write_text("**Status:**\tCANCELLED\n", encoding="utf-8")
+
+    assert _cancellation_failures(tmp_path, plan) == []
+
+
+@pytest.mark.parametrize(
+    ("evidence", "expected"),
+    (
+        ("/tmp/outside.md", "must be repository-relative"),
+        ("nested/../evidence.md", "must not contain .. traversal"),
+    ),
+)
+def test_cancellation_evidence_rejects_absolute_and_traversal_paths(
+    tmp_path: Path, evidence: str, expected: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, evidence=evidence)
+
+    assert any(
+        expected in failure for failure in _cancellation_failures(tmp_path, plan)
+    )
+
+
+def test_cancellation_evidence_rejects_outside_symlink(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    (tmp_path / "evidence.md").symlink_to(outside)
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must stay inside the repository"
+    ]
+
+
+def test_cancellation_evidence_rejects_symlink_loop(tmp_path: Path) -> None:
+    (tmp_path / "evidence.md").symlink_to("evidence.md")
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence path could not be resolved safely"
+    ]
+
+
+def test_cancellation_evidence_rejects_directory(tmp_path: Path) -> None:
+    (tmp_path / "evidence").mkdir()
+    plan = _write_cancelled_plan(tmp_path, evidence="evidence")
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must be a regular file"
+    ]
+
+
+def test_cancellation_evidence_rejects_unreadable_file(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    evidence.chmod(0)
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must be readable"
+    ]
+
+
+def test_cancellation_evidence_rejects_invalid_utf8(tmp_path: Path) -> None:
+    (tmp_path / "evidence.md").write_bytes(b"\xff\xfe")
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must be valid UTF-8 text"
+    ]
+
+
+@pytest.mark.parametrize(
+    "marker", ("**Status:**\nCANCELLED\n", "**Status:**\vCANCELLED\n")
+)
+def test_cancellation_evidence_rejects_split_or_vertical_marker(
+    tmp_path: Path, marker: str
+) -> None:
+    (tmp_path / "evidence.md").write_text(marker, encoding="utf-8")
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must contain exact same-line prefix: "
+        "**Status:** CANCELLED"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("probe_override", "expected"),
+    (
+        (
+            "cancellation_validation_probe() { printf PROBE_EXCEPTION; };",
+            "probe raised an exception",
+        ),
+        (
+            "cancellation_validation_probe() { printf UNEXPECTED; };",
+            "probe returned malformed output",
+        ),
+    ),
+)
+def test_cancellation_evidence_probe_failures_block(
+    tmp_path: Path, probe_override: str, expected: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert any(
+        expected in failure
+        for failure in _cancellation_failures(
+            tmp_path, plan, probe_override=probe_override
+        )
+    )
+
+
+def test_cancellation_evidence_missing_python_blocks(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+
+    assert _cancellation_failures(
+        tmp_path,
+        plan,
+        probe_override=f"PATH={shlex.quote(str(empty_path))};",
+    ) == ["phase-cancelled cancellation validation requires python3"]
+
+
+def test_pause_evidence_accepts_paused_session_log(tmp_path: Path) -> None:
+    plan = _write_paused_plan(tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+
+    assert _pause_failures(tmp_path, plan) == []
+
+
+@pytest.mark.parametrize(
+    "missing_field", ("paused_at", "paused_reason", "pause_session_log")
+)
+def test_pause_evidence_names_each_missing_field(
+    tmp_path: Path, missing_field: str
+) -> None:
+    plan = _write_paused_plan(tmp_path, missing_field=missing_field)
+    if missing_field != "pause_session_log":
+        (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+
+    assert _pause_failures(tmp_path, plan) == [
+        f"phase-paused paused plan must set {missing_field}"
+    ]
+
+
+def test_pause_evidence_rejects_markerless_session_log(tmp_path: Path) -> None:
+    plan = _write_paused_plan(tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** IN-PROGRESS\n", encoding="utf-8")
+
+    assert _pause_failures(tmp_path, plan) == [
+        "phase-paused pause session log must contain exact same-line prefix: "
+        "**Status:** PAUSED"
+    ]
+
+
+@pytest.mark.parametrize("reason", ('"   "', "|- # folded", "[not, prose]"))
+def test_pause_evidence_rejects_yaml_like_reason(tmp_path: Path, reason: str) -> None:
+    plan = _write_paused_plan(tmp_path, reason=reason)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+
+    assert any(
+        "single-line scalar prose" in failure
+        for failure in _pause_failures(tmp_path, plan)
+    )
+
+
+@pytest.mark.parametrize(
+    ("log", "expected"),
+    (
+        ("/tmp/outside.md", "repository-relative"),
+        ("nested/../pause.md", "must not contain .. traversal"),
+    ),
+)
+def test_pause_evidence_rejects_unsafe_paths(
+    tmp_path: Path, log: str, expected: str
+) -> None:
+    plan = _write_paused_plan(tmp_path, log=log)
+
+    assert any(expected in failure for failure in _pause_failures(tmp_path, plan))
+
+
+def test_pause_evidence_rejects_missing_nonregular_and_invalid_utf8_logs(
+    tmp_path: Path,
+) -> None:
+    missing = _write_paused_plan(tmp_path, log="missing.md")
+    assert any(
+        "log file is missing" in failure
+        for failure in _pause_failures(tmp_path, missing)
+    )
+
+    (tmp_path / "directory").mkdir()
+    directory = _write_paused_plan(tmp_path, log="directory")
+    assert any(
+        "regular file" in failure for failure in _pause_failures(tmp_path, directory)
+    )
+
+    (tmp_path / "invalid.md").write_bytes(b"\xff\xfe")
+    invalid = _write_paused_plan(tmp_path, log="invalid.md")
+    assert any(
+        "valid UTF-8" in failure for failure in _pause_failures(tmp_path, invalid)
+    )
+
+
+def test_pause_evidence_rejects_outside_symlink_and_probe_failures(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside.write_text("**Status:** PAUSED\n", encoding="utf-8")
+    (tmp_path / "pause.md").symlink_to(outside)
+    plan = _write_paused_plan(tmp_path)
+    assert any("stay inside" in failure for failure in _pause_failures(tmp_path, plan))
+    assert any(
+        "probe raised an exception" in failure
+        for failure in _pause_failures(
+            tmp_path,
+            plan,
+            probe_override="pause_validation_probe() { printf PROBE_EXCEPTION; };",
+        )
+    )
+
+
+def test_pause_evidence_rejects_unreadable_log_and_missing_python(
+    tmp_path: Path,
+) -> None:
+    log = tmp_path / "pause.md"
+    log.write_text("**Status:** PAUSED\n", encoding="utf-8")
+    log.chmod(0)
+    plan = _write_paused_plan(tmp_path)
+    assert any(
+        "must be readable" in failure for failure in _pause_failures(tmp_path, plan)
+    )
+
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+    assert _pause_failures(
+        tmp_path,
+        plan,
+        probe_override=f"PATH={shlex.quote(str(empty_path))};",
+    ) == ["phase-paused pause validation requires python3"]
+
+
+def test_git_targets_nested_claude_detects_nested_claude_paths() -> None:
+    assert _git_targets_nested_claude("git -C .claude commit -m hi", "commit") == 0
+    assert (
+        _git_targets_nested_claude("git --git-dir .claude/.git commit -m hi", "commit")
+        == 0
+    )
+    assert (
+        _git_targets_nested_claude("git --work-tree .claude commit -m hi", "commit")
+        == 0
+    )
+    assert _git_targets_nested_claude("git commit -m hi", "commit") == 1
+
+
+def test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands() -> None:
+    """A nested-.claude git call earlier in a compound command must not exempt
+    an unrelated outer-repo commit/push later in the same command — the
+    original fix checked "does ANY git call in the string touch .claude"
+    instead of "does THIS subcommand's own invocation touch .claude", which
+    let `git -C .claude status && git commit -m ...` skip the ceremony gate
+    entirely for the outer commit."""
+    bypass_commit = 'git -C .claude status && git commit -m "sneaky outer commit"'
+    assert _git_targets_nested_claude(bypass_commit, "commit") == 1
+
+    bypass_push = "git -C .claude fetch origin && git push origin main"
+    assert _git_targets_nested_claude(bypass_push, "push") == 1
+
+    # The inverse (nested call after the outer one) must also stay gated.
+    bypass_commit_reversed = (
+        'git commit -m "sneaky outer commit" ; git -C .claude status'
+    )
+    assert _git_targets_nested_claude(bypass_commit_reversed, "commit") == 1
+
+    # Two genuinely nested invocations chained together should still exempt.
+    both_nested = "git -C .claude add -A && git -C .claude commit -m hi"
+    assert _git_targets_nested_claude(both_nested, "commit") == 0
+
+
+def _init_git_repo(path: Path, *, bare: bool = False) -> Path:
+    """Create a minimal real git repository (bare or not) at ``path``. No
+    commit is needed for any of the resolver tests below: ``git rev-parse
+    --show-toplevel`` behaves realistically right after ``git init``."""
+    path.mkdir(parents=True, exist_ok=True)
+    args = (
+        ["git", "init", "-q", "--bare"] if bare else ["git", "init", "-q", "-b", "main"]
+    )
+    subprocess.run([*args, str(path)], check=True, capture_output=True, text=True)
+    return path
+
+
+def _physical_path(path: Path) -> str:
+    return subprocess.run(
+        ["bash", "-c", f"cd {shlex.quote(str(path))} && pwd -P"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+
+def _git_invocation_top_level(
+    repo_root: Path, *tokens: str
+) -> subprocess.CompletedProcess[str]:
+    quoted = " ".join(shlex.quote(token) for token in tokens)
+    expression = (
+        f"REPO_ROOT={shlex.quote(str(repo_root))}\n_git_invocation_top_level {quoted}"
+    )
+    return _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+
+
+def _git_targets_other_repository(
+    command: str, subcommand: str, repo_root: Path
+) -> int:
+    expression = (
+        f"REPO_ROOT={shlex.quote(str(repo_root))}\n"
+        f"git_targets_other_repository {shlex.quote(command)} {shlex.quote(subcommand)}; "
+        "printf '%s' $?"
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return int(result.stdout.strip())
+
+
+def _branch_create_targets_other_repository(command: str, repo_root: Path) -> int:
+    expression = (
+        f"REPO_ROOT={shlex.quote(str(repo_root))}\n"
+        f"branch_create_targets_other_repository {shlex.quote(command)}; printf '%s' $?"
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return int(result.stdout.strip())
+
+
+def test_git_invocation_top_level_resolves_a_real_repository_to_itself(
+    tmp_path: Path,
+) -> None:
+    """F3.1 Contract: the private resolver prints the physical top level a
+    -C redirect targets."""
+    repo_root = _init_git_repo(tmp_path / "repo_root")
+    target = _init_git_repo(tmp_path / "target")
+
+    result = _git_invocation_top_level(repo_root, "-C", str(target))
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _physical_path(target)
+
+
+@pytest.mark.parametrize(
+    ("command_template", "expected"),
+    (
+        ("git -C {other} commit -m x", 0),
+        ("git commit -m x", 1),
+        ("git --git-dir {other}/.git --work-tree={other} commit -m x", 0),
+        ("git --work-tree={other} commit -m x", 0),
+        # --git-dir given without --work-tree is a real git footgun, not a
+        # foreign redirect: git defines the CURRENT directory as the work
+        # tree in that case (confirmed against git 2.43), so the invocation
+        # still acts on REPO_ROOT's own working tree and correctly stays
+        # gated. Every existing caller of this resolver already forwards
+        # --git-dir and --work-tree together (tests/test_lifecycle_hooks.py),
+        # never --git-dir alone.
+        ("git --git-dir {other}/.git commit -m x", 1),
+        ("git -C {notrepo} commit -m x", 1),
+        ("git -C {bare} commit -m x", 1),
+        ('git -C "$SOME_VAR" commit -m x', 1),
+        ("git -c foo=bar -C {other} commit -m x", 1),
+        ("git -C {other} commit -m a && git -C {other2} commit -m b", 0),
+        ("git -C {other} commit -m a && git commit -m b", 1),
+        ("git commit -m a && git -C {other} commit -m b", 1),
+    ),
+    ids=(
+        "explicit-C-foreign",
+        "no-redirect-stays-gated",
+        "git-dir-and-work-tree-together-foreign",
+        "work-tree-alone-foreign",
+        "git-dir-alone-stays-gated",
+        "nonexistent-directory-stays-gated",
+        "bare-repository-stays-gated",
+        "unexpanded-variable-stays-gated",
+        "unforwarded-flag-stays-gated",
+        "two-distinct-foreign-repos-foreign",
+        "foreign-then-local-stays-gated",
+        "local-then-foreign-stays-gated",
+    ),
+)
+def test_git_targets_other_repository_scenarios(
+    tmp_path: Path, command_template: str, expected: int
+) -> None:
+    """F3.1 Contract: ``git_targets_other_repository`` fails closed on
+    anything undeterminable and returns 0 only when every matching
+    invocation provably resolves to a different, real repository. The
+    ``explicit-C-foreign`` case is the exact Phase F reproduction."""
+    repo_root = _init_git_repo(tmp_path / "repo_root")
+    other = _init_git_repo(tmp_path / "other")
+    other2 = _init_git_repo(tmp_path / "other2")
+    notrepo = tmp_path / "notrepo"
+    notrepo.mkdir()
+    bare = _init_git_repo(tmp_path / "bare.git", bare=True)
+
+    command = command_template.format(
+        other=other, other2=other2, notrepo=notrepo, bare=bare
+    )
+    assert _git_targets_other_repository(command, "commit", repo_root) == expected
+
+
+@pytest.mark.parametrize(
+    ("command_template", "expected"),
+    (
+        ("git -C {other} switch -c anything", 0),
+        ("git -C {other} checkout -b anything", 0),
+        ("git switch -c foo_implementation", 1),
+        ("git checkout -b not-an-implementation-name", 1),
+        ("git -C {other} switch -c a && git switch -c b_implementation", 1),
+        ("git -C {notrepo} checkout -b x", 1),
+        ("git branch foo", 1),
+    ),
+    ids=(
+        "switch-c-foreign",
+        "checkout-b-foreign",
+        "switch-c-local-stays-gated",
+        "checkout-b-local-stays-gated",
+        "mixed-foreign-and-local-stays-gated",
+        "unresolvable-target-stays-gated",
+        "plain-branch-creates-nothing",
+    ),
+)
+def test_branch_create_targets_other_repository_scenarios(
+    tmp_path: Path, command_template: str, expected: int
+) -> None:
+    """F3.6 Contract: branch creation spans two subcommand shapes with
+    different flag grammars, so this predicate cannot reuse
+    git_targets_other_repository directly; it is tested the same way."""
+    repo_root = _init_git_repo(tmp_path / "repo_root")
+    other = _init_git_repo(tmp_path / "other")
+    notrepo = tmp_path / "notrepo"
+    notrepo.mkdir()
+
+    command = command_template.format(other=other, notrepo=notrepo)
+    assert _branch_create_targets_other_repository(command, repo_root) == expected
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_branch"),
+    (
+        ("git checkout -b foo_implementation", "foo_implementation"),
+        ("git checkout -B foo_implementation", "foo_implementation"),
+        ("git switch -c bar_implementation", "bar_implementation"),
+        ("git switch -C bar_implementation", "bar_implementation"),
+        ("git switch --create bar_implementation", "bar_implementation"),
+        ("git switch --create=bar_implementation", "bar_implementation"),
+        ('git checkout -b "quoted_implementation"', "quoted_implementation"),
+        ("git checkout -b 'quoted_implementation'", "quoted_implementation"),
+        ("git status", ""),
+        ("git branch foo", ""),
+        ("git checkout main", ""),
+        ("git -C /tmp checkout -b elsewhere", "elsewhere"),
+        ("git --git-dir /tmp/.git checkout -b elsewhere", "elsewhere"),
+        ("git --work-tree /tmp checkout -b elsewhere", "elsewhere"),
+        (
+            "git status && git checkout -b second_implementation",
+            "second_implementation",
+        ),
+    ),
+)
+def test_parse_branch_create_command_matches_the_pre_extraction_grammar(
+    command: str, expected_branch: str
+) -> None:
+    """F3.6 Acceptance: extracting ``_git_invocation_created_branch`` must
+    not change ``parse_branch_create_command``'s observable per-invocation
+    grammar (global-flag skip, checkout -b/-B, switch -c/-C/--create(=), and
+    quote stripping)."""
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"parse_branch_create_command {shlex.quote(command)}",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == expected_branch
+
+
+def _commit_gate_repo(tmp_path: Path, branch: str = "main") -> Path:
+    """A synthetic outer checkout on a non-implementation branch, isolated
+    via ``_isolated_hook_scripts_dir``, so the commit ceremony denies
+    deterministically once reached, whatever the scoping exemption decides."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    for args in (
+        ["git", "init", "-q", "-b", branch],
+        ["git", "config", "user.email", "hook@example.com"],
+        ["git", "config", "user.name", "Hook Test"],
+    ):
+        subprocess.run(args, cwd=tmp_path, check=True, capture_output=True, text=True)
+    return scripts_dir / "enforce-commit-gate.sh"
+
+
+def _run_enforce_commit_gate(
+    script: Path, cwd: Path, command: str
+) -> subprocess.CompletedProcess[str]:
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return subprocess.run(
+        ["bash", str(script), "test-target"],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_enforce_commit_gate_scopes_a_foreign_commit(tmp_path: Path) -> None:
+    """The exact Phase F reproduction: this must fail before the change."""
+    script = _commit_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git -C {other} commit --allow-empty -m spike"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_commit_gate_still_denies_a_commit_targeting_this_repository(
+    tmp_path: Path,
+) -> None:
+    """The proof the gate still fires for a commit that does target this
+    repository."""
+    script = _commit_gate_repo(tmp_path)
+
+    result = _run_enforce_commit_gate(script, tmp_path, 'git commit -m "x"')
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "commit gate failed for test-target" in result.stdout
+
+
+def test_enforce_commit_gate_denies_when_a_local_commit_follows_a_foreign_one(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git -C {other} commit -m a && git commit -m b"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_commit_gate_denies_when_a_foreign_commit_follows_a_local_one(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git commit -m b && git -C {other} commit -m a"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_commit_gate_allows_two_distinct_foreign_commits(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    other_a = _init_git_repo(tmp_path / "other-a")
+    other_b = _init_git_repo(tmp_path / "other-b")
+
+    result = _run_enforce_commit_gate(
+        script,
+        tmp_path,
+        f"git -C {other_a} commit -m a && git -C {other_b} commit -m b",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_commit_gate_keeps_the_pre_existing_nested_claude_exemption(
+    tmp_path: Path,
+) -> None:
+    """Unchanged: the nested-.claude exemption is checked before, and
+    independently of, the foreign-repository exemption this phase adds."""
+    script = _commit_gate_repo(tmp_path)
+
+    result = _run_enforce_commit_gate(script, tmp_path, "git -C .claude commit -m sync")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_commit_gate_ignores_a_cd_prefix_and_still_denies(
+    tmp_path: Path,
+) -> None:
+    """Documented limit: a `cd` prefix is out of scope and stays gated."""
+    script = _commit_gate_repo(tmp_path)
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, "cd /tmp/elsewhere && git commit -m x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_commit_gate_denies_a_commit_to_an_unresolvable_target(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git -C {not_a_repo} commit -m x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def _branch_state_gate_repo(tmp_path: Path, current_branch: str = "dev") -> Path:
+    """A synthetic outer checkout for enforce-branch-state.sh, isolated via
+    ``_isolated_hook_scripts_dir``."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    subprocess.run(
+        ["git", "init", "-q", "-b", current_branch],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return scripts_dir / "enforce-branch-state.sh"
+
+
+def _run_enforce_branch_state(
+    script: Path, cwd: Path, command: str
+) -> subprocess.CompletedProcess[str]:
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return subprocess.run(
+        ["bash", str(script), "test-target"],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_enforce_branch_state_scopes_a_foreign_switch(tmp_path: Path) -> None:
+    """Foreign case; fails before the change."""
+    script = _branch_state_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, f"git -C {other} switch -c anything"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_branch_state_scopes_a_foreign_checkout(tmp_path: Path) -> None:
+    script = _branch_state_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, f"git -C {other} checkout -b anything"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_branch_state_still_denies_a_local_switch(tmp_path: Path) -> None:
+    """The proof the branch gate still fires for a branch created in this
+    repository."""
+    script = _branch_state_gate_repo(tmp_path, current_branch="not-dev")
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, "git switch -c foo_implementation"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "must be created from dev" in result.stdout
+
+
+def test_enforce_branch_state_still_denies_a_bad_branch_name(tmp_path: Path) -> None:
+    script = _branch_state_gate_repo(tmp_path)
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, "git checkout -b not-an-implementation-name"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "implementation branch must be named" in result.stdout
+
+
+def test_enforce_branch_state_denies_when_only_some_creations_are_foreign(
+    tmp_path: Path,
+) -> None:
+    script = _branch_state_gate_repo(tmp_path, current_branch="not-dev")
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_branch_state(
+        script,
+        tmp_path,
+        f"git -C {other} switch -c a && git switch -c b_implementation",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_branch_state_denies_an_unresolvable_target(tmp_path: Path) -> None:
+    script = _branch_state_gate_repo(tmp_path)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, f"git -C {not_a_repo} checkout -b x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_branch_state_ignores_a_cd_prefix_and_still_denies(
+    tmp_path: Path,
+) -> None:
+    """Documented limit: a `cd` prefix is out of scope, for the same reason
+    given in the commit gate."""
+    script = _branch_state_gate_repo(tmp_path)
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, "cd /tmp/elsewhere && git checkout -b x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_branch_state_does_not_gate_plain_branch_creation(
+    tmp_path: Path,
+) -> None:
+    """`git branch foo` creates no checked-out branch; the parser has no
+    `branch` arm today, and this phase does not add one."""
+    script = _branch_state_gate_repo(tmp_path)
+
+    result = _run_enforce_branch_state(script, tmp_path, "git branch foo")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_record_branch_state_writes_nothing_for_a_foreign_branch_creation(
+    tmp_path: Path,
+) -> None:
+    """record-branch-state.sh is unchanged by this phase: its own
+    CURRENT_BRANCH != BRANCH bail already declines to write when the branch
+    created is not this repository's own HEAD, so a foreign branch creation
+    cannot reach the plan-state write, proven here end-to-end."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    subprocess.run(
+        ["git", "init", "-q", "-b", "dev"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    big_plan = plans / "foo.md"
+    original_text = (
+        "---\nname: foo\ntype: big-plan\nstatus: planning\nphases:\n"
+        "  - phase-one\n---\n"
+    )
+    big_plan.write_text(original_text, encoding="utf-8")
+    other = _init_git_repo(tmp_path / "other")
+
+    payload = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"git -C {other} switch -c foo_implementation"},
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(scripts_dir / "record-branch-state.sh")],
+        cwd=tmp_path,
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert big_plan.read_text(encoding="utf-8") == original_text
+
+
+def _run_protect_files(
+    payload: dict,
+    repo_root: Path | None = None,
+    target_id: str = "openai-codex",
+) -> subprocess.CompletedProcess[str]:
+    root = repo_root if repo_root is not None else REPO_ROOT
+    scripts_dir = (
+        _isolated_hook_scripts_dir(root) if repo_root is not None else SCRIPT_SRC
+    )
+    return subprocess.run(
+        ["bash", str(scripts_dir / "protect-files.sh"), target_id],
+        cwd=root,
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={
+            **os.environ,
+            "REPO_ROOT": str(root),
+            "TARGET_ID": target_id,
+            "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", "/tmp/uv-cache"),
+        },
+    )
+
+
+def test_protect_files_python_pass_ignores_slashy_free_text() -> None:
+    payload = {
+        "tool_name": "edit",
+        "tool_input": {
+            "comment": "Please update the docs/section or call out /not-a-path in the note."
+        },
+    }
+    process = _run_protect_files(payload)
+    assert process.returncode == 0, process.stderr
+    assert process.stdout.strip() == "", f"unexpected stdout: {process.stdout!r}"
+    assert process.stderr.strip() == "", f"unexpected stderr: {process.stderr!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "rg codex .codex/config.toml 2>/dev/null",
+        "wc -l .codex/config.toml 2>/dev/null",
+        "cat .codex/config.toml 2>/dev/null",
+        "sed -n '1,10p' .codex/config.toml 2>/dev/null",
+        "stat uv.lock",
+        "git diff uv.lock",
+        "git show HEAD:uv.lock",
+        "git -C . diff uv.lock",
+        "git -C . status",
+    ),
+)
+def test_protect_files_allows_read_only_or_non_targeted_protected_paths(
+    command: str,
+) -> None:
+    """Only mutation targets, not incidental read operands, are protected."""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+    }
+    process = _run_protect_files(payload)
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "printf x > .env",
+        "printf x | tee .env",
+        "sed -i 's/x/y/' .codex/config.toml",
+        "perl -i -pe 's/x/y/' .codex/config.toml",
+        "touch .env && cat README.md",
+        "mv README.md .env",
+        "chmod 600 .env",
+        "chown root .env",
+        "sed -ni 's/x/y/' .codex/config.toml",
+        "perl -pi -e 's/x/y/' .codex/config.toml",
+        "sudo touch .env",
+        "env FOO=1 touch .env",
+        "command touch .env",
+        "ln -s README.md .env",
+        "dd if=README.md of=.env",
+        'python3 -c \'open(".env", "w")\'',
+        "bash -c 'cat credentials-prod.json > /tmp/out'",
+        'python3 -c \'open("deploy.key", "w")\'',
+        "bash -c 'cat uv.lock > /tmp/out'",
+        "bash -c 'cat service.pem > /tmp/out'",
+        'python3 -c \'open(".claude/hooks/guard.sh", "w")\'',
+        "bash -c 'cat .codex/hooks.json > /tmp/out'",
+        "cp .env public-example.env",
+        "touch nested/../.claude/settings.json",
+        "cat README.md\ntouch .env",
+        "git rm .env",
+        "git restore .env",
+        "git checkout -- .env",
+        'TARGET=.env rm "$TARGET"',
+        "git diff --output=.env",
+        "git diff --output .env",
+        "git show --output=.env HEAD",
+        "git log --output=.env -1",
+        "git -C . rm .env",
+        "git --work-tree=. checkout -- .env",
+    ),
+)
+def test_protect_files_blocks_mutation_targets(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git mv terraform/secrets.tf terraform/aws/secrets.tf",
+        'git commit -m "fix: Needs AWS credentials for deploy"',
+        "grep -n closeout .claude/hooks/scripts/enforce-commit-gate.sh",
+        "python3 - <<'PY'\ndef secret(self, ref: str):\n    return ref\nPY",
+        'python3 -c \'open("db_secret_backup.txt", "w")\'',
+    ),
+)
+def test_protect_files_allows_non_path_secret_words(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_expands_mutating_glob_before_classification(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "terraform"
+    destination = tmp_path / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "normal.tf").write_text("", encoding="utf-8")
+    (source / "credentials-prod.json").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"mv {source}/* {destination}/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "credentials-prod.json" in process.stdout
+
+
+def test_protect_files_allows_mutating_glob_with_only_normal_sources(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "terraform"
+    destination = tmp_path / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "main.tf").write_text("", encoding="utf-8")
+    (source / "secrets.tf").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"mv {source}/* {destination}/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_tracks_cd_before_expanding_mutating_glob(tmp_path: Path) -> None:
+    source = tmp_path / "terraform"
+    destination = source / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "credentials-prod.json").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cd {source} && mv * aws/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "credentials-prod.json" in process.stdout
+
+
+def test_protect_files_does_not_expand_quoted_glob(tmp_path: Path) -> None:
+    source = tmp_path / "terraform"
+    destination = tmp_path / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "credentials-prod.json").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"mv '{source}/*' {destination}/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cd missing || mv * /tmp/out",
+        "cd /tmp | mv * /tmp/out",
+    ),
+)
+def test_protect_files_checks_original_cwd_when_cd_is_not_provable(
+    tmp_path: Path, command: str
+) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cd {tmp_path} && {command}"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_wildcard_move_destination() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "mv README.md .claude/h?oks/scripts/protect-files.py"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_keeps_protected_paths_inside_quoted_interpreter_text() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "bash -c 'printf x > .env; echo *'"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_expands_quoted_assignment_at_unquoted_use(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"cd {tmp_path} && PATTERN='*'; mv $PATTERN /tmp/out"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_does_not_expand_variable_at_quoted_use(tmp_path: Path) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"cd {tmp_path} && PATTERN='*'; mv \"$PATTERN\" /tmp/out"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    ('X=.env; touch "${X}.local"', "X=.env; touch ${X}.local"),
+)
+def test_protect_files_substitutes_variable_with_suffix(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_does_not_expand_quoted_braces(tmp_path: Path) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"cd {tmp_path} && mv '{{credentials-prod.json,main.tf}}' /tmp/out"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_expands_simple_brace_operand() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "mv {.env,README.md} /tmp/out"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    ("mv .e\\\nnv /tmp/out", "printf x > .e\\\nnv"),
+)
+def test_protect_files_applies_shell_line_continuation(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_git_mv_of_protected_source() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git mv .env examples/environment"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_applies_git_c_before_resolving_mv_source() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "git -C .claude mv hooks/scripts/guard.sh archive/guard.sh"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/scripts/guard.sh" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cd .claude && git mv hooks/scripts/protect-files.py archive/protect-files.py",
+        "git --git-dir=.claude/.git --work-tree=.claude mv hooks/scripts/protect-files.py archive/protect-files.py",
+    ),
+)
+def test_protect_files_blocks_git_mv_from_effective_worktree(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_git_archive_output() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git archive --output=.env HEAD"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_resolves_git_output_from_git_c() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git -C .claude diff --output=hooks/new.patch"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/new.patch" in process.stdout
+
+
+def test_protect_files_blocks_mutation_through_symlinked_protected_source(
+    tmp_path: Path,
+) -> None:
+    protected_source = tmp_path / "credentials-prod.json"
+    protected_source.write_text("", encoding="utf-8")
+    alias = tmp_path / "ordinary.json"
+    alias.symlink_to(protected_source)
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cp {alias} {tmp_path / 'copy.json'}"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "credentials-prod.json" in process.stdout
+
+
+def test_protect_files_blocks_write_through_symlinked_directory(tmp_path: Path) -> None:
+    """A write through a symlinked directory that resolves onto this
+    repository's own protected hooks path is still denied. Anchored to an
+    isolated checkout (F3.4 scopes the ``.claude/hooks/**``-style control-
+    plane alternatives to REPO_ROOT): both the symlink and its real target
+    must live inside REPO_ROOT for the resolved candidate to land there."""
+    repo_root = tmp_path / "repo"
+    protected_dir = repo_root / ".claude" / "hooks"
+    protected_dir.mkdir(parents=True)
+    alias = repo_root / "ordinary"
+    alias.symlink_to(protected_dir, target_is_directory=True)
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"printf x > {alias / 'new.sh'}"},
+        },
+        repo_root,
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/new.sh" in process.stdout
+
+
+def test_protect_files_blocks_exact_credentials_path_in_interpreter() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'python3 -c \'open("credentials", "w")\''},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_pathlib_write_to_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").write_text("x")\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_pathlib_open_write_to_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").open("w").write("x")\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_pathlib_open_update_to_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").open("r+").write("x")\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3 -c \'open("credentials", mode="w")\'',
+        'python3 -c \'Path("credentials").open(mode="w").write("x")\'',
+    ),
+)
+def test_protect_files_blocks_keyword_open_write_mode(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3 -c \'open(file="credentials", mode="w")\'',
+        'python3 -c \'Path("credentials").open(encoding="utf-8", mode="w").write("x")\'',
+    ),
+)
+def test_protect_files_blocks_reordered_keyword_open_write(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_allows_pathlib_open_read_of_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").open("r").read()\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_builtin_open_read_of_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'python3 -c \'open("credentials", "r")\''},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_credentials_as_interpreter_prose() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "python3 -c 'print(\"credentials\")'"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {"tool_name": "Write", "tool_input": {"path": ".env"}},
+        {
+            "tool_name": "apply_patch",
+            "tool_input": {
+                "command": "*** Begin Patch\n*** Update File: .codex/config.toml\n*** End Patch\n"
+            },
+        },
+    ),
+)
+def test_protect_files_blocks_native_edits(payload: dict) -> None:
+    process = _run_protect_files(payload)
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "FOO=bar\nrg something .",
+        "FOO=bar\nBAR=baz\nrg something .",
+        'ROOT="$(pwd)"\nrg something "$ROOT"',
+        "some-valid-but-unsupported-shell-syntax",
+        "rg something .;",
+        "chmod 600",
+    ),
+)
+def test_protect_files_allows_valid_syntax_the_classifier_cannot_fully_model(
+    command: str,
+) -> None:
+    """Assignment-only segments, trailing separators, and other syntax our
+    lightweight parser cannot fully model must not become a blanket denial
+    when no protected resource is involved."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_resolves_tracked_variable_before_blocking_mutation() -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": 'TARGET=.env\nrm "$TARGET"'}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_resolves_tracked_variable_before_allowing_normal_target() -> (
+    None
+):
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'TARGET=normal.txt\nrm "$TARGET"'},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_denies_ambiguous_protected_reference_without_infra_failure() -> (
+    None
+):
+    """An unsupported command touching a protected literal (via a tracked
+    variable) must become a normal, reasoned safety denial - not the
+    'protect-files.sh exited with status 2' infrastructure-failure path."""
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'TARGET=".env"\nsome-unsupported-command "$TARGET"'
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+    assert "exited with status" not in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        # `diff`/`cat` never write through their own arguments (READ_ONLY);
+        # reading a protected-looking path through a nested, read-only
+        # process substitution must not become a mutation denial merely
+        # because the classifier cannot yet model <( ).
+        "diff <(cat .env) <(cat CLAUDE.md)",
+        "diff <(cat credentials-prod.json) <(echo ok)",
+    ),
+)
+def test_protect_files_allows_read_only_process_substitution(command: str) -> None:
+    """Regression test for the reported false positive: a read-only process
+    substitution must be allowed, not denied merely because its inner
+    command happens to reference a protected-looking path for reading."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_data_heredoc_with_unmatched_apostrophe() -> None:
+    """A heredoc body is prose/data, not shell syntax: an unmatched
+    apostrophe or shell metacharacters inside it must not corrupt outer
+    tokenization."""
+    command = "cat <<'EOF'\nFix: don't break ${arr[@]} or \"${arr[@]}\" handling\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_git_commit_file_dash_heredoc_reproduction() -> None:
+    """Firsthand reproduction: `git commit -F - <<'EOF' ... EOF` was denied
+    with "protect-files.sh exited with status 2" because the commit
+    message's `${arr[@]}` and `"${arr[@]}"` broke outer shell tokenization,
+    even though the body is pure data fed to git's own -F - stdin convention
+    and can never become a filesystem write target."""
+    command = (
+        "git commit -F - <<'EOF'\n"
+        'Fix: don\'t break ${arr[@]} or "${arr[@]}" handling\n'
+        "EOF"
+    )
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_read_only_command_heredoc_with_harmless_data() -> None:
+    """A READ_ONLY command's heredoc is stdin data, exactly like its own
+    command-line arguments already are; harmless prose must not be denied."""
+    command = "wc -l <<'EOF'\njust some ordinary text\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_denies_read_only_command_heredoc_mentioning_protected_path() -> (
+    None
+):
+    """CRITICAL security-review fix: a READ_ONLY consumer's heredoc body is
+    never fully skipped - only its own command-line arguments are known
+    never to write. sed's own script sub-language supports `w file` and `e`
+    without `-i` (see the dedicated sed test below), so every READ_ONLY
+    command's heredoc gets the same conservative literal-scan floor an
+    unmodeled command's own arguments already get."""
+    command = "wc -l <<'EOF'\nreferences .env in prose\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+
+
+def test_protect_files_denies_sed_heredoc_write_command() -> None:
+    """CRITICAL security-review fix: sed is READ_ONLY for its own arguments,
+    but its own scripting language can write an arbitrary file via `w file`/
+    `s///w file`, or execute a shell command via `e`, without ever using
+    `-i`. The dedicated sed/perl `-i` branch does not fire here, so the
+    heredoc-body literal-scan floor is what must catch this."""
+    command = "sed -n -f - CLAUDE.md <<'EOF'\ns/.*/&/w .env\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_denies_unquoted_heredoc_command_substitution() -> None:
+    """CRITICAL security-review fix: an *unquoted* heredoc delimiter's body
+    is expanded by the shell - including $( ) command substitution - before
+    any consuming command ever runs, so `cat <<EOF` with `$(touch .env)` in
+    the body must deny even though `cat` never interprets its own stdin."""
+    command = "cat <<EOF\n$(touch .env)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cat <<EOF\n'literal $(touch .env) more'\nEOF",
+        'cat <<EOF\n"literal $(touch .env) more"\nEOF',
+    ),
+)
+def test_protect_files_denies_quote_wrapped_command_substitution_in_unquoted_heredoc(
+    command: str,
+) -> None:
+    """A heredoc body is not re-tokenized with normal shell quoting rules:
+    only a backslash escaping $, a backtick, or itself is special, so a
+    single or double quote around $( ) is plain literal text and does not
+    suppress it (verified empirically in a real bash). Wrapping the exploit
+    in quotes must not smuggle it past the scanner."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_allows_backslash_escaped_dollar_in_unquoted_heredoc() -> None:
+    """A backslash immediately before `$` suppresses command-substitution
+    expansion even in an unquoted heredoc, so this must not be recursively
+    classified as executable code - it is still denied by the always-on
+    literal-scan floor for the literal ".env" text, but only with the
+    softer "could not determine" wording, not the confirmed one a genuinely
+    executed mutator would produce."""
+    command = "cat <<EOF\nescaped: \\$(touch .env)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+    assert "Protected file blocked by policy" not in process.stdout
+
+
+def test_protect_files_resolves_tracked_variable_inside_unquoted_heredoc_command_substitution() -> (
+    None
+):
+    """The $( ) inside an unquoted heredoc runs in a subshell of the
+    *current* shell (like a process substitution), so it inherits already-
+    tracked variables. The body text itself never contains the literal
+    ".env" substring - only the recursive classification proves this."""
+    command = "TARGET=.env\ncat <<EOF\n$(touch $TARGET)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "TARGET=.env bash <<'EOF'\ntouch $TARGET\nEOF",
+        "env TARGET=.env bash <<'EOF'\ntouch $TARGET\nEOF",
+    ),
+)
+def test_protect_files_resolves_prefix_assignment_inside_quoted_bare_shell_heredoc(
+    command: str,
+) -> None:
+    """CRITICAL security-review fix: a *quoted* heredoc delimiter's body
+    passes through to the child `bash` process literally; the child's own
+    environment does contain this command's own prefix assignment (`VAR=v
+    cmd` and `env VAR=value cmd` both export it to the child), so `touch
+    $TARGET` must resolve and deny. Verified in real bash first (throwaway
+    temp dir, harmless marker file): both forms write the marker."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_allows_prefix_assignment_inside_unquoted_bare_shell_heredoc() -> (
+    None
+):
+    """Must-not-regress control: with an *unquoted* delimiter, the *parent*
+    shell expands the body before the child ever runs, using the parent's
+    own scope - and a prefix assignment is not part of that scope (it is
+    exported only to the child about to exec). Real bash expands `$TARGET`
+    to empty here and `touch` errors with no write (verified empirically).
+    "Fixing" this to resolve would be a new false positive, not a fix."""
+    command = "TARGET=.env bash <<EOF\ntouch $TARGET\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_resolves_persistent_assignment_inside_unquoted_bare_shell_heredoc() -> (
+    None
+):
+    """MAJOR test-gap fix: the fourth quoted/prefix combination. A bare
+    assignment on its own, separate segment (`TARGET=.env` then `bash ...`
+    later) *is* already in `outer_variables`, because it was recorded
+    before this segment ever ran; with an *unquoted* delimiter the parent
+    shell expands the body using exactly that scope before the child runs
+    (verified empirically: `touch` succeeds and writes the marker here,
+    unlike the quoted-delimiter sibling test above). This is the one case
+    that actually distinguishes "outer_variables correctly threads
+    cross-segment scope" from "outer_variables is empty and broken exactly
+    like the old unconditional {}" - every sibling test in this batch
+    expects "stays unresolved", so a regression back to always-empty would
+    pass them all untouched."""
+    command = "TARGET=.env\nbash <<EOF\ntouch $TARGET\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_does_not_resolve_persistent_assignment_inside_quoted_bare_shell_heredoc() -> (
+    None
+):
+    """Must-not-regress control: a bare assignment on its own, separate
+    segment (`TARGET=.env` then `bash ...` later) is never exported to a
+    child process - only a same-command prefix assignment is. Real bash
+    leaves `$TARGET` empty in the child too here (verified empirically:
+    `touch` errors with "missing file operand", no write), distinguishing
+    this from the prefix-assignment case above."""
+    command = "TARGET=.env\nbash <<'EOF'\ntouch $TARGET\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_process_substitution_still_resolves_persistent_assignment() -> (
+    None
+):
+    """Control: the process-substitution path is untouched by this fix and
+    must keep resolving a persistent, separate-segment assignment exactly
+    as before - a subshell fork inherits the parent's entire variable
+    scope, exported or not."""
+    command = "TARGET=.env\ndiff <(touch $TARGET) <(echo x)"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        # env -u NAME takes a separate value token; the old loop skipped
+        # only the flag, leaving the value token ("VAR") to be misread as
+        # the command name, so `bash` and its heredoc were never reached.
+        # Indirect construction (TARGET=env, then ".$TARGET") means the
+        # literal ".env" text never appears anywhere - only correct
+        # resolution can catch this, not the generic literal-scan floor.
+        "env -u VAR TARGET=env bash <<'EOF'\ntouch \".$TARGET\"\nEOF",
+        # env -C dir (chdir) - another separate-value flag.
+        "env -C /tmp TARGET=env bash <<'EOF'\ntouch \".$TARGET\"\nEOF",
+        # env -S "" (split-string) - another separate-value flag.
+        'env -S "" TARGET=env bash <<\'EOF\'\ntouch ".$TARGET"\nEOF',
+        # sudo shares the same wrapper-skip loop and has its own
+        # separate-value flags (-u USER, -g GROUP).
+        "sudo -u nobody TARGET=env bash <<'EOF'\ntouch \".$TARGET\"\nEOF",
+    ),
+)
+def test_protect_files_resolves_prefix_assignment_past_wrapper_value_flag(
+    command: str,
+) -> None:
+    """CRITICAL security-review fix: command_name()'s sudo/env/command
+    wrapper-flag loop now skips a value-taking flag's separate value token
+    too, so the real command and its own prefix assignment are still found
+    and resolved. Verified in real bash first (throwaway temp dir, harmless
+    marker file): `env -u SOME_VAR TARGET=marker bash <<'EOF'` does write
+    the marker."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    # `env -C /tmp` also runs the body in /tmp, so that `.env` is named too.
+    assert "Protected file blocked by policy: " in process.stdout
+    assert ".env" in process.stdout
+
+
+def test_protect_files_allows_legitimate_env_value_flag_with_harmless_body() -> None:
+    """Must-not-regress control: `env -u FOO` followed by a genuinely
+    harmless heredoc body must not become a new false positive merely
+    because the wrapper now understands -u takes a value."""
+    command = "env -u FOO bash <<'EOF'\necho hello\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_fails_closed_for_unrecognized_wrapper_flag() -> None:
+    """CRITICAL security-review fix, backstop 2: a future/unmodeled env
+    flag must not be silently assumed to take no value (that assumption is
+    exactly how -u's value was mistaken for the command name before this
+    fix) - the segment becomes ambiguous instead, and the conservative
+    fallback still examines the heredoc body directly rather than treating
+    it as invisible."""
+    command = "env --future-flag=value bash <<'EOF'\ntouch .env\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_allows_quoted_heredoc_command_substitution_syntax_as_data() -> (
+    None
+):
+    """A *quoted* heredoc delimiter suppresses shell expansion entirely, so
+    `$(...)`-shaped text in the body is inert prose, not a command
+    substitution - the quoted/unquoted distinction the CRITICAL fix relies
+    on. (The commit-message reproduction test above already proves the
+    apostrophe/brace case; this proves the $( ) case specifically stays
+    inert when quoted, with body text that has no protected-looking literal
+    for the always-on scan floor to catch instead.)"""
+    command = "cat <<'EOF'\n$(some_command some_argument)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_heredoc_nested_inside_process_substitution() -> None:
+    """Nesting must compose: a heredoc inside a process substitution, both
+    read-only, must be allowed."""
+    command = "diff <(cat <<'A'\nfoo\nA\n) <(cat <<'B'\nbar\nB\n)"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "diff <(touch .env) <(cat CLAUDE.md)",
+        "diff <(cat <(touch .env)) <(echo x)",
+        "tee >(cat > .env)",
+        # CRITICAL security-review fix: a *mutating heredoc* nested inside
+        # <( ) / >( ), not merely a mutating plain command - the recursive
+        # call for the process substitution's inner text must still be able
+        # to resolve a heredoc placeholder the outer extraction pass lifted
+        # out first.
+        "diff <(bash <<'A'\ntouch .env\nA\n) <(cat <<'B'\nbar\nB\n)",
+        "tee >(bash <<'A'\ntouch .env\nA\n)",
+        # A process substitution nested inside a bare shell heredoc's own
+        # body, itself containing another nested heredoc.
+        "bash <<'EOF'\ndiff <(bash <<'X'\ntouch .env\nX\n) <(cat CLAUDE.md)\nEOF",
+    ),
+)
+def test_protect_files_confirms_mutation_inside_process_substitution(
+    command: str,
+) -> None:
+    """Negative control: a real mutator inside <( ) or >( ), including a
+    nested substitution and a mutating heredoc nested inside one, must still
+    be a *confirmed* denial - not merely the softer "could not determine"
+    uncertain wording a naive token leak could produce by accident, and
+    never a silent allow from an unresolved, orphaned heredoc placeholder."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+    assert "could not determine" not in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "echo $((1 << 2))",
+        "echo $((\n1 << 2\n))",
+    ),
+)
+def test_protect_files_allows_arithmetic_left_shift(command: str) -> None:
+    """MAJOR security-review fix: `<<` inside `$(( ))`/`(( ))` is bash's
+    arithmetic left-shift operator, not a heredoc redirect. The paren-blind
+    scanner used to find `<<` there, misread the next token as a heredoc
+    delimiter word, and failed closed with no body/no terminator - a false
+    fail for a common idiom, on both a single line and split across lines."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "bash <<'EOF'\ntouch .env\nEOF",
+        "bash <<'EOF'\ntouch .claude/hooks/scripts/new.sh\nEOF",
+    ),
+)
+def test_protect_files_confirms_shell_heredoc_protected_write(command: str) -> None:
+    """Negative control: a bare shell interpreter executes its heredoc body
+    as real code, so a protected-file mutation or hook-file edit inside it
+    must still be denied."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3 <<\'PY\'\nopen(".env", "w").write("x")\nPY',
+        'python3 <<\'PY\'\nPath(".env").write_text("x")\nPY',
+    ),
+)
+def test_protect_files_denies_interpreter_heredoc_protected_write(
+    command: str,
+) -> None:
+    """Negative control: an interpreter heredoc that opaquely writes a
+    protected file must be denied, the same as the equivalent `-c` form
+    already is."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_confirms_heredoc_redirected_to_protected_target() -> None:
+    """Negative control: the heredoc's own outer redirect target is still
+    classified regardless of the body content."""
+    command = "cat <<'EOF' > .claude/hooks/scripts/new.sh\necho hi\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/scripts/new.sh" in process.stdout
+
+
+def test_protect_files_denies_unknown_consumer_heredoc_with_protected_evidence() -> (
+    None
+):
+    """An unmodeled command's heredoc stays conservative: a protected-looking
+    literal in the body is still enough for a reasoned (not infra-failed)
+    denial."""
+    command = "some-unsupported-command <<'EOF'\nplease touch .env for me\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cat <<'EOF'\nhello",
+        "printf x <<\n",
+    ),
+)
+def test_protect_files_fails_closed_for_malformed_heredoc(
+    command: str, tmp_path: Path
+) -> None:
+    """A heredoc with no delimiter word, or whose body never reaches its
+    terminator line, is genuinely malformed shell syntax - the
+    infrastructure fail-closed path (exit 2), distinguishable from an
+    ordinary reasoned policy denial such as the one asserted in
+    ``test_protect_files_denies_ambiguous_protected_reference_without_infra_failure``.
+    This genuinely trips the shared library's fail-closed write, so it runs
+    against an isolated `tmp_path` root rather than the live checkout."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}, repo_root=tmp_path
+    )
+    assert process.returncode == 2
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "hook could not evaluate the request safely, denying" in process.stdout
+
+
+def test_protect_files_fails_closed_for_unbalanced_process_substitution(
+    tmp_path: Path,
+) -> None:
+    """An unbalanced <( construct is genuinely malformed shell syntax - the
+    infrastructure fail-closed path, not an ordinary reasoned denial. This
+    genuinely trips the shared library's fail-closed write, so it runs
+    against an isolated `tmp_path` root rather than the live checkout."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "diff <(cat README.md"}},
+        repo_root=tmp_path,
+    )
+    assert process.returncode == 2
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "hook could not evaluate the request safely, denying" in process.stdout
+
+
+# CRITICAL security-review fix: `<`, `<<`, `<(`, and `>(` are shell
+# metacharacters that terminate the preceding word even with no leading
+# space (`bash<<'EOF'` and `cat<(...)` are both valid, executing bash), but
+# the entire corpus above always wrote a leading space before these
+# operators - the same convention the round-1 review itself used, which is
+# exactly why nobody exercised the glued form. Every test below repeats an
+# existing corpus command with that space removed, sweeping allow and deny
+# cases across every distinct mechanism: command-name gluing for both `<<`
+# and `<(`/`>(` (which defeats classification entirely, not merely one
+# protected-path category), the exact/suffix/prefix protected-path
+# categories, the outer redirect target, the READ_ONLY/sed/unquoted
+# command-substitution/unknown-consumer heredoc floors, mutation nested
+# inside a glued process substitution, and the hook-file and interpreter
+# heredoc paths.
+@pytest.mark.parametrize(
+    "command",
+    (
+        "diff<(cat .env)<(cat CLAUDE.md)",
+        "cat<<'EOF'\nFix: don't break ${arr[@]} or \"${arr[@]}\" handling\nEOF",
+        (
+            "git commit -F -<<'EOF'\n"
+            'Fix: don\'t break ${arr[@]} or "${arr[@]}" handling\nEOF'
+        ),
+        "cat<<'EOF'\n$(some_command some_argument)\nEOF",
+        "diff<(cat<<'A'\nfoo\nA\n)<(cat<<'B'\nbar\nB\n)",
+    ),
+)
+def test_protect_files_allows_glued_operator_safe_commands(command: str) -> None:
+    """Sweep: every safe positive case above must stay allowed when written
+    with no space before <<, <(, or >( - including full-glue nesting."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        # Command-name gluing (minimum required coverage): defeats
+        # classification entirely, for both operator families.
+        "bash<<'EOF'\ntouch .env\nEOF",
+        "cat<(touch .env)",
+    ),
+)
+def test_protect_files_denies_glued_command_name_mutation(command: str) -> None:
+    """Sweep: command-name gluing must not silently defeat classification -
+    a real mutator must still be a *confirmed* denial."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_reason_fragment"),
+    (
+        # Exact-match category (minimum required coverage).
+        ("touch .env<<EOF\nx\nEOF", "Protected file blocked by policy: .env"),
+        # Suffix-matched category (minimum required coverage).
+        (
+            "touch service.pem<<EOF\nx\nEOF",
+            "Protected file blocked by policy: service.pem",
+        ),
+        # Prefix-matched controls (minimum required coverage): `startswith`
+        # only inspects leading characters, so these were never at risk from
+        # trailing glued garbage - confirm that stays true, with a clean
+        # (non-garbled) path in the reason now that gluing is fixed.
+        (
+            "touch .env.local<<EOF\nx\nEOF",
+            "Protected file blocked by policy: .env.local",
+        ),
+        (
+            "touch .claude/hooks/scripts/new.sh<<EOF\nx\nEOF",
+            "Editing agent, hook, or server configuration is blocked because "
+            "PreToolUse cannot request approval: .claude/hooks/scripts/new.sh",
+        ),
+        # Redirect-target gluing: `cat > .env<<'EOF'` is valid bash where
+        # ".env" is `>`'s target and `<<'EOF'` is a separate stdin redirect.
+        ("cat > .env<<'EOF'\nx\nEOF", "Protected file blocked by policy: .env"),
+    ),
+)
+def test_protect_files_denies_glued_operand_by_protected_category(
+    command: str, expected_reason_fragment: str
+) -> None:
+    """Sweep: every protected-path category still resolves to a clean,
+    exact operand/redirect-target once the trailing garbage from a glued
+    placeholder is gone, not merely "still denied for the wrong reason"."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert expected_reason_fragment in process.stdout
+    assert "HEREDOC" not in process.stdout, (
+        "a leftover placeholder fragment in the reason means gluing is "
+        f"still corrupting the operand: {process.stdout!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "wc -l<<'EOF'\nreferences .env in prose\nEOF",
+        "sed -n -f - CLAUDE.md<<'EOF'\ns/.*/&/w .env\nEOF",
+        "cat<<EOF\n$(touch .env)\nEOF",
+        "TARGET=.env\ncat<<EOF\n$(touch $TARGET)\nEOF",
+        "some-unsupported-command<<'EOF'\nplease touch .env for me\nEOF",
+    ),
+)
+def test_protect_files_denies_glued_heredoc_floor_cases(command: str) -> None:
+    """Sweep: the READ_ONLY literal-scan floor, sed's own write sub-language,
+    unquoted command-substitution execution (plain and variable-resolved),
+    and the unknown-consumer conservative floor must all still fire when
+    the heredoc operator has no leading space."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "diff<(touch .env) <(cat CLAUDE.md)",
+        "diff <(bash<<'A'\ntouch .env\nA\n)<(cat <<'B'\nbar\nB\n)",
+    ),
+)
+def test_protect_files_confirms_glued_mutation_inside_process_substitution(
+    command: str,
+) -> None:
+    """Sweep: a mutator inside a glued process substitution, including a
+    glued mutating heredoc nested inside one, must still be a *confirmed*
+    denial."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_confirms_glued_shell_heredoc_hookfile_write() -> None:
+    """Sweep: the hook-file branch (a different emit() bucket than a plain
+    protected file) must still fire for a glued bare-shell heredoc."""
+    command = "bash<<'EOF'\ntouch .claude/hooks/scripts/new.sh\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/scripts/new.sh" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3<<\'PY\'\nopen(".env", "w").write("x")\nPY',
+        'python3<<\'PY\'\nPath(".env").write_text("x")\nPY',
+    ),
+)
+def test_protect_files_denies_glued_interpreter_heredoc_protected_write(
+    command: str,
+) -> None:
+    """Sweep: an interpreter heredoc's opaque-write floor must still fire
+    when the interpreter name has no space before <<."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_confirms_glued_heredoc_redirected_to_protected_target() -> None:
+    """Sweep: the outer redirect target is still classified when the
+    heredoc operator is glued to the preceding command name."""
+    command = "cat<<'EOF' > .env\necho hi\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_fails_closed_for_malformed_command_and_without_uv(
+    tmp_path: Path,
+) -> None:
+    malformed = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "sed -i 'unterminated .env"}},
+        repo_root=tmp_path,
+    )
+    assert malformed.returncode == 2
+    assert '"permissionDecision":"deny"' in malformed.stdout
+
+    env = {
+        **os.environ,
+        "PATH": os.pathsep.join(
+            part
+            for part in os.environ["PATH"].split(os.pathsep)
+            if not (Path(part) / "uv").exists()
+        ),
+    }
+    process = subprocess.run(
+        ["bash", str(SCRIPT_SRC / "protect-files.sh")],
+        cwd=REPO_ROOT,
+        input=json.dumps(
+            {"tool_name": "Bash", "tool_input": {"command": "sed -i 's/x/y/' .env"}}
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_bash_safety_wrapper_short_circuits_first_decision_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    """The malformed payload trips both `protect-files.sh`'s and this
+    wrapper's own fail-closed writes, so this runs against an isolated
+    `tmp_path` root rather than the live checkout."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "touch .env"}})
+    result = subprocess.run(
+        ["bash", str(scripts_dir / "pretool-bash-guard.sh"), "openai-codex"],
+        cwd=tmp_path,
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+    malformed = subprocess.run(
+        ["bash", str(scripts_dir / "pretool-bash-guard.sh"), "openai-codex"],
+        cwd=tmp_path,
+        input="{bad",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert malformed.returncode == 2
+    assert '"permissionDecision":"deny"' in malformed.stdout
+
+
+def test_bash_safety_wrapper_uses_ordered_isolated_children(tmp_path: Path) -> None:
+    """Fixture guards prove order, first decision, and malformed fail-closed."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    for name in ("pretool-bash-guard.sh", "_lib-frontmatter.sh"):
+        shutil.copy2(SCRIPT_SRC / name, scripts / name)
+    guards = (
+        "protect-files.sh",
+        "git-protection.sh",
+        "enforce-branch-state.sh",
+        "enforce-commit-gate.sh",
+        "enforce-pr-gate.sh",
+    )
+    for index, name in enumerate(guards):
+        outcome = (
+            "exit 0\n"
+            if index == 0
+            else (
+                'printf \'{"hookSpecificOutput":{"permissionDecision":"deny"}}\\n\'\n'
+                if index == 1
+                else "exit 0\n"
+            )
+        )
+        (scripts / name).write_text(
+            '#!/usr/bin/env bash\ncat >/dev/null\nprintf \'%s\\n\' "$0" >> "$CALLS"\n'
+            'if [[ "${MODE:-deny}" == malformed && "$(basename "$0")" == protect-files.sh ]]; then\n'
+            "  printf 'not-json'\nelse\n"
+            f"  {outcome}fi\n",
+            encoding="utf-8",
+        )
+    calls = tmp_path / "calls"
+    result = subprocess.run(
+        ["bash", str(scripts / "pretool-bash-guard.sh"), "openai-codex"],
+        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "true"}}),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "CALLS": str(calls)},
+    )
+    assert result.returncode == 0
+    assert [Path(line).name for line in calls.read_text().splitlines()] == list(
+        guards[:2]
+    )
+    malformed = subprocess.run(
+        ["bash", str(scripts / "pretool-bash-guard.sh"), "openai-codex"],
+        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "true"}}),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "CALLS": str(calls), "MODE": "malformed"},
+    )
+    assert malformed.returncode == 2
+
+
+def test_protect_files_python_3_9_compatibility(tmp_path: Path) -> None:
+    """Regression test for Python 3.9 compatibility.
+
+    Verifies that protect-files.py:
+    - Imports successfully without type-annotation syntax errors
+    - Classifies harmless commands normally
+    - Denies protected-file mutations
+    - Fails closed on malformed input
+    """
+    # Test 1: protect-files.py imports successfully (compile check)
+    result = subprocess.run(
+        [
+            "python3",
+            "-m",
+            "py_compile",
+            str(SCRIPT_SRC / "protect-files.py"),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, f"Compilation failed: {result.stderr}"
+
+    # Test 2: Harmless Bash command should pass classifier
+    harmless = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "ls -la /tmp"}}
+    )
+    assert harmless.returncode == 0, harmless.stderr
+    assert harmless.stdout.strip() == "", "Harmless command should produce no output"
+
+    # Test 3: Protected file mutation should be denied
+    protected = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "touch .env"}}
+    )
+    assert protected.returncode == 0, protected.stderr
+    assert '"permissionDecision":"deny"' in protected.stdout
+
+    # Test 4: Malformed payload should fail closed. This genuinely trips the
+    # shared library's fail-closed write, so it runs against an isolated
+    # tmp_path root rather than the live checkout.
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    malformed = subprocess.run(
+        ["bash", str(scripts_dir / "protect-files.sh"), "openai-codex"],
+        cwd=tmp_path,
+        input="{bad json",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert malformed.returncode == 2, "Malformed payload should fail closed"
+    assert '"permissionDecision":"deny"' in malformed.stdout
+
+
+def test_antigravity_pretool_allows_safe_command_with_json_only_stdout() -> None:
+    """The bridge preserves a clean protocol response for allowed commands."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "git status", "Cwd": str(REPO_ROOT)},
+            },
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+    assert process.stderr == ""
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    sorted(
+        {
+            tool
+            for capability in ("read", "search", "delegate", "web")
+            for tool in ANTIGRAVITY_TOOL_MAP[capability]
+        }
+    ),
+)
+def test_antigravity_pretool_allows_known_non_mutating_tools(tool_name: str) -> None:
+    """The wildcard bridge admits every generated non-mutating tool."""
+    process = _run_antigravity_pretool({"toolCall": {"name": tool_name, "args": {}}})
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+def test_antigravity_pretool_non_mutating_allowlist_matches_generator() -> None:
+    """The bridge adds only its documented native coordination exceptions."""
+    bridge = runpy.run_path(str(SCRIPT_SRC / "antigravity-pretool.py"))
+    expected = {
+        tool
+        for capability in ("read", "search", "delegate", "web")
+        for tool in ANTIGRAVITY_TOOL_MAP[capability]
+    }
+
+    assert not {"manage_task", "schedule"} & expected
+    assert bridge["NON_MUTATING_TOOLS"] == expected | {"manage_task", "schedule"}
+
+
+@pytest.mark.parametrize("tool_name", ("manage_task", "schedule"))
+def test_antigravity_pretool_allows_native_coordination_only_in_the_bridge(
+    tool_name: str,
+) -> None:
+    """Native coordination is safe but never becomes a custom-agent tool."""
+    process = _run_antigravity_pretool({"toolCall": {"name": tool_name, "args": {}}})
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+    assert tool_name not in {
+        tool for tools in ANTIGRAVITY_TOOL_MAP.values() for tool in tools
+    }
+
+
+def test_antigravity_pretool_is_python_3_9_compatible() -> None:
+    """The standalone bridge stays parseable by the hook runtime baseline."""
+    process = subprocess.run(
+        ["python3", "-m", "py_compile", str(SCRIPT_SRC / "antigravity-pretool.py")],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    ("write_to_file", "replace_file_content", "multi_replace_file_content"),
+)
+def test_antigravity_pretool_denies_protected_file_mutations(tool_name: str) -> None:
+    """Each documented native mutation tool reaches canonical file policy."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {"name": tool_name, "args": {"TargetFile": ".env"}},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout)["decision"] == "deny"
+
+
+def test_antigravity_pretool_allows_normal_file_mutation() -> None:
+    """The bridge does not turn ordinary file writes into blanket denials."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "write_to_file",
+                "args": {"TargetFile": "notes/release.md"},
+            },
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+def test_antigravity_pretool_denies_dangerous_git_command() -> None:
+    """Command normalization retains the canonical dangerous-Git guard."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "git reset --hard", "Cwd": str(REPO_ROOT)},
+            },
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout)["decision"] == "deny"
+
+
+def test_antigravity_pretool_uses_cwd_for_relative_protected_command() -> None:
+    """The documented Cwd field scopes a relative command before classification."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "CommandLine": "touch hooks/guard.sh",
+                    "Cwd": str(REPO_ROOT / ".claude"),
+                },
+            }
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout)["decision"] == "deny"
+
+
+def test_antigravity_pretool_quotes_metacharacter_bearing_cwd() -> None:
+    """Cwd stays one operand and cannot manufacture a second shell command."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "CommandLine": "git status",
+                    "Cwd": str(REPO_ROOT) + "; touch .env",
+                },
+            }
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+@pytest.mark.parametrize("kind", ("file", "directory"))
+def test_protect_files_resolves_native_target_symlink_aliases(
+    tmp_path: Path, kind: str
+) -> None:
+    """Native TargetFile checks include real paths for symlinked targets."""
+    if kind == "file":
+        protected_target = tmp_path / ".env"
+        protected_target.write_text("", encoding="utf-8")
+        alias = tmp_path / "alias"
+        alias.symlink_to(protected_target)
+        target = alias
+    else:
+        protected_directory = tmp_path / ".claude" / "hooks"
+        protected_directory.mkdir(parents=True)
+        alias = tmp_path / "alias"
+        alias.symlink_to(protected_directory, target_is_directory=True)
+        target = alias / "new-guard.sh"
+
+    process = _run_native_protect_files(
+        {"tool_name": "Write", "tool_input": {"path": str(target)}}, tmp_path
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {},
+        {"toolCall": {}},
+        {
+            "toolCall": {"name": "write_to_file", "args": {}},
+        },
+        {
+            "toolCall": {"name": "unverified_write", "args": {}},
+        },
+    ),
+)
+def test_antigravity_pretool_fails_closed_for_invalid_payloads(payload: dict) -> None:
+    """Malformed or unsupported requests never fall through to an allow."""
+    process = _run_antigravity_pretool(payload)
+
+    assert process.returncode == 0
+    assert json.loads(process.stdout)["decision"] == "deny"
+    assert "WARN antigravity-pretool:" in process.stderr
+
+
+def test_antigravity_pretool_fails_closed_for_raw_malformed_json(
+    tmp_path: Path,
+) -> None:
+    """Raw malformed hook stdin receives a protocol deny, not a crash."""
+    process = subprocess.run(
+        ["python3", str(SCRIPT_SRC / "antigravity-pretool.py")],
+        cwd=tmp_path,
+        input="{malformed",
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "REPO_ROOT": str(tmp_path)},
+    )
+
+    assert process.returncode == 0
+    assert json.loads(process.stdout)["decision"] == "deny"
+    assert "WARN antigravity-pretool:" in process.stderr
+
+
+# --------------------------------------------------------------------------
+# GR-008: every client's in-repository hook- and server-launching config gets
+# the hook-config decision (Claude and Copilot ask; Codex and Antigravity
+# deny), whichever way the write arrives.
+# --------------------------------------------------------------------------
+
+HOOK_AND_SERVER_CONFIGS = (
+    ".claude/settings.local.json",
+    ".agents/hooks.json",
+    ".mcp.json",
+    ".vscode/mcp.json",
+    ".agents/mcp_config.json",
+    ".vscode/settings.json",
+    ".github/copilot/settings.json",
+    ".github/copilot/settings.local.json",
+)
+# Agent definition files in every client's agent folder, and a VS Code workspace
+# file (in a multi-root workspace it holds the hook switches).
+AGENT_DEFINITION_PATHS = (
+    ".claude/agents/coder.md",
+    ".codex/agents/reviewer.toml",
+    ".github/agents/planner.agent.md",
+    ".agents/agents/coder/agent.md",
+    "team.code-workspace",
+    "Team.CODE-WORKSPACE",
+)
+PROTECTED_CONFIG_PATHS = HOOK_AND_SERVER_CONFIGS + AGENT_DEFINITION_PATHS
+CONTROL_PLANE_FOLDERS = (
+    ".github/hooks",
+    ".claude/hooks",
+    ".codex/hooks",
+    ".claude/agents",
+    ".codex/agents",
+    ".github/agents",
+    ".agents/agents",
+)
+CLIENT_CONFIG_DECISIONS = (
+    pytest.param("claude-code", "ask", id="claude-code"),
+    pytest.param("openai-codex", "deny", id="openai-codex"),
+    pytest.param("github-copilot", "ask", id="github-copilot"),
+    pytest.param("google-antigravity", "deny", id="google-antigravity"),
+)
+SELF_INSTALL_COMMANDS = (
+    "uv run python scripts/install_bootstrap.py . --allow-self --local-only",
+    "uv run python scripts/generate_targets.py --all",
+)
+
+
+def _client_edit_payload(target_id: str, relative_path: str) -> dict:
+    """The native edit payload shape each client sends to ``protect-files``."""
+    if target_id == "openai-codex":
+        patch = f"*** Begin Patch\n*** Update File: {relative_path}\n@@\n x\n*** End Patch\n"
+        return {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+    if target_id == "github-copilot":
+        return {"toolName": "edit", "toolArgs": json.dumps({"path": relative_path})}
+    return {"tool_name": "Write", "tool_input": {"file_path": relative_path}}
+
+
+def _client_bash_payload(target_id: str, command: str) -> dict:
+    """The Bash payload shape each client sends to the safety guards."""
+    if target_id == "github-copilot":
+        return {"toolName": "bash", "toolArgs": json.dumps({"command": command})}
+    return {"tool_name": "Bash", "tool_input": {"command": command}}
+
+
+def _protect_decision(process: subprocess.CompletedProcess[str]) -> str:
+    """The ``permissionDecision`` a guard printed, or ``allow`` for no output."""
+    assert process.returncode == 0, process.stderr
+    if not process.stdout.strip():
+        return "allow"
+    return json.loads(process.stdout)["hookSpecificOutput"]["permissionDecision"]
+
+
+def _antigravity_bridge_repo(repo_root: Path) -> Path:
+    """Give ``repo_root`` the installed ``.claude/hooks/scripts`` the
+    Antigravity bridge runs, symlinked to the real shared script bytes."""
+    scripts_dir = repo_root / ".claude" / "hooks" / "scripts"
+    if not scripts_dir.exists():
+        scripts_dir.parent.mkdir(parents=True, exist_ok=True)
+        scripts_dir.symlink_to(SCRIPT_SRC, target_is_directory=True)
+    (repo_root / ".claude" / "session_logs").mkdir(parents=True, exist_ok=True)
+    return repo_root
+
+
+@pytest.mark.parametrize("operation", ("edit", "redirect"))
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_gates_hook_and_server_configs_per_client(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str, operation: str
+) -> None:
+    payload = (
+        _client_edit_payload(target_id, relative_path)
+        if operation == "edit"
+        else _client_bash_payload(target_id, f"echo x > {relative_path}")
+    )
+
+    process = _run_protect_files(payload, tmp_path, target_id)
+
+    assert _protect_decision(process) == expected, process.stdout
+    if expected != "allow":
+        assert relative_path in process.stdout
+
+
+@pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
+def test_pretool_bash_guard_gates_hook_and_server_config_redirects(
+    tmp_path: Path, target_id: str, relative_path: str
+) -> None:
+    """Claude and Codex reach ``protect-files`` for Bash through the ordered
+    ``pretool-bash-guard.sh`` chain, so that is where the redirect is judged."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    process = subprocess.run(
+        ["bash", str(scripts_dir / "pretool-bash-guard.sh"), target_id],
+        cwd=tmp_path,
+        input=json.dumps(_client_bash_payload(target_id, f"echo x > {relative_path}")),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    expected = "deny" if target_id == "openai-codex" else "ask"
+    assert _protect_decision(process) == expected, process.stdout
+
+
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
+@pytest.mark.parametrize("operation", ("write_to_file", "run_command"))
+def test_antigravity_bridge_denies_hook_and_server_config_writes(
+    tmp_path: Path, relative_path: str, operation: str
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+    args = (
+        {"TargetFile": relative_path}
+        if operation == "write_to_file"
+        else {"CommandLine": f"echo x > {relative_path}", "Cwd": str(root)}
+    )
+
+    process = _run_antigravity_pretool(
+        {"toolCall": {"name": operation, "args": args}}, root
+    )
+
+    assert process.returncode == 0, process.stderr
+    response = json.loads(process.stdout)
+    assert response["decision"] == "deny"
+    assert relative_path in response["reason"]
+
+
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_allows_reading_hook_and_server_configs(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str
+) -> None:
+    """Only writes are gated. ``expected`` is unused: reads are always allowed."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, f"cat {relative_path}"), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
+@pytest.mark.parametrize(
+    "command, relative_path",
+    (
+        pytest.param("ls .mcp.json", ".mcp.json", id="ls"),
+        pytest.param(
+            "test -f .vscode/settings.json", ".vscode/settings.json", id="test"
+        ),
+        pytest.param(
+            "ls .claude/agents/coder.md", ".claude/agents/coder.md", id="ls-agent"
+        ),
+    ),
+)
+def test_protect_files_denies_a_command_that_only_names_a_hook_config(
+    tmp_path: Path, target_id: str, command: str, relative_path: str
+) -> None:
+    """Existing rule, locked in for the new names: a command that is not on the
+    read-only list is denied when it names a protected config, even though it
+    may only read it, because the guard cannot tell. `cat` stays allowed."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert relative_path in process.stdout
+
+    read = _run_protect_files(
+        _client_bash_payload(target_id, f"cat {relative_path}"), tmp_path, target_id
+    )
+    assert _protect_decision(read) == "allow", read.stdout
+
+
+@pytest.mark.parametrize("relative_path", PROTECTED_CONFIG_PATHS)
+def test_antigravity_bridge_allows_reading_hook_and_server_configs(
+    tmp_path: Path, relative_path: str
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+
+    for name, args in (
+        ("run_command", {"CommandLine": f"cat {relative_path}", "Cwd": str(root)}),
+        ("view_file", {"AbsolutePath": str(root / relative_path)}),
+    ):
+        process = _run_antigravity_pretool(
+            {"toolCall": {"name": name, "args": args}}, root
+        )
+        assert process.returncode == 0, process.stderr
+        assert json.loads(process.stdout) == {"decision": "allow"}, name
+
+
+@pytest.mark.parametrize("command", SELF_INSTALL_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_self_install_command_line_passes_the_bash_guard(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """The installer writes these configs from Python without naming them, so
+    the command that runs it must stay allowed. ``expected`` is unused."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("command", SELF_INSTALL_COMMANDS)
+def test_antigravity_bridge_allows_the_self_install_command_line(
+    tmp_path: Path, command: str
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": command, "Cwd": str(root)},
+            }
+        },
+        root,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+# --------------------------------------------------------------------------
+# BF-D2: each protected folder is protected as a whole, and an unmodelled Git
+# subcommand or a `cd` resolves its paths against the directory it runs in.
+# --------------------------------------------------------------------------
+
+WHOLE_FOLDER_COMMANDS = (
+    pytest.param("rm -rf {folder}", id="rm"),
+    pytest.param("mv {folder} /tmp/x", id="mv"),
+    pytest.param("ln -s /tmp/x {folder}", id="ln"),
+)
+FOLDER_FROM_WORKING_DIRECTORY_COMMANDS = (
+    pytest.param("git -C .claude rm -r -q hooks", id="git-rm"),
+    pytest.param(
+        "git -C .claude checkout HEAD~5 -- hooks/scripts/protect-files.py",
+        id="git-checkout",
+    ),
+    pytest.param("cd .claude && rm -rf hooks", id="cd-rm"),
+)
+# Unmodelled Git commands with a path that is protected from the repository
+# root keep the uncertain deny on every client. The `-C` and `cd` resolution
+# must not add a confirmed hit for them: `emit()` prefers a confirmed hit and
+# would turn the deny into ask on Claude Code and Copilot. `{repo}` is the
+# repository root.
+GIT_COMMANDS_THAT_STAY_DENIED = (
+    pytest.param("git restore .claude/hooks", id="restore-folder"),
+    pytest.param("git stash push -- .claude/agents/coder.md", id="stash-agent-file"),
+    pytest.param(
+        "git -C .claude restore {repo}/.claude/hooks/x", id="dash-C-absolute-path"
+    ),
+    pytest.param("cd shared && git restore .claude/hooks/x", id="cd-relative-overlap"),
+    pytest.param(
+        "git -C .claude restore hooks/x {repo}/.claude/hooks/y", id="mixed-tokens"
+    ),
+)
+# Any uncertain protected hit denies on every client, even when another part of
+# the command confirms the same or a different path. Before this phase the
+# first four were deny; the last two were ask.
+UNCERTAIN_HIT_BESIDE_CONFIRMED_COMMANDS = (
+    pytest.param(
+        "git restore .claude/hooks/x && git -C .claude restore hooks/y",
+        id="git-restore-then-git-dash-C",
+    ),
+    pytest.param(
+        "git restore .claude/hooks/x && rm -rf .claude/agents",
+        id="git-restore-then-rm-folder",
+    ),
+    pytest.param(
+        "git restore .claude/hooks/x && git -C .claude restore hooks/x",
+        id="git-restore-then-git-dash-C-same-path",
+    ),
+    pytest.param(
+        "git restore .claude/hooks/x && cd .claude && git restore hooks/x",
+        id="git-restore-then-cd-git-restore-same-path",
+    ),
+    pytest.param(
+        "git restore .claude/settings.json && rm .mcp.json",
+        id="git-restore-then-rm-other-config",
+    ),
+    pytest.param(
+        "git restore .claude/settings.json && rm .claude/settings.json",
+        id="git-restore-then-rm-same-config",
+    ),
+)
+# A redirect is only a confirmed target, even for a command the guard does not
+# model: its target is not also scanned as an uncertain argument.
+REDIRECT_COMMANDS_THAT_ASK = (
+    pytest.param("echo x > .claude/settings.json", id="redirect"),
+    pytest.param("echo x >> .mcp.json", id="append-redirect"),
+    pytest.param("printf x 2> .claude/agents/coder.md", id="fd-redirect"),
+    pytest.param("git stash list > .claude/settings.json", id="git-redirect"),
+    pytest.param("> .claude/settings.json", id="leading-redirect"),
+    pytest.param(">> .mcp.json", id="leading-append"),
+    pytest.param("&> .claude/settings.json", id="leading-both-streams"),
+    pytest.param(">| .claude/settings.json", id="leading-clobber"),
+    pytest.param(">.claude/settings.json", id="leading-glued"),
+    pytest.param(">.claude/settings.json echo x", id="leading-then-command"),
+    pytest.param("echo x 2>&1 > .claude/settings.json", id="fd-dup-then-redirect"),
+    pytest.param(": > .claude/settings.json", id="colon-redirect"),
+)
+# A confirmed hook-config hit never softens the secret-file deny: a command
+# that also names `.env` stays denied on every client, as it was before this
+# phase named the agent and workspace paths.
+SECRET_BESIDE_HOOK_CONFIG_COMMANDS = (
+    pytest.param("cp .env .claude/agents/x.md", id="cp-agent-file"),
+    pytest.param("rm .env .claude/hooks", id="rm-hook-folder"),
+    pytest.param("rm .env .mcp.json", id="rm-server-config"),
+    pytest.param("rm .env && git -C .claude rm -r hooks", id="rm-then-git-dash-C"),
+)
+# A secret-shaped name inside a protected folder is a secret first: it denies on
+# every client, and a read tool is denied too. In the agent folders this keeps
+# the deny from before this phase. In the older hook folders it is a deliberate
+# tightening: HEAD asked on Claude Code and Copilot for an edit and allowed a
+# read tool, because the hook-folder name hid the secret name.
+SECRET_NAMES_IN_PROTECTED_FOLDERS = (
+    ".claude/agents/.env",
+    ".codex/agents/credentials.json",
+    ".agents/agents/x/uv.lock",
+    ".claude/agents/x.key",
+    ".claude/hooks/.env",
+    ".github/hooks/credentials.json",
+)
+# Reads, the editable bootstrap source, and a parent folder (the nested
+# checkpoint is `git -C .claude add -A`) stay allowed for every client.
+UNPROTECTED_COMMANDS = (
+    pytest.param("cat .claude/agents/coder.md", id="cat-agent-file"),
+    pytest.param("git -C .claude add -A", id="git-add-parent-folder"),
+    pytest.param("ls .claude", id="ls-parent-folder"),
+    pytest.param("rg --files .claude/agents", id="rg-files-agents"),
+    pytest.param(
+        "git diff --no-index .claude/agents/reviewer.md"
+        " dist/multi-agent/.claude/agents/reviewer.md",
+        id="git-diff-no-index",
+    ),
+    pytest.param("echo x > shared/agents/coder/prompt.md", id="write-shared-agents"),
+)
+UNPROTECTED_EDIT_PATHS = (
+    "shared/agents/coder/prompt.md",
+    ".claude/skills/ponytail/SKILL.md",
+    ".agents/skills/ponytail/SKILL.md",
+    ".claude/agents-old/x.md",
+    "team.code-workspaces",
+)
+
+
+@pytest.mark.parametrize("command", WHOLE_FOLDER_COMMANDS)
+@pytest.mark.parametrize("folder", CONTROL_PLANE_FOLDERS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_gates_a_whole_protected_folder(
+    tmp_path: Path, target_id: str, expected: str, folder: str, command: str
+) -> None:
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command.format(folder=folder)),
+        tmp_path,
+        target_id,
+    )
+
+    reason = {
+        "ask": "Editing agent, hook, or server configuration requires approval: ",
+        "deny": "Editing agent, hook, or server configuration is blocked because "
+        "PreToolUse cannot request approval: ",
+    }[expected]
+    assert _protect_decision(process) == expected, process.stdout
+    assert reason + folder in process.stdout
+
+
+@pytest.mark.parametrize("folder", CONTROL_PLANE_FOLDERS)
+@pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
+def test_protect_files_denies_interpreter_removal_of_a_whole_protected_folder(
+    tmp_path: Path, target_id: str, folder: str
+) -> None:
+    """The literal matcher finds a folder name with no path after it."""
+    command = f"python3 -c \"import shutil; shutil.rmtree('{folder}')\""
+
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+@pytest.mark.parametrize("command", FOLDER_FROM_WORKING_DIRECTORY_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_resolves_paths_against_the_git_or_cd_directory(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == expected, process.stdout
+
+
+@pytest.mark.parametrize("command", GIT_COMMANDS_THAT_STAY_DENIED)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_keeps_denying_git_paths_visible_from_the_repository_root(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command.format(repo=tmp_path)),
+        tmp_path,
+        target_id,
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+@pytest.mark.parametrize("command", UNCERTAIN_HIT_BESIDE_CONFIRMED_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_an_uncertain_hit_beside_a_confirmed_one(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients. The
+    confirmed-only cases keep asking on Claude Code and Copilot in
+    ``test_protect_files_gates_a_whole_protected_folder`` and
+    ``test_protect_files_resolves_paths_against_the_git_or_cd_directory``."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "could not determine whether the command may modify" in process.stdout
+
+
+@pytest.mark.parametrize("command", REDIRECT_COMMANDS_THAT_ASK)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_gates_a_redirect_as_a_confirmed_target_only(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == expected, process.stdout
+
+
+@pytest.mark.parametrize("command", SECRET_BESIDE_HOOK_CONFIG_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_a_secret_file_beside_a_hook_config(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize("operation", ("edit", "rm"))
+@pytest.mark.parametrize("relative_path", SECRET_NAMES_IN_PROTECTED_FOLDERS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_a_secret_file_inside_a_protected_folder(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str, operation: str
+) -> None:
+    """``expected`` is unused: the decision is deny for all four clients."""
+    payload = (
+        _client_edit_payload(target_id, relative_path)
+        if operation == "edit"
+        else _client_bash_payload(target_id, f"rm {relative_path}")
+    )
+
+    process = _run_protect_files(payload, tmp_path, target_id)
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert f"Protected file blocked by policy: {relative_path}" in process.stdout
+
+
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_denies_a_protected_folder_symlink_to_a_secret(
+    tmp_path: Path, target_id: str, expected: str
+) -> None:
+    """``expected`` is unused. The link's own name is a protected name, but its
+    target is a secret, and the secret deny must win on every client."""
+    (tmp_path / ".env").write_text("SECRET=1\n", encoding="utf-8")
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "link").symlink_to(tmp_path / ".env")
+
+    process = _run_protect_files(
+        _client_edit_payload(target_id, ".claude/agents/link"), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "Protected file blocked by policy" in process.stdout
+
+
+@pytest.mark.parametrize("command", UNPROTECTED_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_allows_commands_outside_the_protected_names(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """``expected`` is unused: none of these commands is protected."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("relative_path", UNPROTECTED_EDIT_PATHS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_allows_edits_outside_the_protected_names(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str
+) -> None:
+    """``expected`` is unused. The bootstrap source, the skill folders, and a
+    name that only starts like a protected one are not protected."""
+    process = _run_protect_files(
+        _client_edit_payload(target_id, relative_path), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+# --------------------------------------------------------------------------
+# VS Code's Local harness (the supported Copilot client) sends PreToolUse as
+# {"tool_name": <model-facing name>, "tool_input": {...}}. Its terminal tools
+# are run_in_terminal and send_to_terminal; its read tools never write.
+# --------------------------------------------------------------------------
+
+TERMINAL_TOOL_NAMES = ("run_in_terminal", "send_to_terminal")
+# Each read-only tool with the input key the VS Code documentation gives it.
+READ_ONLY_TOOL_INPUTS = (
+    pytest.param("read_file", "filePath", id="read_file"),
+    pytest.param("view_image", "filePath", id="view_image"),
+    pytest.param("list_dir", "path", id="list_dir"),
+    pytest.param("file_search", "query", id="file_search"),
+    pytest.param("grep_search", "includePattern", id="grep_search"),
+    pytest.param("semantic_search", "query", id="semantic_search"),
+    pytest.param("view", "path", id="view"),
+    pytest.param("grep", "path", id="grep"),
+    pytest.param("rg", "path", id="rg"),
+    pytest.param("glob", "path", id="glob"),
+)
+
+
+def _local_payload(tool_name: str, tool_input: dict) -> dict:
+    """A PreToolUse payload in the VS Code Local harness shape."""
+    return {
+        "timestamp": "2026-10-17T00:00:00.000Z",
+        "cwd": "/workspace",
+        "sessionId": "session-1",
+        "hookEventName": "PreToolUse",
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "tool_use_id": "tool-use-1",
+    }
+
+
+def _local_terminal_payload(tool_name: str, command: str) -> dict:
+    tool_input: dict = {"command": command}
+    if tool_name == "send_to_terminal":
+        tool_input["id"] = "terminal-1"
+    return _local_payload(tool_name, tool_input)
+
+
+def _run_shared_guard(
+    script: str, payload: dict, cwd: Path, target_id: str = "github-copilot"
+) -> subprocess.CompletedProcess[str]:
+    """Run one shared guard from ``cwd``, which must hold the isolated
+    ``shared/hooks/scripts`` directory (see ``_isolated_hook_scripts_dir``)."""
+    return subprocess.run(
+        ["bash", str(cwd / "shared" / "hooks" / "scripts" / script), target_id],
+        cwd=cwd,
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "tool_name, expected",
+    (
+        ("run_in_terminal", True),
+        ("send_to_terminal", True),
+        ("Bash", True),
+        ("run_command", False),
+        ("manage_todo_list", False),
+        ("read_file", False),
+    ),
+)
+def test_is_bash_tool_payload_recognises_the_vs_code_terminal_tools(
+    tool_name: str, expected: bool
+) -> None:
+    payload = json.dumps(_local_terminal_payload(tool_name, "git status"))
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"is_bash_tool_payload {shlex.quote(payload)}; printf '%s' $?",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ("0" if expected else "1")
+    command = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"hook_command {shlex.quote(payload)}",
+    )
+    assert command.stdout.strip() == "git status"
+
+
+@pytest.mark.parametrize("tool_name", TERMINAL_TOOL_NAMES)
+def test_commit_gate_denies_a_copilot_terminal_commit_without_a_closeout_receipt(
+    tmp_path: Path, tool_name: str
+) -> None:
+    _commit_gate_repo(tmp_path, branch="foo_implementation")
+
+    result = _run_shared_guard(
+        "enforce-commit-gate.sh",
+        _local_terminal_payload(tool_name, 'git commit -m "feat: x"'),
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "commit gate failed for github-copilot" in result.stdout
+    assert "closeout receipt" in result.stdout
+
+
+def test_commit_gate_ignores_a_tool_that_is_not_a_shell(tmp_path: Path) -> None:
+    """A tool that is neither a shell nor a terminal tool is not a command,
+    even when its input carries a `command` key."""
+    _commit_gate_repo(tmp_path, branch="foo_implementation")
+
+    result = _run_shared_guard(
+        "enforce-commit-gate.sh",
+        _local_payload("manage_todo_list", {"command": 'git commit -m "feat: x"'}),
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize("tool_name", TERMINAL_TOOL_NAMES)
+def test_git_protection_denies_a_dangerous_git_command_from_a_copilot_terminal(
+    tmp_path: Path, tool_name: str
+) -> None:
+    _isolated_hook_scripts_dir(tmp_path)
+
+    result = _run_shared_guard(
+        "git-protection.sh",
+        _local_terminal_payload(tool_name, "git reset --hard"),
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "Blocked dangerous git operation" in result.stdout
+
+
+@pytest.mark.parametrize("tool_name", TERMINAL_TOOL_NAMES)
+def test_protect_files_gates_a_copilot_terminal_redirect_into_a_hook_config(
+    tmp_path: Path, tool_name: str
+) -> None:
+    process = _run_protect_files(
+        _local_terminal_payload(tool_name, "echo x > .github/hooks/hooks.json"),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "ask", process.stdout
+    assert ".github/hooks/hooks.json" in process.stdout
+
+
+def test_protect_files_does_not_read_a_command_key_of_a_non_terminal_tool(
+    tmp_path: Path,
+) -> None:
+    process = _run_protect_files(
+        _local_payload("manage_todo_list", {"command": "echo x > .mcp.json"}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize(
+    "relative_path", (".vscode/settings.json", ".mcp.json", ".claude/agents/coder.md")
+)
+@pytest.mark.parametrize("tool_name, path_key", READ_ONLY_TOOL_INPUTS)
+def test_protect_files_allows_copilot_read_tools_on_hook_configs(
+    tmp_path: Path, tool_name: str, path_key: str, relative_path: str
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, {path_key: relative_path}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize(
+    "tool_name", [case.values[0] for case in READ_ONLY_TOOL_INPUTS]
+)
+def test_protect_files_read_exemption_covers_every_name_even_with_a_path_key(
+    tmp_path: Path, tool_name: str
+) -> None:
+    """Three of the documented read tools take a search query, not a path, so
+    they were never checked; this pins the exemption itself for each name."""
+    process = _run_protect_files(
+        _local_payload(tool_name, {"path": ".mcp.json"}), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize(
+    "secret_path",
+    (".env", ".env.local", "keys/server.pem", "uv.lock")
+    + SECRET_NAMES_IN_PROTECTED_FOLDERS,
+)
+def test_protect_files_still_denies_a_copilot_read_of_a_secret_file(
+    tmp_path: Path, secret_path: str
+) -> None:
+    """The read exemption covers hook configs only. A secret-shaped file keeps
+    the deny it had before, whatever the tool."""
+    process = _run_protect_files(
+        _local_payload("read_file", {"filePath": secret_path}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "Protected file blocked by policy" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "tool_name", [case.values[0] for case in READ_ONLY_TOOL_INPUTS]
+)
+def test_protect_files_denies_every_copilot_read_tool_on_a_secret_file(
+    tmp_path: Path, tool_name: str
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, {"path": ".env"}), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+@pytest.mark.parametrize("tool_name", ("create_file", "replace_string_in_file"))
+def test_protect_files_keeps_denying_copilot_edit_tools_on_a_secret_file(
+    tmp_path: Path, tool_name: str
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, {"filePath": ".env"}), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+# Built in two pieces so this file never holds an unterminated patch marker.
+UNTERMINATED_PATCH = "*** Begin " + "Patch\n"
+
+
+def test_protect_files_does_not_scan_read_tool_text_for_patches(
+    tmp_path: Path,
+) -> None:
+    """Searching the code for the patch marker is an ordinary read, not an
+    unterminated patch to fail closed on."""
+    process = _run_protect_files(
+        _local_payload("grep_search", {"query": UNTERMINATED_PATCH}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+def test_protect_files_still_scans_edit_tool_text_for_patches(tmp_path: Path) -> None:
+    """The same text in an edit tool is an unterminated patch and fails closed."""
+    process = _run_protect_files(
+        _local_payload("apply_patch", {"input": UNTERMINATED_PATCH}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert process.returncode == 2, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "unterminated apply_patch request" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "tool_name, tool_input",
+    (
+        pytest.param("create_file", {"filePath": ".mcp.json"}, id="create_file"),
+        pytest.param(
+            "replace_string_in_file",
+            {"filePath": ".mcp.json", "oldString": "a", "newString": "b"},
+            id="replace_string_in_file",
+        ),
+        pytest.param(
+            "multi_replace_string_in_file",
+            {"replacements": [{"filePath": ".mcp.json", "oldString": "a"}]},
+            id="multi_replace_string_in_file",
+        ),
+        pytest.param(
+            "insert_edit_into_file",
+            {"filePath": ".mcp.json", "code": "{}"},
+            id="insert_edit_into_file",
+        ),
+        pytest.param(
+            "apply_patch",
+            {
+                "input": "*** Begin Patch\n*** Update File: .mcp.json\n@@\n x\n"
+                "*** End Patch\n"
+            },
+            id="apply_patch",
+        ),
+        pytest.param(
+            "create_directory",
+            {"dirPath": ".github/hooks/extra"},
+            id="create_directory",
+        ),
+    ),
+)
+def test_protect_files_still_asks_for_copilot_edit_tools_on_hook_configs(
+    tmp_path: Path, tool_name: str, tool_input: dict
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, tool_input), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "ask", process.stdout
+
+
+def test_protect_files_read_exemption_is_exact_names_only(tmp_path: Path) -> None:
+    """A name that merely resembles a read tool is still checked."""
+    process = _run_protect_files(
+        _local_payload("read_file_and_write", {"filePath": ".mcp.json"}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "ask", process.stdout
+
+
+if __name__ == "__main__":
+    test_git_targets_nested_claude_detects_nested_claude_paths()
+    test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands()
+    test_protect_files_python_pass_ignores_slashy_free_text()
+    test_protect_files_allows_read_only_or_non_targeted_protected_paths(
+        "cat .codex/config.toml"
+    )
+    test_protect_files_blocks_mutation_targets("printf x > .env")

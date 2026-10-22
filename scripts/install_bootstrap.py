@@ -1,57 +1,193 @@
 #!/usr/bin/env python3
-"""Install the generated multi-agent bootstrap into a consumer repository."""
+"""Install the generated bootstrap into a consumer repository.
+
+Two modes, chosen by ``--mode`` or auto-detected from the target alone
+(``detect_install_mode``): **full** takes over the agent harness (today's
+behavior, and the default when the target shows no other evidence), while
+**sidecar** installs a private, per-clone overlay inside a team-owned
+harness and never changes a tracked file. See the big plan's "Mode
+detection" table (``.claude/plans/consumer-sidecar-bootstrap-overlay.md``).
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import shlex
 import shutil
 import stat
 import subprocess
 import sys
-from pathlib import Path
+import tomllib
+from datetime import datetime, timezone
+from pathlib import Path, PurePosixPath
+from typing import Literal
+
+from runtime_ownership import (
+    COPILOT_SURFACE_PATHS,
+    FULL_INSTALL_ROOT_PATHS,
+    GIT_REPO_LOCAL_ENV_VARS,
+    RESTORABLE_ROOT_PATHS,
+    SIDECAR_DEFAULT_PROFILE,
+    SIDECAR_PRESERVED_NAME,
+    SIDECAR_PROFILES,
+    STATE_DIR_OWNED_README_PATHS,
+    active_ignore_patterns,
+    bootstrap_root_paths,
+    install_mode_from_manifest,
+    is_consumer_state_path,
+    is_root_adapter_path,
+    is_third_party_skill_dir,
+    restore_manifest,
+)
+from sidecar_overlay import (
+    _EXCLUDE_MARKER_REMEDY,
+    ExcludeMarkerError,
+    _c_locale_env,
+    _read_index_entries,
+    _report_preserved_folder_if_nonempty,
+    backup_sidecar_state,
+    git_path,
+    install_sidecar,
+    read_sidecar_profile,
+    rev_parse,
+    sidecar_evidence,
+    uninstall_sidecar,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = REPO_ROOT / "dist" / "multi-agent"
+InstallMode = Literal["full", "sidecar"]
+
+
+def default_sidecar_source(profile: str) -> Path:
+    """Return the default sidecar source tree for ``profile`` (Decision 1):
+    ``dist/sidecar/<profile>/``. Replaces the old constant
+    ``DEFAULT_SIDECAR_SOURCE`` (a single ``dist/sidecar/`` path), since the
+    default now depends on which profile a run installs."""
+    return REPO_ROOT / "dist" / "sidecar" / profile
+
+
 IGNORE_BLOCK_START = "# BEGIN multi-agent bootstrap generated/private AI content"
 IGNORE_BLOCK_END = "# END multi-agent bootstrap generated/private AI content"
-IGNORE_PATTERNS = (
-    ".claude/",
-    ".codex/",
-    ".github/agents/",
-    ".github/hooks/",
-    ".github/instructions/",
-    ".github/copilot-instructions.md",
-    ".vscode/mcp.json",
-    ".mcp.json",
-    "AGENTS.md",
-    "CLAUDE.md",
-)
+LEGACY_ANTIGRAVITY_KEY = "BOOTSTRAP_ANTIGRAVITY_PATH"
+LEGACY_ANTIGRAVITY_ALLOWLIST = Path(".claude/antigravity-ownership.env")
 
 
+def scrub_inherited_git_environment() -> None:
+    """Remove Git's repository-local environment variables from this
+    process's own environment (Decision 27; S10), before any detection or
+    Git call.
+
+    An exported one of these -- ``GIT_DIR`` left set by a wrapper script or
+    a previous ``git -C`` invocation is the common case -- silently points
+    every Git call this process makes at a different repository, in either
+    mode: queries would read the wrong repository's state, and a full
+    install would write there too.
+    """
+    for name in GIT_REPO_LOCAL_ENV_VARS:
+        os.environ.pop(name, None)
+
+
+# GitHub Copilot cloud agents read the agent/hook/instruction surface only from
+# the default branch, so it must be committed to work in the cloud. By default
+# these paths are gitignored (local-IDE Copilot only); --commit-copilot-surface
+# omits them from the ignore block so they are trackable like `.devcontainer/`.
+# D5: root-level adapter files that live outside .claude/ in a consumer, so
+# state-sync.sh's checkout of .claude/ alone does not carry them. Mirrored
+# into .claude/bootstrap-root/ (tracked, git-backed) and restored back out to
+# these same relative paths by restore-root-adapters.sh on a fresh machine.
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target_repo", type=Path, help="Consumer repository root.")
     parser.add_argument(
+        "--mode",
+        choices=("full", "sidecar"),
+        default=None,
+        help="Installation mode. 'full' takes over the agent harness (today's "
+        "behavior). 'sidecar' installs a private per-clone overlay inside a "
+        "team-owned harness and never changes a tracked file. Omitting this "
+        "auto-detects the mode from the target alone; an unbootstrapped "
+        "repository that already tracks bootstrap paths refuses to guess.",
+    )
+    parser.add_argument(
         "--source",
         type=Path,
-        default=DEFAULT_SOURCE,
-        help="Generated bootstrap source directory.",
+        default=None,
+        help="Generated bootstrap source directory. Defaults to dist/multi-agent "
+        "for a full install or dist/sidecar/<profile> for a sidecar install, once "
+        "the mode (and profile) is known.",
     )
     parser.add_argument(
-        "--bucket",
-        default="Ghisso/vscode_mounts",
-        help="HF bucket id or bucket prefix path used for bootstrap/state sync.",
+        "--profile",
+        choices=SIDECAR_PROFILES,
+        default=None,
+        help="Sidecar profile: 'skills' (today's four skills and two bridges) or "
+        "'workflow' (adds the relaxed workflow: more skills, agents, rules, "
+        "review profiles, templates, and a namespaced state folder). Only "
+        "used in sidecar mode; ignored by --uninstall and full mode. Defaults "
+        "to an existing manifest's own recorded profile, else 'skills'.",
     )
     parser.add_argument(
-        "--prefix",
-        help="Optional project prefix inside the bucket. Overrides remote-derived prefixes.",
+        "--state-remote",
+        default=None,
+        help="Git remote URL for the nested .claude/ AI-state repo (env: AI_STATE_REMOTE). "
+        "Defaults to this repo's own 'origin' URL when unset.",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Print planned actions without writing files.")
-    parser.add_argument("--skip-upload", action="store_true", help="Do not upload bootstrap files to HF.")
-    parser.add_argument("--verbose", action="store_true", help="Pass verbose mode to the HF sync helper.")
+    parser.add_argument(
+        "--commit-copilot-surface",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Keep the GitHub Copilot cloud surface (.github/agents, .github/hooks, "
+        ".github/instructions, .github/copilot-instructions.md) out of the ignore block "
+        "so it can be committed. Omitting the option retains an existing consumer's "
+        "mode and defaults to local-IDE-only on a fresh install.",
+    )
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Refresh and commit AI state locally without contacting its configured remote.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print planned actions without writing files.",
+    )
+    parser.add_argument(
+        "--allow-self",
+        action="store_true",
+        help="Permit the bootstrap repository to refresh its own dogfood overlay, "
+        "where the generated source lives inside the target. Every other "
+        "overlapping-root case stays rejected.",
+    )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove the sidecar overlay: units whose content matches its record "
+        "are removed, a locally modified or unfinished unit is preserved instead "
+        "of deleted, and team or foreign content is never touched. Only valid "
+        "for a sidecar target (explicit --mode sidecar, or no --mode when "
+        "detection finds sidecar evidence); refused with --mode full or full "
+        "evidence. The namespaced state folder (.ai-bootstrap) is kept "
+        "and hidden by default; pass --purge-state to remove it too.",
+    )
+    parser.add_argument(
+        "--purge-state",
+        action="store_true",
+        help="With --uninstall, move the namespaced state folder "
+        "(.ai-bootstrap) into the preserved-copy folder and stop "
+        "hiding it, instead of the default: kept in place, still hidden. "
+        "Ignored without --uninstall.",
+    )
+    parser.add_argument(
+        "--backup-state",
+        action="store_true",
+        help="Copy the namespaced state folder (.ai-bootstrap) into "
+        "the preserved-copy folder and change nothing else: a standalone "
+        "action, taking priority over --uninstall and every install option.",
+    )
     return parser.parse_args()
 
 
@@ -63,33 +199,755 @@ def warn(message: str) -> None:
     print(f"WARNING install-bootstrap: {message}", file=sys.stderr)
 
 
-def copy_generated_tree(source: Path, target: Path, dry_run: bool) -> None:
+def nested_git(target: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(target / ".claude"), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def require_nested_head(target: Path, action: str) -> None:
+    """Abort when a fail-open state-sync call did not create durable state."""
+    if not (target / ".claude" / ".git").exists():
+        raise SystemExit(
+            f"{action} did not create a nested AI-state repository: "
+            f"{target / '.claude'} has no .git"
+        )
+    head = nested_git(target, "rev-parse", "--verify", "HEAD")
+    if head.returncode != 0:
+        raise SystemExit(
+            f"{action} did not create a nested AI-state commit: {head.stderr.strip()}"
+        )
+
+
+def require_clean_nested_state(target: Path, action: str) -> None:
+    """Abort when an installer operation leaves nested state uncommitted."""
+    require_nested_head(target, action)
+    status = nested_git(target, "status", "--porcelain")
+    if status.returncode != 0 or status.stdout.strip():
+        raise SystemExit(
+            f"{action} left nested AI state uncommitted: {status.stderr.strip()}"
+        )
+
+
+def strip_quarantine(path: Path) -> None:
+    """Copied files can carry macOS's com.apple.quarantine xattr (shutil.copy2/
+    copytree preserve xattrs from the source tree). Left in place, that flag
+    makes git refuse to exec the installed hook scripts (EPERM)."""
+    if sys.platform != "darwin":
+        return
+    subprocess.run(["xattr", "-rc", str(path)], check=False, capture_output=True)
+
+
+def _agents_tree(
+    root: Path, relative_root: str
+) -> tuple[dict[str, bytes | None], tuple[str, ...]]:
+    """Return a safe relative `.agents` tree or paths that cannot be owned."""
+    if not (root.exists() or root.is_symlink()):
+        return {}, ()
+    if root.is_symlink() or not root.is_dir():
+        return {}, (relative_root,)
+
+    entries: dict[str, bytes | None] = {}
+    invalid: list[str] = []
+    for directory, names, files in os.walk(root, topdown=True, followlinks=False):
+        directory_path = Path(directory)
+        for name in sorted(names):
+            path = directory_path / name
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink() or not path.is_dir():
+                invalid.append(f"{relative_root}/{relative}")
+                names.remove(name)
+                continue
+            if is_third_party_skill_dir(path):
+                # OpenWiki's own installer owns this bundle once it writes
+                # its marker inside it; neither the takeover comparison nor
+                # the mirror comparison should see it, in either tree being
+                # walked here. A same-named directory without the marker
+                # falls through unchanged and is still ordinary content.
+                names.remove(name)
+                continue
+            entries[relative] = None
+        for name in sorted(files):
+            path = directory_path / name
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink() or not path.is_file():
+                invalid.append(f"{relative_root}/{relative}")
+                continue
+            entries[relative] = path.read_bytes()
+    return entries, tuple(sorted(invalid))
+
+
+def _agents_conflicts(
+    actual: dict[str, bytes | None],
+    expected: dict[str, bytes | None],
+    relative_root: str,
+) -> tuple[str, ...]:
+    missing = object()
+    return tuple(
+        f"{relative_root}/{path}"
+        for path in sorted(set(actual) | set(expected))
+        if actual.get(path, missing) != expected.get(path, missing)
+    )
+
+
+def _is_legacy_agents_path(path: str) -> bool:
+    pure_path = PurePosixPath(path)
+    if (
+        pure_path.parts[:1] != (".agents",)
+        or pure_path.is_absolute()
+        or "." in pure_path.parts
+        or ".." in pure_path.parts
+        or path.endswith("/")
+        or "//" in path
+    ):
+        return False
+    return (
+        path in {".agents/mcp_config.json", ".agents/hooks.json"}
+        or (
+            len(pure_path.parts) == 4
+            and pure_path.parts[1] == "agents"
+            and pure_path.parts[3] == "agent.md"
+        )
+        or (len(pure_path.parts) >= 3 and pure_path.parts[1] == "skills")
+    )
+
+
+def _legacy_allowlist_records(text: str) -> tuple[str, ...] | None:
+    """Read old file-level ownership records without widening their shape."""
+    paths: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(f"{LEGACY_ANTIGRAVITY_KEY}="):
+            path = line.removeprefix(f"{LEGACY_ANTIGRAVITY_KEY}=")
+            if not _is_legacy_agents_path(path) or path in paths:
+                return None
+            paths.append(path)
+        else:
+            return None
+    return tuple(sorted(paths)) if paths else None
+
+
+def _legacy_manifest_records(text: str) -> tuple[bool, tuple[str, ...]] | None:
+    """Validate the complete retired root manifest before migration reads it."""
+    mode: bool | None = None
+    root_paths: list[str] = []
+    agents_paths: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("BOOTSTRAP_COMMIT_COPILOT_SURFACE="):
+            value = line.removeprefix("BOOTSTRAP_COMMIT_COPILOT_SURFACE=")
+            if mode is not None or value not in {"0", "1"}:
+                return None
+            mode = value == "1"
+        elif line.startswith("BOOTSTRAP_ROOT_PATH="):
+            path = line.removeprefix("BOOTSTRAP_ROOT_PATH=")
+            if path in root_paths:
+                return None
+            root_paths.append(path)
+        elif line.startswith(f"{LEGACY_ANTIGRAVITY_KEY}="):
+            path = line.removeprefix(f"{LEGACY_ANTIGRAVITY_KEY}=")
+            if not _is_legacy_agents_path(path) or path in agents_paths:
+                return None
+            agents_paths.append(path)
+        else:
+            return None
+    if mode is None:
+        return None
+    expected_roots = set(bootstrap_root_paths(mode)) - {".agents"}
+    if set(root_paths) != expected_roots:
+        return None
+    return mode, tuple(sorted(agents_paths))
+
+
+def _regular_text(path: Path) -> str | None:
+    """Read one evidence file only when it is a regular, non-symlink file."""
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _current_install_mode(target: Path) -> bool | None:
+    """Return a validated current root-manifest mode, never trusting legacy data."""
+    text = _regular_text(target / ".claude" / "bootstrap-ownership.env")
+    return install_mode_from_manifest(text) if text is not None else None
+
+
+def _legacy_agents_evidence(target: Path) -> tuple[str, ...] | None:
+    """Return matching old allowlist records, never widening their ownership."""
+    allowlist = target / ".claude" / "antigravity-ownership.env"
+    manifest = target / ".claude" / "bootstrap-ownership.env"
+    allowlist_text = _regular_text(allowlist)
+    manifest_text = _regular_text(manifest)
+    if allowlist_text is None or manifest_text is None:
+        return None
+    allowed = _legacy_allowlist_records(allowlist_text)
+    manifest_records = _legacy_manifest_records(manifest_text)
+    if allowed is None or manifest_records is None:
+        return None
+    _mode, recorded = manifest_records
+    if allowed != recorded:
+        return None
+    return allowed
+
+
+def _has_legacy_agents_evidence(target: Path) -> bool:
+    """Return whether old per-file ownership records remain to be migrated."""
+    allowlist = target / ".claude" / "antigravity-ownership.env"
+    manifest = target / ".claude" / "bootstrap-ownership.env"
+    if allowlist.exists() or allowlist.is_symlink():
+        return True
+    if not manifest.is_file():
+        return False
+    try:
+        return LEGACY_ANTIGRAVITY_KEY in manifest.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return True
+
+
+def _legacy_agents_tree_matches(
+    tree: dict[str, bytes | None],
+    legacy_paths: tuple[str, ...],
+    source_tree: dict[str, bytes | None],
+) -> bool:
+    """Return whether a tree exactly matches the retired generated-file record."""
+    entries = {path.removeprefix(".agents/") for path in legacy_paths}
+    directories = {
+        "/".join(path.split("/")[:index])
+        for path in entries
+        for index in range(1, len(path.split("/")))
+    }
+    return set(tree) == entries | directories and all(
+        tree.get(path) == source_tree[path] for path in entries & set(source_tree)
+    )
+
+
+def validate_agents_takeover(source: Path, target: Path) -> None:
+    """Fail before writes unless an existing `.agents` tree is proven generated."""
+    source_tree, source_invalid = _agents_tree(source / ".agents", ".agents")
+    if source_invalid:
+        raise SystemExit(
+            "Generated .agents source contains unsafe entries: "
+            + ", ".join(source_invalid)
+        )
+    agents_root = target / ".agents"
+    mirror_root = target / ".claude" / "bootstrap-root" / ".agents"
+    has_agents = agents_root.exists() or agents_root.is_symlink()
+    has_mirror = mirror_root.exists() or mirror_root.is_symlink()
+    actual_tree, actual_invalid = _agents_tree(agents_root, ".agents")
+    mirror_tree, mirror_invalid = _agents_tree(
+        mirror_root, ".claude/bootstrap-root/.agents"
+    )
+    legacy_paths = _legacy_agents_evidence(target)
+    current_mode = _current_install_mode(target)
+    conflicts: list[str] = []
+    evidence_paths = (
+        target / ".claude" / "antigravity-ownership.env",
+        target / ".claude" / "bootstrap-ownership.env",
+    )
+    for path in evidence_paths:
+        if (path.exists() or path.is_symlink()) and _regular_text(path) is None:
+            conflicts.append(str(path.relative_to(target)))
+    if _has_legacy_agents_evidence(target) and legacy_paths is None:
+        conflicts.extend(
+            str(path.relative_to(target))
+            for path in evidence_paths
+            if path.exists() or path.is_symlink()
+        )
+    conflicts.extend(actual_invalid)
+    conflicts.extend(mirror_invalid)
+    if has_mirror and not mirror_invalid:
+        if has_agents:
+            if mirror_tree != actual_tree:
+                conflicts.extend(
+                    _agents_conflicts(
+                        mirror_tree, actual_tree, ".claude/bootstrap-root/.agents"
+                    )
+                )
+        elif current_mode is None and not (
+            legacy_paths is not None
+            and _legacy_agents_tree_matches(mirror_tree, legacy_paths, source_tree)
+        ):
+            conflicts.extend(
+                _agents_conflicts(
+                    mirror_tree, source_tree, ".claude/bootstrap-root/.agents"
+                )
+            )
+            if mirror_tree == source_tree:
+                conflicts.append(".claude/bootstrap-root/.agents")
+    if conflicts:
+        raise SystemExit(
+            "Refusing .agents takeover; move or back up the listed content, remove it "
+            "only if intended, then rerun: " + ", ".join(sorted(set(conflicts)))
+        )
+    if has_agents and actual_tree == source_tree:
+        return
+    if has_mirror and not has_agents:
+        if current_mode is not None or (
+            legacy_paths is not None
+            and _legacy_agents_tree_matches(mirror_tree, legacy_paths, source_tree)
+        ):
+            return
+    if has_mirror and has_agents and current_mode is not None:
+        return
+
+    if not has_agents:
+        return
+
+    if legacy_paths is not None and _legacy_agents_tree_matches(
+        actual_tree, legacy_paths, source_tree
+    ):
+        return
+    final_conflicts = _agents_conflicts(actual_tree, source_tree, ".agents")
+    raise SystemExit(
+        "Refusing .agents takeover; move or back up the listed content, remove it "
+        "only if intended, then rerun: " + ", ".join(final_conflicts)
+    )
+
+
+def _third_party_skill_owner(surface_root: Path, relative_path: Path) -> bool:
+    """Return whether ``relative_path`` (relative to ``surface_root``, e.g.
+    ``.claude`` or ``.agents``) sits inside a marker-claimed third-party
+    skill directory. Checks ``relative_path`` itself and every ancestor so a
+    file nested inside the bundle is covered by its directory's marker."""
+    return any(
+        is_third_party_skill_dir(surface_root / candidate)
+        for candidate in (relative_path, *relative_path.parents)
+        if candidate != Path(".")
+    )
+
+
+def copy_generated_tree(
+    source: Path,
+    target: Path,
+    dry_run: bool,
+    commit_copilot_surface: bool = False,
+    previously_committed_copilot_surface: bool = False,
+) -> None:
     if not source.is_dir():
         raise SystemExit(f"Generated source does not exist: {source}")
     info(f"copy {source} -> {target}")
     if dry_run:
         return
     target.mkdir(parents=True, exist_ok=True)
+
+    def is_tracked(relative_path: Path) -> bool:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(target),
+                "ls-files",
+                "--error-unmatch",
+                "--",
+                relative_path.as_posix(),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return relative_path.as_posix() in result.stdout.splitlines()
+
+    def should_preserve(relative_path: Path) -> bool:
+        if not is_root_adapter_path(relative_path):
+            return False
+        is_copilot_surface = any(
+            relative_path == Path(path) or Path(path) in relative_path.parents
+            for path in COPILOT_SURFACE_PATHS
+        )
+        if is_copilot_surface and (
+            commit_copilot_surface or previously_committed_copilot_surface
+        ):
+            return False
+        return is_tracked(relative_path)
+
+    def owned_files() -> set[Path]:
+        owned: set[Path] = set()
+        claude_root = target / ".claude"
+        if claude_root.is_dir():
+            for directory, names, files in os.walk(claude_root, topdown=True):
+                relative_directory = Path(directory).relative_to(claude_root)
+                names[:] = [
+                    name
+                    for name in names
+                    if not (relative_directory == Path(".") and name == ".git")
+                    and not is_consumer_state_path(relative_directory / name)
+                    and not _third_party_skill_owner(
+                        claude_root, relative_directory / name
+                    )
+                    and not (
+                        relative_directory == Path(".") and name == "bootstrap-root"
+                    )
+                ]
+                for name in files:
+                    relative = relative_directory / name
+                    if not (
+                        relative_directory == Path(".") and name == ".git"
+                    ) and not is_consumer_state_path(relative):
+                        owned.add(Path(".claude") / relative)
+        for adapter in RESTORABLE_ROOT_PATHS:
+            adapter_path = target / adapter
+            if adapter_path.is_file() or adapter_path.is_symlink():
+                owned.add(Path(adapter))
+            elif adapter_path.is_dir():
+                owned.update(
+                    path.relative_to(target)
+                    for path in adapter_path.rglob("*")
+                    if (path.is_file() or path.is_symlink())
+                    and not _third_party_skill_owner(
+                        adapter_path, path.relative_to(adapter_path)
+                    )
+                )
+        return owned
+
+    for relative_path in sorted(owned_files()):
+        if (
+            relative_path != LEGACY_ANTIGRAVITY_ALLOWLIST
+            and (source / relative_path).is_file()
+        ) or should_preserve(relative_path):
+            continue
+        destination = target / relative_path
+        if destination.is_dir() and not destination.is_symlink():
+            warn(
+                "preserve directory that replaced obsolete generated adapter: "
+                f"{relative_path.as_posix()}"
+            )
+            continue
+        info(f"remove obsolete generated file {relative_path.as_posix()}")
+        destination.unlink()
+        parent = destination.parent
+        while parent != target:
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent
+
+    def copy_ignore(directory: str, names: list[str]) -> set[str]:
+        relative_directory = Path(directory).relative_to(source)
+        ignored: set[str] = set()
+        for name in names:
+            relative_path = relative_directory / name
+            destination_path = target / relative_path
+            if relative_path == LEGACY_ANTIGRAVITY_ALLOWLIST:
+                ignored.add(name)
+                continue
+            claude_relative = (
+                relative_path.relative_to(".claude")
+                if relative_path.parts and relative_path.parts[0] == ".claude"
+                else None
+            )
+            if claude_relative is not None and is_consumer_state_path(claude_relative):
+                if destination_path.exists() or destination_path.is_symlink():
+                    ignored.add(name)
+                    info(f"preserve consumer state {relative_path.as_posix()}")
+            elif should_preserve(relative_path):
+                ignored.add(name)
+                info(f"preserve tracked authoring adapter {relative_path.as_posix()}")
+            elif (
+                # OpenWiki's own installer owns `.claude/skills/openwiki` and
+                # `.agents/skills/openwiki` once it writes its marker there;
+                # a refresh must not overwrite either once it exists, only
+                # seed it on a genuinely fresh install.
+                relative_path.parts
+                and relative_path.parts[0] in (".claude", ".agents")
+                and _third_party_skill_owner(
+                    target / relative_path.parts[0],
+                    relative_path.relative_to(relative_path.parts[0]),
+                )
+            ):
+                if destination_path.exists() or destination_path.is_symlink():
+                    ignored.add(name)
+                    info(f"preserve third-party skill {relative_path.as_posix()}")
+        return ignored
+
     for child in sorted(source.iterdir()):
         destination = target / child.name
+        if should_preserve(Path(child.name)):
+            info(f"preserve tracked authoring adapter {child.name}")
+            continue
         if child.is_dir():
-            shutil.copytree(child, destination, dirs_exist_ok=True)
+            shutil.copytree(
+                child,
+                destination,
+                dirs_exist_ok=True,
+                ignore=copy_ignore,
+            )
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(child, destination)
+        strip_quarantine(destination)
+
+    # The per-directory ignore logic above protects the whole consumer-state
+    # directory a README lives in (real plans, logs, and reports), which
+    # also means copytree never looks inside it to find that README. Refresh
+    # each one explicitly and unconditionally so a pre-existing install picks
+    # up canonical-source fixes; every other file in the same directory is
+    # untouched because this only ever names the one allowlisted path.
+    for relative_readme in STATE_DIR_OWNED_README_PATHS:
+        seed = source / ".claude" / relative_readme
+        if not seed.is_file():
+            continue
+        destination_readme = target / ".claude" / relative_readme
+        destination_readme.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(seed, destination_readme)
+        strip_quarantine(destination_readme)
+        info(
+            f"refresh bootstrap-owned state directory README .claude/{relative_readme}"
+        )
 
 
-def ignore_block() -> str:
-    lines = [IGNORE_BLOCK_START, *IGNORE_PATTERNS, IGNORE_BLOCK_END]
+def _legacy_install_mode(text: str) -> bool | None:
+    """Read the old root manifest only while retaining the Copilot mode."""
+    records = _legacy_manifest_records(text)
+    return records[0] if records is not None else None
+
+
+def persisted_install_mode(target: Path) -> bool | None:
+    """Return the consumer's validated persisted Copilot-surface mode."""
+    manifest = target / ".claude" / "bootstrap-ownership.env"
+    if not manifest.is_file():
+        return None
+    try:
+        text = manifest.read_text(encoding="utf-8")
+        mode = install_mode_from_manifest(text)
+        return mode if mode is not None else _legacy_install_mode(text)
+    except OSError:
+        return None
+
+
+def validate_install_roots(
+    source: Path,
+    target: Path,
+    allow_self: bool = False,
+    *,
+    suggest_allow_self: bool = True,
+) -> None:
+    """Reject overlapping source and target trees before installer side effects.
+
+    ``--allow-self`` permits exactly one overlap: the bootstrap repository
+    refreshing its own dogfood overlay, where the generated source lives inside
+    the target. That case is safe because removal only walks ``target/.claude``
+    and ``RESTORABLE_ROOT_PATHS``, so the source under ``dist/`` is never a
+    removal candidate. Installing a tree over itself, or into a directory under
+    the source, stays rejected either way. ``suggest_allow_self`` is ``False``
+    for a sidecar target (Decision 13, 36): sidecar mode always passes
+    ``allow_self=False`` regardless of the flag, so the option genuinely has
+    no effect there and must not be suggested (S16).
+    """
+    if allow_self and source != target and source.is_relative_to(target):
+        if target != REPO_ROOT:
+            raise SystemExit(
+                "--allow-self only refreshes the bootstrap repository's own overlay: "
+                f"target={target}; bootstrap={REPO_ROOT}"
+            )
+        return
+    if (
+        source == target
+        or source.is_relative_to(target)
+        or target.is_relative_to(source)
+    ):
+        hint = (
+            ""
+            if allow_self or not suggest_allow_self
+            else " Pass --allow-self to refresh the bootstrap repository's own overlay."
+        )
+        raise SystemExit(
+            "Generated source and target repository must be separate, non-overlapping directories: "
+            f"source={source}; target={target}.{hint}"
+        )
+
+
+def require_source_exists(source: Path, *, explicit: bool) -> None:
+    """Abort with a message that fits how ``source`` was chosen (Decision
+    36; S16). A missing default source (the person passed no ``--source``)
+    says to regenerate it; a missing explicit ``--source`` names that path,
+    since regenerating would not create the path the person actually gave.
+    """
+    if source.is_dir():
+        return
+    if explicit:
+        raise SystemExit(f"Generated source does not exist: {source}")
+    raise SystemExit(
+        f"Generated source does not exist: {source}. Run "
+        "`uv run python scripts/generate_targets.py --all` to build it, then rerun."
+    )
+
+
+def require_full_source_complete(source: Path) -> None:
+    """Refuse a full-mode source that lacks the state-sync helper (Decision
+    31; S14): without it, a full install writes the ``.gitignore`` block,
+    ``bootstrap-ownership.env``, and a dangling ``core.hooksPath`` and then
+    fails deep inside ``sync_state_after_install`` instead of before any
+    write. Also catches ``--source dist/sidecar`` in full mode, which is
+    missing this file by construction (Decision 31, L2). Runs after
+    ``validate_install_roots`` and ``validate_agents_takeover`` so their
+    existing refusal messages keep their order and wording.
+    """
+    state_sync = source / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        raise SystemExit(
+            f"Full-mode source is incomplete: missing {state_sync}. Pass a "
+            "source built by `uv run python scripts/generate_targets.py "
+            "--all` (dist/multi-agent), not a sidecar tree such as "
+            "dist/sidecar."
+        )
+
+
+def ignore_block(
+    commit_copilot_surface: bool = False,
+) -> str:
+    lines = [
+        IGNORE_BLOCK_START,
+        *active_ignore_patterns(commit_copilot_surface),
+        "openwiki/.run.json",
+        IGNORE_BLOCK_END,
+    ]
     return "\n".join(lines) + "\n"
 
 
-def merge_gitignore(target: Path, dry_run: bool) -> None:
+PROJECT_NAME_PLACEHOLDER = "**Project:** [TODO: project name and one-liner description]"
+# Every generated surface that states the project's identity. Root guidance is
+# installed alongside workspace instructions and must carry the same facts.
+PROJECT_NAME_FILES = (
+    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
+    Path(".claude") / "instructions" / "workspace.instructions.md",
+    Path(".claude") / "instructions" / "workspace.md",
+)
+
+
+def substitute_project_name(target: Path, dry_run: bool) -> None:
+    """Fill generated project-name placeholders with the target directory name."""
+    paths = [target / relative for relative in PROJECT_NAME_FILES]
+    if not any(
+        path.is_file() and PROJECT_NAME_PLACEHOLDER in path.read_text(encoding="utf-8")
+        for path in paths
+    ):
+        return
+    info(f"substitute generated project name -> {target.name}")
+    if dry_run:
+        return
+    for path in paths:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if PROJECT_NAME_PLACEHOLDER in text:
+            path.write_text(
+                text.replace(PROJECT_NAME_PLACEHOLDER, f"**Project:** {target.name}"),
+                encoding="utf-8",
+            )
+
+
+# The bootstrap's declared Python baseline. Kept in generated guidance verbatim
+# when the target declares nothing more specific. Must stay in sync with the
+# `**Python:**`/`**Stack:**` lines in shared/policies/workspace.instructions.md.
+PYTHON_BASELINE = "3.12+"
+# Every generated surface that carries the two project-fact lines. workspace.md
+# and workspace.instructions.md are near-duplicates and the root adapters embed
+# the same section, so all four must be reconciled together.
+PYTHON_FACT_FILES = (
+    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
+    Path(".claude") / "instructions" / "workspace.instructions.md",
+    Path(".claude") / "instructions" / "workspace.md",
+)
+
+
+def _python_display(requires_python: str | None) -> str | None:
+    """Turn a `requires-python` spec into a docs display string like `3.13+`.
+
+    Only the common `>=X.Y` form is normalized; a compound or unusual spec
+    (`>=3.11,<3.14`, `~=3.12`, `==3.12.*`) returns None so the baseline is kept
+    rather than guessed."""
+    if not requires_python:
+        return None
+    spec = requires_python.strip()
+    if not spec.startswith(">="):
+        return None
+    version = spec[2:].strip()
+    if not version or any(ch in version for ch in ",<>=!~* "):
+        return None
+    return f"{version}+"
+
+
+def _target_requires_python(target: Path) -> str | None:
+    """Read `[project].requires-python` from the target's pyproject.toml, or
+    None when it is absent/unreadable (a fresh, pre-`uv init` target)."""
+    pyproject = target / "pyproject.toml"
+    if not pyproject.is_file():
+        return None
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return None
+    value = project.get("requires-python")
+    return value if isinstance(value, str) else None
+
+
+def substitute_python_version(target: Path, dry_run: bool) -> None:
+    """Reconcile the documented Python prerequisite with the target's declared
+    `requires-python` across every generated surface that states it. A fresh
+    target with no parseable `requires-python` keeps the bootstrap baseline."""
+    display = _python_display(_target_requires_python(target))
+    if display is None or display == PYTHON_BASELINE:
+        return
+    replacements = (
+        (f"**Python:** {PYTHON_BASELINE} |", f"**Python:** {display} |"),
+        (
+            f"**Stack:** Python {PYTHON_BASELINE} with uv",
+            f"**Stack:** Python {display} with uv",
+        ),
+    )
+    info(f"substitute documented python version -> {display}")
+    if dry_run:
+        return
+    for relative in PYTHON_FACT_FILES:
+        path = target / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        updated = text
+        for old, new in replacements:
+            updated = updated.replace(old, new)
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+
+
+def merge_gitignore(
+    target: Path,
+    dry_run: bool,
+    commit_copilot_surface: bool = False,
+) -> None:
     gitignore = target / ".gitignore"
-    block = ignore_block()
+    block = ignore_block(commit_copilot_surface)
     current = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     if IGNORE_BLOCK_START in current and IGNORE_BLOCK_END in current:
-        info(".gitignore already contains multi-agent ignore block")
+        # Refresh an existing block in place so pattern changes (e.g. a new
+        # ignore entry) reach consumers that already have the block. Text
+        # outside the START..END markers is left untouched.
+        start = current.index(IGNORE_BLOCK_START)
+        end = current.index(IGNORE_BLOCK_END) + len(IGNORE_BLOCK_END)
+        refreshed = current[:start] + block.rstrip("\n") + current[end:]
+        if refreshed == current:
+            info(".gitignore multi-agent ignore block is up to date")
+            return
+        info(f"refresh multi-agent ignore block in {gitignore}")
+        if dry_run:
+            return
+        gitignore.write_text(refreshed, encoding="utf-8")
         return
 
     info(f"append multi-agent ignore block to {gitignore}")
@@ -97,11 +955,18 @@ def merge_gitignore(target: Path, dry_run: bool) -> None:
         return
 
     separator = "" if not current or current.endswith("\n") else "\n"
-    gitignore.write_text(f"{current}{separator}\n{block}" if current else block, encoding="utf-8")
+    gitignore.write_text(
+        f"{current}{separator}\n{block}" if current else block, encoding="utf-8"
+    )
 
 
 def chmod_runtime_scripts(target: Path, dry_run: bool) -> None:
-    patterns = (".claude/hooks/scripts/*.sh", ".devcontainer/*.sh", ".devcontainer/*.py")
+    patterns = (
+        ".claude/hooks/scripts/*.sh",
+        ".claude/hooks/git-hooks/*",
+        ".devcontainer/*.sh",
+        ".devcontainer/*.py",
+    )
     for pattern in patterns:
         for path in target.glob(pattern):
             if not path.is_file():
@@ -112,105 +977,904 @@ def chmod_runtime_scripts(target: Path, dry_run: bool) -> None:
             path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def update_devcontainer_sync_env(target: Path, bucket: str, prefix: str | None, dry_run: bool) -> None:
-    devcontainer_path = target / ".devcontainer" / "devcontainer.json"
-    if not devcontainer_path.is_file():
-        warn(f"missing devcontainer config: {devcontainer_path}")
+def configure_git_hooks_path(target: Path, dry_run: bool) -> None:
+    if not (target / ".git").exists():
+        warn(f"{target} is not a git repository; skipping core.hooksPath configuration")
         return
-
-    info(f"set devcontainer HF_AI_SYNC_BUCKET={bucket}")
-    if prefix:
-        info(f"set devcontainer HF_AI_SYNC_PREFIX={prefix}")
+    info("set git config core.hooksPath .claude/hooks/git-hooks")
     if dry_run:
         return
-
-    data = json.loads(devcontainer_path.read_text(encoding="utf-8"))
-    container_env = data.setdefault("containerEnv", {})
-    container_env["HF_AI_SYNC_BUCKET"] = bucket
-    if prefix:
-        container_env["HF_AI_SYNC_PREFIX"] = prefix
-    else:
-        container_env.pop("HF_AI_SYNC_PREFIX", None)
-    devcontainer_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-
-
-def tracked_generated_paths(target: Path) -> list[str]:
     result = subprocess.run(
-        ["git", "-C", str(target), "ls-files", "--", *IGNORE_PATTERNS],
+        [
+            "git",
+            "-C",
+            str(target),
+            "config",
+            "core.hooksPath",
+            ".claude/hooks/git-hooks",
+        ],
         text=True,
         capture_output=True,
         check=False,
     )
     if result.returncode != 0:
+        warn(f"could not set core.hooksPath: {result.stderr.strip()}")
+
+
+def update_devcontainer_state_remote(
+    target: Path, state_remote: str | None, dry_run: bool
+) -> None:
+    """Persists a non-default --state-remote into the committed devcontainer
+    config, so a fresh container clone (which has no other way to learn a
+    private state-remote URL, since .claude/ itself is gitignored) picks it
+    up automatically. The default (origin) needs no config at all."""
+    if not state_remote:
+        return
+    devcontainer_path = target / ".devcontainer" / "devcontainer.json"
+    if not devcontainer_path.is_file():
+        warn(f"missing devcontainer config: {devcontainer_path}")
+        return
+
+    info(f"set devcontainer AI_STATE_REMOTE={state_remote}")
+    if dry_run:
+        return
+
+    data = json.loads(devcontainer_path.read_text(encoding="utf-8"))
+    container_env = data.setdefault("containerEnv", {})
+    container_env["AI_STATE_REMOTE"] = state_remote
+    devcontainer_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def populate_bootstrap_root(
+    target: Path,
+    dry_run: bool,
+    commit_copilot_surface: bool,
+) -> None:
+    """D5: mirrors the root-level adapter files into .claude/bootstrap-root/
+    so they are carried by the git-backed .claude/ checkout even though they
+    live outside .claude/ themselves. Skips the Copilot surface when it is
+    already committed to the outer repo (--commit-copilot-surface)."""
+    paths = bootstrap_root_paths(commit_copilot_surface)
+
+    destination_root = target / ".claude" / "bootstrap-root"
+    info(f"populate {destination_root} from root adapters")
+    if dry_run:
+        return
+    destination_root.mkdir(parents=True, exist_ok=True)
+
+    active_paths = set(paths)
+    for relative in RESTORABLE_ROOT_PATHS:
+        if relative in active_paths:
+            continue
+        destination = destination_root / relative
+        if not (destination.exists() or destination.is_symlink()):
+            continue
+        info(f"remove inactive bootstrap-root adapter {relative}")
+        if destination.is_dir() and not destination.is_symlink():
+            shutil.rmtree(destination)
+        else:
+            destination.unlink()
+        parent = destination.parent
+        while parent != destination_root:
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent
+
+    for relative in paths:
+        source = target / relative
+        if not source.exists():
+            continue
+        destination = destination_root / relative
+        if source.is_dir():
+            if destination.is_dir() and not destination.is_symlink():
+                shutil.rmtree(destination)
+            elif destination.exists() or destination.is_symlink():
+                raise SystemExit(
+                    "Unsafe bootstrap-root adapter destination: "
+                    f"{destination.relative_to(target)}"
+                )
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        strip_quarantine(destination)
+
+    ownership_manifest = target / ".claude" / "bootstrap-ownership.env"
+    ownership_manifest.write_text(
+        restore_manifest(commit_copilot_surface),
+        encoding="utf-8",
+    )
+
+
+def sync_state_after_install(
+    target: Path,
+    dry_run: bool,
+    state_remote: str | None,
+    had_claude_git: bool,
+    had_pre_existing_content: bool,
+    local_only: bool,
+) -> None:
+    """Commits and pushes the nested .claude/ AI-state repo (D1/D4). A
+    pre-git .claude/ with real content must already have been migrated before
+    generated files replace it. This function then makes the distinct
+    `bootstrap: install/update <timestamp>` commit, separate from `session:`
+    commits made by the Stop hook."""
+    info("sync AI state via state-sync.sh")
+    if dry_run:
+        return
+
+    state_sync = target / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        raise SystemExit(f"missing state-sync helper: {state_sync}")
+
+    env = os.environ.copy()
+    if state_remote:
+        env["AI_STATE_REMOTE"] = state_remote
+    if local_only:
+        env["AI_STATE_LOCAL_ONLY"] = "1"
+
+    # stdin=DEVNULL (F2 in plans/plan-git-state-sync.md §9): state-sync.sh
+    # drains stdin for up to 2s (a hook/task contract). When invoked from this
+    # installer with inherited stdin, an interactive run would block on — and
+    # swallow — terminal input; the installer never reads stdin, so close it.
+    subprocess.run(
+        ["bash", str(state_sync), "setup"],
+        check=False,
+        cwd=target,
+        env=env,
+        stdin=subprocess.DEVNULL,
+    )
+    require_nested_head(target, "state-sync setup")
+    if not had_claude_git and not had_pre_existing_content:
+        require_clean_nested_state(target, "state-sync setup")
+    # On a truly fresh install, `setup` above already committed everything
+    # currently on disk as "bootstrap: init ai-state" (it always commits
+    # whatever it finds when .claude/.git doesn't yet exist) — that commit
+    # already satisfies D1's bootstrap:-prefixed-commit requirement, so there
+    # is nothing left to stage here. On a repeat run .claude/.git already
+    # existed, so `setup` was a no-op, and this run's freshly copied files
+    # are real, uncommitted changes that need their own commit.
+    if had_claude_git or had_pre_existing_content:
+        status = subprocess.run(
+            ["git", "-C", str(target / ".claude"), "status", "--porcelain"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if status.stdout.strip():
+            subprocess.run(
+                ["git", "-C", str(target / ".claude"), "add", "-A"], check=False
+            )
+            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(target / ".claude"),
+                    "commit",
+                    "-q",
+                    "-m",
+                    f"bootstrap: update {timestamp}",
+                ],
+                check=False,
+            )
+
+    require_clean_nested_state(target, "bootstrap update")
+
+    if local_only:
+        status = nested_git(target, "status", "--short", "--branch")
+        print("Nested AI-state status:")
+        print(status.stdout.rstrip() or "(unable to read nested repository status)")
+        print(f"Publish later: bash {shlex.quote(str(state_sync))} push")
+        return
+
+    push_result = subprocess.run(
+        ["bash", str(state_sync), "push"],
+        check=False,
+        cwd=target,
+        env=env,
+        stdin=subprocess.DEVNULL,
+    )
+    if push_result.returncode != 0:
+        warn(
+            "state-sync push reported a non-zero exit; state committed locally, will retry on next sync."
+        )
+
+
+def report_codex_hook_trust(dry_run: bool) -> None:
+    """Explain the explicit Codex for VS Code project-hook trust boundary."""
+    action = "would install or update" if dry_run else "installed or updated"
+    info(
+        f"{action} .codex/hooks.json; Codex for VS Code project-hook trust "
+        "is bound to its content/hash."
+    )
+    print("An actual install or update can require review/retrust.")
+    print(
+        "After an actual install or update, reopen/reload this repository in Codex for VS Code, "
+        "then review and approve the project hooks when prompted before relying on the new lifecycle hooks."
+    )
+    print(
+        "This installer does not approve project hooks or change user trust settings."
+    )
+
+
+def migrate_pre_existing_state(
+    target: Path,
+    source: Path,
+    dry_run: bool,
+    state_remote: str | None,
+    had_pre_existing_content: bool,
+    local_only: bool,
+) -> None:
+    """Commit legacy state before generated files replace it."""
+    if not had_pre_existing_content:
+        return
+
+    state_sync = source / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        raise SystemExit(f"missing source state-sync helper: {state_sync}")
+
+    info("migrate pre-existing AI state via state-sync.sh")
+    if dry_run:
+        return
+
+    env = os.environ.copy()
+    env["AI_STATE_REPO_ROOT"] = str(target)
+    if state_remote:
+        env["AI_STATE_REMOTE"] = state_remote
+    if local_only:
+        env["AI_STATE_LOCAL_ONLY"] = "1"
+    subprocess.run(
+        ["bash", str(state_sync), "migrate-from-hf"],
+        check=False,
+        cwd=target,
+        env=env,
+        stdin=subprocess.DEVNULL,
+    )
+    require_clean_nested_state(target, "legacy state migration")
+    history = nested_git(target, "log", "--format=%s")
+    if (
+        history.returncode != 0
+        or "migrate: import pre-git state" not in history.stdout.splitlines()
+    ):
+        raise SystemExit(
+            "legacy state migration did not create a migrate: import pre-git state commit"
+        )
+
+
+class GitDetectionError(RuntimeError):
+    """A Git failure during mode detection other than "not a git repository"
+    (Decision 27): the caller must abort detection in every mode, quoting
+    this message and a remedy, instead of reading it as "no evidence"."""
+
+
+def _detection_abort_message(target: Path, stderr: str) -> str:
+    return (
+        f"Refusing to detect an install mode: git failed on {target}: "
+        f"{stderr}. If this is a dubious-ownership message, run "
+        f"`git config --global --add safe.directory {target}`, then rerun."
+    )
+
+
+def tracked_generated_paths(target: Path, patterns: tuple[str, ...]) -> list[str]:
+    """Return every tracked path under ``patterns``, bytes-safe (Decision
+    29). Returns an empty list only for "not a git repository" (Decision 27)
+    or a missing ``target`` folder; raises ``GitDetectionError`` on any
+    other Git failure, so a caller doing mode detection can tell the two
+    apart instead of reading every failure as "no evidence"."""
+    if not target.is_dir():
         return []
-    return [line for line in result.stdout.splitlines() if line.strip()]
+    result = subprocess.run(
+        ["git", "-C", str(target), "ls-files", "-z", "--", *patterns],
+        capture_output=True,
+        check=False,
+        env=_c_locale_env(),
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", "replace")
+        if "not a git repository" in stderr:
+            return []
+        raise GitDetectionError(stderr.strip())
+    return [os.fsdecode(part) for part in result.stdout.split(b"\0") if part]
 
 
-def warn_tracked_paths(target: Path) -> None:
-    tracked = tracked_generated_paths(target)
+def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
+    """Warn about tracked generated paths (Decision 44; O17). Called after
+    most of the full install's own writes, so a Git failure here must never
+    abort the run: ``tracked_generated_paths`` can raise ``GitDetectionError``
+    for a Git failure other than "not a git repository" (Decision 27), and
+    that becomes a warning instead of a crash mid-way through an otherwise
+    finished install."""
+    try:
+        tracked = tracked_generated_paths(target, patterns)
+    except GitDetectionError as exc:
+        warn(f"could not check for tracked generated paths: {exc}")
+        return
     if not tracked:
         return
     unique_roots = sorted(
         {
             pattern.rstrip("/")
-            for pattern in IGNORE_PATTERNS
-            if any(path == pattern.rstrip("/") or path.startswith(pattern.rstrip("/") + "/") for path in tracked)
+            for pattern in patterns
+            if any(
+                path == pattern.rstrip("/")
+                or path.startswith(pattern.rstrip("/") + "/")
+                for path in tracked
+            )
         }
     )
     warn("some generated AI paths are already tracked by git.")
-    print("Run this in the consumer repo if you want to untrack them while keeping local files:")
+    print(
+        "Run this in the consumer repo if you want to untrack them while keeping local files:"
+    )
     print(f"git rm --cached -r -- {' '.join(unique_roots)}")
 
 
-def upload_bootstrap(target: Path, bucket: str, prefix: str | None, dry_run: bool, verbose: bool) -> None:
-    helper = target / ".devcontainer" / "hf-ai-sync.py"
-    if not helper.is_file():
-        warn(f"missing HF sync helper: {helper}")
-        return
+# Hook script filenames this bootstrap has shipped under `.claude/hooks/
+# scripts/` across both full-install eras (HF-sync and today's git-backed
+# state sync; confirmed against `shared/hooks/scripts/` history and the
+# reported legacy consumer's checked-out `.claude/hooks/scripts/`, which
+# also has the retired `hf-ai-sync.sh`, left out here since it would then
+# exclude a current install). An arbitrary hooks directory with unrelated
+# filenames is not evidence on its own, so `_legacy_hook_scripts_present`
+# requires more than one of these names together.
+_LEGACY_HOOK_SCRIPT_NAMES = (
+    "run-hook.sh",
+    "protect-files.sh",
+    "session-log.sh",
+    "context-mode-dispatch.sh",
+    "git-protection.sh",
+)
+_LEGACY_HOOK_SCRIPT_MIN_MATCHES = 2
 
-    command = [
-        sys.executable,
-        str(helper),
-        "upload-bootstrap",
-        "--repo-root",
-        str(target),
-        "--bucket",
-        bucket,
-    ]
-    if prefix:
-        command.extend(["--prefix", prefix])
-    if dry_run:
-        command.append("--dry-run")
-    if verbose:
-        command.append("--verbose")
+# Tracked devcontainer paths this bootstrap has used to drive its own state
+# sync, one per full-install era: `hf-ai-sync.py` (retired) and today's
+# `state-sync.sh`. Either, tracked, next to a real untracked `.claude` and
+# the hook scripts above, is legacy full-install evidence (finding 2).
+_LEGACY_DEVCONTAINER_SYNC_PATHS = (
+    ".devcontainer/hf-ai-sync.py",
+    ".devcontainer/state-sync.sh",
+)
 
-    env = os.environ.copy()
-    repo_venv_bin = REPO_ROOT / ".venv" / "bin"
-    if repo_venv_bin.is_dir():
-        env["PATH"] = f"{repo_venv_bin}{os.pathsep}{env.get('PATH', '')}"
 
-    info("upload generated AI bootstrap bundle to Hugging Face")
-    result = subprocess.run(command, text=True, check=False, env=env)
-    if result.returncode != 0:
-        warn("HF bootstrap upload command failed; continuing.")
+def _claude_dir_tracked(target: Path) -> bool:
+    """Return whether the outer Git index has any entry at or under
+    ``.claude`` (Phase G's index reader, reused here): a team that tracks
+    ``.claude/**``, ships it as a submodule or an embedded gitlink, or
+    tracks ``.claude`` as a symlink is team config, however the checked-out
+    content looks. A target that is not a Git repository reads as "nothing
+    tracked"; any other Git failure aborts detection in every mode
+    (Decision 27)."""
+    if not target.is_dir():
+        return False
+    try:
+        entries = _read_index_entries(target)
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode("utf-8", "replace")
+        if "not a git repository" not in stderr:
+            raise SystemExit(_detection_abort_message(target, stderr.strip())) from exc
+        entries = ()
+    return any(
+        path == ".claude" or path.startswith(".claude/") for _mode, path in entries
+    )
+
+
+def _real_untracked_claude_dir(target: Path) -> bool:
+    """Return whether ``target/.claude`` exists as a real directory
+    (checked with ``lstat``, so a symlink never counts) that the outer
+    index does not track. This alone only says a private per-clone
+    ``.claude/`` setup already exists; corroborating bootstrap evidence
+    under it (``_legacy_full_install_evidence``) still decides whether it
+    is a recognized legacy full install. A plain-mode refusal also uses
+    this on its own, so it never recommends installing a sidecar overlay
+    next to an existing ``.claude/`` setup it cannot yet confirm
+    (finding 2)."""
+    try:
+        if not stat.S_ISDIR(os.lstat(target / ".claude").st_mode):
+            return False
+    except OSError:
+        return False
+    return not _claude_dir_tracked(target)
+
+
+def _legacy_hook_scripts_present(target: Path) -> bool:
+    """Return whether at least ``_LEGACY_HOOK_SCRIPT_MIN_MATCHES`` of
+    ``_LEGACY_HOOK_SCRIPT_NAMES`` exist as regular files under
+    ``.claude/hooks/scripts``. One familiar filename alone is not legacy
+    evidence; several of this bootstrap's own hook script names together
+    are."""
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    try:
+        if not stat.S_ISDIR(os.lstat(hooks_dir).st_mode):
+            return False
+    except OSError:
+        return False
+    matches = 0
+    for name in _LEGACY_HOOK_SCRIPT_NAMES:
+        try:
+            if stat.S_ISREG(os.lstat(hooks_dir / name).st_mode):
+                matches += 1
+        except OSError:
+            continue
+    return matches >= _LEGACY_HOOK_SCRIPT_MIN_MATCHES
+
+
+def _legacy_verify_script_present(target: Path) -> bool:
+    """Return whether ``.claude/scripts/verify.py`` exists as a regular
+    file: a path this bootstrap has generated at this exact location since
+    before ``bootstrap-ownership.env`` existed (a pre-manifest full
+    install)."""
+    try:
+        return stat.S_ISREG(
+            os.lstat(target / ".claude" / "scripts" / "verify.py").st_mode
+        )
+    except OSError:
+        return False
+
+
+def _legacy_full_install_evidence(target: Path) -> str | None:
+    """Return a description of recognized legacy full-install evidence
+    under a real, untracked ``.claude`` directory, or ``None``. Neither a
+    tracked devcontainer sync path nor a local ``verify.py`` counts by
+    itself, and neither counts without the corroborating hook scripts: an
+    arbitrary ``.claude/hooks`` directory is not evidence on its own.
+    Callers must only invoke this after ``_real_untracked_claude_dir``."""
+    if not _legacy_hook_scripts_present(target):
+        return None
+    try:
+        tracked_sync = tracked_generated_paths(target, _LEGACY_DEVCONTAINER_SYNC_PATHS)
+    except GitDetectionError as exc:
+        raise SystemExit(_detection_abort_message(target, str(exc))) from exc
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    if tracked_sync:
+        return f"tracked {', '.join(sorted(tracked_sync))}; local {hooks_dir}"
+    if _legacy_verify_script_present(target):
+        verify_script = target / ".claude" / "scripts" / "verify.py"
+        return f"local {verify_script}; local {hooks_dir}"
+    return None
+
+
+def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
+    """Full-install evidence per the mode table (Decision 27). Neither
+    ``.claude/.git`` nor ``.claude/bootstrap-ownership.env`` counts when the
+    outer index has any entry at or under ``.claude``: a team that tracks
+    ``.claude/**``, ships it as a submodule or an embedded gitlink, or
+    tracks ``.claude`` as a symlink is team config instead, however the
+    checked-out content looks. Otherwise ``.claude/.git`` counts only when
+    it is a directory (checked with ``lstat``, so a submodule's ``.git``
+    file never counts) and the env file counts by ``lexists`` (never
+    followed).
+
+    A real, untracked ``.claude`` with neither of those two modern markers
+    can still be a recognized legacy full install (finding 2): the
+    HF-sync and git-backed state-sync eras both tracked a devcontainer sync
+    script and shipped this bootstrap's own hook scripts under
+    ``.claude/hooks/scripts``; a pre-manifest install instead has a local
+    ``.claude/scripts/verify.py`` next to those same hook scripts. This
+    check only runs once neither modern marker already fired, so a current
+    full install -- which also ships those same hook scripts and tracks
+    ``.devcontainer/state-sync.sh`` -- is never mislabeled "legacy"."""
+    evidence: list[str] = []
+    claude_tracked = _claude_dir_tracked(target)
+    nested_git = target / ".claude" / ".git"
+    try:
+        nested_is_dir = stat.S_ISDIR(os.lstat(nested_git).st_mode)
+    except OSError:
+        nested_is_dir = False
+    if nested_is_dir and not claude_tracked:
+        evidence.append(f"nested AI-state repository {nested_git}")
+    ownership_env = target / ".claude" / "bootstrap-ownership.env"
+    if os.path.lexists(ownership_env) and not claude_tracked:
+        evidence.append(f"full-install manifest {ownership_env}")
+    if not evidence and _real_untracked_claude_dir(target):
+        legacy = _legacy_full_install_evidence(target)
+        if legacy is not None:
+            evidence.append(f"legacy full install evidence ({legacy})")
+    if allow_self and target == REPO_ROOT:
+        evidence.append("--allow-self with this repository as the target")
+    return tuple(evidence)
+
+
+def _sidecar_evidence(target: Path) -> tuple[str, ...]:
+    """Sidecar evidence per the mode table. A missing ``target`` folder has
+    no Git-directory evidence to read (Decision 27). A Git failure other
+    than "not a git repository" aborts detection in every mode instead of
+    being read as "no evidence" (S2); unbalanced or repeated exclude-block
+    markers (Decision 26; S7) do the same."""
+    if not target.is_dir():
+        return ()
+    try:
+        return sidecar_evidence(target)
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr or ""
+        if "not a git repository" in stderr:
+            return ()
+        raise SystemExit(_detection_abort_message(target, stderr.strip())) from exc
+    except ExcludeMarkerError as exc:
+        raise SystemExit(
+            f"Refusing to detect an install mode: {exc}. "
+            f"To recover, {_EXCLUDE_MARKER_REMEDY}."
+        ) from exc
+
+
+def _team_config_evidence(target: Path) -> tuple[str, ...]:
+    """Tracked paths under ``FULL_INSTALL_ROOT_PATHS``. Empty when ``target``
+    is not a Git repository: ``git ls-files`` then finds nothing tracked,
+    which is exactly the "no team config" reading. Any other Git failure
+    aborts detection in every mode (Decision 27)."""
+    try:
+        return tuple(tracked_generated_paths(target, FULL_INSTALL_ROOT_PATHS))
+    except GitDetectionError as exc:
+        raise SystemExit(_detection_abort_message(target, str(exc))) from exc
+
+
+def _is_linked_worktree(target: Path) -> bool:
+    """Return whether ``target``'s Git directory differs from the common Git
+    directory. A target where either cannot be resolved (not a Git
+    repository) is read as "not linked" rather than a crash; a later step
+    that actually needs a Git repository reports that failure on its own."""
+    git_dir = rev_parse(target, "--git-dir")
+    common_dir = rev_parse(target, "--git-common-dir")
+    return git_dir is not None and common_dir is not None and git_dir != common_dir
+
+
+def _fresh_default_refusal(target: Path) -> str | None:
+    """Name why a fresh-default full install must refuse before any write
+    (Decision 48; N18), or return ``None`` when none of the checks fire.
+
+    Only called once neither full nor sidecar evidence is present: an
+    existing full consumer's refresh carries evidence (a nested AI-state
+    repository or the ownership manifest) and never reaches this function,
+    so a refresh is unaffected.
+    """
+    toplevel = rev_parse(target, "--show-toplevel")
+    if toplevel is not None and Path(toplevel).resolve() != target.resolve():
+        return (
+            f"{target} is not the root of its Git repository "
+            f"(the root is {toplevel}). The full install supports only the "
+            "root of a main worktree; run it from the repository root "
+            "instead."
+        )
+    if _is_linked_worktree(target):
+        return (
+            f"{target} is a linked worktree. The full install supports "
+            "only the root of a main worktree; run it from the main "
+            "worktree checkout instead."
+        )
+    if rev_parse(target, "--is-bare-repository") == "true":
+        return (
+            f"{target} is a bare repository. The full install supports "
+            "only the root of a main worktree, which needs a working tree "
+            "to hold the generated files."
+        )
+    try:
+        claude_is_regular_file = stat.S_ISREG(os.lstat(target / ".claude").st_mode)
+    except OSError:
+        claude_is_regular_file = False
+    if claude_is_regular_file:
+        return (
+            f"{target}/.claude exists as a regular file. The full install "
+            "supports only the root of a main worktree, where .claude can "
+            "become a directory."
+        )
+    return None
+
+
+def detect_install_mode(
+    target: Path, requested_mode: str | None, allow_self: bool
+) -> InstallMode:
+    """Return the install mode for ``target``, or raise ``SystemExit``.
+
+    Implements the big plan's mode-detection table exactly ("Design
+    Overview" -> "Mode detection" in
+    ``.claude/plans/consumer-sidecar-bootstrap-overlay.md``). Reads only
+    ``target``, and only for the row that ``requested_mode`` selects: a
+    linked-worktree check is never made for ``--mode full`` or no
+    ``--mode``, since the table never asks for it there.
+    """
+    sidecar_ev = _sidecar_evidence(target)
+    full_ev = _full_install_evidence(target, allow_self)
+
+    if requested_mode == "sidecar":
+        if full_ev:
+            raise SystemExit(
+                "Refusing --mode sidecar: "
+                f"{target} already has full-install evidence ({'; '.join(full_ev)}). "
+                "This consumer is already managed by a full install; refresh it with "
+                "--mode full, or no --mode at all, instead."
+            )
+        if _is_linked_worktree(target):
+            raise SystemExit(
+                "Refusing --mode sidecar in a linked worktree: "
+                f"{target} is a linked worktree. The sidecar's info/exclude "
+                "block is shared by every worktree of this repository, while "
+                "its manifest is per worktree, so a sidecar installed here "
+                "could hide or expose another worktree's files. Run the "
+                "installer from the main worktree checkout instead."
+            )
+        return "sidecar"
+
+    if requested_mode == "full":
+        if sidecar_ev:
+            raise SystemExit(
+                "Refusing --mode full: "
+                f"{target} already has sidecar evidence ({'; '.join(sidecar_ev)}). "
+                "The sidecar's info/exclude block is shared by every worktree of "
+                "this repository, so this can be true even from a linked worktree "
+                "or a subdirectory. Run without --mode full to keep the sidecar "
+                "overlay, run --uninstall to remove it first, or ask whoever "
+                "manages the sidecar to remove it."
+            )
+        if not full_ev:
+            refusal = _fresh_default_refusal(target)
+            if refusal is not None:
+                raise SystemExit(f"Refusing --mode full: {refusal}")
+        return "full"
+
+    # No --mode: auto-detect, in the table's exact order.
+    if sidecar_ev and full_ev:
+        raise SystemExit(
+            "Refusing to auto-detect an install mode: "
+            f"{target} has both full-install evidence ({'; '.join(full_ev)}) and "
+            f"sidecar evidence ({'; '.join(sidecar_ev)}). Every explicit mode and "
+            "--uninstall refuse while both remain, so this is not a flag choice: "
+            f"back up {target}, inspect which installation you intend to keep, remove "
+            "the other overlay by hand, then rerun once only one kind of evidence is "
+            "left."
+        )
+    if sidecar_ev:
+        return "sidecar"
+    if full_ev:
+        return "full"
+
+    team_config = _team_config_evidence(target)
+    if team_config:
+        if _real_untracked_claude_dir(target):
+            raise SystemExit(
+                "Refusing a plain install with no --mode: "
+                f"{target} already tracks bootstrap-owned paths ({', '.join(team_config)}) "
+                "next to an existing, untracked .claude/ this run cannot yet confirm as "
+                "a recognized bootstrap install. A sidecar overlay must not sit next to "
+                "an existing per-clone .claude/ setup; pass --mode full to restore or "
+                "refresh it instead."
+            )
+        message = (
+            "Refusing a plain install with no --mode: "
+            f"{target} already tracks bootstrap-owned paths ({', '.join(team_config)}) "
+            "and carries no bootstrap or sidecar evidence. Pass --mode sidecar for a "
+            "private per-clone overlay that never changes tracked files, or --mode "
+            "full for today's takeover."
+        )
+        if ".devcontainer/state-sync.sh" in team_config:
+            message += (
+                " This looks like a fresh clone of a full consumer whose .claude/ is "
+                "not restored yet: run `bash .devcontainer/state-sync.sh setup` first, "
+                "or pass --mode full."
+            )
+        raise SystemExit(message)
+
+    refusal = _fresh_default_refusal(target)
+    if refusal is not None:
+        raise SystemExit(f"Refusing a plain install with no --mode: {refusal}")
+
+    return "full"
+
+
+def warn_full_only_options_ignored(
+    args: argparse.Namespace, *, uninstall: bool = False
+) -> None:
+    """Name every full-only option a sidecar install or ``--uninstall``
+    receives and ignores (Decision 13).
+
+    ``--source`` chooses a sidecar install's source tree, so it is never
+    ignored there; ``--uninstall`` never reads ``args.source`` at all, so it
+    is always named when given. ``--local-only`` is a silent no-op for a
+    sidecar install (``update_consumers.py`` forwards it to every target in
+    a batch, so naming it there would be noisy) and stays unnamed there, but
+    ``--uninstall`` never reads it either, so it is named. ``--allow-self``
+    still changes ``--uninstall``'s own full-evidence check (Decision 18),
+    so it is only named for a sidecar install, never for ``--uninstall``.
+    ``--dry-run`` works normally in both and is never named. ``--profile``
+    is never read by ``--uninstall`` (it removes every profile's units
+    regardless), so it is named there; a sidecar install reads it, so it is
+    never named there. ``--purge-state`` is only read by ``--uninstall``, so
+    it is named for a plain sidecar install.
+    """
+    ignored: list[str] = []
+    if uninstall and args.source is not None:
+        ignored.append("--source")
+    if args.commit_copilot_surface is True:
+        ignored.append("--commit-copilot-surface")
+    elif args.commit_copilot_surface is False:
+        ignored.append("--no-commit-copilot-surface")
+    if args.state_remote is not None:
+        ignored.append("--state-remote")
+    if os.environ.get("AI_STATE_REMOTE"):
+        ignored.append("AI_STATE_REMOTE")
+    if uninstall and args.local_only:
+        ignored.append("--local-only")
+    if not uninstall and args.allow_self:
+        ignored.append("--allow-self")
+    if uninstall and args.profile is not None:
+        ignored.append("--profile")
+    if not uninstall and args.purge_state:
+        ignored.append("--purge-state")
+    if ignored:
+        action = "--uninstall" if uninstall else "sidecar install"
+        warn(f"{action} ignores full-only option(s): " + ", ".join(ignored))
+
+
+def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
+    """``--uninstall`` (Decision 34; the small plan's step 9). Never goes
+    through ``detect_install_mode``: it needs its own rule, not the mode
+    table's ("no --mode" auto-detect team-config refusal never applies to
+    --uninstall), and it needs no ``--source`` at all."""
+    if args.mode == "full":
+        raise SystemExit(
+            "Refusing --uninstall with --mode full: --uninstall only removes "
+            "a sidecar overlay, never a full install."
+        )
+    if not target.is_dir():
+        raise SystemExit(f"Refusing --uninstall: {target} is not a directory.")
+    full_ev = _full_install_evidence(target, args.allow_self)
+    if full_ev:
+        raise SystemExit(
+            "Refusing --uninstall: "
+            f"{target} has full-install evidence ({'; '.join(full_ev)}). "
+            "--uninstall only removes a sidecar overlay."
+        )
+    warn_full_only_options_ignored(args, uninstall=True)
+    sidecar_ev = _sidecar_evidence(target)
+    if not sidecar_ev:
+        try:
+            preserved_root = git_path(target, SIDECAR_PRESERVED_NAME)
+        except subprocess.CalledProcessError as exc:
+            if "not a git repository" in (exc.stderr or ""):
+                raise SystemExit(
+                    f"Refusing --uninstall: {target} is not a Git repository, "
+                    "so it cannot hold a sidecar overlay."
+                ) from exc
+            preserved_root = None
+        except OSError:
+            preserved_root = None
+        if preserved_root is not None:
+            _report_preserved_folder_if_nonempty(preserved_root)
+        info("no sidecar found; nothing to do")
+        return 0
+    return uninstall_sidecar(target, dry_run=args.dry_run, purge_state=args.purge_state)
+
+
+def _run_backup_state(target: Path, dry_run: bool) -> int:
+    """``--backup-state``: a standalone action, independent of install and
+    uninstall (Decision 3; the small plan's step 6). ``--dry-run`` reports
+    the copy without making it, like every other action here.
+
+    ``backup_sidecar_state`` (finding 4) now runs the sidecar's own shared
+    preflight and turns a "not a Git repository" target or a filesystem
+    failure into its own already-printed diagnostic -- an ``ABORT:
+    filesystem error at <path>: <reason>`` for the latter, matching install
+    and uninstall -- so this needs no exception handling of its own."""
+    if not target.is_dir():
+        raise SystemExit(f"Refusing --backup-state: {target} is not a directory.")
+    return backup_sidecar_state(target, dry_run=dry_run)
 
 
 def main() -> int:
+    scrub_inherited_git_environment()
     args = parse_args()
     target = args.target_repo.expanduser().resolve()
-    source = args.source.expanduser().resolve()
 
-    copy_generated_tree(source, target, args.dry_run)
-    update_devcontainer_sync_env(target, args.bucket, args.prefix, args.dry_run)
-    merge_gitignore(target, args.dry_run)
-    chmod_runtime_scripts(target, args.dry_run)
-    warn_tracked_paths(target)
+    # --backup-state is a standalone action (Decision 3): it takes priority
+    # over --uninstall and every install option, and needs no mode detection
+    # at all -- it only ever touches the namespaced state folder.
+    if args.backup_state:
+        return _run_backup_state(target, args.dry_run)
 
-    if args.skip_upload:
-        info("skipping HF bootstrap upload")
+    try:
+        if args.uninstall:
+            return _run_uninstall(target, args)
+        mode = detect_install_mode(target, args.mode, args.allow_self)
+    except FileNotFoundError as exc:
+        if exc.filename != "git":
+            raise
+        raise SystemExit(
+            "git not found on PATH: install Git or add it to PATH, then rerun."
+        ) from exc
+
+    source_is_explicit = args.source is not None
+    if mode == "sidecar":
+        profile = (
+            args.profile or read_sidecar_profile(target) or SIDECAR_DEFAULT_PROFILE
+        )
+        source = (
+            args.source.expanduser().resolve()
+            if source_is_explicit
+            else default_sidecar_source(profile)
+        )
     else:
-        upload_bootstrap(target, args.bucket, args.prefix, args.dry_run, args.verbose)
+        if args.profile is not None:
+            warn("full install ignores --profile")
+        if args.purge_state:
+            warn("full install ignores --purge-state")
+        source = (
+            args.source.expanduser().resolve() if source_is_explicit else DEFAULT_SOURCE
+        )
+    require_source_exists(source, explicit=source_is_explicit)
 
+    if mode == "sidecar":
+        validate_install_roots(
+            source, target, allow_self=False, suggest_allow_self=False
+        )
+        warn_full_only_options_ignored(args)
+        return install_sidecar(target, source, dry_run=args.dry_run, profile=profile)
+
+    state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
+    validate_install_roots(source, target, args.allow_self)
+    validate_agents_takeover(source, target)
+    require_full_source_complete(source)
+    persisted_mode = persisted_install_mode(target)
+    commit_copilot_surface = (
+        args.commit_copilot_surface
+        if args.commit_copilot_surface is not None
+        else persisted_mode or False
+    )
+    mode_source = "explicit" if args.commit_copilot_surface is not None else "retained"
+    if persisted_mode is None and args.commit_copilot_surface is None:
+        mode_source = "fresh default"
+    info(
+        "Copilot surface mode: "
+        f"{'committed' if commit_copilot_surface else 'local-only'} ({mode_source})"
+    )
+
+    claude_dir = target / ".claude"
+    had_claude_git = (claude_dir / ".git").exists()
+    had_pre_existing_content = (
+        claude_dir.is_dir() and not had_claude_git and any(claude_dir.iterdir())
+    )
+
+    migrate_pre_existing_state(
+        target,
+        source,
+        args.dry_run,
+        state_remote,
+        had_pre_existing_content,
+        args.local_only,
+    )
+    copy_generated_tree(
+        source,
+        target,
+        args.dry_run,
+        commit_copilot_surface,
+        previously_committed_copilot_surface=persisted_mode is True,
+    )
+    substitute_project_name(target, args.dry_run)
+    substitute_python_version(target, args.dry_run)
+    populate_bootstrap_root(
+        target,
+        args.dry_run,
+        commit_copilot_surface,
+    )
+    update_devcontainer_state_remote(target, state_remote, args.dry_run)
+    merge_gitignore(target, args.dry_run, commit_copilot_surface)
+    chmod_runtime_scripts(target, args.dry_run)
+    configure_git_hooks_path(target, args.dry_run)
+    warn_tracked_paths(
+        target,
+        active_ignore_patterns(commit_copilot_surface),
+    )
+
+    sync_state_after_install(
+        target,
+        args.dry_run,
+        state_remote,
+        had_claude_git,
+        had_pre_existing_content,
+        args.local_only,
+    )
+
+    report_codex_hook_trust(args.dry_run)
     info("done")
     return 0
 

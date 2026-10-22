@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-run_python() {
-  if command -v uv >/dev/null 2>&1; then
-    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
-    return $?
-  fi
-  return 127
-}
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=_lib-frontmatter.sh
+. "$SCRIPT_DIR/_lib-frontmatter.sh"
 
-if ! command -v uv >/dev/null 2>&1; then
+if ! uv_available; then
   exit 0
 fi
 
 INPUT=$(cat)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 TARGET_ID="${1:-unknown-target}"
 LOG_DIR="$REPO_ROOT/.claude/session_logs"

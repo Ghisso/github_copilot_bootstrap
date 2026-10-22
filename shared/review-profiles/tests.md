@@ -6,7 +6,8 @@ Use for test quality, coverage, fixtures, and mocking decisions.
 
 - New public behavior has tests.
 - Happy path, boundary, error, and state cases are covered where relevant.
-- Regression tests exist for bug fixes.
+- Regression tests exist for bug fixes, and the evidence shows the original reproduction now behaves correctly, not only that the suite is green.
+- Expected values are independent of the implementation under test (taken from the requirement or a known source, not copied from its output). For a critical or suspect test, check that a targeted negative control was run (the test fails when the fix is removed). If that evidence is missing and you cannot run it yourself, report it as still needed.
 - Tests have meaningful assertions.
 - `pytest.raises` checks messages with `match=`.
 - Test data is concrete, not vague placeholders.
@@ -16,10 +17,13 @@ Use for test quality, coverage, fixtures, and mocking decisions.
 - Parametrize repeated test logic and use readable ids.
 - Tests are isolated and order-independent.
 - Async tests use `@pytest.mark.asyncio` unless project config enables auto mode.
+- Was every third-party binary, CLI, MCP server, or SDK this diff depends on
+  exercised directly at least once — spike evidence, a real-binary test, or a
+  recorded observation — or only through test doubles? Name the evidence.
 
 ## Severity
 
 - Critical: Tests with no assertions, false positives, or tests that cannot fail for the intended behavior.
-- Major: Missing failure paths, inappropriate mocks, missing edge cases, or unasserted mocks.
+- Major: Missing failure paths, inappropriate mocks, missing edge cases, unasserted mocks, or a third-party binary/CLI/MCP server/SDK dependency exercised only through test doubles with no spike evidence, real-binary test, or recorded observation.
 - Minor: Naming, fixture polish, or parametrization improvements.
 

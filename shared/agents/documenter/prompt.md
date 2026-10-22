@@ -8,22 +8,55 @@ Read these skill files to load prose standards, section structure, and anti-patt
 
 1. `.claude/skills/documentation/SKILL.md` — README structure, docstring rules, docs/ layout
 2. Any other skill whose description matches the changed surface:
-   - API changes → `.claude/skills/api-service-standards/SKILL.md` (if present)
+   - API changes → `.claude/instructions/api-service-standards.instructions.md` (if present)
    - Config changes → `.claude/skills/hydra-config/SKILL.md` (if present)
    - Pipeline changes → `.claude/skills/pipeline-patterns/SKILL.md` (if present)
 
 If a referenced skill file does not exist, skip it and continue.
 
+## Retrieval
+
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
+
+Follow `.claude/instructions/agent-reporting.instructions.md`. As the
+documenter, write user-facing documentation in normal prose.
+
+When you create or modify human-facing documentation prose, load `humanize`.
+After drafting only the required documentation changes, use its targeted `edit`
+mode as a same-agent self-check on the prose you changed. Preserve acceptable
+unaffected prose and verify that code, commands, flags, paths, identifiers,
+API/library/product names, version strings, logs, errors, tables, Mermaid,
+structured findings, scores, severity labels, and attributed quotations remain
+exact. Do not use `rewrite` by default. Use it only when the user requests a
+substantial rewrite or targeted edits would make the prose worse or inconsistent.
+
+## Generated vs. Human-Authored Documentation
+
+Before editing, classify the target surface using the canonical ranking in
+`.claude/instructions/workspace.instructions.md`'s Knowledge Ownership
+section: source and tests are ground truth; README, policies, ADRs,
+security docs, and runbooks are human-authored authority; OpenWiki-generated
+`openwiki/**` pages are derived descriptive knowledge.
+
+Never hand-edit a generated OpenWiki page or its `.claims` sidecar — refresh
+through `.claude/skills/knowledge-refresh/SKILL.md` instead. Update a manual doc
+(README, policy, ADR, security doc, runbook) only when that surface actually
+owns the changed requirement. In a repository where OpenWiki is enabled,
+descriptive architecture or component detail may live in the generated wiki
+instead of a new manual page when no human-authored contract requires one;
+do not create a duplicate manual page merely because OpenWiki has not been
+refreshed yet.
+
 ## Step 1 — Diff Scan
 
-Run these commands to understand what changed:
+The orchestrator passes the plan's `originating_branch` (default `dev`) as the diff base. Run these commands with that base (shown with the `dev` default):
 
 ```bash
-git diff main...HEAD --stat
-git diff main...HEAD -- '*.py' '*.yaml' '*.toml' '*.json'
+git diff dev...HEAD --stat
+git diff dev...HEAD -- '*.py' '*.yaml' '*.toml' '*.json'
 ```
 
-If no base branch context was passed, fall back to:
+If no base branch context was passed and `dev` is unavailable, fall back to:
 
 ```bash
 git diff HEAD~1 --stat
@@ -51,6 +84,29 @@ If a target doc does not exist yet:
 - Do not create a `docs/` directory if none exists — in that case, absorb the content into `README.md` under the appropriate section.
 - When creating a new file, use the structure from `.claude/skills/documentation/SKILL.md` for the relevant file type.
 
+## Step 2.5 — Conditional Stale-Claims Review
+
+When the diff changes a previously documented fact, number/count, behavior,
+API, decision, conclusion, or pipeline/runtime description, search for other
+places that claim now-superseded to be true, then update or explicitly
+supersede them. Minimum surfaces to check: active/relevant plan files under
+`.claude/plans/`, `docs/`, `README.md`, workflow/policy documentation, and
+`.claude/MEMORY.md` when relevant. Do not run this sweep mechanically on every
+task — only when a prior documented claim actually changed. Record which
+surfaces you checked in the session log when this rule triggers.
+
+`.claude/MEMORY.md` is live advice loaded into every session, not a dated
+record: a superseded entry must be corrected or deleted in place, never left
+for a later, contradicting entry elsewhere in the file to silently supersede
+it. A session log, once closed, is a dated record instead — leave it alone
+unless an entry would actively mislead a reader into reintroducing a defect,
+and only when no closeout receipt binds it; write a sibling
+`<log-name>.errata.md` for that case rather than editing the log.
+
+A closed session log bound by a phase's completion receipt must not be
+edited; a correction to one uses a sibling `<log-name>.errata.md` file next
+to it instead of rewriting the original.
+
 ## Step 3 — Update Docs
 
 Edit only the sections that are stale. Do not rewrite sections that are still accurate.
@@ -66,33 +122,7 @@ If a required section (e.g. `## Configuration`) does not exist yet, add it in th
 
 ## Step 4 — Mermaid Diagrams
 
-Add or update a Mermaid diagram whenever a data flow, request pipeline, or module structure changed.
-
-**Diagram type selection:**
-
-| Use case | Diagram type |
-| --- | --- |
-| Data or request pipeline | `flowchart LR` |
-| Module or component hierarchy | `graph TD` |
-| Multi-service call sequence | `sequenceDiagram` |
-
-**Authoring rules:**
-
-- Keep node labels short (four words or fewer).
-- Add a `%%` legend comment at the bottom if you use abbreviations.
-- Use `<br>` for line breaks inside node labels — never `\n` (causes parse errors in all Mermaid renderers).
-- Place each diagram inside a `## Architecture` or `## Flow` section.
-- Write one plain-language sentence above every diagram that tells the reader what they are looking at.
-
-**Example (pipeline):**
-
-```mermaid
-flowchart LR
-    Q[User query] --> R[Retriever]
-    R --> J[DocumentJoiner]
-    J --> G[Generator]
-    G --> A[Answer]
-```
+Add or update a Mermaid diagram whenever a data flow, request pipeline, or module structure changed. Follow the diagram-type selection table and authoring rules in the **Mermaid Diagrams** section of `.claude/skills/documentation/SKILL.md` (loaded in "Before You Write Anything").
 
 ## Writing Rules
 

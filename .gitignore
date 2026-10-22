@@ -1,6 +1,9 @@
 # Generated build output — regenerate with: uv run scripts/generate_targets.py
 dist/
 
+# Local project context and AI state are tracked in the nested .claude repo.
+.claude/
+
 # Python
 .venv/
 __pycache__/
@@ -9,3 +12,28 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.uv-cache/
+
+.context-mode/
+# Local-only Context Mode cache provenance secret (context-mode-dispatch.sh);
+# never commit it, and never restore it from anywhere but this machine. The
+# glob also covers the `.tmp.<pid>` sibling written before the rename.
+.context-mode-provenance.secret*
+
+# BEGIN multi-agent bootstrap generated/private AI content
+.claude/
+.codex/
+.agents/
+.github/agents/
+.github/hooks/
+.github/instructions/
+.github/copilot-instructions.md
+.vscode/mcp.json
+.mcp.json
+.claude/quality_reports/
+AGENTS.md
+CLAUDE.md
+.uv-cache/
+.context-mode-provenance.secret*
+openwiki/.run.json
+# END multi-agent bootstrap generated/private AI content

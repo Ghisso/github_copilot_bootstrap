@@ -16,20 +16,24 @@ description: |
 
 Convert documents, outlines, or freeform content into polished, self-contained HTML slide presentations with keyboard and scroll navigation.
 
-## Step 0: Gather Requirements
+## Step 0: Apply Defaults, Ask Only When It Matters
 
-Before generating anything, check whether the user has specified the following. If any are missing, ask for clarification in a single concise message. Use sensible defaults for anything the user declines to specify.
+Every parameter below has a workable default — use it and proceed directly
+to Step 1 instead of opening a confirmation round. Ask (in a single concise
+message) only when the content makes a parameter ambiguous in a way that
+would materially change the deck.
 
-| Parameter | What to ask | Default |
+| Parameter | Default | Ask only if |
 |---|---|---|
-| **Navigation mode** | "Horizontal (left-to-right) or vertical scroll (top-to-bottom)?" | `horizontal` |
-| **Theme** | "Which visual style? `dark-editorial` (dark bg, serif headlines), `light-minimal` (clean white, sans-serif), `corporate` (navy/white, professional), `hacker` (terminal green-on-black, monospace)" | `dark-editorial` |
-| **Audience & tone** | "Who is this for? (investors, engineers, conference, internal team)" | Infer from content |
-| **Slide count preference** | "Roughly how many slides?" | Auto from content density |
-| **Branding** | "Any logo text, tagline, or accent color?" | None |
-| **CTA / closing** | "Any call-to-action, links, or contact info for the final slide?" | None |
+| **Navigation mode** | `horizontal` | The content is explicitly a long-form scroll-style document |
+| **Theme** | `dark-editorial` | The content signals a mismatched register (e.g. a formal investor deck reads oddly in `hacker`) |
+| **Audience & tone** | Infer from content | The content gives no signal at all about audience |
+| **Slide count preference** | Auto from content density | N/A — always derivable from content |
+| **Branding** | None | The user references branding without providing usable detail (e.g. "use our branding") |
+| **CTA / closing** | None | N/A — omit unless the user asks for one |
 
-If the user provides a document and says "just make it look good", use defaults and proceed.
+If the user provides a document and says "just make it look good", use
+defaults and proceed without asking anything.
 
 ## Step 1: Analyze the Source Document
 

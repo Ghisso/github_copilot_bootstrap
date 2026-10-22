@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS nodejs
+FROM node:22.22.0-bookworm-slim AS nodejs
 
 FROM nvcr.io/nvidia/cuda-dl-base:26.03-cuda13.2-devel-ubuntu24.04
 
@@ -27,9 +27,15 @@ RUN apt-get update \
         sudo \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g context-mode \
+RUN npm install -g context-mode@1.0.169 \
+        openwiki@0.7.2 \
+        mermaid@11.16.0 \
+        jsdom@29.1.1 \
     && command -v context-mode \
-    && context-mode --help >/dev/null
+    && context-mode --help >/dev/null \
+    && command -v openwiki \
+    && test "$(node -p "require('$(npm root -g)/openwiki/package.json').version")" = "0.7.2" \
+    && openwiki integrations list </dev/null >/dev/null
 
 RUN set -eux; \
     if id -u "${USERNAME}" >/dev/null 2>&1; then \
@@ -55,6 +61,9 @@ RUN set -eux; \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
+# huggingface_hub is for the projects themselves (models/datasets via the
+# bind-mounted ~/.cache/huggingface below), not for AI state sync anymore -
+# that moved to git (state-sync.sh); see plans/adr-002-git-backed-state-sync.md.
 RUN uv pip install --system --no-cache \
         "huggingface_hub>=1.0" \
         "semble[mcp]" \

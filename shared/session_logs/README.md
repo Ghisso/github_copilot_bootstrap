@@ -1,45 +1,45 @@
 # Session Logs
 
-This directory stores session logs created during implementation sessions.
+This directory stores implementation session logs.
+
+Use the canonical template at `.claude/templates/session-log.md`.
 
 ## Naming Convention
 
 `YYYY-MM-DD_description.md`
 
-## Session Log Template
+For the final session that closes a small plan, prefer:
+
+`YYYY-MM-DD_<phase-slug>-closeout.md`
+
+Closeout logs must include:
+
+- `**Plan:**` pointing at the small-plan file
+- `**Status:** COMPLETED`
+- `## [LEARN] Entries` with either `[LEARN:category] ...` entries or `[LEARN] none - no new lessons this session`
+
+`MEMORY.md` can still be updated as a separate persistence action, but its
+mtime is never evidence of LEARN completion; the closeout gate reads only the
+`## [LEARN] Entries` section of this file.
+
+## Immutability and Errata
+
+A closeout log already bound by a completed phase's receipt must not be
+edited afterward - the receipt hashes its exact bytes, and historical
+receipt-chain validation depends on that byte stability. Corrections use a
+sibling file named `<original-log-name>.errata.md`, for example:
 
 ```markdown
-# Session: [Short Description]
+# Errata for 2026-09-02_phase-1-verification-authority.md
 
-**Date:** YYYY-MM-DD
-**Plan:** [link to plan file]
-**Status:** IN-PROGRESS | COMPLETED
-
-## Goal
-[What this session aims to accomplish]
-
-## Work Log
-
-### [Time/Phase]
-- [What was done]
-- [Decisions made and why]
-- [Problems encountered and solutions]
-
-## [LEARN] Entries
-
-- [LEARN:category] [what was learned]
-
-## Verification Results
-
-```bash
-# pytest output
-# mypy output
-# ruff output
+- 2026-09-02
+  - Supersedes: <short identification of the stale claim>
+  - Corrected conclusion: <new conclusion>
+  - Evidence/reference: <later phase/log/doc>
 ```
 
-## Score: [N]/100
-
-## Open Questions / Next Steps
-
-- [Question or next step]
-```
+An erratum written during a later active phase is evidence of that
+discovering/correcting phase and may be bound by its own receipt; the
+original phase's receipt never changes. An erratum written outside an active
+plan may remain unbound until a later phase reviews or changes it - it needs
+no dedicated receipt ceremony of its own.

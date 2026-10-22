@@ -1,0 +1,1680 @@
+"""Tests for plan frontmatter validation."""
+
+import os
+from pathlib import Path
+import sys
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import validate_plan_frontmatter as validator  # noqa: E402
+
+BLOCK_SCALAR_HEADERS = [
+    f"{style}{suffix}"
+    for style in ("|", ">")
+    for suffix in (
+        "",
+        "+",
+        "-",
+        *(str(indent) for indent in range(1, 10)),
+        *(f"{chomp}{indent}" for chomp in ("+", "-") for indent in range(1, 10)),
+        *(f"{indent}{chomp}" for indent in range(1, 10) for chomp in ("+", "-")),
+    )
+]
+
+
+# A valid, unhedged block by default so tests unrelated to the verification
+# contract are never incidentally caught by it; tests that exercise the
+# contract itself pass their own `body`.
+DEFAULT_VERIFICATION_BODY = (
+    "\n## Verification\n\n```bash\nuv run pytest tests/ -q --tb=short\n```\n"
+)
+
+
+def write_plan(
+    path: Path, frontmatter: str, body: str = DEFAULT_VERIFICATION_BODY
+) -> Path:
+    """Write a plan with the supplied frontmatter and body."""
+    path.write_text(
+        f"---\n{frontmatter.strip()}\n---\n\n# Plan\n{body}", encoding="utf-8"
+    )
+    return path
+
+
+def cancellation_fields(
+    evidence: str = "evidence.md",
+    *,
+    cancelled_at: str = "2026-08-11T06:30:00Z",
+    reason: str = "Measured value did not justify implementation",
+) -> str:
+    """Return valid cancellation fields for a test plan."""
+    return (
+        f"cancelled_at: {cancelled_at}\n"
+        f"cancelled_reason: {reason}\n"
+        f"cancelled_evidence: {evidence}"
+    )
+
+
+def pause_fields(
+    log: str = "pause.md",
+    *,
+    paused_at: str = "2026-08-11T06:30:00Z",
+    reason: str = "The user requested an overnight checkpoint",
+) -> str:
+    """Return valid pause fields for a test plan."""
+    return f"paused_at: {paused_at}\npaused_reason: {reason}\npause_session_log: {log}"
+
+
+def small_plan(status: str, extra: str = "") -> str:
+    """Return small-plan frontmatter for a test case."""
+    return f"""
+name: 2026-08-11_phase-C-example
+type: small-plan
+parent_plan: example
+phase_index: 3
+status: {status}
+{extra}
+"""
+
+
+def big_plan(status: str, extra: str = "") -> str:
+    """Return big-plan frontmatter for a test case."""
+    return f"""
+name: example
+type: big-plan
+status: {status}
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-C-example
+{extra}
+"""
+
+
+def validation_errors(path: Path) -> list[str]:
+    """Validate one plan and return its accumulated errors."""
+    errors: list[str] = []
+    validator.validate_plan(path, errors)
+    return errors
+
+
+def test_accepts_cancelled_small_plan_with_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "# Decision\n\n**Status:** CANCELLED\n", encoding="utf-8"
+    )
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_accepts_paused_small_plan_with_session_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields()))
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize("missing_field", validator.PAUSED_FIELDS)
+def test_rejects_each_missing_pause_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing_field: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+    fields = {
+        "paused_at": "2026-08-11T06:30:00Z",
+        "paused_reason": "The user requested an overnight checkpoint",
+        "pause_session_log": "pause.md",
+    }
+    del fields[missing_field]
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan(
+            "paused", "\n".join(f"{key}: {value}" for key, value in fields.items())
+        ),
+    )
+
+    assert any(
+        f"missing required field: {missing_field}" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("paused_at", ["2026-08-11T06:30:00", "2026-02-30T06:30:00Z"])
+def test_rejects_invalid_paused_at(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, paused_at: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("paused", pause_fields(paused_at=paused_at))
+    )
+
+    assert any("paused_at" in error for error in validation_errors(plan))
+
+
+def test_rejects_pause_session_log_without_paused_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** IN-PROGRESS\n", encoding="utf-8")
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields()))
+
+    assert any(
+        "pause_session_log must contain **Status:** PAUSED" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("log", ("missing.md", "/tmp/pause.md", "nested/../pause.md"))
+def test_rejects_missing_or_unsafe_pause_session_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, log: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields(log)))
+
+    assert any("pause_session_log" in error for error in validation_errors(plan))
+
+
+def test_rejects_unreadable_pause_session_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    log = tmp_path / "pause.md"
+    log.write_text("**Status:** PAUSED\n", encoding="utf-8")
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields()))
+    data = validator.parse_frontmatter(plan)
+
+    def deny_read(self: Path, *args: object, **kwargs: object) -> str:
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr(Path, "read_text", deny_read)
+    errors: list[str] = []
+    validator.validate_pause(plan, data, errors)
+
+    assert any("cannot read pause_session_log" in error for error in errors)
+
+
+def test_paused_status_is_invalid_for_big_plan(tmp_path: Path) -> None:
+    plan = write_plan(tmp_path / "big.md", big_plan("paused"))
+
+    assert any(
+        "invalid status for big-plan: paused" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_resumed_small_plan_allows_historical_pause_metadata(tmp_path: Path) -> None:
+    plan = write_plan(tmp_path / "small.md", small_plan("in-progress", pause_fields()))
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize("missing_field", validator.CANCELLED_FIELDS)
+def test_rejects_each_missing_cancellation_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing_field: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    fields = {
+        "cancelled_at": "2026-08-11T06:30:00Z",
+        "cancelled_reason": "The phase is no longer authorized",
+        "cancelled_evidence": "evidence.md",
+    }
+    del fields[missing_field]
+    extra = "\n".join(f"{key}: {value}" for key, value in fields.items())
+    plan = write_plan(tmp_path / "small.md", small_plan("cancelled", extra))
+
+    errors = validation_errors(plan)
+
+    assert any(f"missing required field: {missing_field}" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "cancelled_at", ["2026-08-11T06:30:00", "2026-08-11", "yesterday"]
+)
+def test_rejects_malformed_cancelled_at(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cancelled_at: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    fields = cancellation_fields().replace("2026-08-11T06:30:00Z", cancelled_at)
+    plan = write_plan(tmp_path / "small.md", small_plan("cancelled", fields))
+
+    assert any(
+        "cancelled_at must use UTC format" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "cancelled_at", ["2026-02-30T06:30:00Z", "2026-08-11T25:00:00Z"]
+)
+def test_rejects_impossible_cancelled_at(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cancelled_at: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields(cancelled_at=cancelled_at)),
+    )
+
+    assert any(
+        "cancelled_at must be a valid UTC timestamp" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        '"   "',
+        "''",
+        "[]",
+        "[not, prose]",
+        "{}",
+        "{decision: cancelled}",
+        "- list item",
+        "# comment only",
+        "First line\n  continued line",
+        "|\n  block line",
+        "\n  - list item",
+    ],
+)
+def test_rejects_non_scalar_or_non_meaningful_cancelled_reason(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reason: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields(reason=reason)),
+    )
+
+    assert any("cancelled_reason" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize("reason", BLOCK_SCALAR_HEADERS)
+def test_rejects_every_yaml_block_scalar_header_for_cancelled_reason(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reason: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields(reason=reason)),
+    )
+
+    assert any("plain single-line scalar" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize("header", BLOCK_SCALAR_HEADERS)
+@pytest.mark.parametrize(
+    "comment_suffix", ["#", " #", "\t# explanation", " \t # audit"]
+)
+def test_rejects_block_scalar_header_with_comment_suffix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    header: str,
+    comment_suffix: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan(
+            "cancelled",
+            cancellation_fields(reason=f"{header}{comment_suffix}"),
+        ),
+    )
+
+    assert any("plain single-line scalar" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "| ordinary prose",
+        "> threshold was not met",
+        "|2 is a literal measurement",
+        "|- remains ordinary with words",
+        ">+9 remains ordinary with words",
+    ],
+)
+def test_accepts_prose_starting_like_a_block_scalar_header(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reason: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields(reason=reason)),
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_rejects_missing_cancellation_evidence_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+
+    assert any(
+        "cannot read cancelled_evidence" in error for error in validation_errors(plan)
+    )
+
+
+def test_rejects_evidence_without_cancelled_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "# Decision\n\n**Status:** IN-PROGRESS\n", encoding="utf-8"
+    )
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+
+    assert any(
+        "must contain **Status:** CANCELLED" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "**Status:**\nCANCELLED\n",
+        " **Status:** CANCELLED\n",
+        "**Status:** CANCELED\n",
+        "**Status:** cancelled\n",
+        "**Status:** CANCELLED_extra\n",
+        "**Status:**\vCANCELLED\n",
+    ],
+)
+def test_rejects_split_line_and_near_miss_cancelled_markers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    content: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text(content, encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+
+    assert any(
+        "must contain **Status:** CANCELLED" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_accepts_tab_before_cancelled_marker_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:**\tCANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_rejects_directory_as_cancellation_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence").mkdir()
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields("evidence")),
+    )
+
+    assert any(
+        "regular readable text file" in error for error in validation_errors(plan)
+    )
+
+
+def test_rejects_invalid_utf8_cancellation_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_bytes(b"\xff\xfe")
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+
+    assert any(
+        "cannot read cancelled_evidence" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "evidence_field",
+    ["cancelled_evidence: bad\x00path", "cancelled_evidence:\n  - evidence.md"],
+)
+def test_rejects_invalid_cancellation_evidence_path_shapes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    evidence_field: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    fields = cancellation_fields().rsplit("\n", 1)[0]
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", f"{fields}\n{evidence_field}"),
+    )
+
+    assert any("cancelled_evidence" in error for error in validation_errors(plan))
+
+
+def test_rejects_symlink_loop_as_cancellation_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "loop.md").symlink_to("loop.md")
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields("loop.md")),
+    )
+
+    assert any(
+        "cannot read cancelled_evidence" in error for error in validation_errors(plan)
+    )
+
+
+def test_rejects_symlink_to_evidence_outside_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository_root = tmp_path / "repo"
+    repository_root.mkdir()
+    outside_evidence = tmp_path / "outside.md"
+    outside_evidence.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    (repository_root / "evidence.md").symlink_to(outside_evidence)
+    monkeypatch.setattr(validator, "REPO_ROOT", repository_root)
+    plan = write_plan(
+        repository_root / "small.md",
+        small_plan("cancelled", cancellation_fields()),
+    )
+
+    assert any(
+        "stay inside the repository" in error for error in validation_errors(plan)
+    )
+
+
+def test_rejects_unreadable_cancellation_evidence_portably(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    evidence_path = tmp_path / "evidence.md"
+    evidence_path.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
+    )
+    data = validator.parse_frontmatter(plan)
+
+    def deny_read(self: Path, *args: object, **kwargs: object) -> str:
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr(Path, "read_text", deny_read)
+    errors: list[str] = []
+    validator.validate_cancellation(plan, data, errors)
+
+    assert any("cannot read cancelled_evidence" in error for error in errors)
+
+
+def test_accepts_cancelled_big_plan_without_started_at_or_current_phase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "**Status:** CANCELLED because the plan was called off\n", encoding="utf-8"
+    )
+    plan = write_plan(tmp_path / "big.md", big_plan("cancelled", cancellation_fields()))
+
+    assert validation_errors(plan) == []
+
+
+def test_accepts_a_single_trailing_knowledge_refresh_phase(tmp_path: Path) -> None:
+    """A dedicated final knowledge-refresh phase is a normal, valid shape."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-example
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_rejects_two_knowledge_refresh_phases(tmp_path: Path) -> None:
+    """Recursion never occurs: the rule cannot append a second copy of itself."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_non_trailing_knowledge_refresh_phase(tmp_path: Path) -> None:
+    """The knowledge-refresh phase must be last, never mid-plan."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-example
+""",
+    )
+
+    assert any(
+        "the knowledge-refresh phase must be the last phase in phases" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "phases",
+    (
+        [123, "2026-01-01_phase-A-knowledge-refresh"],
+        ["2026-01-01_phase-A-knowledge-refresh", 123],
+    ),
+    ids=("non_string_first", "non_string_last"),
+)
+def test_knowledge_refresh_check_skips_non_string_phase_entries_safely(
+    tmp_path: Path, phases: list[object]
+) -> None:
+    """The defensive non-string guard must skip safely, not crash or misfire."""
+    path = tmp_path / "big.md"
+    path.write_text("---\nname: example\n---\n\n# Plan\n", encoding="utf-8")
+    data: dict[str, object] = {
+        "name": "example",
+        "type": "big-plan",
+        "status": "planning",
+        "originating_branch": "dev",
+        "implementation_branch": "example_implementation",
+        "phases": phases,
+    }
+    errors: list[str] = []
+
+    validator.validate_big_plan(path, data, errors)
+
+    assert not any("knowledge-refresh" in error for error in errors)
+
+
+def test_accepts_a_settled_knowledge_refresh_phase_before_the_last_phase(
+    tmp_path: Path,
+) -> None:
+    """Reopening after a completed refresh keeps that phase where it is."""
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-example
+  - 2026-08-11_phase-C-knowledge-refresh
+""",
+    )
+
+    assert not any("knowledge-refresh" in error for error in validation_errors(plan))
+
+
+def test_rejects_appending_a_phase_after_a_settled_knowledge_refresh_phase(
+    tmp_path: Path,
+) -> None:
+    """A settled refresh phase does not license a further phase after it."""
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-example
+""",
+    )
+
+    assert any(
+        "the knowledge-refresh phase must be the last phase in phases" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "sibling_status",
+    ("in-progress", "planned", None, "unreadable"),
+    ids=("in_progress", "planned", "missing", "unreadable"),
+)
+def test_rejects_an_unsettled_mid_list_knowledge_refresh_phase(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sibling_status: str | None,
+) -> None:
+    """Only a complete or cancelled small plan exempts an earlier refresh phase."""
+    sibling = tmp_path / "2026-08-11_phase-A-knowledge-refresh.md"
+    if sibling_status == "unreadable":
+        sibling.write_text("---\nstatus: complete\n---\n", encoding="utf-8")
+        real_read_text = Path.read_text
+
+        def deny_read(
+            self: Path, encoding: str | None = None, errors: str | None = None
+        ) -> str:
+            if self == sibling:
+                raise PermissionError("permission denied")
+            return real_read_text(self, encoding, errors)
+
+        monkeypatch.setattr(Path, "read_text", deny_read)
+    elif sibling_status is not None:
+        sibling.write_text(f"---\nstatus: {sibling_status}\n---\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_two_unsettled_knowledge_refresh_phases_neither_last(
+    tmp_path: Path,
+) -> None:
+    """Two mid-list refresh phases are never both exempt at once."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+  - 2026-08-11_phase-C-example
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_accepts_a_cancelled_knowledge_refresh_phase_before_the_last_phase(
+    tmp_path: Path,
+) -> None:
+    """A cancelled refresh phase is exempt from the count too."""
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: cancelled\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert not any("knowledge-refresh" in error for error in validation_errors(plan))
+
+
+def test_knowledge_refresh_slug_guard_skips_reading_outside_the_plans_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An invalid slug is unsettled without ever touching its would-be sibling."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - ../escape-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+    original_lstat = Path.lstat
+    original_parse_frontmatter = validator.parse_frontmatter
+
+    def guarded_lstat(self: Path) -> os.stat_result:
+        assert "escape" not in self.name, f"must not stat {self}"
+        return original_lstat(self)
+
+    def guarded_parse_frontmatter(path: Path) -> dict[str, object]:
+        assert "escape" not in path.name, f"must not read {path}"
+        return original_parse_frontmatter(path)
+
+    monkeypatch.setattr(Path, "lstat", guarded_lstat)
+    monkeypatch.setattr(validator, "parse_frontmatter", guarded_parse_frontmatter)
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+# Each of the following five cases pairs an otherwise-``status: complete``
+# sibling with exactly one broken identity field, using the same two-refresh
+# `phases` shape as `test_rejects_an_unsettled_mid_list_knowledge_refresh_phase`
+# above. That shape isolates the identity check: on 010f08c, a sibling whose
+# `status` alone reads `complete` is exempted, `unsettled_refresh_phases`
+# drops to a single (last-phase) entry, and no "at most one" error is
+# raised. After Decision 45's fix, each broken sibling stays unsettled and
+# the error reappears, so every case below fails on 010f08c before the fix.
+def test_rejects_a_symlinked_settled_refresh_sibling(
+    tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """A symlinked sibling is never settled, even one that points at an
+    otherwise-valid complete small plan: an `lstat` identity check rejects
+    it before its frontmatter is ever read (Decision 45, R5).
+
+    fails on 010f08c: yes -- the old helper used `Path.is_file()`, which
+    follows a symlink to wherever it points.
+    """
+    outside = tmp_path_factory.mktemp("outside-plans")
+    target = outside / "target.md"
+    target.write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").symlink_to(target)
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_sibling_with_an_unrelated_parent_plan(
+    tmp_path: Path,
+) -> None:
+    """A sibling whose `parent_plan` names a different big plan is never settled.
+
+    fails on 010f08c: yes -- the old helper never read `parent_plan`.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: unrelated-plan\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_sibling_with_the_wrong_type(
+    tmp_path: Path,
+) -> None:
+    """A sibling that does not declare itself a small plan is never settled.
+
+    fails on 010f08c: yes -- the old helper never read `type`.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: big-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_sibling_with_the_wrong_name(
+    tmp_path: Path,
+) -> None:
+    """A sibling whose own `name` does not match the phase slug is never settled.
+
+    fails on 010f08c: yes -- the old helper never read `name`.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: some-other-plan-name\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_phase_when_the_big_plan_name_is_empty(
+    tmp_path: Path,
+) -> None:
+    """An earlier refresh phase can never settle when the big plan's own
+    `name` is empty, even against a sibling that otherwise matches exactly.
+
+    fails on 010f08c: yes -- the old helper took no big-plan name at all.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: ""
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_big_plan_body_phase_inventory_drift(tmp_path: Path) -> None:
+    """The readable phase list cannot silently diverge from frontmatter."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + "\n## Phases\n\n- [ ] `second`\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory must match frontmatter phases" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("heading", ("Phase", "Phases", "Phase Order"))
+def test_rejects_supported_body_phase_heading_drift(
+    tmp_path: Path, heading: str
+) -> None:
+    """Every supported duplicated phase heading has the same inventory contract."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + f"\n## {heading}\n\n- [ ] `second`\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory must match" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("item", ("- `second`", "- [ ] `second` — descriptive suffix"))
+def test_rejects_unambiguous_phase_inventory_bullets_that_drift(
+    tmp_path: Path, item: str
+) -> None:
+    """Slug-bearing lists under a phase heading cannot evade frontmatter parity."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + f"\n## Phases\n\n{item}\n",
+        encoding="utf-8",
+    )
+
+    assert any("body phase inventory" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    (
+        "",
+        " — descriptive suffix",
+        " -- descriptive suffix",
+        " : descriptive suffix",
+        " - descriptive suffix",
+        " (parenthetical note)",
+        " (owner: coder, status: pending)",
+        " — a note that itself mentions `an-unrelated-slug` in passing",
+    ),
+    ids=(
+        "no-annotation",
+        "em-dash",
+        "double-hyphen",
+        "colon",
+        "hyphen",
+        "parenthetical",
+        "parenthetical-with-colons",
+        "delimited-prose-with-an-embedded-backtick",
+    ),
+)
+def test_accepts_body_phase_annotations_that_still_match_frontmatter(
+    tmp_path: Path, suffix: str
+) -> None:
+    """Every supported trailing annotation still extracts only the matching slug.
+
+    A second backtick pair inside delimited prose (the last case) can never be
+    mistaken for an additional phase: the pattern's single capture group only
+    ever extracts the slug immediately after the opening ``- ``/``- [ ] ``, so
+    trailing prose - however it is punctuated - cannot smuggle a second entry
+    into the extracted phase list.
+    """
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\n"
+            "current_phase: 2026-08-11_phase-C-example\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        + f"\n## Phases\n\n- [ ] `2026-08-11_phase-C-example`{suffix}\n",
+        encoding="utf-8",
+    )
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize(
+    "item",
+    (
+        "- [ ] `2026-08-11_phase-C-example`: no whitespace before the delimiter",
+        "- [ ] `2026-08-11_phase-C-example`(no whitespace before the parenthetical)",
+        "- [ ] `2026-08-11_phase-C-example`glued-trailing-text",
+        "- [ ] `2026-08-11_phase-C-example`  ",
+        "- [ ] `2026-08-11_phase-C-example` plain prose with no leading delimiter",
+    ),
+    ids=(
+        "no-boundary-before-colon",
+        "no-boundary-before-parenthetical",
+        "no-boundary-glued-text",
+        "whitespace-only-annotation",
+        "no-delimiter-before-prose",
+    ),
+)
+def test_rejects_phase_annotations_with_no_safe_delimiter_boundary(
+    tmp_path: Path, item: str
+) -> None:
+    """An annotation that skips the required delimiter is rejected outright.
+
+    ``no-delimiter-before-prose`` matters most: a narrative bullet elsewhere in
+    a plan (for example a ``Key gate:`` list entry like
+    "``- `PreToolUse` denies unsafe operations...``") must never be mistaken
+    for a phase-inventory item just because it starts with a backtick-quoted
+    word - only a recognized delimiter right after the closing backtick opens
+    the door to trailing prose.
+    """
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\n"
+            "current_phase: 2026-08-11_phase-C-example\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + f"\n## Phases\n\n{item}\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory is malformed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_unclosed_backtick_in_a_phase_annotation(tmp_path: Path) -> None:
+    """An unclosed backtick can never be parsed as a safe delimiter boundary."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\n"
+            "current_phase: 2026-08-11_phase-C-example\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        + "\n## Phases\n\n- [ ] `2026-08-11_phase-C-example\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory is malformed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_ignores_narrative_phase_subheadings_and_plain_bullets(tmp_path: Path) -> None:
+    """Narrative checklist text is not an inventory without a code-form slug."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        + "\n## Phase Order\n\n### Phase two\n\n- ordinary prose\n- [ ] narrative checklist\n",
+        encoding="utf-8",
+    )
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize("status", ["canceled", "abandoned"])
+def test_rejects_near_miss_statuses(tmp_path: Path, status: str) -> None:
+    plan = write_plan(tmp_path / "small.md", small_plan(status))
+
+    assert any(
+        "invalid status for small-plan" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "extra"),
+    [
+        ("planned", ""),
+        ("in-progress", ""),
+        ("complete", "closeout_session_log: .claude/session_logs/closeout.md"),
+    ],
+)
+def test_preserves_existing_small_plan_statuses(
+    tmp_path: Path, status: str, extra: str
+) -> None:
+    """A `planned` plan needs only the ordinary identity fields: no pause,
+    cancellation, or closeout evidence, unlike `paused`/`cancelled`/`complete`.
+    """
+    plan = write_plan(tmp_path / "small.md", small_plan(status, extra))
+
+    assert validation_errors(plan) == []
+
+
+def test_complete_small_plan_still_requires_closeout_log(tmp_path: Path) -> None:
+    plan = write_plan(tmp_path / "small.md", small_plan("complete"))
+
+    assert any(
+        "missing required field: closeout_session_log" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "statuses",
+    [
+        ("cancelled", "complete"),
+        ("complete", "cancelled"),
+        ("complete", "complete"),
+    ],
+)
+@pytest.mark.parametrize("kind", ["small", "big"])
+def test_rejects_duplicate_status_fields(
+    tmp_path: Path, statuses: tuple[str, str], kind: str
+) -> None:
+    first, second = statuses
+    frontmatter = small_plan(first) if kind == "small" else big_plan(first)
+    frontmatter = frontmatter.replace(
+        f"status: {first}", f"status: {first}\nstatus: {second}", 1
+    )
+    plan = write_plan(tmp_path / f"{kind}.md", frontmatter)
+
+    assert validation_errors(plan) == [
+        f"{plan}: duplicate status fields are not allowed"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("status", "extra"),
+    [
+        ("planning", ""),
+        ("in-progress", "started_at: 2026-08-11T06:00:00Z\ncurrent_phase: phase-a"),
+        ("complete", "started_at: 2026-08-11T06:00:00Z"),
+    ],
+)
+def test_preserves_existing_big_plan_statuses(
+    tmp_path: Path, status: str, extra: str
+) -> None:
+    plan = write_plan(tmp_path / "big.md", big_plan(status, extra))
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize("evidence", ["/tmp/evidence.md", "../evidence.md"])
+def test_rejects_evidence_outside_repository(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    evidence: str,
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan("cancelled", cancellation_fields(evidence)),
+    )
+
+    errors = validation_errors(plan)
+
+    assert any("repository" in error for error in errors)
+
+
+# The cancellation contract is implemented twice on purpose: this module is
+# authoring-repo-only tooling, while `cancellation_validation_probe` in
+# shared/hooks/scripts/_lib-frontmatter.sh ships into consumer repositories and
+# must run on a stock python3 with no imports. Nothing forces the two to agree,
+# so pin the shared rules here; tightening one copy alone fails this test.
+@pytest.mark.parametrize(
+    ("validator_pattern", "probe_name"),
+    [
+        ("CANCELLED_AT_PATTERN", "TIMESTAMP"),
+        ("CANCELLED_REASON_BLOCK_PATTERN", "BLOCK_REASON"),
+        ("CANCELLED_STATUS_PATTERN", "STATUS"),
+    ],
+)
+def test_shipped_probe_shares_the_cancellation_rules(
+    validator_pattern: str, probe_name: str
+) -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    expected = getattr(validator, validator_pattern).pattern
+    assert f'{probe_name} = re.compile(r"{expected}"' in library, (
+        f"{probe_name} in the shipped push-time probe no longer matches "
+        f"{validator_pattern}; the cancellation contract has drifted"
+    )
+
+
+def test_shipped_probe_shares_the_cancellation_fields() -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    for field in validator.CANCELLED_FIELDS:
+        assert field in library, (
+            f"required cancellation field {field} is not enforced by the "
+            "shipped push-time probe"
+        )
+
+
+@pytest.mark.parametrize(
+    ("validator_pattern", "probe_name"),
+    [
+        ("PAUSED_AT_PATTERN", "TIMESTAMP"),
+        ("PAUSED_REASON_BLOCK_PATTERN", "BLOCK_REASON"),
+        ("PAUSED_STATUS_PATTERN", "STATUS"),
+    ],
+)
+def test_shipped_probe_shares_the_pause_rules(
+    validator_pattern: str, probe_name: str
+) -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    probe = library.split("pause_validation_probe()", 1)[1].split(
+        "assert_pause_evidence()", 1
+    )[0]
+    expected = getattr(validator, validator_pattern).pattern
+    assert f'{probe_name} = re.compile(r"{expected}"' in probe, (
+        f"{probe_name} in the shipped pause probe no longer matches "
+        f"{validator_pattern}; the pause contract has drifted"
+    )
+
+
+def test_shipped_probe_shares_the_pause_fields() -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    for field in validator.PAUSED_FIELDS:
+        assert field in library, (
+            f"required pause field {field} is not enforced by the shipped "
+            "pause-time probe"
+        )
+
+
+# --- Verification Evidence Contract (L1-L4) ---
+
+
+def in_scope_plan(
+    tmp_path: Path,
+    body: str,
+    *,
+    status: str = "planned",
+    filename: str = "2026-09-19_phase-test-example.md",
+) -> Path:
+    """Write a live small plan in scope of the verification contract."""
+    return write_plan(tmp_path / filename, small_plan(status), body=body)
+
+
+def test_missing_verification_block_fails_l1(tmp_path: Path) -> None:
+    plan = in_scope_plan(tmp_path, "\n## Verification\n\nno fenced block here.\n")
+
+    assert any(
+        "L1 verification-block-missing" in error for error in validation_errors(plan)
+    )
+
+
+def test_absent_verification_heading_also_fails_l1(tmp_path: Path) -> None:
+    plan = in_scope_plan(tmp_path, "\nNo verification section at all.\n")
+
+    assert any(
+        "L1 verification-block-missing" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "\n### Step A1 -- when a build host is available, run the check\n\n"
+        "## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+        "\n- **Owner:** `coder` -- when a build host is available, run the "
+        "check\n\n## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+        "\n- **Acceptance criteria:** when a build host is available, run "
+        "the check\n\n## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+        "\n<!-- when a build host is available, run the check -->\n\n"
+        "## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+    ],
+    ids=("step-title", "owner-line", "acceptance-bullet", "html-comment"),
+)
+def test_hedged_verification_sentence_fails_l2_wherever_it_appears(
+    tmp_path: Path, body: str
+) -> None:
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L2 hedged-verification" in error
+        and "when a build host is available, run" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_hedged_sentence_inside_fenced_block_does_not_trigger_l2(
+    tmp_path: Path,
+) -> None:
+    body = (
+        "\n## Verification\n\n```bash\n"
+        "# when a build host is available, run the check\n"
+        "uv run pytest tests/ -q\n```\n"
+    )
+    plan = in_scope_plan(tmp_path, body)
+
+    assert not any(
+        "L2 hedged-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_hedged_sentence_under_optional_verification_does_not_trigger_l2(
+    tmp_path: Path,
+) -> None:
+    body = (
+        "\n## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n"
+        "\n## Optional Verification\n\n"
+        "- when a build host is available, run the check\n"
+    )
+    plan = in_scope_plan(tmp_path, body)
+
+    assert not any(
+        "L2 hedged-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_required_item_with_true_fallback_fails_l3(tmp_path: Path) -> None:
+    body = "\n## Verification\n\n```bash\nexit 3 || true\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L3 unfailable-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_required_item_with_colon_fallback_fails_l3(tmp_path: Path) -> None:
+    body = "\n## Verification\n\n```bash\nexit 3 || :\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L3 unfailable-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_required_item_listing_closeout_fails_l4(tmp_path: Path) -> None:
+    body = (
+        "\n## Verification\n\n```bash\n"
+        "uv run python .claude/scripts/verify.py closeout --format json\n```\n"
+    )
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any("L4 self-listed-closeout" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        'uv run python .claude/scripts/verify.py "closeout" --format json',
+        'uv run python .claude/scripts/verify.py clos""eout --format json',
+        "uv run python .claude/scripts/verify.py --format json closeout",
+        r"uv run python .claude/scripts/verify.py clos\eout --format json",
+    ],
+    ids=(
+        "quoted-closeout",
+        "split-quotes-closeout",
+        "mode-after-options",
+        "backslash-broken-closeout",
+    ),
+)
+def test_disguised_closeout_self_reference_still_fails_l4(
+    tmp_path: Path, item: str
+) -> None:
+    body = f"\n## Verification\n\n```bash\n{item}\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any("L4 self-listed-closeout" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        "exit 3||true",
+        "exit 3 ||true",
+        "exit 3||:",
+        "exit 3 || /bin/true",
+        r"exit 3 || tru\e",
+        "exit 3||./true",
+    ],
+    ids=(
+        "no-space-true",
+        "leading-space-true",
+        "no-space-colon",
+        "absolute-path-true",
+        "backslash-broken-true",
+        "relative-path-true",
+    ),
+)
+def test_unspaced_unfailable_fallback_still_fails_l3(tmp_path: Path, item: str) -> None:
+    body = f"\n## Verification\n\n```bash\n{item}\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L3 unfailable-verification" in error for error in validation_errors(plan)
+    )
+
+
+# Loose text carrying signals for every rule: no ## Verification block at
+# all (L1's trigger), a hedge sentence (L2's trigger), and the L3/L4 marker
+# substrings. None of L1-L4 may fire once the plan is out of scope, proving
+# the scope gate is an early return rather than a per-rule exemption.
+_DEFECT_LADEN_BODY = (
+    "\nWhen a build host is available, run the full smoke check before merging.\n"
+    "\nexit 3 || true\n"
+    "\nuv run python .claude/scripts/verify.py closeout --format json\n"
+)
+
+
+def test_complete_plan_skips_the_verification_contract_even_with_every_defect(
+    tmp_path: Path,
+) -> None:
+    plan = write_plan(
+        tmp_path / "2026-09-19_phase-test-example.md",
+        small_plan(
+            "complete", "closeout_session_log: .claude/session_logs/closeout.md"
+        ),
+        body=_DEFECT_LADEN_BODY,
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_cancelled_plan_skips_the_verification_contract_even_with_every_defect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "2026-09-19_phase-test-example.md",
+        small_plan("cancelled", cancellation_fields()),
+        body=_DEFECT_LADEN_BODY,
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_pre_contract_dated_plan_skips_the_verification_contract_even_with_every_defect(
+    tmp_path: Path,
+) -> None:
+    plan = write_plan(
+        tmp_path / "2026-01-01_phase-test-example.md",
+        small_plan("planned"),
+        body=_DEFECT_LADEN_BODY,
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_phase_a_fixture_fails_l2_on_its_step_bullet_sentence(tmp_path: Path) -> None:
+    """Phase A's real hedge lived in a step-level bullet, not the
+    ``## Verification`` block; forcing the plan back to a live status must
+    still catch it via the hedge scan.
+    """
+    source = (
+        REPO_ROOT
+        / ".claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md"
+    )
+    text = source.read_text(encoding="utf-8").replace(
+        "status: complete", "status: in-progress", 1
+    )
+    plan = tmp_path / source.name
+    plan.write_text(text, encoding="utf-8")
+
+    errors = validation_errors(plan)
+
+    assert any(
+        f"{plan}:72: L2 hedged-verification" in error and "run one smoke check" in error
+        for error in errors
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "2026-07-18_phase-A-preserve-consumer-memory.md",
+        "2026-07-18_phase-B-configure-codex-gpt-5.6.md",
+    ],
+)
+def test_pre_contract_july_bodies_pass_the_lint_because_of_their_date(
+    tmp_path: Path, name: str
+) -> None:
+    """Both plans are ``complete`` on disk, which already skips the lint. Force
+    a copy back to ``in-progress`` so the status cannot skip it; the filename
+    date, which predates ``VERIFICATION_CONTRACT_SINCE``, is then what exempts
+    these live-status bodies from the verification-contract rules.
+    """
+    source = REPO_ROOT / ".claude" / "plans" / name
+    text = source.read_text(encoding="utf-8").replace(
+        "status: complete", "status: in-progress", 1
+    )
+    assert "\nstatus: in-progress\n" in text
+    plan = tmp_path / name
+    plan.write_text(text, encoding="utf-8")
+
+    assert validation_errors(plan) == []

@@ -3,9 +3,10 @@ name: prompt-lab
 visibility: public
 description: |
   Systematic LLM prompt engineering: analyzes existing prompts for failure
-  modes, generates structured variants (direct, few-shot, chain-of-thought),
-  designs evaluation rubrics with weighted criteria, and produces test case
-  suites for comparing prompt performance. Use when:
+  modes, generates structured variants (direct, few-shot, structured
+  rationale), designs evaluation rubrics with weighted criteria, and
+  produces test case suites for empirically comparing prompt performance
+  across models. Use when:
   - "prompt engineering", "prompt lab", "generate prompt variants"
   - "A/B test prompts", "evaluate prompt", "optimize prompt"
   - "write a better prompt", "prompt design", "prompt iteration"
@@ -64,7 +65,7 @@ Create 2-4 prompt variants, each testing a different hypothesis:
 |---|---|---|
 | Direct instruction | Clear instruction is sufficient | Simple tasks, capable models |
 | Few-shot | Examples improve output consistency | Pattern-following tasks |
-| Chain-of-thought | Reasoning improves accuracy | Multi-step logic, math, analysis |
+| Structured rationale | A short, checkable step outline alongside the answer reduces errors | Multi-step logic, math, analysis |
 | Persona/role | Role framing improves tone/expertise | Domain-specific tasks |
 | Structured output | Format specification prevents errors | JSON, CSV, specific templates |
 
@@ -193,20 +194,26 @@ Input: {actual_input}
 Output:
 ```
 
-### Chain-of-thought (CoT)
+### Structured rationale (not hidden chain-of-thought)
 
-Ask the model to reason step-by-step before giving the final answer. Best for multi-step logic, math, and analysis tasks.
+Ask the model for a concise, checkable outline of its steps alongside the
+final answer — not a demand to expose its full internal reasoning. Many
+hosted models, especially dedicated reasoning models, don't expose their
+actual internal process even when asked; a prompt that demands "think
+step-by-step internally" or a long simulated inner monologue elicits a
+plausible-looking narration that may not reflect what the model actually
+did. Best for multi-step logic, math, and analysis tasks.
 
 ```text
 {Task instruction}
 
-Think through this step by step:
-1. First, {reasoning step 1}
-2. Then, {reasoning step 2}
-3. Finally, {conclusion step}
-
-Provide your reasoning, then your final answer.
+List the key steps that lead to your answer (2-4 bullets, each checkable
+against the input), then give your final answer.
 ```
+
+Validate this technique empirically: run it against real test cases and
+compare accuracy across the target models, rather than trusting that
+eliciting more "reasoning" text always helps.
 
 ### Persona/role
 
@@ -253,8 +260,9 @@ Techniques for controlling LLM output format:
 1. **One variable per variant.** Each variant should change ONE thing from the baseline. Changing instruction style AND examples AND format simultaneously makes results uninterpretable.
 2. **Test before declaring success.** A prompt that works on 3 examples may fail on the 4th. Minimum 5 diverse test cases before concluding a variant works.
 3. **Failure modes are more valuable than successes.** Understanding WHY a prompt fails guides improvement more than confirming it works.
-4. **Model-specific optimization.** A prompt optimized for GPT-4 may not work for Claude or Llama. Always note the target model.
+4. **Model-specific optimization.** A prompt optimized for one model may not work for another. Always note the target model, and re-run the comparison empirically per model rather than assuming a technique transfers.
 5. **Simplest effective prompt wins.** If a zero-shot prompt scores as well as a few-shot prompt, use the zero-shot. Fewer tokens = lower cost + latency.
+6. **Judge by observed outputs, not claimed reasoning.** Score variants using their actual outputs against the rubric and test cases. A model's self-reported rationale is not evidence the technique worked — verify empirically.
 
 ## Error Handling
 

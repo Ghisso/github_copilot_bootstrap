@@ -5,7 +5,7 @@ description: |
   Correctly test that context manager __exit__ calls cleanup methods (close, etc.).
   Triggers:
   - Writing `with obj: pass` followed by a comment like "just verify no exception"
-  - `reviewer` with the `tests` profile scores a context manager test as zero-assertion (-20)
+  - `reviewer` with the `tests` profile flags a context manager test as zero-assertion
   - Wanting to verify that __exit__ calls close(), flush(), or similar
 user-invocable: false
 ---
@@ -17,7 +17,7 @@ user-invocable: false
 `with obj: pass` only verifies that `__enter__` and `__exit__` don't raise.
 It does NOT verify that `close()` (or any other method) was called inside `__exit__`.
 
-A reviewer will flag this as a **zero-assertion test** (-20 score deduction).
+A reviewer will flag this as a **zero-assertion test**.
 
 ## Context / Trigger Conditions
 

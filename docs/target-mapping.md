@@ -1,51 +1,60 @@
 # Target Mapping
 
-The repo generates one installable output: `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` to build).
+The repo generates two installable outputs: `dist/multi-agent/`, the full
+bootstrap, and `dist/sidecar/`, the personal per-clone overlay described
+below (both gitignored — run `uv run python scripts/generate_targets.py --all`
+to build).
 
 ## Devcontainer Bootloader
 
 The generated `.devcontainer/` directory is intended to be committed in consumer
 repos. It provides a GPU-capable sandbox and a post-start sync helper that restores
-ignored AI bootstrap/state files from the configured Hugging Face sync path.
+ignored AI bootstrap/state files by checking `.claude/` out from its nested `ai-state`
+git branch (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)).
 
 ## Shared Basis
 
-The shared basis lives under `.claude/`:
-
-- `.claude/skills/**/SKILL.md`
-- `.claude/review-profiles/*.md`
-- `.claude/instructions/*.instructions.md`
-- `.claude/agents/*.md`
-- `.claude/prompts/*.prompt.md`
-- `.claude/scripts/quality_score.py`
-- `.claude/templates/*.md`
-- `.claude/MEMORY.md`, `.claude/plans/`, `.claude/session_logs/`, `.claude/quality_reports/`, `.claude/explorations/`
-- `.claude/hooks/scripts/*.sh`
+Bootstrap maintainers author reusable content in `shared/`. Generation
+renders that content into `.claude/` — skills, review profiles, Ponytail
+provenance, instructions and Claude policy rules, agents, prompts,
+`verify.py`/`record_findings.py`, templates, `MEMORY.md`/plans/session
+logs/quality reports/explorations, and hook scripts including the
+executable `run-hook.sh` dispatcher — which is the canonical runtime basis
+in an installed consumer project. See [Source, generated output, consumer
+repo, and nested AI
+state](../openwiki/architecture/source-generated-consumer-layout.md) for
+the full render sequence and what each rendered path holds.
 
 Keep `.claude/` when pruning optional tool adapters, because it is the shared basis for all supported systems.
 
+Put consumer-specific facts in
+`.claude/instructions/project-context.instructions.md`. Preserve consumer-owned
+memory, plans, explorations, session logs, and quality reports during refreshes.
+`.claude/MEMORY.md` is the curated portable project-memory authority and is
+seeded copy-if-absent; an existing consumer file remains byte-identical across
+install, update, and migration. Native Claude and Codex memory is optional,
+machine-local client state, not generated or synchronized bootstrap state, and
+this bootstrap does not disable it. Promote only sanitized, durable,
+project-wide facts into the shared file; resolve conflicts in shared narrative
+state by manual semantic merge. See [Memory Authority and
+Privacy](architecture.md#memory-authority-and-privacy) and
+[SECURITY.md](../SECURITY.md).
+
+Passwords, API tokens, confidential material, personal or customer-sensitive
+data, and unredacted logs belong in approved protected data systems, never
+shared or native memory. Only non-sensitive preferences and scratch may remain
+local.
+
 ## Native Adapters
-
-GitHub Copilot:
-
-- `.github/copilot-instructions.md`
-- `.github/instructions/*.instructions.md`
-- `.github/agents/*.agent.md`
-- `.github/hooks/hooks.json`
-- `.vscode/mcp.json`
-
-Copilot files are native adapters. Agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`; instruction wrappers preserve Copilot discovery and point to `.claude/instructions/`; hook config invokes `.claude/hooks/scripts/`.
 
 Claude Code:
 
 - `CLAUDE.md`
 - `.mcp.json`
 - `.claude/settings.json`
+- `.claude/rules/*.instructions.md` for conditional policy adapters
 
-Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Review helpers are mapped to:
-
-- `review-pass-claude-primary`
-- `review-pass-claude-adversarial`
+`CLAUDE.md` is a consumer-neutral generated entrypoint; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively and receives the five universal agents.
 
 OpenAI Codex:
 
@@ -54,6 +63,175 @@ OpenAI Codex:
 - `.codex/hooks.json`
 - `.codex/agents/*.toml`
 
-Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/`.
+`AGENTS.md` is a consumer-neutral generated entrypoint; do not hand-edit it. Codex generates seven project-scoped `.codex/agents/*.toml` files — the five universal agents plus Codex-only `luna_coder` and `sol_coder` — each self-contained with its own pinned model and reasoning effort.
 
-Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` with paths such as `../.claude/skills/run-tests`. Codex project trust is required for that project config, hooks, and skill wiring to load.
+Google Antigravity:
+
+- `AGENTS.md` — provider-neutral root guidance shared with Codex.
+- `.agents/agents/` — six static Markdown custom-agent adapters (the five universal agents plus `antigravity_flash_coder`; Codex-only `luna_coder`/`sol_coder` are not emitted here).
+- `.agents/skills/` — the shared skill tree.
+- `.agents/mcp_config.json` — the shared MCP servers under Antigravity's `mcpServers` schema.
+- `.agents/hooks.json` — the named `bootstrap-safety` configuration.
+
+`.agents/` is a bootstrap-owned root adapter, like `.codex/`, with the same pre-write takeover check described in [Installing the bootstrap, file ownership, and runtime drift checks](../openwiki/operations/install-ownership-and-runtime-checks.md).
+
+GitHub Copilot (secondary compatibility adapter):
+
+- `.github/copilot-instructions.md`
+- `.github/instructions/*.instructions.md`
+- `.github/agents/*.agent.md`
+- `.github/hooks/hooks.json`
+- `.vscode/mcp.json`
+
+Copilot files are native adapters; agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`, and Copilot generates only the five universal agents.
+
+## Gate-Repair Client Parity
+
+Per-client status for the `gate-repair` changes. Clients are listed in the order Claude Code, Codex, GitHub Copilot, Antigravity.
+
+| Change | Claude Code (`claude-code`) | Codex (`openai-codex`) | GitHub Copilot (`github-copilot`) | Antigravity | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| Context Mode hook lane is advisory only | Filtered | Filtered | Filtered | Context Mode hooks not wired, so no session continuity (recorded gap) | `tests/test_context_mode_dispatch.py`, `tests/fixtures/context_mode_hook/1.0.169/` |
+| Guarded Context Mode MCP server | Root `.mcp.json` guarded; generated targets guarded | Root and generated Codex config guarded | Root `.vscode/mcp.json` guarded; generated targets guarded | Installed and generated guarded, but the PreToolUse bridge denies MCP calls (gap) | `tests/test_validate_targets.py` |
+| Hook- and server-config protection (ask on Claude and Copilot, deny on Codex and Antigravity) | `.claude/settings.json`, `.claude/settings.local.json`, `.claude/hooks/`, `.mcp.json` | `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` | `.github/hooks/`, `.vscode/mcp.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json`. Local harness: `run_in_terminal`/`send_to_terminal` gated; read tools allowed | `.agents/hooks.json`, `.agents/mcp_config.json` | `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`, `tests/test_state_sync.py` |
+| Plan checks at branch creation | Shared guard | Shared guard | Shared guard. Local harness: `run_in_terminal`/`send_to_terminal` gated | Antigravity bridge | `tests/test_branch_state.py` |
+| Review result and profile gate | Shared `verify.py` gate through `pretool-bash-guard.sh` and the installed Git hooks | Shared `verify.py` gate through `pretool-bash-guard.sh` and the installed Git hooks | `enforce-commit-gate.sh` listed directly; terminal commands covered since the `run_in_terminal`/`send_to_terminal` fix | Through the `antigravity-pretool.py` bridge; native deny never observed | `tests/test_verify.py`, `tests/test_commit_closeout.py`, `scripts/validate_targets.py` installed-hook smoke |
+| Shipped commands cannot hide test failures | Shared skills and a `validate_targets.py` check | Same | Same | Same | `tests/test_validate_targets.py` |
+| Context7 for subagents | Generated agents with the `search` capability list `mcp__context7` | Inherits session MCP servers ([official Codex subagents docs](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [`openai/codex` source `codex-rs/core/src/agent/role.rs`](https://github.com/openai/codex/blob/7ac954ea24116700632906d89715f7755cd3523e/codex-rs/core/src/agent/role.rs), read 2026-10-17; no native run) | `context7/*` | Unverified: `inheritMcp` is not a documented field | `tests/test_validate_targets.py` |
+
+"Filtered" means `context-mode-dispatch.sh` passes upstream hook output through `context-mode-mcp-filter.mjs --hook-output`. See [runtime-checks.md](runtime-checks.md) for the pin and known limits.
+
+The root `.mcp.json` and `.vscode/mcp.json` start Context Mode through `context-mode-dispatch.sh server`, like the root Codex config, and `scripts/validate_targets.py` fails if a root adapter's `context-mode` entry is not the shared guarded route. The root adapters do not carry Context7 (an authoring-repository choice); generated targets do.
+
+The Copilot Local-harness tool names above (`run_in_terminal`, `send_to_terminal`, and the read tools) come from VS Code's source (`microsoft/vscode` at `9a59550fc841805ebb44cfd5a09b92beed591d15`, read 2026-10-17) and the [VS Code hooks reference](https://code.visualstudio.com/docs/agents/reference/hooks-reference).
+
+Recorded follow-ups:
+
+- The shell guards (branch, commit, PR) parse the payload VS Code's Local harness sends (the supported Copilot client): the model-facing tool name with an object `tool_input`. The Copilot SDK harness and Copilot CLI key casing (`toolName`, `toolArgs`) is not established from official sources. Copilot CLI is unsupported (see [runtime-checks.md](runtime-checks.md)), so this becomes work only if support for either is added.
+- Unverified: VS Code may have other command-running tools besides `run_in_terminal` and `send_to_terminal` (for example task tools such as `create_and_run_task`). The shell gates do not treat those as terminal commands. Check a source before changing anything.
+- Workspace files outside this repository's root are not protected, like every other control-plane name. A `.code-workspace` file often sits beside the repository, not inside it.
+- Codex read-only roles are read-only by instruction only. Codex ignores a custom agent's `sandbox_mode`, so the bootstrap no longer writes it, and the reviewer runs with the parent session's sandbox and approval policy.
+- `protect-files.py` is now more than 3,000 lines holding a shell scanner and several command readers in one standalone hook. A later change should split it into modules or shrink it.
+- Removing or replacing a whole parent folder (`.claude`, `.github`, `.codex`, `.agents`) gets no decision. Only the protected folders and the files inside them do. Protecting the parents would also deny `git -C .claude add -A`, the documented nested checkpoint.
+- Skill folders (`.claude/skills/`, `.agents/skills/`) are not protected, although a Claude Code skill can register `hooks` and pre-approve tools with `allowed-tools` ([skills](https://code.claude.com/docs/en/skills), documented, read 2026-10-20).
+- Plain Git commands that the guard does not model and that name a protected path (for example `git restore .claude/hooks` or `git stash push -- .claude/agents/coder.md`) stay denied on all four clients instead of asking. The guard did not loosen any earlier decision. Forms that go through `-C` or `cd` (for example `git -C .claude rm -r -q hooks`) ask on Claude Code and GitHub Copilot and deny on Codex and Antigravity, but only when no path in the command is also protected as written from the repository root. An absolute path (for example `git -C .claude restore <repo>/.claude/hooks/x`), or a command that also names the same file plainly (`git restore .claude/hooks/x && git -C .claude restore hooks/x`), is denied on all four clients.
+- The fail-closed rule (big plan `backlog-followups`, decision 6) denies on all four clients some mixed commands that asked on Claude Code and GitHub Copilot before that plan, for example `git restore .claude/settings.json && rm .claude/settings.json`, or `cat > .claude/settings.json <<EOF` whose body names another protected path. Split the command, or write the file with the native Write or Edit tool. Evidence: `tests/test_hook_gates.py`.
+- The OpenWiki guard has not been run on Codex against the real OpenWiki server. The 2026-09-19 spike saw Codex honor a `PreToolUse` deny on a test MCP server ([spike](2026-09-19-openwiki-hook-mechanics-spike.md)), but the re-probe in this checkout (deny `mode: "init"`, `noop` on a current wiki, root adapters clean after the turn) was optional evidence and recorded `NOT RUN` in `backlog-followups` Phase F because no Codex session was available. Offline evidence: `tests/test_openwiki_guard.py` and `tests/test_openwiki_cli_smoke.py`.
+- Upstream Context Mode ships `antigravity-cli` hooks, but the bootstrap does not wire them, so Antigravity has no hook lane and no session continuity.
+- The commit gate enforces the Task Lanes five-profile review for control-plane, generator, and dependency paths, but not for every multi-file diff. A multi-file diff requires the Ponytail profile only.
+- Antigravity needs a logged native run for two open questions. The MCP tool-name format inside a PreToolUse `toolCall.name` is undocumented ([hooks](https://antigravity.google/docs/hooks)), so the bridge keeps denying MCP calls. Subagent MCP access is unverified: the docs describe `mcpServers: object[]` ([subagents](https://antigravity.google/docs/subagents)), not the `inheritMcp: true` the bootstrap writes. A 2026-08 native run reported `agy mcp list` as "No MCP servers configured", and the docs do not explain it. The documented workspace config is `.agents/mcp_config.json` ([MCP](https://antigravity.google/docs/mcp)).
+- Bash reads of secret-shaped files such as `cat .env` are allowed, while native read tools on them are denied. This is kept by user decision (2026-10-21) for a later policy choice.
+
+## Backlog-Followups Client Parity
+
+Per-client status for the `backlog-followups` agent-definition protection. Clients are listed in the order Claude Code, Codex, GitHub Copilot, Antigravity. The evidence comes from offline tests and the installed-hook smoke in `scripts/validate_targets.py`. No native client run is recorded for these rows.
+
+| Change | Claude Code (`claude-code`) | Codex (`openai-codex`) | GitHub Copilot (`github-copilot`) | Antigravity | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| Agent definition protection (ask on Claude and Copilot, deny on Codex and Antigravity; each folder also protected as a whole) | `.claude/agents/`. Native `.claude` protection only reaches the classifier in `auto` and is off in `bypassPermissions`, so the hook still adds a prompt | `.codex/agents/` | `.github/agents/` and `.claude/agents/` (VS Code reads both). Read tools stay allowed, so the wrappers can read `.claude/agents/<id>.md` | `.agents/agents/` | `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`, `scripts/validate_targets.py` installed-hook smoke; [Claude Code permission modes](https://code.claude.com/docs/en/permission-modes) (documented) and [VS Code custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents) (documented), read 2026-10-20 |
+| Hook folders protected as whole folders | `.claude/hooks` | `.codex/hooks` | `.github/hooks` | `.claude/hooks` (the scripts the bridge runs) | `tests/test_hook_gates.py` |
+| Workspace files (`*.code-workspace`, any letter case, inside the repository) protected | Same guard; Claude Code does not read the file | Same guard; Codex does not read the file | In a multi-root workspace the file holds the window-scoped hook switches `chat.useHooks`, `chat.hookFilesLocations`, and `chat.useClaudeHooks` ([multi-root workspaces](https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces), documented; `microsoft/vscode` `9a59550f` source, read 2026-10-20) | Same guard; Antigravity does not read the file | `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py` |
+| Codex agent `sandbox_mode` removed | Not applicable | Removed: Codex ignores it in a custom agent file. `validate_targets.py` now rejects it as a per-agent override. The reviewer is read-only by its instructions and runs in the parent session's sandbox ([Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), documented, read 2026-10-20) | Not applicable | Not applicable | `tests/test_validate_targets.py`, `scripts/validate_targets.py` |
+| Guard reads shell text as Bash does for quotes, escapes, comments, and line breaks; some forms are not yet checked, listed in [runtime-checks.md](runtime-checks.md) | Same classifier | Same classifier | Same classifier | Same classifier | `tests/test_protect_files_scoping.py`, `scripts/validate_targets.py` installed-hook smoke |
+| Guard checks write paths through substitutions, grouped operators, inline `sed` writes, and `cd` folders; some forms are not yet checked, listed in [runtime-checks.md](runtime-checks.md) | Same classifier | Same classifier | Same classifier | Same classifier | `tests/test_protect_files_substitutions.py` |
+
+Reads (`cat`, native read tools, Copilot `read_file`) stay allowed. `rm -rf`, `mv`, and `ln -s` on a whole protected folder ask on Claude Code and GitHub Copilot and are denied on Codex and Antigravity, like an edit. Any command outside the guard's read-only list that merely names a protected path is denied on all four clients, for example `ls`, `find`, `diff`, or `cmp` on an agent file, and `ls .claude/hooks`. An uncertain literal, such as interpreter code that names the path, is denied on every client. `git -C .claude add -A`, `git add -A`, and `git diff --no-index` stay allowed. When one command line names a protected path the guard cannot judge (an "uncertain" hit) and, in another part, a path it can (a "confirmed" hit), the uncertain hit decides and the command is denied on all four clients. A redirect target (`>`, `>>`, `2>`, `&>`, `>|`, also at the start of a command such as `> <hook config>`) counts only as a confirmed hit, so `echo x > <hook config>` still asks on Claude Code and GitHub Copilot. A secret-shaped target (for example `.env`) always denies on all four clients, even beside a hook or server config (`rm .env .mcp.json`) or inside a protected folder (`.claude/agents/.env`), and read tools are denied for it. Inside the older hook folders (for example `.claude/hooks/.env`) this is a tightening: an edit or `rm` asked and a read tool was allowed before this plan; both now deny. For the agent-definition rows above, no earlier decision was loosened (a deny never became ask or allow, and an ask never became allow).
+
+The shell-reading row is different. It deliberately allows some commands the old guard blocked by mistake, for example `grep '>' .env`, which is a read. The later write-path change closed the forms the first change left open. Some commands now get a looser result than after the first change, by design. A word after `|&` is read as a command. Allowed mentions of a protected name are git message text (`git commit|tag|merge -m "..."`, `-am`, `git notes add -m`, `git stash push -m`, and `-m "$(cat <<'EOF' ... EOF)"` when that heredoc is the only command in the `$( )`; `git commit -F - <<'EOF'`), reads by `cat`, `head`, `wc`, `grep`, `rg`, `stat`, `git diff`, `git log --grep`, and `#` comments. Any other command that names it is still denied (`echo '.env'`, `printf`, `gh pr create --body '...'`). A config write through `|&`, `pushd`, or after `cd` gets the protected-config decision (ask on Claude Code and GitHub Copilot, deny on Codex and Antigravity) instead of a deny. The forms the guard still does not check are listed in [runtime-checks.md](runtime-checks.md).
+
+## Sidecar Overlay
+
+`dist/sidecar/` is a second generated target: a narrow, per-clone developer
+overlay that `scripts/install_bootstrap.py --mode sidecar` installs inside a
+repository whose agent harness a team already owns, without changing any
+tracked file. The same installer, with `--uninstall`, removes the overlay
+again. See [README.md's Personal Sidecar
+Install](../README.md#personal-sidecar-install) for install, update, and
+uninstall instructions, and
+[docs/sidecar-provider-contract.md](sidecar-provider-contract.md) for the
+native-run evidence behind every row below.
+
+`dist/sidecar/` renders two profile trees, one per `--profile` value:
+`dist/sidecar/skills/` (today's default) and `dist/sidecar/workflow/`.
+`dist/sidecar/skills/` is byte-identical to the pre-profile `dist/sidecar/`
+output. `--profile` selects which tree `install_bootstrap.py` reads from by
+default (`dist/sidecar/<profile>/`); an explicit `--source` overrides that.
+
+| Projection | Path(s) | Client(s) that read it |
+| --- | --- | --- |
+| Skill write root | `.claude/skills/<skill>/` | Claude Code; Copilot in VS Code (Local agent and Agent Host) |
+| Skill write root | `.agents/skills/<skill>/` | Codex; Copilot in VS Code (Local agent and Agent Host) |
+| Skill read-only check (never written) | `.github/skills/`, `.agent/skills/`, `.codex/skills/` | Scanned only to detect a name collision with team-owned content; the sidecar skips a skill at every write root rather than shadow a skill in one of these folders |
+| Bridge (`skills` profile) | `.claude/rules/ai-bootstrap-sidecar.md` (no frontmatter) | Claude Code; also loaded by Copilot's Local agent |
+| Bridge (`skills` profile) | `.github/instructions/ai-bootstrap-sidecar.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+| Agent (`workflow` profile) | `.claude/agents/<id>.md` | Claude Code only |
+| Rule (`workflow` profile) | `.claude/rules/ai-bootstrap-*.md` | Claude Code |
+| Instructions (`workflow` profile) | `.github/instructions/ai-bootstrap-workflow.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+| Review profile (`workflow` profile) | `.claude/review-profiles/<name>.md` | Claude Code only |
+| Template (`workflow` profile) | `.claude/templates/plan-big.md`, `plan-small.md` | Claude Code only |
+| State (`workflow` profile) | `.ai-bootstrap/` at the repository root (`MEMORY.md`, `plans/`, `session_logs/`, `explorations/`, `quality_reports/`, each with a README) | Claude Code, Copilot in VS Code, and Codex all read it; it is content, not a discovery mechanism, so every client that opens the file sees it |
+
+The `skills` profile ships the four skills — `debug-investigator`,
+`humanize`, `ponytail`, and `ponytail-review` — plus the two bridges above.
+The `workflow` profile ships every eligible public skill (a fixed denylist
+in `scripts/runtime_ownership.py` excludes skills that need the full
+install) plus the agent, rule, instructions, review-profile, template, and
+state rows above. No `.github/agents` or `.codex/agents` file ships in
+either profile: neither Copilot nor Codex has a config-free way to discover
+a custom agent from an ignored file, so those two clients get the workflow
+profile's skills and state folder only, never its agents. No bridge or
+instructions file ships for Codex (skill-only by design) or for Google
+Antigravity (unverified).
+
+The manifest, staging folder, preserved-copy folder, pending
+ownership record, and run lock that track sidecar ownership live inside the
+Git directory (`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`,
+`ai-bootstrap-sidecar-preserved/`, `ai-bootstrap-sidecar.json.next`, and
+`ai-bootstrap-sidecar.lock`), never in the worktree, so none of them can be
+tracked. The manifest is schema version 2 and records `profile`; a
+version-1 manifest (no `profile` field) reads as `skills`.
+
+The pending record is written after the ignore proof passes and
+before any unit moves, and removed once the real manifest lands — extra
+ownership evidence for a rerun after an interrupted run, never an
+instruction on its own. The run lock is held from just after preflight to
+the end of the run and stays in place, empty, afterward; a dry run takes
+neither. All five paths are built from the same already-verified `git
+rev-parse --path-format=absolute --git-dir` value, never through `git
+rev-parse --git-path`: `--git-path` resolves a symlink in the path before
+printing it, which would hide exactly the symlinked Git-directory case the
+sidecar's own preflight checks exist to catch. The preserved folder holds an
+edited sidecar copy that a taken skill name displaced; see
+[README.md's Personal Sidecar Install](../README.md#personal-sidecar-install)
+for its naming and recovery, and its [Uninstall
+section](../README.md#personal-sidecar-install) for `--uninstall`, which
+removes the manifest and staging folder but leaves the preserved folder in
+place.
+
+The state unit (`.ai-bootstrap/` at the repository root, `workflow` profile
+only) follows its own rules, not the ordinary unit rules above: seeded
+once, from its seed files, when the folder is absent; an existing folder
+only ever gets a missing seed file added, never a comparison or an
+overwrite; kept in place and hidden by plain `--uninstall`; moved into the
+preserved-copy folder and un-hidden only by `--uninstall --purge-state`;
+copied to the preserved-copy folder, without uninstalling anything, by the
+standalone `--backup-state` action. It lives at the repository root, not
+under `.claude/`, because Claude Code refuses agent writes anywhere under
+`.claude/`; an earlier workflow install's `.claude/ai-bootstrap/` folder is
+migrated into it automatically on the next install or update when the
+sidecar's own exclude block already shows it as owned — see
+[docs/sidecar-provider-contract.md](sidecar-provider-contract.md), "Workflow
+state write gate, 2026-10-02". See [README.md's Personal Sidecar
+Install](../README.md#personal-sidecar-install), "The state folder", for
+the exact messages each case prints and the `git clean -x` risk it
+mitigates.
+
+See [Agent roster, prompts, and the skill
+library](../openwiki/architecture/agents-and-skills.md) for how each
+target renders an agent from the same `shared/agents/<id>/` metadata,
+including the Codex prompt-composition rules, the per-agent model/effort
+matrix (also in [Custom Agents](architecture.md#custom-agents)), and the
+Antigravity `mainAgent`/`subagent` layout. See [Hook dispatcher and
+guardrail scripts](../openwiki/architecture/hooks-and-guardrails.md) for
+the shared `PreToolUse` safety lane every target routes through, including
+the Antigravity Python bridge.

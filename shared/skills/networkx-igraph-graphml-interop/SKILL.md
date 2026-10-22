@@ -163,6 +163,8 @@ nx.write_graphml(graph, "out.graphml")
 ET.parse("out.graphml")  # raises ParseError if control chars remain
 ```
 
-Expected metrics on UNSC 2025 dataset:
+**Observation, not a general guarantee** — measured once on one internal
+UNSC 2025 dataset comparison. Treat as an example of a healthy result shape
+for this fix, not an expected value for other graphs or datasets:
 - `edge_recall ≈ 0.97`
 - `edge_precision ≈ 0.88`

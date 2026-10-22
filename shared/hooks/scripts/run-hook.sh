@@ -7,7 +7,9 @@ warn() {
 
 if [[ $# -lt 1 ]]; then
   warn "missing hook script name"
-  exit 0
+  # Fail closed: a missing script name is a wiring error, and a non-zero exit
+  # denies the tool call on runtimes that key blocking on exit status.
+  exit 2
 fi
 
 HOOK_SCRIPT="$1"

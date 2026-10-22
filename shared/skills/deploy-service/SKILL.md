@@ -9,18 +9,32 @@ description: |
 
 # deploy-service — Deployment Workflow
 
+The required checklist (tests, types, lint, health check, secrets in env,
+`.env.example`) is canonical policy in
+`.claude/instructions/deployment.instructions.md`. This skill is the
+step-by-step sequence for running that checklist plus the surrounding
+build/containerize/rollback commands.
+
+## Step 0: Confirm the Actual Service Details
+
+Do not assume a fixed service name or port — read them from this project:
+
+```bash
+cat bentofile.yaml   # service entrypoint name
+grep -n "port" service.py bentofile.yaml 2>/dev/null  # actual bound port, if overridden from the BentoML default
+```
+
 ## Pre-Checks
 ```bash
 uv run python -c "import service; print('Service imports OK')"
 uv run pytest tests/ -q --tb=short
-cat bentofile.yaml
 ```
 
 ## Step 1: Local Serve
 ```bash
 bentoml serve service.py:ServiceName --reload
-# Health: curl http://localhost:3000/healthz
-# Test:   curl -X POST http://localhost:3000/predict \
+# Health: curl http://localhost:${PORT:-3000}/healthz
+# Test:   curl -X POST http://localhost:${PORT:-3000}/predict \
 #           -H "Content-Type: application/json" \
 #           -d '{"text": "test"}'
 ```
@@ -38,10 +52,14 @@ docker images | grep service_name
 ```
 
 ## Step 4: Test Container
+
+Use the port this project's `bentofile.yaml`/service actually binds
+(confirmed in Step 0), not a hardcoded assumption:
+
 ```bash
-docker run -p 3000:3000 service_name:latest &
+docker run -p ${PORT:-3000}:${PORT:-3000} service_name:latest &
 sleep 5
-curl http://localhost:3000/healthz
+curl http://localhost:${PORT:-3000}/healthz
 # Repeat endpoint tests
 ```
 

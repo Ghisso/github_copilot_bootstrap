@@ -6,57 +6,912 @@ Run:
 uv run python scripts/check_runtime.py
 ```
 
-The runtime checker verifies generated runtime files exist and reports optional helper availability.
+The runtime checker verifies generated runtime files exist, including the
+Ponytail coding/review skills and upstream license/provenance, and reports
+optional helper availability.
+
+## Refreshing This Repository's Own Overlay
+
+The bootstrap's dogfood overlay is refreshed with `--allow-self`:
+
+```bash
+uv run python scripts/generate_targets.py --all
+uv run python scripts/install_bootstrap.py . --allow-self --local-only
+```
+
+`install_bootstrap.py` normally refuses overlapping source and target, because
+the generated source (`dist/multi-agent`) lives inside this repository.
+`--allow-self` permits **only** that case, and only when the target is the
+bootstrap repository itself. Installing a tree over itself, or into a directory
+beneath the source, stays rejected with or without the flag. Removal is safe
+here because it walks only `target/.claude` and the restorable root adapters,
+so `dist/` is never a removal candidate. `update_consumers.py` accepts the same
+flag and forwards it.
+
+Never hand-copy `dist/` into place; always regenerate and install.
+
+### What a self-refresh removes
+
+Files under `.claude/` that the generated target does not contain are removed as
+obsolete owned files. Consumer state (`MEMORY.md`, `plans`, `explorations`,
+`session_logs`, `quality_reports`, `project-context.instructions.md`,
+`settings.local.json`, and the nested `.gitignore` and `.gitattributes`) is
+preserved, as are tracked authoring adapters such as `.codex/config.toml` and
+`AGENTS.md`. `state-sync.sh` keeps the two nested Git files current without
+overwriting them: it appends `settings.local.json` to `.gitignore` when that
+file would not be ignored, and `session_logs/*.log merge=union` to
+`.gitattributes` when the line is missing, so a consumer's own lines survive
+every refresh.
+
+`.claude/settings.local.json` is now consumer state and is preserved. It used
+to be deleted as an obsolete owned file on **every** install, in every consumer
+— and because `state-sync.sh` deliberately gitignores it in the nested repo
+("local convenience only; never synced"), that deletion was unrecoverable. Any
+file matching the nested ignore list is local-only by design and must never be
+treated as bootstrap-owned.
+
+A file that exists under `.claude/` but not in the generated target is still
+removed as obsolete. `check_runtime.py` reports such orphans before a refresh
+does anything, so read its output first. An authored skill living only in the
+overlay should be promoted into `shared/skills/` so it regenerates, rather than
+being left to be deleted by the next refresh.
+
+### Expected side effects
+
+A self-refresh writes the consumer ignore block into `.gitignore`
+(`.claude/`, `.codex/`, the Copilot surface, `.vscode/mcp.json`). Files already
+tracked stay tracked; the installer prints a `git rm --cached` hint if you want
+to untrack them.
+
+The refreshed hook guards are stricter than older installed copies. Process
+substitutions (`<(...)`/`>(...)`) and heredocs (`<<WORD`, `<<'WORD'`,
+`<<"WORD"`, `<<-WORD`) are extracted quote-aware and recursively classified,
+so a safe read-only use of either no longer fails just because the guard
+cannot parse it, and a mutation nested inside one is still detected regardless
+of the outer command. Wider syntax support does not weaken that nested
+detection. A malformed, unbalanced, or unterminated construct still fails
+closed. `for`/`while`/`{ }` and other complex control flow remain unmodeled by
+the lightweight parser — put that logic in a script file and run it, which
+stays classifiable and keeps the guard active rather than routing around it.
+Known, unchanged limitation: the guard never recursively parses `-c` script
+content (`bash -c '...'`, `python3 -c '...'`); it only scans that text for
+literal protected paths, so a path assembled from pieces inside `-c` (for
+example `bash -c 'E=env; touch ".$E"'`) is not detected.
+
+It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
+files in this source checkout must match freshly generated output (after the
+documented project-name substitution); unexpected obsolete owned files fail too.
+The check deliberately excludes consumer-owned `.claude` state: `MEMORY.md`,
+plans, explorations, session logs, quality reports, explicit project-context
+customization, `settings.local.json`, and the nested `.gitignore` and
+`.gitattributes`. Tracked source adapters such as root `AGENTS.md` are checked for
+their authoring invariants rather than byte-compared to a generated consumer
+adapter. A failure names the stale path, its authoritative source, and the
+regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode`
+- `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
+  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
+
+  1. Run `uv run python tests/fixtures/context_mode_hook/capture.py [--out-root DIR]`. It records raw upstream output, not filtered output, by running the pinned `context-mode hook <target> <event>` directly with the `CONTEXT_MODE_DIR` and `CONTEXT_MODE_PROJECT_ROOT` the dispatcher passes, in a temporary Git repository with a temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and a private `TMPDIR` (upstream keeps once-per-session tip files in the OS temp directory). It copies the hook scripts there only to run `--self-check` first, which asserts the direct pinned launcher. It reads the pinned version and client-to-target mapping from `shared/hooks/scripts/context-mode-dispatch.sh`, so run it in this authoring repository. It uses one session id per client, redacts temporary paths as `<TMP>`, and writes `<out-root>/<PINNED_CONTEXT_MODE_VERSION>/<client-id>/<event>-<case>.json` (default out-root: the fixture directory).
+  2. Review the new outputs for decisions, input rewrites, and advice blocks. Update the filter if a new shape appears.
+  3. Run the hook tests, including the real-binary test:
+
+  ```bash
+  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
+  ```
+
+  Known limits:
+
+  - A restored-data block that mentions any non-allowlisted `ctx_` name is dropped whole (fail-closed).
+  - Unclosed, nested, or differently cased advice tags are not stripped. For such text only the name safety net applies: the whole field is dropped if it still names a plugin-prefixed or non-allowlisted `ctx_` tool, otherwise the leftover text is forwarded.
+  - The event name must be a plain word (letters only), or nothing is forwarded.
+  - Codex and Copilot restore shapes were not observed.
+  - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
+  - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
+- `openwiki` (the OpenWiki command-line tool and MCP server, installed globally and pinned in `shared/devcontainer/Dockerfile`; `OPENWIKI_PINNED_VERSION` in `scripts/validate_targets.py` names the same version). OpenWiki has no `openwiki --version`, so the Dockerfile reads the version from the installed package's own `package.json`, then runs `openwiki integrations list </dev/null`. `tests/test_openwiki_cli_smoke.py` requires the binary on `PATH` to report exactly the pinned version. It fails when the version differs or the binary is missing, and it never downloads anything. To move to a new pin:
+
+  1. Diff the contents of `npm pack openwiki@<old>` and `npm pack openwiki@<new>`, and read the release notes between them. Look for changes to the tool names, `openwiki_begin`'s input, the managed-block markers, which paths a begin call writes, and the host integrations.
+  2. Observe the candidate version in isolation, outside this repository: a scratch directory, a temporary `HOME`, and no network for the probes. Run the guard round trip (`pre`, `openwiki_begin` with `mode: "update"`, `post`) in a synthetic repository, and confirm both root adapters come back byte for byte.
+  3. Change the `openwiki@` install line and the `package.json` version check in `shared/devcontainer/Dockerfile`, `OPENWIKI_PINNED_VERSION`, and `EXPECTED_TOOLS` in `tests/test_openwiki_cli_smoke.py`.
+  4. Install the new version on your machine, then run `uv run pytest tests/test_openwiki_cli_smoke.py tests/test_openwiki_guard.py -q`.
+  5. Run `openwiki integrations install claude --project <root>` and `openwiki integrations install codex --project <root>` again, never with `--force`. Confirm `.mcp.json` and `.codex/config.toml` are unchanged.
+  6. Start a new host session, or reconnect with `/mcp`, before the next refresh, so the server running in the session matches the new pin.
+
+  Stop rule: keep the old pin when `openwiki_begin` writes outside `openwiki/**`, `AGENTS.md`, and `CLAUDE.md`, or when the guard round trip fails. Install no host integration other than `claude` and `codex`.
 - `npx`
+- `gh`
 - `uv`
 - `uvx`
 - Semble through `uvx --from "semble[mcp]" semble`
+- context7 through `npx -y @upstash/context7-mcp` (missing `npx` warns, does not fail; falls back to training-data knowledge)
+
+Target validation also checks the static Google Antigravity adapter when
+generated output is present: `.agents/hooks.json` contains only
+`bootstrap-safety` and one catch-all `PreToolUse` group, and its command points
+to the direct Python 3.9 standard-library normalization bridge. The bridge's
+runtime decision behavior is covered by the Phase B hook tests: explicit
+non-mutating tools are allowed, command and write tools use the canonical
+guards, and unknown or malformed requests deny with JSON-only protocol output.
+This check does not prove that Antigravity has loaded or trusted the adapter;
+native behavior remains the external acceptance gap/blocker described below.
 
 Missing optional binaries produce `WARN`, not `FAIL`.
 
+## Native Client Release Checks (Opt-In)
+
+`check_runtime.py` remains an offline structural/runtime check. It does not
+authenticate or start Codex, Claude, or VS Code Copilot, and a structural PASS
+is not evidence of native instruction delivery, hook trust, compact/resume
+behavior, Codex role routing, or Copilot custom-agent loading. The native
+probe's default temporary mode deliberately does not launch either existing
+probe client, so it is only a structure/missing-client smoke and reports an
+installed client as unresolved `WARN`/`untrusted`. For actual native execution,
+prepare, inspect, and manually trust a dedicated stable workspace, then rerun
+against that same workspace:
+
+```bash
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe --prepare-only --json
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe \
+  --client codex --require --json
+```
+
+Default availability/trust failures are `WARN`; `--require` makes them `FAIL`.
+`--require` also makes unresolved `unexercised` WARNs nonzero. The probe runs
+two separate read-only temporary consumers (control and shim-removed candidate)
+with ephemeral/non-persistent sessions, a minimal environment, process-group
+timeout cleanup, no Codex MCP/apps/web search, no hook approval, and no trust
+mutation. It keeps client output out of the result. Schema v2 records only
+instruction sentinels; trust is preflight/execution status. Codex role metadata
+can PASS only from explicit JSONL agent/thread/subagent events; undocumented or
+absent events are WARN, not proof. Compact/resume and coder escalation are
+currently unexercised WARNs. The current structural matrix has seven Codex
+roles; the dated 2026-08-09 native observation has six. A future optional
+persistent-thread probe may exercise all seven, but no native run is required
+for the current feature. Claude has no Codex-role matrix. Read [Native
+Client Acceptance](native-client-acceptance.md) before interpreting a report or
+changing a compatibility gate.
+
+### VS Code Copilot evidence boundary
+
+Generation and `validate_targets.py` prove the rendered Copilot custom-agent
+frontmatter only. They do not prove that an authenticated VS Code Copilot
+session loads the agents, exposes their MCP tools, honors delegation metadata,
+or leaves session-selected Auto unpinned. Record those observations only after
+a small authenticated VS Code smoke; otherwise record the smoke as `not run`.
+This bootstrap does not add Copilot CLI, cloud-agent, or native-harness support.
+
+The persistent path must be dedicated: preparation refuses broad paths and
+nonempty directories without its ownership marker. A later preparation refreshes
+only marker-owned probe children. It never writes a trust setting, approves a
+hook, or forces a safety bypass; trust remains an explicit operator action.
+
+Ponytail does not add a runtime binary requirement. Its portable skills are
+vendored into `.claude/`. The coder applies `ponytail` `full` once during
+IMPLEMENT; the reviewer selects the separate `ponytail` profile only when the
+authoritative routing table requires it. Selected findings use the ordinary
+CRITICAL/MAJOR/MINOR gates, with no special zero-Ponytail gate. Node.js is used
+elsewhere by the managed devcontainer, but is not required solely for this
+Ponytail integration.
+
 Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
+- `run-hook.sh`
 - `protect-files.sh`
+- `openwiki-guard.sh`
+- `pretool-bash-guard.sh`
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
 - `session-log.sh`
-- `hf-ai-sync.sh`
+- `state-sync.sh`
+- `claude-stop.sh`
+- `codex-stop.sh`
+- `restore-root-adapters.sh`
+- `session-start-state.sh`
+- `enforce-branch-state.sh`
+- `record-branch-state.sh`
+- `enforce-commit-gate.sh`
+- `record-commit-closeout.sh`
+- `enforce-pr-gate.sh`
+- `stop-session-log-check.sh`
+- `reporting-reminder.sh`
 
-The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos.
+The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos. `run-hook.sh` is especially important because Claude and Codex hook configs execute it directly; generated output is invalid if that dispatcher is not runnable.
 
-## Devcontainer And HF Sync
+`record-commit-closeout.sh` is not a `PostToolUse` handler. The native Git
+`post-commit` hook runs it before `state-sync.sh push`, derives the commit from
+`HEAD`, and records one atomic plan transition. If the recorder fails or returns
+an unexpected result, the hook writes an actionable warning to
+`.claude/session_logs/hooks-errors.log` before state synchronization proceeds.
+
+The static reporting policy applies to all four supported targets. The
+`reporting-reminder.sh` runtime reminder is narrower: prompt-start and selected
+late-turn reminders are wired only for Claude Code and OpenAI Codex. It is
+warn-never-fail and non-blocking. The 183-byte reminder must remain under the
+200-byte ceiling; it emits no output for ordinary commands and writes
+diagnostics only to stderr. The `verify.py closeout` and findings-persistence
+late reminders match on command shape only and do not inspect the command's
+outcome, so a failed run of either command can still produce one reminder;
+the phase-completion commit reminder is confirmed against the plan state
+committed in the nested `.claude` repository. There are no periodic
+every-N-tool reminders, `Stop` rewriting, or
+`PreCompact` reminders. Copilot and Antigravity hook events are unchanged, and
+Gemini CLI is out of scope.
+
+For the primary targets, generated `PreToolUse` routing must remain split into
+three groups: native file mutations (`Edit|Write` for both Claude and Codex)
+call `protect-files.sh`; `Bash` calls the single ordered
+`pretool-bash-guard.sh`; and `*` calls only best-effort
+`context-mode-dispatch.sh`. `Read` and MCP tools must have no mutation handler.
+The Bash wrapper must preserve the guard order: protected files, dangerous Git,
+branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
+outside that lane and retain their existing sequencing.
+
+`protect-files.sh` requires `python3` and calls its bundled classifier directly;
+it never depends on `uv run` or a project virtual environment. Missing Python,
+malformed payloads, classifier errors, incomplete redirects, indeterminate
+in-place targets, and ambiguous shell syntax must fail closed. The classifier
+must preserve the proven read-only path while checking both source and
+destination operands of copy/install/move operations, so a protected source
+cannot be exfiltrated through a write-bearing command. Resolve supported
+wildcards, `cd`, Git `-C`, and symlink targets without executing a shell.
+The classifier reads shell text with one scanner that follows Bash's rules for
+quotes, escapes, comments, and line breaks. It no longer uses `shlex`.
+A backslash outside quotes makes the next character literal.
+`'...'` is literal. `$'...'` allows backslash escapes. `$"..."` is read like `"..."`.
+Inside `"..."`, a backslash escapes only `$`, a backtick, `"`, `\`, and a newline.
+Unquoted `$( )` and `$(( ))` stay part of their word, and the command inside `$( )` is checked on its own.
+A substitution glued to a file name counts as empty, so `tee .env$(true)` is a write of `.env`.
+An unset variable glued to a file name counts as empty, so `tee .env$X` and `tee "$X".env` are writes of `.env`.
+A `#` starts a comment at the start of a word outside quotes.
+A carriage return is an ordinary character, as in Bash.
+An unquoted newline separates commands.
+Blank lines, and a newline after `;`, `&&`, `||`, `|`, or `&`, add no empty segment.
+A leading `(` opens a group, an operator may follow `)`, and a `)` may close a group on its own line.
+A run of operator characters is split by longest match, so `cat x;(tee .env)` is denied.
+A quoted or escaped operator is part of a word and is marked so later stages do not read it as an operator or redirect.
+So `grep '>' .env` is a read and `tee '|' cat .env` writes `.env`.
+Quoted glob, brace, or variable text is kept as written.
+A word that is exactly one quoted glob (it holds `*`, `?`, or `[`) is a pattern, so `find . -name '*.pem'` and `ls '*.key'` are allowed.
+Brace lists such as `'{a,b}.pem'` are not patterns.
+In a command that changes files, `rm 'credentials*'` still treats it as a file name.
+No pattern exemption applies when the command, after `sudo`, `env`, or `command`, is a shell, interpreter, or runner such as `bash -c`, `eval`, `xargs`, `python3 -c`, `timeout`, or `nohup`.
+An unquoted word `case` followed by a blank, inside an unquoted `$( )`, `<( )`, or `>( )`, fails closed, because the guard does not follow `case` patterns there.
+Quoting the word avoids this.
+Outside double quotes, a `${ ... }` expansion is read as one unit, the way Bash does: its own quotes, `)`, `#`, and nested `$( )` or `${ }` stay inside it.
+Inside double quotes, a single quote or `$'` inside a `${ }` fails closed, because Bash and POSIX shells (`sh`, `bash --posix`) read it differently.
+The rules follow Bash 5.2. For the forms its tests check, where Bash and POSIX `sh` read the same text differently, the guard either denies or fails closed.
+Commands run by zsh are not modelled.
+A default word (`${x:-word}`) is checked like the word itself, so `tee ${x:-.env}` is a write of `.env`.
+A `${ }` that never closes fails closed.
+An extended glob (`@( )`, `*( )`, `+( )`, `?( )`, or `!( )` glued to text) is one word, and an extended glob in a write operand fails closed.
+An array assignment `NAME=(...)` is read as one word, and a `#` right after its `)` fails closed.
+All four clients share this classifier.
+These cases fail closed: a truly empty segment (`| head`, `a && && b`), an unterminated quote, and a command nested too deeply.
+Each command gets one work budget, and a command too complex to read fails closed ("shell command is too complex to read").
+A word longer than 512 characters that holds a protected name also fails closed ("a word of N characters is too long to check for a protected name").
+The classifier stops itself after 4 seconds with a process alarm, and the hook treats that as a denial, so the hook's own 10-second timeout, which would let the command through, never decides.
+Ordinary commands are very unlikely to be affected by these limits.
+Commands inside `"$( )"`, inside backticks, and inside double-quoted backticks are checked on their own.
+In the usual commit-message form `git commit -m "$(cat <<'EOF' ... EOF)"` (also `tag`, `merge`, `-am`, `--message`, `git notes add -m`, and `git stash push -m`), the heredoc is message text, and its body is not scanned for names.
+This holds only when the `cat` heredoc is the only command in the substitution. A pipe, `;`, `&&`, `||`, or a second command makes the body a script.
+`|&` is a pipe. `&>>`, `<>`, and `>&` followed by a word that is not a file-descriptor number or `-` are write redirects.
+Inline `sed` scripts that write (`w file`, `W file`, `s///w file`) are writes. A `sed` script that runs a command (`e`, `s///e`) fails closed ("runs a shell command").
+`sed` long options are read the way GNU `getopt` reads them, so any unique prefix works (`--ex=`, `--e`).
+After `cd`, the file names of a command the guard does not model are also resolved against the `cd` folder.
+`cd` operands are expanded (globs and symlinks). `pushd`, `popd`, `builtin cd`, `env -C DIR`, and `--chdir` are followed.
+Wrappers are recognized by base name (`/usr/bin/env -C ...`).
+Any command's `-C DIR`, `--chdir DIR`, `--chdir=DIR`, `--directory DIR`, or `--directory=DIR` adds that folder for its operands (`make -C`, `tar -C`, `timeout 5 env -C ...`).
+A protected config found that way gets the protected-config decision (ask on Claude Code and GitHub Copilot, deny on Codex and Antigravity).
+A script that a shell or interpreter runs from there is denied on every client.
+`bash -c`, `sh -c` (also `dash`, `zsh`, `ksh`, and `ash`), and `eval` scripts are read as command lines with the current folders and variables.
+`source` or `.` of `/dev/stdin`, `/dev/fd/0`, or `/proc/self/fd/0` with a heredoc, `source <(cat <<'EOF' ...)`, and `eval "$(cat <<'EOF' ...)"` are read like `eval` in the current shell.
+`eval` scripts are read in the current shell, so their `cd`, variables, aliases, functions, and `CDPATH=` apply to later commands.
+`bash -c` and `sh -c` scripts are read in a copy, as a child shell.
+`bash -O dotglob -c ...` and `zsh -o glob_dots -c ...` fail closed like `shopt -s dotglob`.
+ANSI-C escapes that spell a name (`$'\056env'`) are decoded. `$'...'` is cut at a NUL byte as Bash does, and a raw NUL byte in the command fails closed.
+Quoted heredoc delimiters are read as whole words.
+A function defined on the same line has its name treated as an unknown command, so its operands are checked.
+`$IFS` and variables whose values contain blanks are split into words.
+Plain `$NAME`, `${NAME}`, `+=`, defaults on unassigned names, and `${#x}` are read.
+An operation, subscript, or indirection (`${x%.md}`, `${a[0]}`, `${!x}`) on a variable assigned earlier on the same command line fails closed ("assigned earlier"). So does a default on an assigned name (`x=a; echo ${x:-b}`) and any array reference.
+A name that holds a tracked value and is assigned a different value again on the same command line (`=` or `+=`, in any context: plain, `&&`/`||`, prefix, subshell, pipeline, background, `export`, `declare`, or inside `bash -c`) fails closed ("assigned twice").
+A copy of a singly assigned value stays tracked, so `x=.env; y=$x; tee $y` is denied.
+An assignment whose value holds a default or an unresolved expansion is also tracked when a guess names a protected file by itself, so `y=${z:-.env}; tee "$y"` is a write of `.env`.
+Unresolved references glued to a protected name are checked with the reference removed, so `x=.en${z}v; tee "$x"` and `y=${z:+a}; tee .env$y` are denied.
+A value that is not tracked does not trigger "assigned twice" (`PORT=${PORT:-8080}; PORT=9090` is allowed).
+A command name held in a variable (`c=cd; $c .claude`, `"${c}"`) is read as that command.
+A shell fed a script by a heredoc, a here-string (`bash <<< '...'`), `cat <<EOF | sh`, or `cat <<< text | sh` is read like `bash -c` (a child shell).
+This holds in any spelling: a full path (`/bin/bash`), `dash`, `ksh`, `ash`, `zsh`, with `-s`, `/dev/stdin`, `/dev/fd/0`, or `/proc/self/fd/0`, and behind runners that start a shell (`exec`, `nohup`, `nice`, `setsid`, `stdbuf`, `ionice`, `timeout`, `doas`, `time`, `xargs`, `watch`, `busybox`). Those runners' `-c` scripts are read too.
+`source /dev/stdin <<< text`, `bash <(cat <<EOF ...)`, and `bash -c "$(cat <<EOF ...)"` are read as well.
+An assignment's value is read before the name is marked, so self-referencing defaults are allowed (`PORT=${PORT:-8080} ./run.sh`, `export PATH="${PATH:-/usr/bin}:/opt/bin"`).
+A name built around one substitution is flagged when the text continues `.env.` or `credentials` (`touch $(echo cred)entials`, `.$(echo env).production`). A whole-word substitution such as `tee $(mktemp)` stays allowed.
+A brace list in the command word (`{tee,.env}`) is checked.
+A glob glued to a variable is checked against the real folder.
+Commands after `then`, `do`, `else`, `{`, `!`, and `time` are checked.
+`find -delete` and `find -exec rm {} +` (also `-execdir` and `-ok`) are checked when they can reach a protected name.
+A `find` `-name` or `-iname` pattern is tested by filling each glob run with nothing, `x`, or `.`. A pattern with `$`, a backslash, or a substitution is not narrowed.
+`-path`, `-ipath`, `-wholename`, `-regex`, and `-iregex` never narrow, so a deleting `find` with them is denied.
+`perl -e` and other perl forms are read like an interpreter. Short-flag clusters are parsed (so `-Mwarnings` is not mistaken for `-i`).
+With `-i`, the file operands are write targets (a hook config asks on Claude Code and GitHub Copilot and is denied on Codex and Antigravity, like `sed -i`), and only the `-e`, `-E`, `-M`, and `-m` text is scanned for names.
+Without `-i`, every operand is scanned too, because a perl program can write to a file it only gets as an argument. `git -c NAME=VALUE` values are scanned, so `git -c alias.x='!tee .env' x` is caught. `rg --pre COMMAND` is read as a command.
+`shopt`, `setopt`, `unsetopt`, `set -o glob_dots`, `alias`, `GLOBIGNORE=`, and `CDPATH=` are read from the command's own words (quotes removed). Text that only mentions them, such as a commit message or `echo`, is allowed.
+These forms fail closed: `shopt -s dotglob`, `GLOBIGNORE=`, `CDPATH=`, `setopt dotglob`, zsh glob qualifiers that run code (`*(e:...:)`, `*(+func)`, `${(e)x}`), more than 64 distinct `cd` folders, a brace list of more than 256 words, the per-command work budget, and the 4-second classifier alarm.
+The guard blocks a few harmless commands on purpose: `rm 'credentials*'`, `git add '*.pem'`, `echo $X.env`, `find . -name '{a,b}.pem'`, `bash -c '*.pem'`, and `timeout 5 find . -name '*.pem'` are denied.
+`echo $'\056env'`, `find docs -delete`, `find . -type f -delete`, `alias cat=tee; cat .env`, and `touch cred$(echo entials).json` are denied.
+Also denied: a name assigned twice with different values on one line (`x=a; x=b; echo $x`, `x=a; x+=b`, an `if`/`else` that sets one name both ways, a counter `i=$((i+1))`, `DEBUG=1 cmd1; DEBUG=0 cmd2`), `git commit -m "$(echo 'mention .env')"` (a `$( )` that is not a message heredoc is a command), any pipe after a commit-message heredoc, `x=.env; x=out.txt; tee $x` (assigned twice), `find` with `-path` or `-regex`, `find . -name "$X" -delete`, `find . -newer x -delete`, names like `.$(date).txt`, `pushd d; popd; cmd settings.json` (gated), `bash -c` scripts the parser refuses, `y=${z/#/.env}; tee "$y"` (Bash writes nothing when `z` is unset), `perl -ne 'print' .env`, a full-path mutator such as `/bin/tee .claude/settings.json` (denied where plain `tee` asks), `nice -n 5 echo bash -c ...` (read as a shell), and any `sed` `e` command.
+A quoted heredoc outside a commit message whose text names a write to `.env` is denied.
+Any zsh glob qualifier that starts with `e` or `+name` is denied.
+`echo ${x:- ; tee .env }` and `echo ${X:-.env}` are denied.
+`echo $(case a in a) echo hi;; esac)`, `echo $(grep -c case README.md)`, `echo ${x:-"a}"`, `rm @(a|b)`, `echo "${x%'}'}"`, `x="${y:-'a'}"`, and `x=readme.md; echo ${x%.md}` fail closed.
+A word over 512 characters that contains a protected name also fails closed.
+The guard does not yet check these forms, so a write through them is allowed:
+whole-word command output used as a name (`tee $(printf '\056env')`, `rm $(find . -name '.env*')`);
+names fed to `xargs` (`find . -name '.env*' | xargs rm`);
+a `cd` into a folder computed at run time (`cd "$(echo .claude)" && ...`);
+loop and input variables (`for`, `select`, `getopts`, `read`, `mapfile`: `for x in .e; do tee ${x}nv; done`), and names built by `printf -v`, `set --`, or `declare -n`;
+other folder-change spellings (`-D`, `--cwd`, `--prefix`, `--workdir`) and folder changes inside a nested script (`xargs sh -c 'cd ...'`, `find -exec sh -c`, `ssh host '...'`, `docker run ... sh -c`);
+wrappers other than `env`, `sudo`, `command`, `builtin`, and plain `time` are not unwrapped (`exec`, `xargs`, `setsid`, `stdbuf`, `ionice`, `watch`, `doas`, `timeout`, `nohup`, `nice`, `time -p`, `/usr/bin/time`); their words are scanned only (a protected name in them is denied on every client), except that runners that start a shell have their shell scripts read;
+a one-character tail after a substitution for the prefix and suffix families (`touch $(echo credential)s`, `$(echo server.pe)m`; exact names such as `.env` are flagged for any tail);
+`find -name` narrowing is a sample: `find . -name '*.pyc' -delete` can reach a file named `.env.pyc` or `credentials.pyc`, and it stays allowed because denying it would block every `*.pyc`, `*.log`, or `*.tmp` cleanup;
+`sed -f script` (the script file is not read);
+environment variables that name a command (`PAGER`, `GIT_PAGER`, `GIT_SSH_COMMAND`, `BASH_ENV`, `PROMPT_COMMAND`) and git aliases from config files;
+interpreter text with escaped quotes, and variables from the environment;
+a variable read when a same-line function is called (`f() { tee "$x"; }; x=.env; f`: the body is read where the function is defined);
+scripts given as `bash < file`, `bash < <(cmd)`, `source <(cmd)`, or `eval "$(cmd)"` (for example `source <(echo 'cd .claude')`), unless the substitution is only `cat` of a heredoc;
+text piped into a shell from any producer other than `cat <<EOF` or `cat <<< text` (`echo '...' | sh`, `printf ... | bash`, `cat file | sh`, `curl ... | sh`), and a pipe into a group that changes folder first (`echo '...' | (cd .claude; sh)`);
+launchers that start a shell but are not read for names built inside their script (`su -c`, `ssh`, `flock`, `unshare`, `strace`, `taskset`, `parallel`, `script -c`, `chroot`, `runuser`, `env -S`, `sudo -s`; a name written in full is still caught);
+interpreters other than shells that read a script from stdin (`python3 -`, `node`, `perl`, `ruby`, `awk -f -`) only have their text scanned;
+a value whose default word, or what is left without its expansions, is only a fragment of a protected name (`y=${z:-.e}; tee "${y}nv"`, `x=.e; y=${z}${x}nv; tee "$y"`); only a guess that names a protected file by itself is tracked;
+a single-quoted `$` in an assignment is read as an expansion (the quote kind is not tracked);
+functions defined on an earlier command line;
+and zsh syntax beyond the refused qualifiers, `setopt`/`unsetopt`, and `${(` flags (zsh is not modelled).
+For
+opaque command or interpreter syntax, verify conservative high-confidence path
+coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
+paths, agent definition paths, `*.code-workspace` files, and protected hook
+configuration files; do not treat prose or ordinary
+source filenames containing `secret` as credentials, and do not require denial
+of unknown commands that carry none of those path literals. Within that
+coverage, the hook paths, agent definition paths, `*.code-workspace` files, and
+protected hook configuration files (this repository's own guardrail setup) are scoped to
+this repository only, decided on the resolved real path of the candidate; the
+four credential-shaped alternatives (`.env*`, `uv.lock`, `credentials*`,
+`.pem`/`.key`) stay protected on any path, in this repository or any other;
+and a candidate whose real path cannot be resolved stays protected rather
+than being allowed.
+
+Three gates besides the classifier — commit, push, and branch creation — now
+stand down for a command that provably targets a different repository: a
+`git commit`, `git push`, or `git checkout -b`/`git switch -c` that carries an
+explicit `-C`, `--git-dir`, or `--work-tree` redirect resolving to a
+repository other than this checkout stands down, so `git -C <dir> commit`,
+`git -C <dir> push`, and `git -C <dir> switch -c` are the supported ways to
+act on another repository from this checkout. `--git-dir` given without
+`--work-tree` does not stand down: git then treats the current directory as the
+working tree, so from inside this checkout such a command still acts on this
+repository's files. Creating a pull request never
+stands down: `gh pr create` is always checked against this checkout, whatever
+repository `-R` names, because comparing remote URLs to decide otherwise
+could wrongly let a real pull request skip this repository's closeout
+ceremony. Every undeterminable case — no explicit redirect, a redirect that
+does not resolve to a repository, or a `cd` into another directory before the
+command — keeps the full gate, exactly like the classifier's
+unresolvable-path rule above. `git branch foo`, which creates a branch
+without switching to it, is not covered by the branch-creation gate at all;
+this is unchanged.
+
+The runtime checker also runs the shipped `scripts/validate_plan_frontmatter.py` when it is present, and surfaces its failures as hard `FAIL` errors, not `WARN` — plan-frontmatter validation is a hard runtime contract, not an advisory check. A missing validator script is not itself an error here; the required-files/required-directories checks already gate on the generated tree.
+
+Runtime verification also expects the installer and updater defaults to create
+and publish nested `ai-state` commits. With `--local-only`, they must instead
+complete the full generated refresh and leave a clean, committed nested
+repository without invoking fetch, `ls-remote`, pull, merge, or push. A legacy
+consumer must retain ordered `migrate: import pre-git state` and subsequent
+`bootstrap:` history; the installer reports nested status and a shell-safe
+manual publish command.
+
+The installer writes `.claude/bootstrap-ownership.env` as inert data, never as
+executable shell input. It records whether the Copilot surface is local-only or
+committed and which root adapters may be restored from `.claude/bootstrap-root/`.
+An update retains that mode unless you explicitly select the opposite
+`--[no-]commit-copilot-surface` option. During a refresh, obsolete files that
+are bootstrap-owned by the active mode are removed safely; consumer state and
+the nested repository metadata are retained.
+
+### Google Antigravity ownership
+
+`.agents/` is a bootstrap-owned root adapter, like `.codex/`. A consumer has one
+`.agents/` ignore entry; the directory is mirrored at
+`.claude/bootstrap-root/.agents/` and represented by
+`BOOTSTRAP_ROOT_PATH=.agents` in the ordinary root manifest. No
+`.claude/antigravity-ownership.env` or generated file-level allowlist is
+produced.
+
+The installer checks the complete tree before its first write. Current
+generated bytes, a matching prior mirror, or strictly validated legacy
+ownership evidence may establish safe takeover. Unknown, modified, unsafe,
+non-regular, or unproved paths fail closed with sorted paths and instructions
+to back up or move the content, remove it only if intended, and rerun. The
+installer never silently adopts or deletes consumer content. A successful
+migration removes obsolete per-file records and leaves the directory-level
+mirror and manifest record. Repeat local-only self-installs are deterministic.
+
+The installer never writes `~/.gemini/`. During the recorded dogfood refresh,
+temporary `PATH` entries were removed before final runtime checks; no persistent
+`PATH` change is part of the installer contract.
+
+### Google Antigravity evidence boundary
+
+Static checks prove generated structure, not a native client result. The
+following Antigravity role observations are historical and predate verifier
+retirement; they are not the current generated role matrix. The
+authenticated `agy` CLI initially ran as 1.1.16 and later self-updated to
+1.1.17. It initially reused the development repository from
+a persisted project, so that run is invalid. Native tests must use
+`--new-project --sandbox`; an isolated run verified workspace root
+`/tmp/antigravity-native-consumer.1ZpJpK`. Root `AGENTS.md` guidance loaded
+correctly, and exact-response invocations succeeded for `planner`, canonical
+`coder`, `reviewer`, `antigravity_flash_coder`, `verifier`, and
+the default native agent with root guidance. A custom main agent could not
+invoke a workspace custom subagent. The approved adapter layout therefore
+makes the default native agent the main thread through root `AGENTS.md`, sets
+every custom adapter to `mainAgent: false`, and keeps only the six specialists
+as subagents.
+
+The Flash-coder and verifier checks passed after the free-tier quota reset;
+their successful loading is not model-tier evidence. Earlier parallel attempts
+produced no retained output and are not evidence. A fresh `agy` 1.1.17 run in
+`/tmp/antigravity-final-native.y4Nx6j`, again using `--new-project --sandbox`,
+gave the default agent one tiny prompt. It delegated to
+`antigravity_flash_coder` and then `coder`, returned exact `F/P`, and completed
+with `SUCCESS`. This proves default-agent delegation and that the bridge now
+allows native task scheduling; it is not model-tier proof or proof of the
+formal automatic Flash-to-Pro escalation contract. `agy mcp list` reported `No
+MCP servers configured`. No native `modelName` or tier proof, bounded
+Flash-only task, skill discovery or use, specialist MCP, or native PreToolUse
+hard-deny execution was completed. This remains an external acceptance
+gap/blocker, not a passed native acceptance result.
+
+The generated `state-sync.sh` supports `setup`, `pull`, `checkpoint`,
+`publish`, `push`, `status`, and `migrate-from-hf`. Verify `checkpoint` without
+network access: it must create only a local commit. Verify `publish` only from
+a clean nested worktree: it must not stage or commit, and it must preserve dirty
+state for a later checkpoint. `push` remains the compatible checkpoint-then-
+publish operation. Operational output belongs on stderr; `status` alone writes
+a read-only, network-free report using local and cached tracking state, without
+printing a remote URL or credentials. Failures remain auditable in
+`.claude/session_logs/hooks-errors.log`, which is local-only: it is gitignored
+and, once tracked (e.g. an upgraded nested repository), untracked on the next
+commit without deleting the file, so it never needs a size cap or rotation and
+never round-trips through `ai-state`. `session_logs/hooks-bypass.log` is a
+separate file and stays tracked and union-merged like every other
+`session_logs/*.log`.
+
+`settings.local.json` is handled the same way. After an upgrade, the first sync checkpoint commits an untrack of `settings.local.json` in the nested `ai-state` repository (index only; the local file stays), and the next publish removes it from the shared remote. While a pull or merge runs, `state-sync.sh` keeps a byte copy at `.claude/.git/settings.local.json.<random suffix>`. After the pull or merge, it restores the copy only if `settings.local.json` is missing or its bytes equal the version on the remote (`origin/<branch>`). Otherwise it keeps the current file and the copy, and warns. A write that lands before git writes its version in the same window cannot be told apart from git's write, so the older copy is restored in that case. These messages can appear:
+
+- `restored local settings.local.json, which git replaced during reconciliation.`: informational. The file was put back and there is nothing to do. This is the most common one during an upgrade, when a second clone pulls the untrack commit.
+- `could not keep a copy ... skipped and will retry`: the pull or merge is skipped until the next sync.
+- `could not restore ... its bytes are kept at <path>`: copy the bytes back yourself.
+- `settings.local.json was written while state sync ran; kept the newer file. The copy taken before sync is kept at <path>.`: compare the two files and delete the copy when you no longer need it.
+
+If a sync is killed (for example by the hook timeout), the copy can be left under `.claude/.git/`. Copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
+
+For generated Codex and Claude hooks, verify one runtime-specific Stop wrapper
+runs sequentially for each turn: session log, session-log check, `checkpoint`,
+then best-effort `publish`. Codex stdout must be exactly one valid JSON object;
+Claude's wrapper emits no stdout. Both `UserPromptSubmit` hooks retry `push`
+with a 60-second timeout. Codex delayed, best-effort `SessionEnd` invokes only
+local `checkpoint` with timeout `3`; Claude `StopFailure` also invokes only
+local `checkpoint`, while Claude `SessionEnd` invokes `push` with timeout `60`.
+No lifecycle event may split checkpoint and publication into concurrent handlers.
+Timeout or network failure must preserve the local commit for a later retry;
+use `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` to
+inspect recovery state. Post-commit and the manual VS Code **AI state: push**
+task remain the durable checkpoint-and-publish paths.
+
+An install or update can change `.codex/hooks.json`, whose Codex for VS Code
+project trust is content/hash-bound. Verify the installer and batch updater
+only print the reopen/reload-and-review guidance: they must never approve hooks
+or mutate user trust settings. A dry run must describe the potential review
+without claiming that it changed hooks. If sync is not progressing after you
+approve updated hooks, run `state-sync.sh status` and inspect
+`.claude/session_logs/hooks-errors.log`.
+
+Findings reports must be written as `.claude/quality_reports/findings-<phase>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records the exact phase-receipt and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; every bound report must be `dirty: false` (no unstaged changes) and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
+
+Phase and closeout receipts also bind the governing nested control plane. Their
+`control_plane_provenance` records the nested `.claude` HEAD, relevant nested
+tracked/dirty state, active big- and small-plan digests, and a runtime
+fingerprint, with a schema version. The runtime fingerprint excludes mutable
+consumer evidence such as plans, session logs, quality reports, and local
+cache state, so receipt generation does not invalidate itself. Closeout treats
+the nested HEAD as informational when all other provenance fields match: an
+evidence-only nested commit may advance that HEAD without staling the receipt.
+Changes to governing runtime files, relevant nested state, or either active
+plan make the receipt stale. Structural receipt invariants are enforced by the
+schema and verifier; they are not represented as synthetic PASS check IDs.
+
+The relevant nested tracked/dirty state that provenance binds to is not
+informational the way the nested HEAD is, and its ordering is exact in both
+directions.
+
+Checkpoint nested plan state once every plan, log, and memory edit is
+final and before
+`verify.py phase --persist`/`closeout --persist`. `control_plane_provenance`
+records `big_plan_digest` from the big plan's working-tree bytes, while the two
+predicates that authorize a terminal push
+(`has_only_terminal_big_plan_change`, `has_only_checkpointed_terminal_big_plan_change`)
+can only re-derive that digest from a nested Git revision. A big plan still
+dirty in nested state when the receipt is persisted therefore binds a digest
+that is neither indexed nor committed, and no later state can make it match —
+the completion commit becomes permanently unpublishable. A multi-phase big plan
+hides this, because each intermediate commit checkpoints nested state; a
+single-phase plan does not. `closeout --persist` now fails closed on that
+condition before writing anything, and names the checkpoint command.
+
+`bash .claude/hooks/scripts/state-sync.sh checkpoint` is the canonical operation, used by the
+editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies running it from an agent's Bash tool (any command outside the guard's read-only list that names a `.claude/hooks/` path); the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
+
+Never checkpoint or publish nested state *after* the receipts are persisted.
+That changes what they are bound to and fails the next commit closed with
+`closeout receipt governing control-plane provenance is stale`. Findings and
+receipt files are not provenance-bound paths, so writing them after the
+checkpoint is expected. Leave nested publication itself to the native
+`post-commit` hook after the outer commit.
+
+Two guards protect the recovery path. `--persist` refuses to replace a passing
+receipt with a failing one, so a diagnostic run cannot destroy the only valid
+evidence. And when a big plan is already `complete`, the refusal message
+recommends `phase --persist --phase <slug>` followed by
+`closeout --persist --phase <slug>`, in that order: the closeout receipt records
+the phase receipt's digest at its own persist time, so refreshing the phase
+receipt alone would leave
+`closeout receipt artifact phase_receipt was tampered with`. That recovery is
+only valid while the working tree still matches the commit being certified.
+
+When `.claude` is present but is not its own Git repository, every mode except
+`gate` exits 2 before building a receipt and prints one message:
+
+```text
+.claude is not its own Git repository, so nested AI-state provenance is unavailable and no verification receipt can be built; run git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>" (or, from a terminal or editor task, bash .claude/hooks/scripts/state-sync.sh checkpoint)
+```
+
+The nested-state readers report absence in that state rather than
+letting Git walk up to the outer repository, so no receipt can record the
+outer `HEAD`, outer file bytes, or outer dirty paths as nested provenance.
+
+When control-plane provenance is unavailable because of a root-adapter
+mismatch, the verifier's message names each affected path from the ownership
+manifest, a `side` (`live`, `mirror`, `pair`, or `manifest`), and a `category`
+(`missing-or-invalid`, `missing-or-unsafe`, `unsupported-file-type`,
+`unreadable-bytes`, or `content-difference`). For example, `CLAUDE.md: live
+missing-or-unsafe` means the live root copy is missing, or a symlink is
+present somewhere along its path. `CLAUDE.md: live unsupported-file-type`
+means the entry exists but is neither a regular file nor a directory (for
+example a FIFO or a device file). The diagnostic never includes file
+contents, absolute external paths, or hashes beyond what the receipt already
+records. It recommends `bash .claude/hooks/scripts/restore-root-adapters.sh`
+only when every diagnosed path is a genuinely recoverable live-side mismatch —
+the mirror under `.claude/bootstrap-root/` is valid and the live destination
+can be replaced exactly. It withholds that recommendation when the mirror
+itself is invalid or the ownership manifest (`.claude/bootstrap-ownership.env`)
+is missing or invalid, because restoring from a broken source of truth cannot
+fix the problem.
+
+### Mid-plan consumer upgrade
+
+For a consumer with active work, use the installer or updater with
+`--local-only`. The refresh preserves active plans, user-owned state, and
+historical schema-v2/schema-v3 receipts. Those receipts remain available for
+history, but the current schema-v4 verifier rejects them as authorization for
+current gates: `validate_receipt` requires an exact `schema_version` match, so
+a stale receipt fails closed (`VFY-RECEIPT-001`/receipt validation reports
+`FAIL` with a diagnosable message) rather than crashing or silently passing.
+Recovery needs no manual receipt rewrite or bypass — re-running `verify phase
+--persist` then `verify closeout --persist` under the refreshed runtime
+regenerates a valid current-schema receipt at the same deterministic path.
+Before verification, confirm that nested `.claude` has a valid `HEAD` and a
+clean worktree.
+
+Re-record the current phase's findings report with `record_findings.py
+--gate-result PASS|WARN|FAIL` before closeout. A report without `gate_result`
+blocks the commit gate. A re-record is not always enough: the commit gate
+applies the path-based profile rule to any report. If the branch diff from the
+merge-base, including earlier phases, includes a test file and the report
+lacks the `tests` profile, or it includes a control-plane, generator, or dependency path and the report lacks any of
+`code`, `architecture`, `security`, `tests`, and `ponytail`, run a new review
+with those profiles. Phases completed before the upgrade stay valid at push:
+the push gates apply the `gate_result` and path-based profile rules only to
+reports with `schema_version >= 2`.
+
+Run focused and fast checks, then review. Update documentation, final plan,
+`[LEARN]`, and completed session-closeout evidence; explicitly stage intended
+outer files; persist findings; then persist `verify phase --persist` and
+`verify closeout --persist`. Run the native commit gate and native pre-push gate
+only after this sequence passes; commit and push are supported only after those
+gates allow them.
+
+An evidence-only checkpoint does not stale current evidence. A change to the
+governing plan or runtime does stale it, so rerun the verification and closeout
+sequence after such a change. Evidence-only checkpoints that are excluded from
+the provenance fingerprint do not require a rerun.
+
+The verifier derives consumer scopes from native project configuration and
+layout. It excludes `.claude` from consumer Ruff coverage, honors configured
+Mypy `files`, `packages`, or `modules`, and falls back only to a conventional
+`src` root. If required Mypy scope cannot be proven, it reports `UNVERIFIED`.
+Any `UNVERIFIED` check makes the whole receipt `UNVERIFIED`
+(`aggregate_status`), and the commit and push gates accept only `PASS` — a
+`NOT_APPLICABLE` check does not block them. A repository with no
+`test_*.py`/`*_test.py` files anywhere outside version-control, virtual
+environment, dependency, build, and cache directories (`.git`, `.claude`,
+`.venv`, `venv`, `node_modules`, `.tox`, `build`, `dist`, `site-packages`,
+`__pycache__`) reports its pytest check as `NOT_APPLICABLE` rather than
+`UNVERIFIED`; once test files exist, pytest must actually collect and run
+them, or the check stays `UNVERIFIED`. If part of the tree could not be read
+while looking for test files, the check also stays `UNVERIFIED` and says so.
+A missing Ruff, mypy, or pytest executable also reports
+`UNVERIFIED`, naming `uv add --dev ruff mypy pytest` as the fix.
+The bootstrap authoring repository retains its explicit `shared`, `scripts`,
+and `tests` scope. The commit/push/PR gates themselves are Bash 3.2 plus
+Python 3 standard-library JSON parsing; they have no `uv` dependency and
+remain enforceable when `uv` is absent. Only `verify.py phase`/`closeout`
+(which run `ruff check`, `ruff format --check`, `mypy`, and `pytest`) need the
+project environment. `VFY-RUFF-001` folds `ruff format --check` in alongside
+`ruff check` under the same scope selection, rather than a separate check ID
+— `CHECK_IDS` is part of the receipt schema the gate validates its own
+history against, so a new ID would invalidate every already-persisted
+receipt. The summary distinguishes `lint:`/`format:` so a failure is still
+diagnosable. A consumer refreshed mid-plan whose tracked files are not yet
+formatted will newly fail `VFY-RUFF-001`'s format half; the recovery is
+`uv run ruff format` (see "Mid-plan consumer upgrade" above).
+
+`record_findings.py` requires `--gate-result PASS|WARN|FAIL`, accepts a
+repeatable `--open-request TEXT`, and writes `schema_version: 2`,
+`gate_result`, and `open_requests`. It refuses `PASS` while any open request
+exists. The commit gate passes a phase only when `gate_result` is `PASS` with
+no open request. The gates also require review profiles by changed path (test
+surfaces need `tests`; control-plane, generator, and dependency-file paths need
+`code`, `architecture`, `security`, `tests`, and `ponytail`), computed from the
+closeout receipt's `changed_paths`, cumulative from the merge-base. See
+`shared/policies/quality-and-testing.instructions.md`.
+
+When routing selects the `ponytail` profile, `record_findings.py --profile
+ponytail` always emits `ponytail_reviewed: true` and a numeric
+`ponytail_findings` count; a new unselected report omits both. Its content hash
+invalidates the review after any real source, test, script, hook, config,
+manifest, template, container, or generator edit. Optional diffs may read
+compatible legacy `false`/`0` reports, but high-risk routing requires true
+evidence. An exemption is exactly one documentation OR one mutable
+workflow-state file, only when no control-plane/high-risk condition applies;
+every multi-file diff is high-risk.
+
+#### Other gates that newly block a refresh
+
+Beyond the receipt-schema and formatting gates above, a consumer refreshed
+onto this runtime can hit more gates that either did not exist before or did
+not previously block. Each row states the effect and the exact recovery; none
+of this changes what a gate checks, only what an operator should expect.
+
+| Gate | Effect on a refreshed consumer | Recovery |
+| --- | --- | --- |
+| Plan-frontmatter validation (`.claude/scripts/validate_plan_frontmatter.py`) runs at commit time | An existing plan with an invalid `status` blocks the next commit | Fix the plan's `status`. Valid small-plan values: `planned`, `in-progress`, `paused`, `complete`, `cancelled`. Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled` |
+| A big plan's `phases:` list may carry at most one unfinished dedicated final knowledge-refresh phase, and it must be last; an earlier knowledge-refresh phase is exempt once it has settled its identity — the big plan's own `name` is non-empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, whose frontmatter declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`; a plan that has any knowledge-refresh phase must still end with one | `at most one knowledge-refresh phase is allowed` blocks validation when two or more phases end in `-knowledge-refresh` and are not settled; `the knowledge-refresh phase must be the last phase in phases` blocks validation when an unsettled knowledge-refresh phase is not the last entry, or when every knowledge-refresh phase is settled but the plan's last phase does not itself end in `-knowledge-refresh` | Remove the duplicate `-knowledge-refresh` phase, or move the remaining one to the end of `phases:`. To reopen a completed big plan, append one new `-knowledge-refresh` phase at the end of `phases:` (see "Reopening a completed big plan" in `shared/policies/workflow.instructions.md`) |
+| A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
+| `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
+| `gate_result` and path-based review profiles (`record_findings.py`, commit gate; push gates only for `schema_version >= 2` reports) | The phase-completion commit blocks unless the findings report has `gate_result: PASS` and no open request. It also blocks when the report lacks a profile the changed paths require: `tests` for test files; `code`, `architecture`, `security`, `tests`, and `ponytail` for control-plane, generator, and dependency paths | Re-record with `record_findings.py ... --gate-result PASS\|WARN\|FAIL`, resolving or listing each open request (`PASS` is refused while one is open). If a required profile is missing, run a new review with the missing profiles; a re-record cannot add them |
+| An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
+| `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
+| `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |
+| Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks implementation-branch creation (the big plan and its listed phases) and the next commit when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
+| `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
+| Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
+| OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Ask the user to run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell (the guard denies an agent command that names a hook script) to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
+| More files are protected hook or server configs: `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json` | An agent edit of one asks on Claude and Copilot and is denied on Codex and Antigravity, including an ordinary `.vscode/settings.json` edit. Any command outside the guard's read-only list that merely names one of these files is denied on all four clients, including `ls`, `jq`, `test -f`, `git add <file>`, and an inline `gh pr create --body "..."` | Approve the prompt, or edit the file yourself outside the agent. Inspect with `cat` or the native read tool, stage with `git add -u` or a path that does not name the file, and pass PR text written with the native Write tool through `--body-file` |
+| Agent definition files (`.claude/agents/`, `.codex/agents/`, `.github/agents/`, `.agents/agents/`), each protected hook folder as a whole folder, and `*.code-workspace` files inside the repository are protected | An agent edit of one, and `rm -rf`, `mv`, or `ln -s` on a whole protected folder, asks on Claude and Copilot and is denied on Codex and Antigravity. Any command outside the guard's read-only list that merely names one of them is denied on all four clients, including `ls`, `find`, `diff`, and `cmp` on an agent file. The `git -C` and `cd` forms of unmodelled Git commands (for example `git -C .claude rm -r -q hooks`) ask on Claude and Copilot and deny on Codex and Antigravity, but only when no path in the command is also protected as written from the repository root. Plain forms, and commands with an absolute path such as `git -C .claude restore <repo>/.claude/hooks/x`, are denied on all four clients. The guard also scans heredoc bodies and the arguments of commands it does not model | Approve the prompt, or edit the file yourself outside the agent. Read with `cat`, a native read tool, or `rg --files`; compare with `git diff --no-index` or `uv run python scripts/check_runtime.py`. Change agents in `shared/agents/` and regenerate (this repository) or re-run the installer (a consumer). Write findings JSON, PR bodies, and session-log additions that name a protected path with the native Write or Edit tool, then pass `--findings-json <file>` or `--body-file <file>` |
+| Creating an implementation branch runs the plan-frontmatter validator on the big plan and its listed phase files | A branch-creation command is denied with the first validator errors when the big plan or a listed phase file is invalid. An unrelated draft plan does not block | Fix the reported frontmatter, then create the branch again |
+
+The reverse also holds: three gates in this table's family now stand down
+instead of newly blocking. The commit, push, and branch-creation gates skip a
+command whose invocations all carry an explicit `-C`, `--git-dir`, or
+`--work-tree` redirect resolving to a repository other than this checkout; an
+undeterminable redirect keeps the gate active, the same unresolvable-target
+rule stated above for the protected-file classifier. Creating a pull request
+is not part of this stand-down and keeps gating from this checkout regardless
+of what repository it names.
+
+Three practical notes worth knowing before a refresh:
+
+- **Root-owned tracked files.** A tracked file owned by `root` is a container
+  artifact, not a bootstrap defect, and it breaks the *fix* rather than the
+  check. `VFY-RUFF-001` runs `ruff format --check`, which only reads: it
+  reports an ordinary formatting diff even on a file it could never write. The
+  failure appears when you run `ruff format` to fix that diff, as
+  `error: Failed to write <path>: Permission denied (os error 13)`. So the
+  symptom is a formatting failure you cannot clear, not a misreported check.
+
+  Expect more such files than are currently failing. An already-formatted file
+  is never rewritten, so it stays silent until something needs to change it —
+  fixing only today's failures leaves the rest to surface one at a time.
+  Enumerate the extent once, before refreshing:
+
+  ```bash
+  git ls-files -z | while IFS= read -r -d '' f; do
+    [ "$(stat -c '%U' -- "$f")" = "$(id -un)" ] || printf '%s\n' "$f"
+  done
+  ```
+
+  That lists every **tracked** file not owned by you. It reads the index
+  instead of walking the tree, so it changes nothing and does not stop on an
+  unreadable directory, and it ignores untracked caches and vendored assets no
+  gate inspects. The NUL-delimited loop keeps each path bound to its own owner
+  lookup, so a filename containing a space or a newline is still reported
+  correctly. Then take ownership of what it reports. A recursive `chown` over
+  a source tree is quicker but changes every file beneath it, including
+  anything deliberately owned by another user, so prefer the enumerated list
+  unless you know the whole tree is yours.
+- **`.devcontainer/hf-ai-sync.py` disappears.** It (and its earlier `.sh`
+  form) is obsolete — `state-sync.sh` replaced it — and a refresh deletes it
+  while pruning obsolete generated files. No fix is needed; do not spend time
+  repairing it.
+- **Order matters.** Fix file ownership and run `uv run ruff format` before
+  refreshing, not after. Once tracked files are owned correctly and
+  formatted, and the refresh has run, the obsolete `hf-ai-sync.py` stops
+  mattering because it is already gone.
+
+`verify.py closeout` runs the completing phase's required `## Verification`
+block itself, in order, before it binds the tree — it never accepts a
+session-log claim that a check ran instead. The run results are stored at
+`extensions.verification_items` in the closeout receipt, one entry per item,
+each bounded by a 600-second timeout. The commit gate judges only the phase
+being completed, and only under the `exact` head relation. See the canonical
+definition in `shared/policies/workflow.instructions.md`, section
+"Verification Evidence Contract", rather than restating its parsing rules
+here.
+
+## Two Layers, Two Invariants: Commit And Push Enforcement
+
+Two workflow invariants are each enforced twice, from a single shared contract per invariant:
+
+- **Commit invariant** — the plan/findings/closeout/LEARN ceremony, via `assert_commit_invariants` in `_lib-frontmatter.sh`:
+  - **`PreToolUse` (`enforce-commit-gate.sh`)** gates the AI agent's own Bash tool calls. It can `ask`/`deny` before a turn is wasted and denies an agent commit on any branch that isn't `<plan_name>_implementation`. It exempts commits that target the nested `ai-state` repo (`git -C .claude commit`, `--git-dir=.claude/.git`, `--work-tree .claude`) — `state-sync.sh` commits there constantly and has no ceremony of its own to satisfy — but only when the *matching commit invocation itself* carries the nested-repo flag, not merely because some other `git` call earlier or later in the same compound command happens to touch `.claude/`.
+  - **`commit-msg` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every commit that reaches git itself — human, IDE, script, or alias (`git ci`) — on one code path, with no command string to classify and no timeout to fail open on. It only runs the ceremony checks on `<plan_name>_implementation` branches — `dev`/`main` commits pass through untouched.
+- **Push invariant** — the completed-phase/final-closeout/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
+  - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It permits a paused checkpoint or the exact phase-completion commit directly certified by the predecessor phase's receipt after `post-commit` advances `current_phase`; it rejects later in-progress work. It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above. A denied command that chains a `git commit` into the same Bash call as the `git push` (`git commit -m x && git push`) gets a prefixed reason naming that ordering rule, since the gate evaluates the pre-commit HEAD — the commit and the push must be separate Bash commands.
+  - **`pre-push` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every push that reaches git itself, reading ref lines from stdin (`<local-ref> <local-sha> <remote-ref> <remote-sha>`). It derives the branch and the commit-count check from the *pushed* ref/sha, not from whatever is checked out, so a push of `foo_implementation` from elsewhere is still gated. It skips branch deletions (all-zero local sha) and only runs the ceremony checks on `<plan_name>_implementation` refs — `dev`/`main` pushes pass through untouched.
+
+**Historical receipt-chain validation** — the push/PR gate does not check only
+the terminal completed phase. `verify.py`'s `historical_chain_errors` walks
+the big plan's declared phase order backwards from the terminal phase and, for
+every earlier completed phase, validates that its receipt's `head_sha`
+resolves to a real commit, is an ancestor of the next completed phase's head,
+and that the certified commit introduces a tree matching the receipt's
+`tree_sha`. A receipt's `head_sha` is the *parent* of the commit it certifies,
+because receipts are generated before their completion commit, so the
+certified commit is identified as the one commit on the ancestry path from
+`head_sha` to the next completed phase's head whose own parent set contains
+`head_sha`. Parentage is proven rather than inferred from list position: if
+that path holds no such commit, the chain fails closed noting the missing
+ancestry path; if it holds more than one - as a merge inside the
+implementation branch could produce - it fails closed with a diagnostic
+naming the ambiguity, rather than selecting whichever commit git happened to
+list first. It then re-verifies every
+`phase_receipt`/`findings`/`closeout_log`
+artifact hash against the current file bytes. Only the terminal completed
+phase receives current-tree/current-runtime freshness checks; every earlier
+phase gets this ancestor/tree/artifact-hash chain instead.
+
+The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested.
+
+**Closed session logs are immutable.** Because a closeout log's bytes are
+hashed into its phase's receipt, editing a log after its phase closes breaks
+that historical artifact-hash check above. Corrections use a sibling
+`<log-name>.errata.md` file next to the closed log instead of rewriting it; an
+erratum discovered during a later active phase may be bound as that later
+phase's own evidence without touching the earlier receipt.
+
+**LEARN evidence** lives entirely inside a closeout log's own `## [LEARN]
+Entries` section: either one or more explicit `[LEARN:category] ...` entries,
+or the exact sanctioned marker `[LEARN] none - no new lessons this session`.
+`MEMORY.md`'s mtime is never accepted as a substitute for this section.
+
+Both git-hook layers are installed by setting `git config core.hooksPath .claude/hooks/git-hooks`. `install_bootstrap.py` sets it once at install time; `state-sync.sh`'s `configure_outer_hooks_path` (called from `restore_root_adapters`, so on every `setup`, `pull`, and fresh `checkpoint`) sets or re-activates it on every subsequent sync, so a `git clone` with no install step, or a hooks path a consumer later changed back, still gets it. It compares the current value first — a match is left alone, a different value is overwritten with a warning naming the old one — and a failure only warns, never a hard exit. A session that starts with `.claude/hooks/git-hooks` checked out but `core.hooksPath` still not pointed at it is told in its `SessionStart` context to run `bash .devcontainer/state-sync.sh setup`.
+
+Gate orchestration uses Bash 3.2 plus Python 3 standard-library JSON parsing,
+with no dependency on `uv`; the surrounding hook scripts are not all pure Bash.
+The Bash baseline avoids bash-4-only builtins (`mapfile`/`readarray`),
+associative arrays, and negative array indices. It also guards every array
+expansion that can be empty: `"${arr[@]}"` on an empty array aborts under
+`set -u` on Bash 3.2 (but not 4.4+), so hook scripts use the repository's
+`${arr[@]+"${arr[@]}"}` idiom instead, and `check_runtime.py` fails a hook
+script under `shared/hooks/` that reintroduces the unguarded form. This keeps
+the gates working identically on a stock macOS consumer machine and on the
+`macos-latest` CI runner (`.github/workflows/validate.yml`), where
+`_lib-frontmatter.sh`'s
+GNU-vs-BSD `stat`/`find` fallbacks are exercised.
+
+`git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes from the `commit-msg` / `pre-push` layers respectively (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored, a fresh clone has no `.claude/hooks/git-hooks/` until it is checked out — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`). That window shrank when AI state moved from a Hugging Face bucket to a nested git repo (`plans/adr-002-git-backed-state-sync.md`): `post-start.sh` now checks `.claude/` out via `state-sync.sh setup` using the same git credentials as the code checkout, with no separate authenticated pull to wait on; `setup` itself configures `core.hooksPath` immediately after the checkout populates the hook directory (see `configure_outer_hooks_path` above), so `post-start.sh` no longer carries its own copy of that step.
+
+Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit`). A plain merge commit authors no content of its own, so the hook passes merge commits through unledgered on an implementation branch — the ceremony re-attaches at the next real commit, since the findings report's `merge_base_sha`/`content_hash` checks force a fresh report once new content lands. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (this is git behavior, not a bootstrap bug); commits they create skip the git layer, but the next real commit on the branch is still gated normally. `git commit --amend` *does* invoke `commit-msg`, and the `content_hash` check is designed to survive a content-preserving amend (the diff against the merge base is unchanged, so a report generated before the amend still matches). **Known, accepted escape:** the `MERGE_HEAD`-based passthrough cannot distinguish a pure merge from `git merge --no-commit` followed by manually staging extra changes before completing the commit — this is a second, undetected way to land ungated content on an implementation branch, alongside the sanctioned `--no-verify` escape. It requires deliberately reaching for `--no-commit`, the same trust boundary as `--no-verify`.
+
+## Devcontainer And Git-Backed State Sync
 
 Generated output includes `.devcontainer/`:
 
-- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers. UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
-- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` is pinned directly (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead). The lower bound is required because `HfApi.sync_bucket` was added in 1.0; without it, sync calls raise `AttributeError` that the broad exception handler swallows silently, causing the script to exit 0 having done nothing. If a project's `pyproject.toml` introduces a transitive dep that would downgrade `huggingface_hub` below 1.0, the `import_hf_api()` function in `hf-ai-sync.py` detects the missing method, emits a named warning, and falls back to the `hf` CLI so the failure is visible rather than silent.
-- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes). It then calls `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback.
+- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
+- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, `openwiki`, `mermaid`, `jsdom`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere) and `state-sync.sh pull`. `setup` configures `core.hooksPath` to `.claude/hooks/git-hooks` itself, inside `restore_root_adapters`, immediately after the checkout populates the hook directory, so the commit-msg gate is wired the instant `.claude/hooks/git-hooks/` exists; `post-start.sh` carries no separate `core.hooksPath` step of its own. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
 
-The default bucket base is `Ghisso/vscode_mounts`, but installed consumer repos should
-store a project-specific bucket path such as `Ghisso/vscode_mounts/img-classification`
-in `.devcontainer/devcontainer.json`. The sync helper resolves settings in this order:
-explicit CLI arguments, `HF_AI_SYNC_*` environment variables, `.devcontainer` config,
-then the default bucket base. Auth resolves in this order: `HF_TOKEN`,
-`HUGGING_FACE_HUB_TOKEN`, then the cached token created by `hf auth login` or
-`huggingface-cli login`. Missing auth or bucket access produces warnings and does not
-fail the container start or agent hook.
+There is **no separate credential to configure** — by default the nested `.claude/`
+repo's remote is the outer repo's own `origin`, so it authenticates the same way the
+code checkout does. `install_bootstrap.py --state-remote <git-url>` (env
+`AI_STATE_REMOTE`) points it somewhere else instead (a private personal repo, for
+example); when set, the installer persists `AI_STATE_REMOTE` into
+`.devcontainer/devcontainer.json`'s `containerEnv` so a fresh container clone still
+finds it. A missing remote or network access produces warnings and does not fail
+the container start or agent hook (see `plans/adr-002-git-backed-state-sync.md`).
 
-Prefer CLI sync through `huggingface_hub` over `hf-mount`. The generated devcontainer
-does not require `/dev/fuse`, `SYS_ADMIN`, or apparmor overrides.
+Source-layout validation permits a root `.github/` self-install overlay only
+when Git ignores it and it is byte-identical to the generated target. A tracked,
+unignored, or stale mirror fails validation, preventing generated runtime files
+from becoming a second editable source.
+
+The generated devcontainer does not require `/dev/fuse` or apparmor overrides for
+`huggingface_hub`. It does set `SYS_ADMIN` and `seccomp=unconfined` so `bubblewrap`
+can create namespaces inside Docker.
 
 Codex-specific runtime notes:
 
-- `.codex/config.toml` must include `[features] codex_hooks = true`.
-- `.codex/config.toml` includes `[agents]` with `max_depth = 1` to keep generated custom-agent fan-out bounded.
-- `.codex/config.toml` includes one `[[skills.config]]` entry for each `.claude/skills/<name>` directory.
-- `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, and `developer_instructions`.
+- `.codex/config.toml` omits the flat `[features]` block — hooks are on by default, so restating `hooks = true` is redundant — but includes `[features.multi_agent_v2]` with visible spawn metadata in the `agents` namespace so named custom-agent model and effort profiles are honored.
+- `.codex/config.toml` leaves the interactive session model and reasoning effort unpinned; generated custom agents carry their explicit model intent.
+- `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
+- `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
+- `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
+- `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
+- `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
+- `.codex/agents/*.toml` files are project-scoped custom agents and must define
+  `name`, `description`, `model`, `model_reasoning_effort`, and
+  `developer_instructions`; model and effort must match canonical `agent.yaml`
+  metadata. Codex has seven files: the five universal agents plus Codex-only
+  `luna_coder` and `sol_coder`. Claude and Copilot retain only the universal
+  five.
+- Each Codex instruction body has one generated delimiter and the exact
+  transformed role prompt, with no runtime read of a Claude-native agent file.
+  Normal Codex supplements append once to their own prompt. The two derived
+  coders use one-level composition: transformed `coder` base, one literal role
+  delimiter, then their supplement. Per-agent MCP and skill overrides are
+  omitted, so the trusted project config supplies the shared registrations.
+  The validator checks exact composition and records actual sizes; native
+  probes, not a static threshold, must establish delivery without truncation.
+- The current model/effort matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
+  coder Terra/high, reviewer Sol/high, documenter Luna/medium, `luna_coder`
+  Luna/xhigh, and `sol_coder` Sol/xhigh. The named graph
+  is exactly `luna_coder -> coder -> sol_coder`; it uses no spawn-time model or
+  effort override, no same-tier retry, and no successor after Sol.
+- Only the Codex orchestrator receives the bounded-routing supplement. It
+  validates the packet and five Luna-selection conditions, structured blocker,
+  preservation of prior work, and four-category failure attribution. Only an
+  implementation-attributable Terra failure advances automatically to Sol.
+  Environment and baseline failures stop escalation; indeterminate evidence
+  returns to orchestrator judgment.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
 - Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.
-- Because Codex `PreToolUse` cannot request approval, edits to Codex hook config are denied instead of downgraded to an approval prompt.
+- Because Codex `PreToolUse` cannot request approval, hook-config mutations are denied instead of downgraded to an approval prompt. Claude asks for approval. Both allow a read-only inspection of a protected configuration when the command classifier can prove it has no mutation target; redirects, in-place edits, and ambiguous commands fail closed.
+
+The generated consumer `.codex/config.toml` is carried in
+`.claude/bootstrap-root/.codex/` and restored on a fresh consumer machine. In
+this bootstrap repository, the root `.codex/config.toml` is protected tracked
+authoring, so a dogfood refresh preserves it while it updates generated sibling
+adapters. The protected V2 shim is not removed based on parsing or static
+validation alone. See the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md): repeated trusted-project, six-role native probes on two supported versions are required before removing the shim; `max_depth` has its own removal gate. Six-role routing was verified on 2026-08-09 with the shim present.
+Those statements describe the preserved compatibility gate and historical
+evidence. They do not claim that the two current Codex-only roles have been run
+natively.

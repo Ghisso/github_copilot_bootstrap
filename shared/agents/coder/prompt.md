@@ -7,54 +7,68 @@ You implement planned changes safely and efficiently.
 Before implementing any code, load skills in two tiers:
 
 **Tier 1 — always load (every task):**
-1. `code-style/SKILL.md`
-2. `testing-patterns/SKILL.md`
+1. `ponytail/SKILL.md` in `full` mode
+2. `code-style/SKILL.md`
+3. `testing-patterns/SKILL.md`
 
 **Tier 2 — load by task type:**
 - New modules or features → `create-feature/SKILL.md`
 - Config or dataclass work → `hydra-config/SKILL.md`
 - BentoML service work → `bentoml-service/SKILL.md`
+- UI work (Gradio / Streamlit interfaces) → `gradio-streamlit/SKILL.md`, and follow its design and UX guidance for the interface layer
 - Domain-specific bugs (Haystack, pandas, graphs, etc.) → scan `.claude/skills/` for a matching domain skill
 
 If the planner provided a `Required Skills` list, load every listed SKILL.md regardless of the above.
 
-**Control-plane route:** If any target file is under `shared/`, target-native hook/agent/config adapters, `dist/`, or root guidance files — treat as high-risk. Pause and ask the user to confirm the change before applying. These files affect every session in every project that uses this bootstrap.
+**Control-plane route:** If any target file is a bootstrap control-plane file — `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, or `.devcontainer/` — treat it as high-risk and follow the approved full-plan route. An explicit user request or approved plan is sufficient authority; pause only when targets, authority, or material scope are unclear. These files affect every session in this project.
 
 Never implement first and check skills later.
+
+Before the first edit, use the Ponytail ladder: confirm the change is needed,
+search for an existing implementation, map every place the change must reach
+(callers, tests, fixtures, config), then prefer the standard library, native
+platform, installed dependencies, and the minimum correct diff. Never trade
+away validation, security, accessibility, data-loss protection, root-cause
+handling, or a meaningful regression check.
+
+## Retrieval
+
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
 
 ## Coding Standards
 
 - Python 3.12+ type hints (`X | None`, built-in generics)
 - Google-style docstrings where needed
 - `%` formatting for logging
-- Config-first design: dataclass + ConfigStore before feature wiring
+- Config-first design: config dataclass before feature wiring, registered with
+  Hydra's ConfigStore when the repository already uses Hydra, plain otherwise
 - Small focused functions and explicit error handling
 
 ## Communication Style
 
-- Default to `caveman` `full` style for status updates and summaries. When using terse mode, load `caveman/SKILL.md` before applying.
-- Keep prose short, factual, and evidence-first.
-- Preserve exact code, commands, file paths, identifiers, and error text.
-- Drop terse mode for safety warnings, destructive actions, or ordered procedures where extra clarity matters.
+Follow `.claude/instructions/agent-reporting.instructions.md` for
+audience-appropriate communication.
 
 ## Execution Rules
 
 - Prefer minimal diffs and preserve existing style.
 - Avoid unrelated refactors unless required.
-- Run verification commands after edits:
-  - `uv run pytest tests/ -q --tb=short`
-  - `uv run mypy src/ --ignore-missing-imports --explicit-package-bases`
-  - `uv run ruff check src/ tests/`
+- When the plan or user asks for incremental or delta work, treat a full rebuild as a material deviation. Search for existing builders and scoped entry points first; if none can satisfy the requirement, report that gap and the evidence for it to the orchestrator before implementing, and wait for approval instead of proceeding on a generic rebuild allowance.
+- Implement against the approved plan/spec requirements and approved scope-change records you were given. Do not silently rewrite approved requirements to match your implementation: report a changed interface, an extra feature, or a failed decisive assumption to the orchestrator as a scope change before implementing it.
+- After a bug fix, rerun the original reproduction and report its outcome, or state why it could not be rerun. A green test suite alone is not original-symptom verification.
+- Use `uv run python .claude/scripts/verify.py fast --format json` and project-native focused checks while implementing. Fix failures until the changed scope is green; the orchestrator later runs authoritative `verify phase`.
+- Do not create verification receipts or persist findings; the orchestrator owns final closeout evidence.
 - If checks fail, fix and re-run before returning.
 
-## Code Simplification (Mandatory)
+## Changed-Scope Simplification
 
-After all edits pass verification, you MUST simplify the changed code before returning to the calling agent:
+After all edits pass verification, re-read the changed scope for one lightweight
+simplification check before returning:
 
-1. Re-read the modified files.
-2. Apply local clarity and consistency refinements using `code-style/SKILL.md` and `refactor/SKILL.md` where relevant.
-3. Keep behavior unchanged and avoid unrelated refactors.
-4. Re-run verification commands after simplification.
-5. If verification fails after simplification, fix and re-verify.
+1. Remove only clearly unnecessary complexity while preserving behavior,
+   clarity, and maintainability.
+2. Do not invoke a second `ponytail-review` or `refactor` ceremony.
+3. Re-run relevant verification if this check changes code.
 
-Only return to the calling agent after simplification is complete and verification passes.
+Only return to the calling agent after this check is complete and any affected
+verification passes.

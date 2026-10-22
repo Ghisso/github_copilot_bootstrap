@@ -5,7 +5,7 @@ description: |
   Extract non-obvious discoveries into reusable skills that persist across
   sessions. Use when debugging took significant effort, found misleading errors,
   discovered undocumented behavior, or built a repeatable multi-step workflow.
-  Trigger: "I learned something", "save this as a skill", "document this".
+  Trigger: "I learned something", "save this as a skill".
 argument-hint: "[skill-name]"
 ---
 
@@ -21,10 +21,39 @@ Answer these questions:
 
 **Continue only if YES to at least one.**
 
+Then route the lesson before creating anything: a cross-project reusable
+lesson becomes a skill (Phase 3); a project-specific fact that current
+repository evidence cannot reliably re-derive becomes a `.claude/MEMORY.md`
+entry (Phase 5); a fact already derivable from current source, tests, or an
+enabled OpenWiki refresh gets no redundant entry — see the canonical
+Knowledge Ownership contract in `.claude/instructions/workspace.instructions.md`;
+and a historical execution fact belongs in a session log or plan, never
+MEMORY.
+
+For an observed failure, connect it to its reproduction, cause, smallest
+correction, and regression, and record those in the session log. Prefer an
+existing test or skill as the durable home; add no new instruction where none
+is justified. Not every failure yields a lesson.
+
+Example with no new instruction: a test fails after a rename because one call
+site still uses the old helper name. Reproduction: the failing test. Cause: the
+missed call site. Smallest correction: update that call. Regression: the same
+test, which already covers the path. Code and test now enforce the fact, so no
+skill, `.claude/MEMORY.md` entry, or instruction is justified.
+
 ## Phase 2: Check Existing Skills
+
+Search the authoring source when one exists, otherwise the installed copy.
+In this bootstrap's authoring repository, `shared/skills/` is canonical and
+`.claude/skills/` is a regenerated output. In an installed consumer project
+there is no `shared/skills/`, so `.claude/skills/` is the only copy and is the
+correct target.
+
 ```bash
-ls .claude/skills/
-grep -r -i "KEYWORD" .claude/skills/
+# Bootstrap authoring repository (shared/skills/ exists):
+ls shared/skills/ && grep -r -i "KEYWORD" shared/skills/
+# Installed consumer project:
+ls .claude/skills/ && grep -r -i "KEYWORD" .claude/skills/
 ```
 - Nothing related → create new skill
 - Same trigger & fix → update existing skill
@@ -32,11 +61,19 @@ grep -r -i "KEYWORD" .claude/skills/
 
 ## Phase 3: Create Skill
 
-Create `.claude/skills/[skill-name]/SKILL.md`:
+Create the skill in the canonical location for the repository you are in:
+`shared/skills/[skill-name]/SKILL.md` in this bootstrap's authoring
+repository, so it regenerates into every target; `.claude/skills/[skill-name]/SKILL.md`
+in an installed consumer project, which has no `shared/skills/`. A skill left
+only in the generated overlay is deleted by the next refresh.
+
+`name` must match the skill's directory name, and `visibility` is required
+under `shared/skills/`; `scripts/validate_targets.py` fails the run otherwise.
 
 ```markdown
 ---
 name: descriptive-kebab-case-name
+visibility: public
 description: |
   [Include specific trigger conditions and exact error messages]
   - What the skill does
@@ -68,12 +105,17 @@ description: |
 
 ## Phase 5: Update .claude/MEMORY.md
 ```markdown
-[LEARN:category] Brief description -> see .claude/skills/[name]/SKILL.md
+[LEARN:category] Brief description -> see <shared/skills or .claude/skills>/[name]/SKILL.md
 ```
 
 ## Output
+
+Report the path actually written, which depends on the repository type in
+Phase 3: `shared/skills/` in the bootstrap authoring repository,
+`.claude/skills/` in an installed consumer project.
+
 ```
-Skill created: .claude/skills/[name]/SKILL.md
+Skill created: <shared/skills or .claude/skills>/[name]/SKILL.md
   Trigger: [when to use]
   Problem: [what it solves]
   .claude/MEMORY.md: Updated

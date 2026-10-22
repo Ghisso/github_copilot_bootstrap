@@ -5,16 +5,19 @@ warn() {
   printf 'WARNING post-start: %s\n' "$*" >&2
 }
 
-run_helper() {
-  if command -v python3 >/dev/null 2>&1; then
-    python3 "$@"
-    return $?
-  fi
-  return 127
-}
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || cd "$SCRIPT_DIR/.." && pwd)"
+# NOT `A || cd B && pwd` on one line: || and && share precedence and
+# left-associate, so that reads as (A || cd B) && pwd — pwd always runs,
+# printing the invocation-time cwd on its own line below A's own output
+# whenever A (git rev-parse) already succeeded, corrupting REPO_ROOT with an
+# embedded newline and a bogus trailing path.
+# The `|| true` is required: under `set -e` a bare assignment inherits the
+# command substitution's status, so a git failure (exit 128 outside a repo)
+# would kill the script before the fallback below could run.
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$REPO_ROOT" ]]; then
+  REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 
 # Fix git object ownership — root can create files in .git during container init
 # when the workspace is a bind mount, breaking subsequent git operations.
@@ -22,16 +25,19 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
   sudo chown -R "$(id -u):$(id -g)" "$REPO_ROOT/.git" 2>/dev/null \
     || warn "could not fix .git ownership; git writes may fail."
 fi
-HELPER="$SCRIPT_DIR/hf-ai-sync.py"
 
-if ! command -v python3 >/dev/null 2>&1; then
-  warn "python3 is unavailable; skipping Hugging Face AI state sync."
+STATE_SYNC="$SCRIPT_DIR/state-sync.sh"
+
+if [[ ! -f "$STATE_SYNC" ]]; then
+  warn "missing state-sync helper at $STATE_SYNC; skipping AI state sync."
   exit 0
 fi
 
-if [[ ! -f "$HELPER" ]]; then
-  warn "missing sync helper at $HELPER; skipping Hugging Face AI state sync."
-  exit 0
-fi
+# `setup` checks out .claude/ (including .claude/hooks/git-hooks/) from the
+# ai-state branch and then configures core.hooksPath itself
+# (configure_outer_hooks_path in state-sync.sh), so there is no window where a
+# fresh container is ungated because nobody re-ran this after the checkout
+# populated the hook directory.
+bash "$STATE_SYNC" setup || warn "AI state setup failed; continuing."
 
-run_helper "$HELPER" pull --repo-root "$REPO_ROOT" || warn "Hugging Face AI state sync failed; continuing."
+bash "$STATE_SYNC" pull || warn "AI state pull failed; continuing."

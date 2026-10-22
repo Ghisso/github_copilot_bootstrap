@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../scripts/_lib-frontmatter.sh
+. "$SCRIPT_DIR/../scripts/_lib-frontmatter.sh"
+
+# git always invokes pre-push with cwd set to the working-tree root and one
+# ref line per push on stdin: "<local-ref> <local-sha> <remote-ref>
+# <remote-sha>". Unlike the PreToolUse gate there is no command string to
+# classify or evade, and no PR concept: --base checks stay PreToolUse-only.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+ZERO_SHA="0000000000000000000000000000000000000000"
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha || [[ -n "$local_ref" ]]; do
+  [[ -n "$local_ref" ]] || continue
+
+  # A branch deletion has an all-zero local sha; nothing to gate.
+  if [[ "$local_sha" == "$ZERO_SHA" ]]; then
+    continue
+  fi
+
+  # D4-B: gate only <plan>_implementation refs; dev/main and everything else
+  # pass through untouched, same scope as the commit-msg mirror.
+  branch="${local_ref#refs/heads/}"
+  if [[ "$local_ref" != refs/heads/* ]] || ! is_implementation_branch "$branch"; then
+    continue
+  fi
+
+  # assert_push_invariants derives the plan slug from the ref being pushed,
+  # not from whatever is currently checked out - a `git push origin
+  # foo_implementation` from elsewhere must still gate foo_implementation,
+  # using the pushed sha (not HEAD) for the commit-count check.
+  failures=()
+  assert_push_invariants "$REPO_ROOT" "$branch" "$local_sha"
+
+  if [[ "${#failures[@]}" -gt 0 ]]; then
+    reason="$(printf '%s; ' "${failures[@]}")"
+    printf 'pre-push gate failed for %s: %s\n' "$branch" "${reason%; }" >&2
+    exit 1
+  fi
+done
+
+exit 0

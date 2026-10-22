@@ -2,10 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "AI state: pull from HF bucket",
+      "label": "AI state: pull",
       "type": "shell",
-      "command": ".claude/hooks/scripts/run-hook.sh",
-      "args": ["hf-ai-sync.sh", "pull-state"],
+      "command": "bash .devcontainer/state-sync.sh setup && bash .devcontainer/state-sync.sh pull",
       "options": { "cwd": "${workspaceFolder}" },
       "runOptions": { "runOn": "folderOpen" },
       "presentation": {
@@ -17,10 +16,9 @@
       "problemMatcher": []
     },
     {
-      "label": "AI state: push to HF bucket",
+      "label": "AI state: push",
       "type": "shell",
-      "command": ".claude/hooks/scripts/run-hook.sh",
-      "args": ["hf-ai-sync.sh", "push-state"],
+      "command": "bash .devcontainer/state-sync.sh push",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "reveal": "always",

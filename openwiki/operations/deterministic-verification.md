@@ -1,0 +1,160 @@
+---
+type: operations
+title: "Deterministic verification: verify.py modes, receipts, and findings"
+description: What verify.py's fast, phase, closeout, and gate modes measure, the seven check ids, what a receipt binds (code state, nested AI state, and the bootstrap-root mirror), how closeout runs a plan's required verification items, what record_findings.py records, and which failures block a commit or push.
+tags: [verification, verify.py, receipts, provenance, findings, gates, closeout]
+sources:
+  - id: openwiki-source-37cd5f3d3aa49832caf1a222
+    resource: repo://docs/runtime-checks.md
+  - id: openwiki-source-f11e4ce184d9addc83c16d26
+    resource: repo://shared/hooks/scripts/_lib-frontmatter.sh
+  - id: openwiki-source-9fa38289fd921baabf765923
+    resource: repo://shared/policies/workflow.instructions.md
+  - id: openwiki-source-ac6151a0e717fb82e280dbaf
+    resource: repo://shared/scripts/record_findings.py
+  - id: openwiki-source-b7cd6d01f37550e855f61bdc
+    resource: repo://shared/scripts/verify.py
+  - id: openwiki-source-7c9c9eb3a89efa00dd8df426
+    resource: repo://tests/test_verify.py
+generated: { by: "claude-code", at: "2026-10-21T23:14:28.484Z" }
+verified:
+  - by: openwiki/0.7.2
+    at: 2026-10-21T23:14:28.484Z
+---
+
+# Deterministic verification: verify.py modes, receipts, and findings
+
+Source, tests, and the policies under `shared/policies/` outrank this page.
+
+`shared/scripts/verify.py`, installed as `.claude/scripts/verify.py`, is the one deterministic authority for verification evidence. It runs the lint, type, and test measurements itself, writes receipts that bind the exact state they measured, and exposes a `gate` mode the commit, push, and pull-request hooks call. Nothing in it is model-backed.
+
+```
+uv run python .claude/scripts/verify.py fast --format text
+uv run python .claude/scripts/verify.py phase --format json --persist
+uv run python .claude/scripts/verify.py closeout --format text
+uv run python .claude/scripts/verify.py closeout --format json --persist
+```
+
+## From evidence to a gated commit
+
+This diagram shows how the three receipts relate and where the hooks consult them.
+
+```mermaid
+flowchart LR
+    P[phase receipt] --> C[closeout receipt]
+    F[findings report] --> G[gate mode]
+    C --> G
+    G -->|exact| K[commit-msg and commit gate]
+    G -->|ancestor or certified| U[pre-push and PR gate]
+```
+
+## The seven check ids
+
+Every receipt carries the same seven checks, each `PASS`, `FAIL`, `UNVERIFIED`, or `NOT_APPLICABLE`. `validate_receipt` refuses a receipt whose aggregate `status` disagrees with its checks or whose metadata has unknown or missing fields.
+
+| Check | Meaning |
+| --- | --- |
+| `VFY-RUFF-001` | Ruff lint and format |
+| `VFY-MYPY-001` | mypy |
+| `VFY-PYTEST-001` | pytest |
+| `VFY-FRESH-001` | the evidence captured, or still matches, the relevant code state |
+| `VFY-FRESH-002` | the evidence captured, or still matches, the governing control-plane provenance |
+| `VFY-GEN-001` | the generated verifier matches its source and no OpenWiki managed state leaked into the tree |
+| `VFY-RECEIPT-001` | closeout reused a passing phase receipt |
+
+## The three measurement modes
+
+- **`fast`** is feedback during IMPLEMENT. It runs Ruff only on changed Python paths that still exist and marks every other check `NOT_APPLICABLE`. It never creates reusable evidence.
+- **`phase`** runs the full measurement group and persists reusable evidence. In this authoring repository it lints and type-checks `shared`, `scripts`, and `tests` and runs `tests/`. In a consumer it lints the repository excluding `.claude`, type-checks the configured mypy scope (or reports `UNVERIFIED` with the fix: add `src/` or set `[tool.mypy]` files, packages, or modules), and runs pytest.
+- **`closeout`** does not re-measure. It loads the persisted phase receipt for `VFY-RECEIPT-001` and proves freshness. `VFY-FRESH-001` passes only when `base_ref`, `branch`, `head_sha`, `merge_base_sha`, and `content_hash` equal the phase receipt's values. `VFY-FRESH-002` passes only when control-plane provenance still matches. The failure messages are `relevant code evidence is stale` and `governing control-plane provenance is stale`.
+
+Each lint, type, generation, or pytest command in `phase` mode runs under `COMMAND_TIMEOUT_SECONDS = 480`. A command that exceeds it is reported as `UNVERIFIED`, for example `VFY-PYTEST-001: UNVERIFIED - pytest did not run: Command ... timed out after 480 seconds`, and the phase receipt then cannot satisfy closeout's `VFY-RECEIPT-001`. The budget stays below the 600-second per-item budget described below, because a required closeout item may itself be `verify.py phase`; this repository's own suite takes about 190 seconds.
+
+`phase` and `closeout` refuse to run when `.claude` is not its own Git repository, because nested provenance is then unavailable. The message tells you to checkpoint with `git -C .claude add -A && git -C .claude commit`.
+
+## What a receipt binds
+
+Receipt metadata holds `base_ref`, `branch`, `head_sha`, `merge_base_sha`, `tree_sha` (from `git write-tree`, so it binds the index), `phase`, `content_hash` (the diff against the merge base), `tracked_state_hash`, `changed_paths`, `relevant_paths`, `path_discovery_ok`, and a `control_plane_provenance` object. `tracked_state_hash` is informational and no gate compares it; at commit time `tree_sha` is the binding check, so any change staged after closeout, documentation included, makes the receipt stale. `changed_paths` also drives the required review profiles described below.
+
+`control_plane_provenance` stops evidence from one runtime or plan being reused for another:
+
+- `nested_head`: the nested repository's current commit.
+- `runtime_fingerprint`: a hash of the nested `.claude` runtime paths combined with the bootstrap-root fingerprint.
+- `tracked_state_fingerprint`: a hash over the active plans.
+- `big_plan_digest` and `small_plan_digest`.
+
+The bootstrap-root fingerprint hashes each installer-owned live root adapter listed in `.claude/bootstrap-ownership.env` against its mirror under `.claude/bootstrap-root/`. A marker-claimed third-party skill bundle such as OpenWiki's `skills/openwiki` is excluded on both sides. When any adapter is missing, symlinked, or differs from its mirror, the fingerprint is empty and the receipt fails with `receipt metadata control-plane provenance is invalid`. The usual cause is a root adapter edited without a bootstrap refresh; the fix is the refresh, not editing the mirror.
+
+Receipts live under `.claude/quality_reports/` at fixed per-phase paths, the closeout one being `verification-closeout-<phase>.json`. A completed phase's receipts are immutable.
+
+## Required verification items at closeout
+
+A small plan's `## Verification` section holds fenced `bash` or `sh` blocks. Every non-comment line is a required item, and `closeout` runs them itself:
+
+- In order, from the repository root, before any metadata is collected, so files an item rewrites are part of what the receipt binds.
+- Each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600`.
+- The run stops at the first non-`PASS` item and exits 2 without a receipt.
+- Results are stored at `extensions.verification_items` in the closeout receipt with item text, status, exit code, duration, and the last 20 lines of output. In text format one summary line prints per item, for example `PASS       47.5s  uv run python scripts/validate_targets.py`.
+
+`## Optional Verification` bullets are numbered items. Each needs a `- optional <n>: PASS|FAIL|NOT RUN — <detail>` line in the closeout session log. A bullet that says "None" still counts as optional item 1.
+
+Closeout needs three files to exist first: the phase receipt, the findings report, and the closeout session log the small plan names in `closeout_session_log`. When one is missing, `verify.py closeout` prints one line such as `closeout evidence is missing: .claude/quality_reports/findings-<phase>.json; run record_findings.py to create it`, exits 2, and persists no receipt. A symlinked or non-regular artifact is still refused, with a message that says which.
+
+Closeout also requires the closeout session log to carry LEARN evidence: `[LEARN:category] ...` entries or the exact marker `[LEARN] none - no new lessons this session`, outside fenced code blocks. `MEMORY.md`'s modification time is never a substitute. When the phase is the big plan's last declared phase, the log must also contain `## Stale-claims surfaces checked`. A closeout whose diff touches no documentation needs `--documentation-na "<reason>"`.
+
+## The OpenWiki backstop inside `VFY-GEN-001`
+
+`openwiki_managed_state_violations` checks three conditions using only file reads and Git queries:
+
+- an `AGENTS.md` or `CLAUDE.md` that still carries the `<!-- OPENWIKI:START -->` managed block. The failure message itself gives the fix: ask the user to run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell, because the guard denies an agent command that names a hook script;
+- an untracked or newly staged `.github/workflows/openwiki-update.yml` (init mode is forbidden; delete it);
+- a tracked or staged `openwiki/.run.json` (`git rm --cached` it and keep it ignored).
+
+Any violation fails `VFY-GEN-001` and, through the same function, the commit gate, whether or not the hook guard ran.
+
+## The findings report
+
+`shared/scripts/record_findings.py` persists the reviewer's surviving findings as `.claude/quality_reports/findings-<phase>.json`:
+
+- Each finding needs a `severity` of `CRITICAL`, `MAJOR`, or `MINOR`, a non-empty `title`, and a `profile` among the repeated `--profile` arguments.
+- The report records `schema_version: 2`, `counts`, `profiles_reviewed`, the findings, the reviewer's `gate_result` (from the required `--gate-result PASS|WARN|FAIL`), `open_requests` (from repeatable `--open-request`), and Git metadata: `branch`, `head_sha`, `merge_base_sha`, `content_hash`, `changed_files`, and `dirty: true` when any tracked change is unstaged. That is why the closeout sequence stages before recording.
+- The recorder refuses `--gate-result PASS` together with any open request, and an empty open request, and writes nothing in that case.
+- When the findings text names a protected path, write the findings JSON with the native Write tool to a scratch file and pass `--findings-json <file>`; `protect-files` denies a heredoc or inline command text that names a protected path.
+- When `ponytail` was reviewed the report carries `ponytail_reviewed: true` and `ponytail_findings`.
+
+## What blocks a commit or push
+
+`verify.py gate --branch <b> --phase <p> --head <sha> --head-relation exact|ancestor|certified` prints `{"errors": [...]}` and exits 1 on any error. The hooks call it with the relation that fits the moment:
+
+- `exact`, at commit time: the receipt's `head_sha` must equal HEAD and its `tree_sha` must equal `git write-tree` on the index. A receipt made before staging is stale.
+- `ancestor`, for pushes of later work: the receipt's head must be an ancestor of the pushed ref.
+- `certified`, for the exact phase-completion commit: the pushed commit must be the direct child of the receipt's `head_sha`, because receipts are generated before the commit they certify.
+
+In every relation the gate requires a passing `closeout` receipt for `base_ref` `dev`, the same branch and phase, and a matching `merge_base_sha`. It also requires `counts.critical == 0` and `counts.major == 0` in the findings report and a `disposition` with a non-empty `reason` on every surviving MINOR.
+
+Two more rules come from the review evidence itself:
+
+- **Gate result.** At phase completion the report's `gate_result` must be `PASS` and `open_requests` empty. A report without `gate_result` is refused with a message to re-record it with `--gate-result` before closeout.
+- **Required review profiles.** `required_review_profiles` maps the receipt's `changed_paths`, cumulative from the merge base, to profiles. Test surfaces are checked first: a path under `tests/` or a file named `test_*.py`, `*_test.py`, or `conftest.py` needs `tests`. Otherwise a `control-plane` or `generator` path, or a dependency file (`DEPENDENCY_FILES`, `pyproject.toml`, `requirements*.txt`, `requirements*.in`), needs `code`, `architecture`, `security`, `tests`, and `ponytail`; `.vscode/mcp.json` is a control-plane file. The gate also adds `ponytail` for a multi-file or otherwise high-risk diff. A missing profile is refused in one error, `findings report is missing required review profiles: …`, which keeps `this high-risk diff requires a fresh Ponytail review` when `ponytail` is missing.
+
+The commit gate (`exact`) applies the profile rule to every commit and the gate-result rule at phase completion, which is the commit that completes a small plan. The push gates (`ancestor`, `certified`) apply them only to reports with `schema_version` 2 or later, so a phase completed before these rules existed is never re-judged. A `schema_version` that is not an integer below 2 counts as 2 or later.
+
+With the `exact` relation the gate also enforces the verification-items contract with these prefixes:
+
+- `G1 verification-results-missing:` no `extensions.verification_items`;
+- `G2 verification-item-unrun:` a plan item without a result;
+- `G3 verification-item-failed:` a recorded non-`PASS`;
+- `G4 optional-verification-unaccounted:` an optional item with no outcome line in the log.
+
+For pushes and pull requests, `historical_chain_errors` additionally walks every earlier completed phase: its receipt's `head_sha` must resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches `tree_sha`, and the recorded receipt, findings, and closeout-log hashes must still match the files. Closed session logs are therefore immutable; corrections go in a sibling `<log-name>.errata.md`.
+
+## Representative tests
+
+- `tests/test_verify.py` covers receipt schema migration (v2 and v3 receipts are rejected), per-phase receipt immutability, symlink rejection, the explicit documentation-not-applicable requirement, every LEARN-section rule, and the bootstrap-root fingerprint's third-party exemption.
+- `tests/test_commit_closeout.py` covers the post-commit phase advance: a completed phase advances for every commit-message source, an incomplete or bypass commit does not, and a recorded head cannot advance a second phase.
+
+## Related pages
+
+- [Task lanes and the enforced lifecycle](../workflows/lifecycle-and-task-lanes.md)
+- [Hook dispatcher and guardrail scripts](../architecture/hooks-and-guardrails.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](install-ownership-and-runtime-checks.md)

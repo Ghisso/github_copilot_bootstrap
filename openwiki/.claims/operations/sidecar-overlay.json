@@ -1,0 +1,704 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:e19b4ddca67278732e4abcd8efdd9aea72cbd3b83b3538d6d7b0194c0429b2dc",
+  "claims": [
+    {
+      "id": "claim_b0158374af164219ad80eee5f9baed11",
+      "statement": "The sidecar writes the four SIDECAR_SKILLS skills under both .claude/skills and .agents/skills and two bridges, .claude/rules/ai-bootstrap-sidecar.md with no frontmatter and .github/instructions/ai-bootstrap-sidecar.instructions.md with applyTo \"**\"; it keeps its manifest ai-bootstrap-sidecar.json, the pending record ai-bootstrap-sidecar.json.next, its staging folder, its preserved-copy folder ai-bootstrap-sidecar-preserved, the lock file ai-bootstrap-sidecar.lock, and its marked info/exclude block in the Git directory.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L101-L129",
+          "version": "repo-lines-v1:sha256:2fc6a2efef98a7e7de823eb20f5a254536bc0b6c9c7d4e6e0b2ff0ea5c9ade7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUwMGU5Y2Q2YTA0NDVlOTMwZTZkYjZjMjkzOGNmYzQ0YTA1YjBlZTE5MTRhNjU2OGM0ZGNkZGRiZGMzOWIzNzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlYmI2YzA5OTE0NmU3MGI5MTViNDU5N2I1OTYxMTZhMzA0MGI0ZTgzNjUwZGU3MWU3MzEwMDNmNjA3ZjRiZTEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4014-L4046",
+          "version": "repo-lines-v1:sha256:970407ca29e3fdefd45db7d73aed81f2ddcbe4f53364233d408cbc417f8a53c2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZmZWU0MjhkYjFmN2NhODc1ZDhmM2NjNDQ4NTY2NzA0ZGVlMWQzODE3N2ZkNzg2MTkyOGE0MGFkOTNiOTI1YTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViODk2MmE1MDc3MDFlZWI3YzdkMTY2YTE0N2FlNjUyZDYwYjIxN2Q2ZWYwYmQ0MjlkM2M2ZWI2YWYwNjgxYzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA1NzIyYjhjNGYyODMxYTA4YTZmZjE2OGQxNjUxMTRiNmZkYmFjZjk4NDIxNTM2NjI3NzY5M2JkY2IzYmQwMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cb4863e28d3a4d8ebde9fa1b229e75d4",
+      "statement": "Before any write, the sidecar aborts with 'sidecar-install: ABORT:' and a remedy, returning 1, when an install source does not match the profile's exact sidecar source set, Git is older than 2.31, the target is not a Git repository, not its worktree's top level, or a linked worktree, the Git directory is on another filesystem, the manifest, staging, preserved-copy, or info/exclude path is a symlink or the wrong type, info/ is a symlink or not a folder, an existing info/exclude cannot be read ('cannot read <exclude>: <strerror>'), the manifest is invalid, a nested repository or submodule or a non-folder ancestor sits at or above a skill write root, a single-file unit's parent, or the state root, the state root exists as a file or symlink, a tracked path sits under the state root, or the exclude markers are unbalanced; a pending record ai-bootstrap-sidecar.json.next that parses is loaded alongside the manifest.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4070-L4254",
+          "version": "repo-lines-v1:sha256:6a51f44ece2170fa2c85748f8191d4159f315efedd22038109324912cc50ca31:eyJzZWxlY3RlZExpbmVDb3VudCI6MTg1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJkMGU3MzdlNmVjZDVlZjZkMmM3NmYyMWExM2E4MzQyMGQ1MGI3MWUwNDg2NWYzYzhlY2JjM2JhMDE4ZWNmNWY1IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJmM2I1MjhlMmE0MGRhYTNmM2U4NDViMjA1NjNkYjI5NWRhZTZjNmE3YzE2NDhlNTA1NmZmNjIyZmM0NGIxNWFmIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI2YmE3NzgyYTkwZjBhMzYyM2I2ZjllZDM4YTg0NjJjMDlkYzE0MDk2ZTVjN2QyYzA1MjhiYTMwMDAwYTVkMDQwIn0"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4443-L4463",
+          "version": "repo-lines-v1:sha256:6d97ae16a2748935d3155cb69248c8f0f62b51e9988c66d3a7e6434ae100f83d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0M2QwOGY2ZTE1NmNkOWNhMmE0ODcxNDEwMzQwOWMzYzI1ZTY5MDVjOWJkNDhmYzZhYzk2OTBhZWQ0OGM4ZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg3OWMzMDBmOTFkNWI5OTM1OGI2MjNhNDcyZjMzM2NjZmQ4ZTIwZjcxOTZkOGEyOTFhMWI2MzJlZTliYTc1YjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkNDg3MDA1MmUyMjU2ODE1ODE3MGZmNGY4OGM1ZTBmMDdmYTIwM2VjOWQwNmJhYzM1YWY3MmY3MGMyMTMzY2EifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L467-L484",
+          "version": "repo-lines-v1:sha256:4ead5c28d7ad1e05c2185ffaeb61457d439d98a44c20213e6c88f3ed107a3ac0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiZGRlYjE0NDc3YzljNjI3NTNmY2VkOTQxODM3NjVkM2E3ZjE1NTE3ZDhkYWE3ZjIyZGE3YjZkZDZlNzZmYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhMWRkOGVmMDI3NDg0Mzg5ZWFkNGJmNTJlNGI4MTMwYTUwOTkwZjU5OTY1OTA3YjJlOTIxMmM0NTM4ZjYxNzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlYmE2ZWNkNzQ2YjE2MTA0YWZmYmJjZDQ3MmMwOTAxMDNmYTg5NmM3ZjBjZjE5YjIwZWM4NTEyYmUxYTgzNDUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_347b8ef62339498cb9cf2076972a8aa5",
+      "statement": "The planner aborts with no actions when a symlinked ancestor sits above a required unit; manifest validation rejects a unit path that is absolute, contains '..', a backslash, a control character, or a space-only segment, or is not one of every profile's single-file units, the state root, or a path under a current or retired write root, and rejects a retained path that is absolute, contains '..' or a '.' segment, or lies outside a sidecar unit, while a backslash in a retained name is allowed; serialize_manifest validates every retained path before rendering and writes the profile key only for schema_version 2, so the sidecar never writes a manifest its own parser refuses.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1907-L1912",
+          "version": "repo-lines-v1:sha256:d71677eae44761fb044101dc0be8ea0ef27fd8f2e6dc4eba39b6e9df5ff0244d:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmYzMzE5MDhkNzdiNmM0MjczYjY5MzY5ZDM0OTRmZmZlYWQxMjZjMDBiMzg2NTUwZGM1NTUzYjQ2ZTA5NjcwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiYTQ3Yzg4MTQ1MDMwOWRmODJlODgwYjZjZGNhYmM4NGI0MDUwYzY5ZTcyMjQ4N2MzMWJjNTg0NWNhZTE0YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODEzOWVmZDRkMzYyZmQ1MDE1MjUzYTEyNjc2YzExMjYyYTA2ZWQ1ZWUzZGEwNWQzMDMxZmE1NjY2NGY1YjY1MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDg3MzJlOGMzY2JiNDI0ZmIyYzZkZWY5M2Y1YmI2ZGJjZTYwZDRiZGM1Y2Q2NTEyMThhMTVhMjRhYmQ5MzEwZiJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L334-L371",
+          "version": "repo-lines-v1:sha256:73dcc80e81e7c7d852d301e7d6b60991f2c2468f098bf92335eb86fc360b3c81:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4NTRjZDJjMTZiODYxNTE4ZTliOGY0Zjg2NjdiMTg0MzJlNzhjZTRiYTA3ZDY2ZTBkNTJkZGQxZmIyZWY0NjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM1MzU3N2M0MzJiZTdlNmQ1MzhkZmYyYmU2MmQ3YjQyYTc2OWM4NDlhZTA4NmYwMjc4MTVmY2FmNmJkMWFlMWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI1YmY0ZjhlOTQ3YjgzOTdhMjZhODNlMTViZDMyOTUxNmI2MTlhZThhMDk5NGVlNWVmYTg3YmU4NWZiZDAwNGQifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L488-L519",
+          "version": "repo-lines-v1:sha256:c0dd5186a653de4d6c9bfce530ca815aa90f2a7ce6ce5d7ffb3a8304e3fa9211:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAzZmJlMTJjMTY5ZDYxMDRjYmNjOTI0NWE1YzZmODllMDZkOWUxNDkxNzcwZjc1ZTNkOGVkYzJlOGVmMWI0ZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiYTIxMzMyMjJjOWVjYmFhOWExNGFhMzQyYmUzOTEzNWYzNmZjOTBjYmE4YzYyZWYxZmNmYjc4Y2FlNDgwYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_30401c814c2d4b048e0ad55236a2e6ff",
+      "statement": "A unit's hash is SHA-256 over its files sorted by relative path, each record framed as the file-system-encoded path bytes (identical to UTF-8 for legal names), a NUL byte, the file's SHA-256 hex digest, and a newline.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L221-L238",
+          "version": "repo-lines-v1:sha256:6f6e3a5ea1cc5cc3b5ebc70dfbaa0a0c3b6826ec167ae9a3b9b5ef82a79c9cd0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxN2ZhMGZmMzJlMGEzN2RhZWZkYjJlMjA1ZDNjMmI4YTAyNWE1M2EzZDUwZWI1ZTI2ODlkZTE5MzU0NGM1ZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0MGExODU1YWFhZjY5ZDk1M2FhNzFhMGMxYzQ5MmU0YzBlOWJlYmQ5ZDE5MGIwZDA3MWE0ZjJiYjMyYjQ2ZjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE4MDY3N2QxM2VjMzUwYzQxYTJiM2EyMmFkNTc0ODhkMzFjMTFlZjUwZGU4YTBlMTIzOTgwY2QwZjMxYjNhZDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkY2MyMTY0YzllYTUyNmUwYzI5NDAzOWQxNTAyNzJhNDVhZGI3NmIxZGEyMDkzNjNhZjlkOGY3MzM1NzBhNzIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_50262203ef2a41b6bafe99494c7eeb6b",
+      "statement": "_classify_unit dispatches either state root (the current .ai-bootstrap or the legacy .claude/ai-bootstrap) to _classify_state_unit and otherwise gives a unit that is itself a gitlink the gitlink outcome; it treats a tracked unit as a team takeover when the manifest records it or the exclude block lists it and as team-owned otherwise; an absent unit is installed when wanted or has its record dropped; a complete unit matching its record is removed, unchanged, or updated; a complete unit matching the wanted content is adopted when it is listed or recorded; a complete unit matching the pending record of an interrupted update is updated, or removed when nothing is wanted; a recorded unit that differs or is incomplete is locally modified; a listed unit with no record is an unfinished sidecar copy kept with its line; anything else is foreign. The same rows apply to every single-file unit kind.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1410-L1622",
+          "version": "repo-lines-v1:sha256:823cd29955849d6fa4d6082d79aa219808c5bb936bd20550998546f39d851ac9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEzLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJjOThjZTIwMDlkNjJlZDY5N2E2ZWUyMjAyMGZkYTUzYTE4MWNjZTk3NzBmMWE5YzFlZGNlMGJhMjRiMDY2MGMyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI1YWYxYTFlODU3MzRlYjVmNjkwYjg3NzZkZGFmZTVkOWU5YTIyYWE1ZWMwOGJhZjcwNTJiNjM5MmQyNDM3ZmU2IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIxYjM3ODhmNWZmMjg0MDQzMzcxOWI4NGE3YzFkZGEyOGU0NjMxNzM3NjQ4Y2Q5NzRmYTVmMTFhNzcwNzAyMWQ2In0"
+        }
+      ]
+    },
+    {
+      "id": "claim_6e3a6593ca0043c5927b6336e46454b4",
+      "statement": "Precedence is decided over every shipped skill plus the skill of every required unit, so a dropped skill's recorded copies obey the same rule: a skill is taken when a write-root unit for it is team-owned, a team takeover, a gitlink, or foreign, or when a read-only folder entry, a case variant under core.ignorecase, or a non-sidecar SKILL.md frontmatter name claims it; the workflow profile's agents get the same check over .claude/agents (write root) and .github/agents, .codex/agents, .agents/agents (read-only), comparing entries by _entry_id, the name up to the first dot, so reviewer.agent.md, reviewer.toml, or the folder reviewer/ takes the agent reviewer; taken_units spans current and retired write roots plus taken file units, and each taken unit is converted through an allowlist so an install becomes nothing, an unchanged, updated, or adopted copy becomes a removal, and a locally modified or unfinished copy becomes a preserve, with every taking path reported.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1720-L1781",
+          "version": "repo-lines-v1:sha256:a3b3e3d2bd433ea45ea41ee24d42982f93b82557867e6cac87ac448a4904d74e:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU4ZjM2N2RjNzEwMjRlNmY4MjYyZGE3ZTA5NTg4OTViMDVjZDg2NDMxYmU1YWVkYzZlMDFkMTUwODUxOWViYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlhYmRkYmJkNWFmODBhY2UxNDA0ZWViZWI3MzhkMjVlMDMyNTc3YjA5YTQ3NWI4YTU5OWRkNjZiYWVjNjZlNTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkxZWVmNGJhNzcwMzNhODk2YTNkYTZhNGJhOGQ4ZWE1MmY1Y2EzMWZiMzNhMGRhNDI0NDlhNDQxNmIyZGUzMjcifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1782-L2236",
+          "version": "repo-lines-v1:sha256:36231e27fc8a9024759634dd4950b937f81421dd63a767d7a508978fd4c0f321:eyJzZWxlY3RlZExpbmVDb3VudCI6NDU1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIyOTI3YTgyNDVkOTRhZTZjMzkzZTQwMGE0MTllZjNmMTY1OWEwZjgxYzQ3MTcxMWNiY2Y3YmFiNDBjYjUxMGEwIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIzNjIwMjEwNzNlYmVkZGU0OGM1MjMyZjdiNjZkN2Q4NWYzNzU1ODE3MGYyZmEyYjAzMWU4Njc5MWU2ZGY3OGY0IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlNWVlNjA1M2Q2YjJlZDg2NmEzODUxMzU2M2M4OTIyZjVkNzY5MzJjMzc5M2JhMGRkYmRiMzk4OTQwOTJhZTY1In0"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L988-L997",
+          "version": "repo-lines-v1:sha256:f2bd7ef96bb345fb96bb598a2807a0bff2df926ff2c258dbbbe460bdef53a04d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxOTI4YjQzMjRiYjY4YjQ5YzViMDY5Y2NlZTYxOTVkOGZlMzc3Mjg1MzNmMjRlMWMzMzc5OTRlYjdjMmY1MTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQzN2E0NWY0MTYzODFmMWY5MmI2NjE5N2U1MTE5NjA5MGRlNTNhMzI2Mzc5NTQzNTI1YzZhMDU5N2U5MGE3YTMifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+        }
+      ]
+    },
+    {
+      "id": "claim_6161e0bcaea641a1aa641f9bebd4213c",
+      "statement": "In a team takeover the planner drops the unit record, deletes untracked files whose bytes match the record, the wanted content, or the pending record of an interrupted update, retains other ignored untracked files and untracked symlinks (which carry no hash and are never deleted) with a RETAINED report and an exact-path exclude line unless gitignore cannot express the name, and leaves visible untracked entries alone; a retained entry is dropped once it is deleted or tracked, and a file line in the block keeps hiding its file without a manifest.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2089-L2154",
+          "version": "repo-lines-v1:sha256:800ce9d5ea92cf1ff524152e4112b51a4b320dffcade85476790b8b4176a6b01:eyJzZWxlY3RlZExpbmVDb3VudCI6NjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzMGQxOTBmZjA1MzkwMTQ4OThjODU2NDMwN2FiM2JlOTYxMjBlZDIzODUxM2I5MjBlM2VkYTA2YmRmYmFjZTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxOTUyNjgyYTM3YTJjZTE5MTk5ZjQyMTVmZTNkZTEyYzlkZWYyODEzYjgxNjlhYzViNTQwNDJmMTNmOWU5YzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjM2RkZjFmYTM5YmMwYTlkMDRhZDMwNmEwYWE4OGIyNmI3OGUwNDA2Yjk5MTM3YjczODg3MTNkNTQ3NzRmMTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiMmZkM2ZiNTM0ZGRiNjYzYzY4Y2IxYzBkNmFiNDU1N2NmYzg1MGYwZDk5MmFjMWNjZTkzNDJmZTU0MTE3NjMifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1256-L1325",
+          "version": "repo-lines-v1:sha256:aa2b90dda29fd1881c386663525ad19e2d0e7cf0e409029aeccb1d8251197268:eyJzZWxlY3RlZExpbmVDb3VudCI6NzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmOWZkYTBmNDQ4YzFmNmU5MDlhZDc1YTBlNDkyOGVjOGM4ZjQ3ODhmNDNjMDQwNjg4OTYxZmJiNGNhMzNiZjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyODMxMjNmNjhkYzYzOTIyMDZjN2EyYTNiNzZmMTMzNzhmOWYwNWYxOWYyNDA0MDA0NTk5MzY2M2U4OTk4ZjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkYzU3YzgzMWZiNjc4NzMyNzY2YWQ1MDcyMWMxYzY2YjRkZGViYWU5OGZhN2U1YWMxZTkwZmZmODI2YzNmNGEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_35b733b72b7a47909d8c2c045fc6af58",
+      "statement": "Exclude lines are anchored with a leading slash and escape backslash, '*', '?', '[', a leading '!' or '#', and trailing spaces, leaving non-ASCII text as raw bytes; a unit line has no trailing slash.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L789-L817",
+          "version": "repo-lines-v1:sha256:005012066aeb0bab9ac19fc33416010c35082e19010d542e6968938970238fc9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZDYwNDhiMzUzMmYyZDAzMjY4OWQ3YzI3OTExYjIzMmU2YmU2MWJhYzg4NjgxNTE2YzJkODUyOGJkODMwYjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlNWVkMjFlMDdhODU3MjMyYzIyNjM4ZTBhOTQyOWQ0YmIzYzYzZmJmOTg2ODA2NWZiZjFiNzMwM2RmNzAxNjcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_64b768752cf24b209e9c01ade14eb9c9",
+      "statement": "run_ignore_gate passes only when git check-ignore --stdin -z prints exactly the gate paths the planner returned, where a skill unit or the state root is spelled '<unit>/' only when it is a real folder or absent and '<unit>' when it exists as a symlink or another non-folder; a Git exit other than 0 or 1 raises GitCheckIgnoreError; on failure git check-ignore -v -n -z --stdin explains only the paths that are not ignored, and when Git names no rule the message points at a rule ending in '/' or a plain negation naming the folder; a dry run points a one-shot core.excludesFile at a temporary file instead of touching info/exclude.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3468-L3510",
+          "version": "repo-lines-v1:sha256:ec6a7522feca6b90fabb40c3c5f3aa2e123147fcc141a39690734bf80c4bf5a5:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMGI3N2E5MzA2NmVmODU0MWM3YmNlZWQxZDVlNzNkYTBhNDk1ZDAwZmQwNDM0MmFkOWI0MTUzZTRlNjI1YzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhY2NiNWNjMzE5YmU4ODYxNDg3MTY2YjI4N2YxMjVhNzVlMTE1Y2NjOWFhZGI0NTJlN2IxMDNlMzhmOGI3YjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU0ZjUxZjAzNDRlM2RhNDI2NTY4NWI0YTEwYzdmYjRmMDU2NjJjZjNkYzRjOTkxMmY1NDJhZWVjNzI0ZWJmYTQifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3542-L3618",
+          "version": "repo-lines-v1:sha256:8f37e8f19ad63641d49fb32c3802a164972abf286ecccfe40bfdb8a898c86f36:eyJzZWxlY3RlZExpbmVDb3VudCI6NzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBlZjA4Mzg4OTA4MjE2YTkzZGU5OWEzMzIyZjI5Y2MyMjRkNzFmOTI3MDgyZThhZGExZGJkM2ZmMjI1ZDM5ZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwYjZkOTI4M2NhMmZhNDczYWMxMTNhNDZhYWViOTU2NTQ4Y2I5Y2M2NThiZDBiNDJlY2UxNDU1NTUxZDMwNjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVlNWJjNzlmMDFhYTAxN2VlMTAyZGY5ZGMxODMxOGZiYmI4MGY1YTU1MGRhMzVlMjY0ZDM3ODNiM2MwZDU2MDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE3MTk5YjhhNjM3NDk2N2RlOTE0YTZkN2Q2YTk5NjlhNzM4MmI3NzAyZTA2MjYyMGM0MjYxYmYzNTRmYmE4OGEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c564ee1b49354e4095c609c996873809",
+      "statement": "A real run writes the exclude block, runs the gate and restores the previous exclude file on failure, writes the next manifest to ai-bootstrap-sidecar.json.next, empties staging, applies unit actions including preserves and seed_missing, writes the final exclude lines, writes the manifest last through a temporary file and os.replace, unlinks the pending record, writes the exclude file and manifest only when their bytes change, and finally removes empty sidecar parent folders.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3934-L4020",
+          "version": "repo-lines-v1:sha256:7b8932925fb952117e34db1a7337ac72fa654524af469e50d332d4f287984896:eyJzZWxlY3RlZExpbmVDb3VudCI6ODcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0ZTUyYzMzOGFmYjY5NjFhNWIyMzZlYjg2ZTkwZWNlOWU4MTRiZDI2ZmY2ZTZhMTU0M2ViN2U5MzY4NTkzNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlMzc5ZGJlMDk4ZjNiNDIxMjNhM2U2NmMwNjlmNDM1NGMyYzc0NGZmNjdhMjM3MDMzZmU2ZmI3N2MyOGVmNDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA1NzIyYjhjNGYyODMxYTA4YTZmZjE2OGQxNjUxMTRiNmZkYmFjZjk4NDIxNTM2NjI3NzY5M2JkY2IzYmQwMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4MjQyZWU4YWQxZjYwOWU2OTZjZDQ5MDFlMjUxOTBlYjRhZWI5MDIzZmVmNzFkNDkzYjZjMGI0ZWE0NTVmMDYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bf6b2371f24745f2ab0399e2e5239590",
+      "statement": "_place_unit builds the new unit in staging, moves any existing copy into staging, and swaps the new copy into place with one os.replace, so an interrupted run leaves each unit old, new, or absent; removal moves the unit into staging.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3726-L3756",
+          "version": "repo-lines-v1:sha256:72133bd9e3018094c762574697a1fb823d954e55e570e116f345f4830afb74a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxNjYzOGZjZGUyNmFhZGJiMWNlZDE0Y2M5YmU4ZDkyZTg2YzY0ZjI2Y2Q3YzM0MDgxMzZhMDUyZjgwM2M4ODQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1YTVjOWVhMDIyNTFiNzY2ZTdkMjRkODgzNjZhYTBkOTViYjBmNjc4MTMxOTM3OTJlNTQxNTc1MjcyNGFkMzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkMDcxZmZkNDI4NjFlNWZjNDQ4ZTc3MjZhZmMzMTBhMmYyM2I2MDU3MWNmNTM2Y2VlMGQ0NWZkNTJmYTllZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRmZmU3ZmE5NTM0OTkyNzdhM2JlOGIyNWFkYzVlOWM5OWY4ZmFlOTczZmU3YjcwMDc1NzQ0NTVkNDgzOGYzZjMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4803d73f02b9406ebff7fe9ebb7200f8",
+      "statement": "Dry-run runs the gate on the candidate block, prints each action as 'would ...', writes nothing (no staging folder, pending record, or lock file), never prints a past-tense removed, deleted, seeded, or PRESERVED action line, and states that its gate is an approximation because Git ranks info/exclude above core.excludesFile.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3841-L3933",
+          "version": "repo-lines-v1:sha256:e44adb9fb69e0fb4261b64d3345d5c86830eb00113dc96aff64d1b0308fef93c:eyJzZWxlY3RlZExpbmVDb3VudCI6OTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1MDczNjZjMGE1NmUxMWU1MjMzOWNmNjA4MDAzZTUzMjQzNjZiODFkZjAxZDI5ODhlMjg2NWIzOTY0OGMyYTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5NjNkZmM5YzJiY2QwNDM2Y2NmMGFkOGExYmQwNDYwZGEzNDQ3ZjYyMzU1MDI1YmI4NDkzNjhiZjlmNzgzNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4NjM1MzYyNzk2MWE0ZGM2MDljOTYyYmQ0ZTc2YTBmOTZmMTI0NTc5NDgyODFkYjkyNGZiNWVhMTRjMjdiM2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_96fd0a5650504371aa4498369190c561",
+      "statement": "The report prints installed, updated, removed, adopted, unchanged, preserved, and seeded counts, then, in a real run only, one line per removed, deleted, seeded, or preserved path, then one SKIPPED, RETAINED, or PRESERVED line per path with its remedy; a workflow unit is named with its kind word (agent, rule, instructions, review profile, template, state) and its name up to the first dot; during uninstall the team-owned, gitlink, and foreign remedies say the sidecar leaves the path alone, an unrecorded listed unit is described as listed by the sidecar's exclude block but never recorded, and every printed path escapes bytes that are not valid UTF-8; per-path skips do not change an install's exit code.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1016-L1029",
+          "version": "repo-lines-v1:sha256:c10f74b9a1805b999f2c62e143cec86e73d90fd31237c7839d940bc7873bb0c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiM2YwNGM4YTFkODcyMTVlMWIyYmFmYmViZTEyNzczMzA5NjIxOGY1ZjFhZmUzZjYyYjU0YWRlMjNlZTM4NzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZjkzMDgzYzE5NzEyMWI5ODI3MDBiYThhZmFiZDE3MjJjZjFkM2U3NDA0NTA5ZTgwZWZhMjcyNDdmNjJmMDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIxYzAyOTEzMmU4OGM5ZjI3NGQ0ZjBmY2E0Yzk0ZDFkMTE1YjdiNTYyNDlhYTk2MWYyYzAwYTE3OTY0ZmEzYTQifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1092-L1240",
+          "version": "repo-lines-v1:sha256:012671f52a6baa0de8ab8562f21ffcdd7ff966671b275ba732a28858f95e1961:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQ5LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI3NjRlMDQ3YzM4MTQ2MzdiZDE3OWQ1ZDE1MTM5OTM2OTRiMWMxZjhiZjkyNzdkYzhmYjNlNDkwOGJmMTdmNDkzIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwYmEyMTMzMjIyYzllY2JhYTlhMTRhYTM0MmJlMzkxMzVmMzZmYzkwY2JhOGM2MmVmMWZjZmI3OGNhZTQ4MGE2IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI4Y2M0YTdkMWNjNzk2YWJhM2U0NjcyMzMyN2Y1MTdlOWY4MTE5ODJkMjUwZjA3MDI5ODZlNGI1NzY0YWQ5NTg5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI3YmJlODcyODRhY2M1MDBkMjAzMjIzYzViMThjZThhODI4ODMyYWI1Yjg1MDBiMTFkZWEyM2ExMDllNGQwYWEwIn0"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3841-L3877",
+          "version": "repo-lines-v1:sha256:b4fdf257ff78167a05b2de32148263fe973f9c6f17f8886d77f7bb21f6c73675:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1MDczNjZjMGE1NmUxMWU1MjMzOWNmNjA4MDAzZTUzMjQzNjZiODFkZjAxZDI5ODhlMjg2NWIzOTY0OGMyYTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5NjNkZmM5YzJiY2QwNDM2Y2NmMGFkOGExYmQwNDYwZGEzNDQ3ZjYyMzU1MDI1YmI4NDkzNjhiZjlmNzgzNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI2Y2VkNzNmNTVkNzA1M2E1MDNjMTRkOWJkY2FhOTNmNTQ0ZjFjOTUzMTUyNzMyZTIzNTNiZTJmMDUxNTUwYzQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1306614210644b4ca40120b3839ad925",
+      "statement": "Native runs on 2026-09-25 verified Claude Code (.claude/skills and the rules bridge), Codex (.agents/skills, no bridge), and Copilot in VS Code in Local agent and Agent Host sessions; Antigravity was unavailable and is unverified for sidecar v1, and Copilot's Local agent let a sidecar .agents/skills copy hide a team skill of the same name in .github/skills.",
+      "evidence": [
+        {
+          "resource": "repo://docs/sidecar-provider-contract.md#L484-L600",
+          "version": "repo-lines-v1:sha256:b5d4ec488db14eff4b4f945983ff441b1315404fd46d4e39548fcdfc3cc1fb62:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIzZWZhMzljZDhjMzViZjgzODFkN2Q1YjAxMzVhNGNhZTIzNTZiYTFmZDlhYzI1YmE0Mzc0NDk2YTMyZWEzZjQ3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwNzZkZGY0OTM2YWI0ODRkOGVhZTI3NWYwMzM0NGQ4OTg1NGVkNjAzZDI0ZTM5NTY3ZjZlZTZlZDkxN2RlMDQ0IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIyOWMwOWU4Nzk1NDVjY2ZkYmViYzBkNTk5OWNmNWE0NTk0ZmM1YzhlZWU5NWY2NGZhOWJiZjNjNzgxMzUwMzYxIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
+        }
+      ]
+    },
+    {
+      "id": "claim_64a3148d55974ba3bfebeecc722222a1",
+      "statement": "Crash recovery is tested by faults injected after the exclude write, in the middle of a unit swap, and before the manifest write, each followed by a rerun with the same source and with a newer source that converges through the pending record, plus an uninstall after the crash that removes the sidecar's own bytes; uninstall adds a fault after units are removed, and the legacy state migration adds faults after its backup and after its rename, each followed by a rerun that converges without migrating twice.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2367-L2393",
+          "version": "repo-lines-v1:sha256:dd8481b535f81f7099b67d479da4f1a4835b2ce497498dc305c9f7955e7056d4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0NGU3YTAxODY3MmI5MGIxODllNzkwZWYyYjU3YzFmMjU4MzA1MzBjZGFhM2U5ZTU0ZDU0MTU4ZDBjYjIzYzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM1OGE5MGJjMDBjYjQ3YmQ2MDdmNzIwZjQxNDMxYzc4MTAwZmNkZGUyMjRiMThiMDFkNDM0NTlkYTI2MzVlMjAifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4332-L4422",
+          "version": "repo-lines-v1:sha256:d63cc477a3e56aaf7489472b249ec758b4b9035d0b40e1a1eddddf2fb4b7c3c5:eyJzZWxlY3RlZExpbmVDb3VudCI6OTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZmZTk3ZWI3OGI0NWE3MDRiNmU5OTdiZDdkNzY2NTgxNzM0OWU0ZDg5NWIxYzg5MDdmMTZmOTY3MDRlMjI5YjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljNjFjMGNkNjliM2ExMjQxMGRhOTMzZmI0NWRiM2EyODIyNTJlNTA4ZDRlYmY5MGJiOGFmNzFmZWFhZDUyOWYifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py",
+          "version": "repo-file-v1:sha256:14c1a690e4e12ec013c2bde29e48614d2e8348ca460fef316543ed0cf791bdf8"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py",
+          "version": "repo-file-v1:sha256:0c97b881c48f835c431d6a3c7d6b8e95aafaba8ac3c86b2fa4283a2fb71ab9d7"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+        }
+      ]
+    },
+    {
+      "id": "claim_d97e645a24b64eea9b1ec8fe2b99cf8a",
+      "statement": "Sidecar mode supports only the main worktree; the main worktree's info/exclude lines also hide sidecar paths in linked worktrees, background-session worktrees get no sidecar files unless listed in git.worktreeIncludeFiles or .worktreeinclude, and info/exclude is not a security boundary.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L897-L916",
+          "version": "repo-lines-v1:sha256:e1a01674b4fb99a67a16feb0fa27a7fc836b53fff4e8df1bb4671769651b9d8f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxMWE1OWQyNGM5YjFlZWZjZTgzNjA0MGUzYmFiNzM3NWE1MzQxOGRiNDM1ODliYTRjYjg0YThjN2MzYzc2YmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTZkNDcwZDE2ZTdkOGMwNTc1MDdiMTMyZGRkOTkzZTQzODExMDk0MmNiMTA5NzAwNTVhMGU4YjYzMmMwMWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNmMxZjkxMmI3MmRlYzk5MzdjYmFhMmY2MTFjNTVlMDA5MmYyZTJkN2EzMjEwNDgxNjYyYzljZDQyN2Y2MGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlNmI2OWUxZDA5ODJlZGU1YzRiMGUxMjc2YWFmNGEwMzE4MDk4ZTI1MDBlYzcyNWJjMTVlN2FjODI5ZjI2ODUifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4098-L4104",
+          "version": "repo-lines-v1:sha256:37c849ebabeada5bd1054dd4e2882cbc8dcdb8463311dea42d0b783f62f11ff5:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdjOWEzMGQ2MGYzY2Q3MWQxOGE0NDM1YmU3NmY3Zjk1ZTVlM2RkYmFmMzE5YjBiNDc0YmI4OWNmNDkyYWQxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkwOWE1M2E2MThkMDI4ZTFkMzAwMGMwYTdhYmNlZWNiZTVmYjM3ZjRlNTExZWZlNDY2NDNmYWQ2ZTY2ODcyZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmU1NGQwZjY1OGViOTM2MGU3OWUzZDNhNmYzNjNjZWE2NGRlOGVmN2YzYjhhZDc1NjIzOWIzNjM4YWQ4NDg0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzUxZDgwYjQzZTA3YjRkYzU0MTljM2I2ZmFkOWJmYjQ0ZWJiZGE0MzM3MWVhMmJiMTI5YzgxZmNmOTMyMzc2MSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_bd85343df99d4e22b799bbef8662a6c0",
+      "statement": "Sidecar ownership comes from the Git index: every index entry at or under a unit path, for a bridge as well as a skill folder, including skip-worktree, gitlink, and symlink entries and files deleted from disk, makes the unit tracked, compared case-insensitively and reported in the on-disk casing when core.ignorecase is true; a tracked folder at a bridge path is therefore team-owned and never preserved.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2758-L2799",
+          "version": "repo-lines-v1:sha256:a696448fbc85ba0b4e4a969b0a3fe8e5a31d013ec47d41ecd07983d778dab7bb:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjNzNjYzY0M2ZhMzQ0OTc5M2UzNTkzZTM5ZWUzMDY0OTQ5YjY0NzhiMjNiNGQ2NTc0ZGFmMTY3NjliOTQ0MjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4M2RkY2FmNDlkMjc2N2U3NTA0YjY0MWM3ZDcyN2QxZjc4MDg1OWIzMDRhNjUxNWU3ZjA2NzQ4MjBjMDMxYzAifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2833-L2876",
+          "version": "repo-lines-v1:sha256:4e315157d7240c87fb82b85879304a97aa4b47a9e490fbc7dba721e5cc4f44f8:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3YWQ2NDRiZTlkNDNlZDY3MTg3NTAxYWFjZWE4NDg0NDUxOGE5ZmM5ZTcwOTdmMWMxYjUxMGRlZDQyNjdmMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQwZTRiMjllZTVhYWYzNDFlNzIzNDJmMjFiMWVhODMwMDg5ZDk0ZjMyZTQwMmQ1M2VlODRmZjg5MzgzNjM2MzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY3OWQ1ZmZkNzdhMjYzOTA3NjQ1ZmJjZjI1NGMzZGNiNmRlZDY0MzkxOGRkYmM5OWQxZmQ0ZjNjZGEyOGExYjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_daea5aebf819493d864d577fcfe0ac32",
+      "statement": "parse_exclude_block sorts the sidecar block's lines into unit lines (including the state root's line), file lines, and unrecognized lines in file order; the planner keeps every unrecognized line, reports each non-blank one once per run, and renders the block as the sidecar's sorted lines followed by the unrecognized lines in their original order; the markers must form exactly one BEGIN line followed by one END line or the run refuses.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2200-L2234",
+          "version": "repo-lines-v1:sha256:d4f39a41676f902c8a771d2cf024681fdd72c9524b4be10357ff8be6b0b239bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkZGM5ZGE5MTUxZjQ3ZWRmYmE4NTNkMDc4ZWM4OGQ4MTMzOTQ4M2NiOTYxYjZkMDFmOTc3MDJiNTMyZmVkNmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyNTYxYmUwMGM3NWE5YTZjZjNlNWI0OGM2OGEyZGY1NmM4NjJiMWJhY2YwZWU1ZGI1OWY2OGNhOWI2NGI3YmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJiN2I5Yzc1Nzc0ZDI1MWMzN2Y3NjYzZWY0Y2E1OWQxZDRmYmJlMjNjY2VkMWEwYWFjYzUyNWU5MzVhOGVkMDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwYjlmZmE0ZTRhMWRmODNkZGFlNmVmYmVjZGZjY2NjYjMwNjk4OTE5NWVlNzM5MGU3NmM5OGViNWZlYTg2ZGYifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3322-L3353",
+          "version": "repo-lines-v1:sha256:9d59700828eee69e304c53f5f19743155301345e59a2ef9a123958f6fb076e3d:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFhZWE4MmE0ZDk3OThlMzAwZjI3OTM4YzljNjYzZTljZjNhNzY1MTVmZDViMjZkMGM1OTM2YWZiYzk0YmZiOWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlOTdkNmFjYmFkMGJlODBkMThhMDc5NzM4Mjg2YjY0MDQ5NGY0YzBlN2UzOWFhODNkZjFmZjUwM2UxMWQ0NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkMzJmYmQ2YTViMzc4ZDZmNGYxOTVmYWY4ZTRmZjZjYWViNjBiNjc1YjA4ODI3YjBlMjIzYTVjNDQzN2EwNDcifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L898-L942",
+          "version": "repo-lines-v1:sha256:04d19a00e019d83c795f31f0c03186983cbe46f081774a30cd59be6984f701ba:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhZDc1N2E1NmRiOTdjNjhkYWJmMmY4MDUzNDg3MmMyYzJlZWY5ZmUzZjA0YWM3YzlhODI5YjY0ZjAyZGUzNzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIyNjlmZmVlY2I5YjYzZDBmZWVlZThhZWJlYzAxYmE4NjQwZTgwNzQ0NDBkN2FlNzE0ZmJjNzk1YzlkZjg5NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_42df8045d1b0439fa825180f5dcb1ac2",
+      "statement": "A taken skill's edited or unfinished copy is moved with os.replace to <git dir>/ai-bootstrap-sidecar-preserved/<unit path with / replaced by __>--<content hash>, one level deep; when that destination already exists the unit stays in place with its record and line and the report names a conflict.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1201-L1240",
+          "version": "repo-lines-v1:sha256:2a1979311ae2ef12bc89243384147c4815826b25c0515dc856d172bd7de516e5:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkYjcyMzA2NjRkNzhiNWUwMzcwZDkzMWE2NjE4M2VjZmFlMjUwMmU5NGE2MDM3M2JkZDI4NjM1OWFjNDc3NzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiYTIxMzMyMjJjOWVjYmFhOWExNGFhMzQyYmUzOTEzNWYzNmZjOTBjYmE4YzYyZWYxZmNmYjc4Y2FlNDgwYTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdiYmU4NzI4NGFjYzUwMGQyMDMyMjNjNWIxOGNlOGE4Mjg4MzJhYjViODUwMGIxMWRlYTIzYTEwOWU0ZDBhYTAifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L241-L248",
+          "version": "repo-lines-v1:sha256:42b5dd70888e2a4e2273819de0867099e951b0a06f1091d8c57ad4ebb04d7948:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2UxMTc2YjA2ZmFmMjcxOTkzMGIzOTc2MGU2NTM4M2Q2YjgyODc2N2M5Mzg4ZTcxNThmMTA4YTY5M2IxZjIxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDI1MTMzNzA4ZjgyZTZiYThjMGEyNjQxNjIzMGY0OTgxMDU4MzY1MjFjZWE2YzU0ZGMzN2QxOWRhYTE3MTBhOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWQ3YzhiNGRmZGQ2NWZmZjgwYzhkZDM0NTdkNGNlNTJhMzU3ZWQ2MWY3MmJhNGI4ZjViNDMzZTJhN2I1MDIyNSJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3767-L3775",
+          "version": "repo-lines-v1:sha256:333949e91cd5ce939337b1d09b8349bfee0bcf5b1511846919d83020840c520f:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc3MmUwMzljZDhiOWNlYjk4YjUxNDU3YWNmNzg2MDI5OTQ5MDYwMWQ1ZWI5ZjU1YTcxODA5OGU0YTE3NzJmNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDQ5MWU0MjEzNjI1ZTc2YTgzNzNiNmE3ZGUwZjU3YzE2ODg2ODc4Y2UzODUyNjMyOGZjY2YzODMzNDIwMDNkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWY1ZTk4YmFjODQzMGE3NmM1YWY4MGEzOThmODhjYjE0YmQ4ZDgxNWFiNzVkZDlkOTU1ODhhZTVlZjIzZDRiZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5571a8d8b5d34ad8b15348a426a808dd",
+      "statement": "uninstall_sidecar runs the shared preflight; with no manifest and no block it prints the preserved-copy folder when that folder holds anything and reports nothing to do; otherwise it snapshots every well-known unit of every profile at current and retired write roots plus every current and retired single-file unit and both recognized state roots and plans with an empty wanted set, where every classified unit except a state root is taken, so matching units are removed, edited or unfinished copies are preserved, retained files are un-hidden, and each state folder is kept hidden unless purge_state moves it to the preserved-copy folder under its own state--<timestamp> name.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4809-L4983",
+          "version": "repo-lines-v1:sha256:99bae44e332292408d9def7bb4f67cd086572d54b90681f6ea32c438dff69086:eyJzZWxlY3RlZExpbmVDb3VudCI6MTc1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI2M2Y1ZGVkYWExNWMyODE0ZDViNTlkOWFhNGI5MjRkN2UyMzY5NjMzMjNkMjY2ZGJhMDQxOGZhNzlkN2E4NWNjIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJkMGIyZGQ5NDM0NWE3ZWUyZjcxZmVlNWU4OTI5ZjBhMjFjZjBjMjU4NTFlZjM1OWIxZTk0NGY2ZTc5ZWQwOTQ5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5NDkyMGQ3Y2ZkM2JhOTFjYjE5NGNjNWEwMDBmZjEwZGJkODVjNGRlNjZhZmRlODcxZTllOGMxYzk5MGZjNmU0In0"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L720-L788",
+          "version": "repo-lines-v1:sha256:acf519ca7c3c9298e74c6fed073cb120676b04f8447e169312d9f3e399bf4f20:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MTQzM2ZmNTMxZTcwZmMwYWIwYmI5YzA4MzA4MDE1NzE4YTkxNjkwZDA1Zjg5MmJmNjhlNjYwZGVhYWUzMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5MDZiZWIzMDc1NzQyODY5ZTFmYTlkMDgzMDZhNTUwNWU3MWMxZmU0YjU3NzBlZmJkOWYzYTk1NzM5NTMxZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImExYzM3NDdmNDRhMTY2MWI0YTZhNGU4MDFkN2E4NmJiZmRhZDlmMDc3YzIyNmFmODI3YTc3YzM3YmRmYmY2NDUifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py",
+          "version": "repo-file-v1:sha256:0c97b881c48f835c431d6a3c7d6b8e95aafaba8ac3c86b2fa4283a2fb71ab9d7"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+        }
+      ]
+    },
+    {
+      "id": "claim_3bf7bc1f8e9b4fc897e0638683383aa8",
+      "statement": "Uninstall follows the install's write order: it writes the write-phase block (skipped when there is no block and no line to write), gates only the paths the final block keeps (empty unless a preserve conflict or the kept state root keeps a line) and restores the exclude file on failure, applies actions through the shared _apply_actions, then either removes the block, writing unrecognized lines back as plain lines in their original order, deletes the manifest, the pending record, and the staging folder, and removes empty sidecar parent folders (.claude/skills, .agents/skills, .claude/rules, .claude/agents, .claude/review-profiles, .claude/templates, .github/instructions, then .claude, .agents, .github), or, when kept_conflicts is non-empty or the sidecar's own state line survives, writes the final block and a manifest of only the kept units' records and exits 1 only for a preserve conflict.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2442-L2454",
+          "version": "repo-lines-v1:sha256:74fe7f5823a7b0bb2eeb607c3bf97211e9bccc0ea836a8cd5a40eca881dfd0f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNWYyMDVlZDNjYmFjODdhMjBlOTgyOTI4YmU1MjRmMWQwYjQ2NThkNDE2OTQ2YzhkZWU5NjUyMmIxYTI4MzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImViMGUxNjg1YjZjOGJjYTE1YThlYjA1OTkwMzBjZTkyMWM2YjQ3MWUxNWY4MmNkZjg0MmE2MzMzMmJiMjEyZTYifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4700-L4808",
+          "version": "repo-lines-v1:sha256:8d74eb896b4d06db7d4bbf1b893f03b8c2676d47fdde6f06f39f5aa7a12ecd6f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTA5LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI1YzUxNzg0NTMwYzVhOWExNmIyMTZmNTIzMjhkYjUzODJkOTM4NGM2N2ExNWY2MjBiMTNhYzJiZjA3MmNmZjYwIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIwNTcyMmI4YzRmMjgzMWEwOGE2ZmYxNjhkMTY1MTE0YjZmZGJhY2Y5ODQyMTUzNjYyNzc2OTNiZGNiM2JkMDIwIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIzNjgzOTQ0OTAxZTZiMWQ5OTgyYmM3ZDQ0YTRhOGM4YjczMDZjYTg4N2U1NzkzY2IzNGI2YWQyYzQyZjRlYWU0In0"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py",
+          "version": "repo-file-v1:sha256:0c97b881c48f835c431d6a3c7d6b8e95aafaba8ac3c86b2fa4283a2fb71ab9d7"
+        }
+      ]
+    },
+    {
+      "id": "claim_9071252f35af4cc1ac92c5b675f26668",
+      "statement": "A recorded or listed unit that holds a .git entry whose parent folder is not a gitlink makes the planner abort before any write with the nested-repository message, while an unrecorded, unlisted unit with such an entry is classified foreign so its skill is taken and nothing inside it is touched; gathering stops below any .git entry.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1914-L1938",
+          "version": "repo-lines-v1:sha256:667fd40f44ac61d9f692701ee1dd035ce590f2981a5ac6948cf825214b1ee3c7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmYjBmYTM2Yjg1ZmZlMWRjZTA4NGYxN2IzMWI4NWJjYzVhNzkxOGVmY2JkMDY1YTkyNDBkZTYzZTE1YWZhOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5ODBjYjI5YjJhMTgyZTk3ZGIwNjBkNGFlNmQzNzRiZmYxNzE2M2Q0NTMyNjBmYmUyNGVjNGU4NzhkM2MyMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcyYmRhNjk2MGY3OTYwMWI1MmY4OGU3NDEyNjMxYjJiZmVmYjk5NzJlNWIwMzhmNjVhZmFmNmVjYjY2NDYzODgifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3013-L3020",
+          "version": "repo-lines-v1:sha256:3d0e75bcf050a211039ae942f72b8d446ccaa47d5ccc2b87c59eb9fd68ddcec1:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDA4MjY4OWY3YjJlNjMwYTBkYTc0ODE1MjIwMGU0ZGIzMWRlZGMxMGJiZWVmMjZmMTk1ZTlkZDdiZWIyNzcxZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ4YTllOWMzMjUyODIwYzY1YTgxNjUyMGI4ZGI0OTMyMjgwODQ5ZWM4YzdkMmViNjI3MmFmZGZlYmUwNTljMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2JhZDllN2RmYzJlYmU5YTIxNzRhYmQzODNkMWMyNjdiYWM1NWNhYjk4NzhlZjhiNjZiYjRiZGMzMTAxOWEzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQyNjdiZmUxMWEwYzgwOGZhMjZmMzllYThkN2YwMjNmZTJmNmExYzIwMjczMjVhMzM1ZjI5MTFiZTA4YTZlOCJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3049-L3112",
+          "version": "repo-lines-v1:sha256:a5b9a2fb08ee034c015e196ff2f52ff9bbb164eea69fbdfd70ec7c3ef1187a08:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4ZDYzM2I2MGM3Y2FlMGQxM2Y4ZDdhMjc4OGY2Y2E0NmVkODIyM2Y4OWU3ZDFlNzBlMjFjMWM3YWJmZTQ5NTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZGI4YmY0MjRiNTMyMjBiNWYwMjBhMGI0ZGExYTMxODQyZDJjMjE1MmU4Y2Y3YjJlMGE5YzRjMGYwY2Q5ZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExOGJjZjQ2OWE5ZjI5MWM1OGI5NmQ5OTgyNGJiYjEyYjAyMDk1YjdiYmM0Yjk3Mjk3YzJhODBhMDM0ZDA0NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZjhjMTUwOGQ0YTU5YzM2NmUxMzAwN2UyN2FhMWM1YWYzYWM5OGRiNDIxMWU1YjU5MGQ3YmMwZDcxODc3YWUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_47a9170ecb0949b599e179221fb970d2",
+      "statement": "A unit that is itself a gitlink gets the gitlink outcome: any record is dropped, no file action is planned, the report says the sidecar never touches files inside a submodule, and the skill is taken; gathering never recurses below any gitlink, so nothing inside a submodule is hashed or sent to git check-ignore.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1068-L1089",
+          "version": "repo-lines-v1:sha256:857ba217633cc75e975b37aa6b04be7e0ee955bd5661e2ce934a6c50a12d69dc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlOGJjYTE0N2MxYTNjMWNiODQ5Y2RkNWJiOWU3NTRmYmUyZDlmOGMxNzAxMjVlYjQ4NjMzMjkyMzQ3NGVlYmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkY2EyNTFlY2ZkY2E5ZGI2ZjE1NzVhNTA5NGRhZWMyYTQ0ZWQzOGE2YzlkZDBiYmY4NGZlYmIxMGJiNGRlOTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI5NGZmMWQzMDg4ZDk3ZWY0MjQ0M2FlNGE1OTM3Y2EyNDc2YjBlMDM5YmMyOGE5NzY2YTYxMjUyYTc2ZmExYWMifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1452-L1460",
+          "version": "repo-lines-v1:sha256:2c17d682f2119db01822b0747c9f66163f13ba9a323b0051d82d8d6b5546ff13:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY4N2I5OGQ3MzZkNTVjYzc0NWRlNGQ1ZDM4ZmM0Mjc0NDljYWFkMmYwNWU4NGE5ZGVmNWNkZWNjYjUyMDdiMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkwOWE1M2E2MThkMDI4ZTFkMzAwMGMwYTdhYmNlZWNiZTVmYjM3ZjRlNTExZWZlNDY2NDNmYWQ2ZTY2ODcyZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDhlZTU0MTc3YjAxYzBlNDQwOGJlYTk5NzcyYjRiNzI4ZTRhNDc2MzJiODZmZjgxYzg5NTI3MzQ3NGQ3ODE0YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTQxYzFkMTVhYzgzOTUwMzAyNTg0YWNiZWY3NjBmMWQwMTk1ZDc0NjAxYjk3MjNjODUwYjdkMGY4MTBlNzYxYSJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3000-L3007",
+          "version": "repo-lines-v1:sha256:586ed37345de2677f561f5f0d576c1dc7151dd3f7bc5d4a6ae1693f3684bb7d4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkzNjYyM2NiMTI2ZGYyNmIxNzYxN2NiMWUxYzhlNTU4YjFmNmMwNzA2MWFlYzMyNzRmZGYwNmUwNjg2ZGY1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ4YTllOWMzMjUyODIwYzY1YTgxNjUyMGI4ZGI0OTMyMjgwODQ5ZWM4YzdkMmViNjI3MmFmZGZlYmUwNTljMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDVkMGFiMTQ4NDQ5ZWJkNDBkMzI3Y2Q0ZDc1OGZmMjQ2ODM0ZTkyYTdmY2IxZDI0OGIyOWEwMWNhNmI4ODQ3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzEwY2YwOWM0OWQ5MWFlYmZiYTFlODg0MjUzMmRlN2E5ZWRkNDQyYmE1YzczODYwYjdlYWFhMGM3YWEwZGNhNiJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3017-L3046",
+          "version": "repo-lines-v1:sha256:7417cee99d961c6c82515d3c1a778956919d34d012211506938d5eb0e9bb3935:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ3MDU2ZWIyNDA4ZjAzZWQzMDljMjhiZTI1MDJkOWY2YjUxNDRkYmRkMWM5YWNhMWFkYjM0NTA3NDk1MDY4Y2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NTBiMzNlN2FlMGYzMjY0MTlhYmQwYjcxMDY4M2VjNmFlZDUyNTliYmQxMjFmMTRkMjQ2NGZlMGJlNDkxOTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzMjU2MzY3YzZiYjQ4MWI2YTI2OGQyMTFlYmE4MTE2N2JhOWU5NDY3NmRhNGNkMzJlZDdiMTY2YWE5ZGQyYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYxNzhjNTgzYWFjYzJlNDkxZWMxYTQ4MjU2NzEzNjc5YzYyZGZiMDdiNTg3MTY2MTk4MjE1YTU3YjQwMTUyZDUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c0cb226122c8418ba2b7b2b855c1c2e4",
+      "statement": "A retained or listed file line that falls under a gitlink nested inside a unit is dropped and reported as now visible, whatever the owning unit's own outcome that run.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2108-L2115",
+          "version": "repo-lines-v1:sha256:897bdd69d2135fad3cde276f0d899b1f8a74a17f62b6f6e3e19af3c8c2c09ded:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGVmNzljZDMyNWNhMGE1YTIyNDIwM2RkMWY2NTM4OTBjZGI4MmM2ZTAwMWE1NDU0YWMxMWI3YTg0YmU4MzZlZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjZhZDA1MmM0NGI5NTNmMGQ4MzI4NmEyZGRkZWMyMTg1ZTdmMTg5ZGIwZTRmNTAyYzZmMDZmMzQ3NTg0NTRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2QyMzRmMDI5NWVmOWJjNjU0ODMyNDU5M2MyOTliNWE5MzA4OWY1ZGJiZDBkOWMwOWJkNmVjNWZiOTlhMzA0OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2QyOWM0Zjk0YzZmZWRkZTYwNGE1YzQ2YTNhZDFkYjJkYTVkOGY4MWFlZmY0MTRhZjE4NmY4NmY1ZjI3YTE4YyJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3181-L3244",
+          "version": "repo-lines-v1:sha256:5766b2fc90ffb176860552645ad7e4835a6e17a635162fe606a57f11a4699659:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMjFmOGVkYTE0YzBmYjQ0MDRlMzM3NzliN2JlODE0ODYxMTBjMmZmZWIwMTYyMWQxODVmNWRlNjIwNDczYTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkODVmZjA4NjM1NjI2ZGU0N2I3MzAxMjIwNDQ2ZjQzMTdhYjc5ZTc4NDdlYTc0MzdkZTdkNTE2NjI5NzFiZWQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8b527ecda1684dd79a8db218e4901778",
+      "statement": "A unit holding a symlink, named pipe, socket, device, empty subfolder, unreadable subfolder, or unreadable file is incomplete and never matches its record or the wanted content, so it is kept as locally modified, unfinished, or foreign, or preserved whole for a taken skill, and is never removed as an unchanged copy; a symlink inside a unit no longer aborts the run.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1504-L1510",
+          "version": "repo-lines-v1:sha256:642b82467197373ec84a9352e3e85fbc2bc7d69c8d7a75f3ab34dc29966eecaa:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTE2YjM1MjU1NWE1NDE0YWZkZDgzMzRlN2FjNTRhMmZjYTkxODdlMWRkNTNmZWEzODBiNjI5NGVjMDJlOWI0NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWFmNzc1MjYyMzlkZDBkNTEwMDM5OWRjMWNlMDA5MjUwZDJiZTQ3MWYwMmY0MDUzY2JmMmY5NTY3MzdmY2VlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTY2MWI0NTBmY2QyMjdkN2QzYTBkNzcxYmJlYWRhZmExOWNhYWJlY2JkOGM4YWIwM2M4NDQ5N2QzODkyMzY1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzAxYmEwYWFjZDYxYWQ4MmI0ODNjYzAzYmQwZDgyZTc3NzhlODQxZjJjODM3YzQxZWJjNDc5NmExMmZlYTQxZiJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2985-L3038",
+          "version": "repo-lines-v1:sha256:50501a660b7145b578851993e321d317e45ebf74d9d972f12bf884acb00e22bd:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNlZjA5ZmFhNDBjYzYzNjk4ZWQ2ZDJkOGIzZDdlN2RhNTY2YTM3MjIzOTVlYzhhYTBiYTVlN2NlYTdjNTU5MGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3YTVlYmM1NWQwYTU4ODI2OGIxNzM3NzFhYmZlZWZlOTEzYzdjOWY4MzhjMmEwOWI1MDYzZTFjZTUwNjk2YzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkZWNhNzM4NjYxOTQ2MzhjZDRkOTllMzkyYmYzODQ1MDRhNjdhZDg5YTAwOGIxZWNkNDhiZjE1ODQyODM3MTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdkYThmMTExMjRmM2U5Y2YyZDJmMmU5YTAyZDQxY2M1ZWE3NTdkZjIzYzNkNmYzMDFhNmVkZDVmOWQ5M2JmNDcifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3294-L3321",
+          "version": "repo-lines-v1:sha256:d61fd2a375f193e400922a37e861579987419b6fe564e56a55bb5aab3d5a151d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzNWNhNzQ4NTRjZWZlYzBlYmQxNDNiMzBiZWJhZDk4NjJiZmIzYzAyMGZhMGE3ZDVhYWE4ODg0ZWUwOWQzMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMzRjNjc3ZDAwNDZjODU0MWM0YjM5NDQ3ZTE1MGQ4YTlkMDlkMzVmYjcwYjIwNTQ1ZTkyYjQ3YTA1MTU4YzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5YmM3OTFkYjFjNmI4ZmUwZTI5N2UwODNiZDg1Y2ZjYTEwNGUyZDdjMDM2Y2M4ZDUzNjI5MTBmZjRmYjM2NWIifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3398-L3414",
+          "version": "repo-lines-v1:sha256:a396b1ed3a1abc2cd25767c2570b95501b3a57f32da91c0387c0fdb074971926:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiNDMwOGJmNDVlYWQxNmU4OTMxNjBlOTAwZDU5NDk2ZjZjMTk0ZDMwMGNlZmU0Mjc4NTU4MTI3ZjVmMGFmNzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxYjhmMTgzNDQ3ZGMxYTc3M2MxZThlOGM4NWExODgyYjAzOWRmMmI2ZDQzM2JhZjI2ZDdhNWY1OTg0YTJhMzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkMDEyOGEyM2JlYTI3NDE4MGVmN2JlM2M1ZmQxZmU4ZDMzM2VlNzI5NDUxOWZiMTIwZDFkZjExN2Y2ODgzMGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMyNjJmYzgwZmVmMmI3ZjNjZGZkYzNkNzM3NWE4MjJkZTM3NzA4NTUyYjgxYmQzNjI2NmU0NjFkYTU4Mzk4ZWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_110de42cbde8473daf7a4f7d3f612025",
+      "statement": "_enumerate_read_entries(target, roots, write_roots, files_too) is the one path-identity rule for skill folder names, frontmatter names, and agent entries: a read root or an entry is an alias, contributing nothing, when its resolved path differs from its own path and lies inside one of the given write roots, whether the symlink is the root itself, a parent above it, or the entry; every other entry, including a case variant or a differently named folder at a write root, is listed by its own name; the agent reader passes the agent roots with files_too=True so a client's agent file or folder is listed.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3118-L3192",
+          "version": "repo-lines-v1:sha256:f08122c382e1fc854c9136f7d84b0e8e0ae9ca8bd0789e9f53c8a71bfa3beba9:eyJzZWxlY3RlZExpbmVDb3VudCI6NzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0OGVjYmQ0ODQxMzczN2NjZjQ5M2I5YjVhNmMzMGU3ZTA1NDI0MGYyNDU4OWQxZTk4NGMxODZkYzQzNTlhYTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0ZGRkZWY2NmE5NDJiNjVkNmY0MDBiYTJiZTE2ODlhNzY5ZWUyODQ5ZTI5ODkyNjIzNzNlZDI1OWQwNDRhYzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjczM2U4NDg3Yzg1ZGZkY2Y5ZmE3YjkzYzc0NmM5NDYyNWFlNDdlMTIwYzc5N2U3OTFlNzM3ZjllZDdmZmM3M2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRkYWY2YjU4M2U4NWY4MWE0MjEwYmQ5MTE3YjRhNzNlMWVjNjVhMzU5NjBmNDdhNWU3N2IyOGQwN2JhNzJhZTUifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3195-L3213",
+          "version": "repo-lines-v1:sha256:f5196f65c67317c7586cb223a2274517f47df155eb56934bdd3bf5d21b36817f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2Njk2YmY3NDNiOGUxY2RkZjBlYzJjMmEyZjY5ZTYxNDgwZjkxMGRhNTZkNTAzYmM1NjFiMGYxZmJjMWFkYmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5Yjg3NTY2ODEwZmU3YTA1ODA4YmRkNDc1Y2RhNDNkNzcyZWMxYzU3YjE2MWEyNmRhYmY1Zjk5YmI5ZWVlNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY2ODI4NTc2MTRmZTZlNjcyY2Y5Mjc5NDJlYTg3YTg4ZjRlMTAwMTZiMTc3OGYwNmE2MjlkZTM5NDg0ODVmMmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdhNzQ5ZmJhMTg4ODE2N2ZkNGE5ZGI4YWU5NDU3ZGUzMzc1NWY2N2M4YTMyOWJiNzEzM2U2ZGMyNzY3ZTg5MzUifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3216-L3243",
+          "version": "repo-lines-v1:sha256:7a2d43473d18d5ec1e88b94fcafe9e3380159fd3e8f254faa2a8fe901482476a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk5M2ZiODU4MmMxM2UzYmM1MDNhNmY1M2VhODcyNTU5MzE0YmMzMWJhYmViZTA0ZWQyNzFkYmNmMGYwZjcxZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5Yjg3NTY2ODEwZmU3YTA1ODA4YmRkNDc1Y2RhNDNkNzcyZWMxYzU3YjE2MWEyNmRhYmY1Zjk5YmI5ZWVlNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU3N2NjYWEyOGE3YjMyZjgwZTIwNDc5YTE2OGI5MWVkYmYxMTQyOWQ2MDQyNjU4NzNlNjUwYjk1YWQ4NmMwMjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRiOGNmZjViNzRjNDhhZjg1ZjQxMTE2NjJlMGNjODI0NDI5MGRjYzQxMjI4YTA4M2JjZGEwOTBiNTYyNDg1YzkifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3284-L3319",
+          "version": "repo-lines-v1:sha256:65c8c94ca8b55da01be792fd739cf6ec55ed2e8a5a003aedf5c3cc9f912de137:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmMzM3MTA4ZTQ4Y2FjZDU2YWI2MGNhYTk4YTcyYTc2N2Q2NmQzMTRlN2Y1NzE3MGU2MjAxNTU2YTJmMmE2Y2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwZGZhOWMxOWU5NzhhNGE4YjY0MDUyZDg5OTdjYTdiMjgyZDZhZTI1N2RhZWJhZTM2YjVlY2IyYzBkMzM0N2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA0YzBlODYyNDA2ZDczODY0YzBkOWQ0NjI0ODdjYzRkMmZmMmI3NWNmMTAxZGM5YmEwMDM5NWZlY2U3MDc4ZmUifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L1714-L1759",
+          "version": "repo-lines-v1:sha256:8b930904fa0449dfc0dff256f6667b7206a6dc70f787a0191c8284b9a01e4281:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxYmI1MjI3NWNhOWUzNDlkOTcxOWY3NzA1MDEyNzFhOGU3MTEwOTI0YjY4MGJjZjY3MGQ5YzI1ODMyYmFmOTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1MTk1NTZkNjMxOWE2OTg3N2U1NTI0NzFjOGFmYzFiZDE0NTFkYzA3MGQxMmNiYWNlODAwZDJiNzM4OTcyMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhN2JmOTcyZmJjMTg0OWIwZWRiMjNhYzA3ZDc3NGNmZTg5ZDdiNDhkMjhkNWNjNjNhMzg5NTA5YzIzYzc2YzEifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L1806-L1833",
+          "version": "repo-lines-v1:sha256:ce99db949d6dacfd196fec8a019ad8823876be41cf2dac65416650dc9c9505f5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5YzMwNTVmMmQ3NDRmNGFjZDEwYWEzZDE0MjQzNWNlN2YyNWM5N2QyZmZiMzlkMTljOTc5MzczMzQ0NjYyMzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzOWQ4YWM0ZGI0ZDgwOGYyYWY2NWQ5MGNiYjk2OTFmODljN2MzYTM2ZTVmZDk4ZmI2YWMyYTUyMzdlNTFkNDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d06d3bc7c20e477cb4ffe11bb4516a60",
+      "statement": "Every exclude-block reader and writer splits on newline only, as Git does, ignoring one trailing carriage return when comparing, so a retained name containing a form feed, vertical tab, or U+2028 stays one pattern line instead of producing a raw pattern that hides unrelated files.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L871-L895",
+          "version": "repo-lines-v1:sha256:ab137f8025446782040b0b38be0fe2592c145710472550c36a7fcf17aeb5a777:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxZmQwZmY4YWNjYWFhZDE4YWQ4ZTBkM2UzZTQzZjFlMDU0NDU4YzliY2NjODRmODk0ZWJjOTVlNjNlMmFhYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjMGIzNmFmZGU0Y2NlNDQxNDYxYzZiNzQwMTFiZmFkNjI5NGUyZDZkZjcyZTM3ZDJiNmI1ZmE3MzRhNTFjMDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1MmY3NmMzZjJmNTgzZjZhMDZmMTgyNWZlNmIxYTBlZmU4ODM2ZGFmZTZhZTU0MmU0YzE5ZDNmNTI4MWNlZjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0MjRkNTc4ZDY1ZWJlOWE3MDIwM2M4ZWJhOWRhZWNhYjY1Yzc3MjMzZmZiNzY2N2VlODY4NzkwZDI1YmZhOTUifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L2723-L2758",
+          "version": "repo-lines-v1:sha256:93d10eaf1b9fd41fc7ab7490270e3348b4609955aae7d9ce714eb0240de512cb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3MDkwNTc1OGFkNTIxYTcxYzAzMTk1ZTk4YWY5YmM0MjZlMjk5ZWRhNWFhZDcyZTcwZGE5NjE0ZWI0ZmY3MTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4MTljMTAwY2NmMWVlNDQxYTMxZTczNjgxMWZjY2VkOGM2MTZkMWMyNjkyMzY2ZjAzMGIzZmRmNjY1MDgxZGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5NDQwNDFiYzgyYmIyNTZlYWJkYTM2YjE3ZDA4ZmRjNTkxNzUxYmFjNGYxN2UwYWRiZjcxOTQ0NDIzZWU4ZjQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_93d99e472aea49ea82bec8636a5b6a55",
+      "statement": "required_snapshot_units includes every state root and the owning unit of every file line in the exclude block, so a retained file of a skill a later profile dropped keeps hiding after a lost manifest and uninstall reports it as now visible.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L720-L754",
+          "version": "repo-lines-v1:sha256:c4da026f004cd82ebb74ad778fa4759d5557862477e6c3be86504923c0e5e3fa:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MTQzM2ZmNTMxZTcwZmMwYWIwYmI5YzA4MzA4MDE1NzE4YTkxNjkwZDA1Zjg5MmJmNjhlNjYwZGVhYWUzMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlYTEzOTU2ZjFhYTE4M2NhZWY0OTc2NmRmZTYzNjE0ZGNlOWY1OWNjZGNmNjQ3ZjQyNWEzN2E4MDNlMGNmZTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5MDZiZWIzMDc1NzQyODY5ZTFmYTlkMDgzMDZhNTUwNWU3MWMxZmU0YjU3NzBlZmJkOWYzYTk1NzM5NTMxZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3492-L3540",
+          "version": "repo-lines-v1:sha256:c87bbc2ac644733d42d1c34605dfa6541ca2d07815a0ed5305e465ee3667a8af:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5NmRlMTRmNjVkYjgwZjE4NmU4ZmVmODc0NDJiZGE0ZmJjOWZjOGQ1ODJhODRjMjNlM2FjZmZiMTA4YTNiNWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjYWY3YmZiZTVlM2RiNWMyYjQxNDdkZTgwOGIwNTU5NjRiYjA4Mzc5Nzg5ZTQ1YTBhMmMzMmYyYTlkNjdlZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_65f68729c5b24b2c9bec72869830dfa3",
+      "statement": "A git check-ignore exit other than 0 or 1 while gathering unit snapshots raises GitCheckIgnoreError and aborts the run with Git's message before any write, and the same error during the ignore gate restores the exclude file before aborting.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2800-L2825",
+          "version": "repo-lines-v1:sha256:2b9cba1e31a7403ae8cc9b34b4ee177ddc38bafb43845ea1a5743b43179e43d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3YTBkNDdiOTljNTYzODliM2ZlYTQyYzgxZDBiNTgzNTY1ZDg1ZjljY2Q0MDk0OGUwZTlkMTdkYTI2NzZjMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyNDZmNzkwNzEzOTI3YzljMTNkNzM0MjczYTBjZTdkYzhlMThmYjg5MzBiYjcwOTBiZjhmMTI3Y2FkNzllN2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI3NjM4YTdiNmExYWM4MWMxYTExYzI2ZDNkZmUyZGJhZGNhNGQxYmU2ZWQxODBlYzMxZjcwZGFlMDAxMTIxODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJjOWI2MzgyMWU4MTA5YWFiZTgzYzJjZTBhNzJkYzliM2IzZWM5MjZjNjgzZDViODMzM2UxYjIxNDA4NzcxOTgifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3961-L3970",
+          "version": "repo-lines-v1:sha256:397b18f9f7800293a8db655791c764ff9ddb0b85b1738aaa2f8d803385ff26d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkYTVjNjZlMTdiMTQ1Mzk3ODM0YjhjODU0ZGM0MTkzZTIxMjUxODBhODk5NmExNGMzMTg4MzMyNmIyZWZiY2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmQyZmU1YmYyZjQzZDA1ODA1ZGRkMzk2MWVhMmIyMzRkNWYxZjk2MTdhOGQ0YTMzYzIwOGEyMDFhZWJjMDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImViODBhOGM1NWFmMmUxOWNhYzQ0MzZhZjhlZGY5NzgzYzQyM2Y0NjVlM2YyM2RiM2ZiZWY5OTE2ZjAyMGJjNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY1OTQzOTEyOGY5MGUwN2U3MTk5OWE1MThkMWEwOWY4YmNmZjMyYjFjOGFlYmI1OTMyZGY4Y2M1MWQ5ZTFjNWUifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4542-L4547",
+          "version": "repo-lines-v1:sha256:e13296c280afacc8e721a317c4c870ec09049d78fdcc96b03d3e64894f8e0314:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWRhNWM2NmUxN2IxNDUzOTc4MzRiOGM4NTRkYzQxOTNlMjEyNTE4MGE4OTk2YTE0YzMxODgzMzI2YjJlZmJjZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmQ0NzAzOThhYTE0NmM4MTM3YjVlNzkxZmQxMzJiZDg3YzMyOGU3M2Y1ODc1NWUxMDY5ZTI5MTlkNjIwOWY5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDRiNzA2MmJiYWQ3YmFmMTQzNDMxZTQwOTllNmU4MTY1NzhhY2Y4ZGVkYmY2NTNjZTVmNzE0NDcyYjU2OTM4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGViZDI5ZmViZGYyMzkzNGY2ZTBjZDM5OWFhMDczMDg4N2RhM2ZhYmFiOTk0ZTQ0Mjc1MmMwZjVmN2QzNWNlYyJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3247-L3273",
+          "version": "repo-lines-v1:sha256:fbc9d8a3f4c878455257a6b2967e2a6a2d26a4d446967cf976842fc9b7f50cd7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3ZWVkNjkzOGY5ZjU0NTc3MjllNmM5NmUxOGZkMDIyMWVhYTU4YmQ2MjAwNGM0NzQxZjEwMmE5M2IzMDg0ZTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiMjFkNzhhNzE2MjAwZTIzNzllMGIxMzViYWY4OTMzOWNmODliMjgzMTU0NDExNDBjOGFkMDVjZTVhNzNlOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YmE0YzhjZjM1ZGU3NzI2OTA2Mzg0NGU5YThmNGEwYTkzZGUwYTc3NzRlY2UwMThhZTdhODk4Mzc3NmYzYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0M2FjNGZhYjkwM2Q1N2Q5MWJhZWRlN2JhYjc1NjJjN2QyNmZkMWFkYzZjNDNlNGUwODk3MzRjNzYwMDAwMjYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_131dd44e43eb49a09b26f1263fd5aca1",
+      "statement": "While a preserve conflict keeps a taken unit's edited copy in place, that unit's other taking paths are reported as keeping it until the edited-copy conflict is resolved, not as skipped at every root.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1097-L1108",
+          "version": "repo-lines-v1:sha256:1d477f27c35378ac474f5728bd48b8514f9e8517204fc602f39e0645938fbfd3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlZTI3MzZhODc2YjExMjBhNGViODNiYTE5Y2JjMTJjMzZkN2JmYzljMzkzZTliZDM0NTE1ZjQ4ZGY2NTQxY2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg1YjZkMmEyNzNkNjA3MjhjNTgxNjdmYWRlN2M1YzQ2ZDkzMzg4MGVkZDE3M2Q4ZDVmZDc4NmQ1MzlmN2YyNTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2OTg2MDY3MmZiYmVjZTI5MzZmNTM4ZmRlZmFkYzRiZjhjNjI2YjI0ODFhOGI0NjJmYzg0YmI1MjBiNWZiYTgifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2069-L2087",
+          "version": "repo-lines-v1:sha256:7fee62dbc027ab1ab8d23fc50e902f545b87c4be987e13d19e4c4741740a4842:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5M2FlNTdlZWM5YjI1NDcwOTNiNzY1N2ExNjU2OTNhZDA2ZTRmNjgwYzY0NjU0MmY1ZTdmODMyZDkwMjMzMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwZTEzOGVkOGQ5MmFiOTliMzhmMGZkMTViNmFmY2UyMmE3NGE5ZGQ0Y2Q3MzdiMzE2YTljMDIyYzc3OTZkYTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0NmIxYjEyNzU4ZWEyNTgyZWU3ODFkZDIxMWU1NjRkNDJmMGI1YTU0NjZlMmY1MzFlNWE4NDkzNmZhNTlmOGEifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3696-L3734",
+          "version": "repo-lines-v1:sha256:ba088043a3d0890061539fc356ec441feff7e9970e1609bd77ad21355075910f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMzFmMTdjYTFkNDg2ZWJkODJhNGI4N2Q3ZGZmZmI2MWIzZmM5MWU5NGExZTNiYzBhOWRmODEyNWMxYTY4OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjN2ZhOTg1ODU5YjJlOWFjNWM4NTA3YWM5ZGQ1MzgwMDhjZGU4Mjc2OWU1YzllZWQwY2Q3NmI5NGYxNzc3MTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3MzdhMDQ3ZTM5Zjc4Y2UxOWJhYTc3NmFiMDg3MjM5Y2NhMDM1MTJlMTQ4ODJlY2M3NDU5NjdiNTEyODdkNmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6d094c81ecbe42b3a80b867e8bd8ec9f",
+      "statement": "Uninstall prints 'preserved copies are in <folder>; the sidecar never empties this folder' whenever the preserved-copy folder holds anything, including on its 'nothing to do' path.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2405-L2423",
+          "version": "repo-lines-v1:sha256:8af6c4342a8ffa35d42fdfdb736a324cc0ca34a2a618a1fb61f77f17ed6349fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjMGQwYTM0NzcxY2U5NDBmMTM1MmMxZjU0YjY5MTUxM2ZlOTM0YzBlZTUwNGEwZTU3MWM3MDc1ZDIyMjg2YTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI3NmYwMGE5MzE2ZjY5OWQ3OTY0ZjhjMDQ1NzA0OWQ1NWFjMDExYjY0N2U5YTlkZjU4YTUzMDE5NGQ0NWM2YTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzOTM0NmVmYjUxMWY0ZGVlZmQyZWE2N2VhMjdlOWU4ZjQ5Yjk0N2Q0ZjE3ZWRhNmRjNDJkMmJkZDFkZDMwZDUifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4843-L4852",
+          "version": "repo-lines-v1:sha256:ba6b8a0c3c4d282d36a431b09a9f9e65c1e956d442715a109519528b190dfabc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiZDY2MmQwNjIzYTFiNTczOThiMzkzYmIwMGZiM2ZjZDY0ZTNhMTgyZWEwODc0MzliYjQzODU5YmY5MGI2N2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhMTY4MDljMDc1ZGIzMDllMDliYmM5YWI3ZWZlZTY5ZWZiNWY0MTliZDRkODkzMGQwMzgwNjYwMmRkMDJmZDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNlOTYzNThkMDc5ODEzODk0NjA2MDcwM2YzMmZhOWQzZDY4ZDllNGQ0YmI2NzVkMGIyNWYxZjllZDgxMzA4NGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVjNGU4NjYwZDFjMzA4MWQ2NDVmMzZlMDUyMDFlNjAyZDBiN2I4ZTc0MDZlZmY1ZTM5ZTk5MWVlOGJmZWQwMzYifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3737-L3760",
+          "version": "repo-lines-v1:sha256:77db1a50d3fc31bc99da0be5ccec280adca2aa97c9b29e9844cc79a4e7873ea2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMDZhODZmZDY2ZTgxMGE5ZDk0OGEzMjMwMzBmODQ4NTlmMzNjMGI1YjMxYjg2M2NjMWQzYTQ4NmI1ZWYzMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ZmM5YmFjYmY5YjM0OWU4ZjcyZmQzZjY5ODJjNWQ2MjZkOTdkYzY2YTQxYTk0MjBiMTcwNGJjYThhNzBjNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlZGZmNjc3OGZjMjg0YjQwOTc2OWU3ZGQ2MThhMTljM2M5NDczMzgwNjY4OTg2M2I2N2U4N2Q3MGJkZGE1NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzNzU5NDM5ZjJhMTk2ZTM5MDI1Y2NjMjk2MjFhMGQ4ODUwNWU2M2M5MGJmZDQ1MjM5YmE3MmEwZTUwN2QwYjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d2908bf7d6fe4932a5f9bf2b91d2e1e7",
+      "statement": "After snapshots are built, the device check also runs on every existing skill unit folder and aborts before any write when one is on a different filesystem than the target.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2634-L2655",
+          "version": "repo-lines-v1:sha256:35d497d488afb55499efaff461ebdbc236a1190f48f1834e5ce23999b85b5407:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxNTE5Yjk5ZWJhNzI5ZjZkMWIyOGVjNzUyMjBiM2EzNWQzNDczZWJjNzc3YWZkNDEyMzNjODJhYTJiMTM0OGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkNmJhOTRkMTJiOTBlM2FmOTA3N2Q5YmIxNDk5ODBmMWQzYzg2MDY5NzYyYjA0M2Q5ZDhlZjMwNTQ4ZWQ3OTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJkNjdiYTIzYmFjOTJhNGVhMDI5MDdhOTdhNTIzMWJmNDQwMThmMzQ3MGQ4MzQwZWYzNzYyNjRkZjg1ZWNiOTgifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4546-L4552",
+          "version": "repo-lines-v1:sha256:50279e26738598f9cced5106448eed29db16e3071cdf71ebd9cc3b12bf4abc47:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQyZGMyYzdmODAzYzg0YTZhZmRiZDE3YzBjOWVkN2UxYjY4YzA4MDE1NzA2MjFmNjJmODIyODM2OGNlNmJlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTMxY2JiMzNmNWZiOTVjMDA2Mjg2Y2Q3NjJiZTRmZGZjMTdlZGIxY2I2ZGU4ZWMyM2M2ZDFiNTJjNjA3NjE5ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmUwMzRjN2IxODA2OWM2NWU0ZmNjOGMyZjdiODNjY2YyOTQ3MjFkMjIyY2YwZGYyZjAzZjljZTMxNzQyZGE5MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQ4MjExYTg3OGQyMDI2NjdkYjZhMTE3NDJhZjVmZTgxYWExOTIzMTk5NzBmZGY2NmJiMWQ1YzEzYWQ1OWJiNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_5a422559032b4132a5ac845497d5b1d9",
+      "statement": "_atomic_write writes through a temporary file in the destination's folder, fsyncs it, replaces the destination with os.replace, and fsyncs the folder; an existing destination keeps its permission mode and a new file gets 0o666 less the umask, so a group-shared info/exclude is not reduced to mode 0600.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3427-L3465",
+          "version": "repo-lines-v1:sha256:a9e00e7204b4bd776efbfc5e5a1495d2bef4a806c9d42d67447d74ef953dfa9a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmZTljNDM4MzVhZWU2OGIxYzZlMjA2MzQ0YzlmNWY3NmEzNDViNjJkOGRmNmU2ZjUzOTVjZmMyY2M2NThhYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY5NmQ2YzQzNDkwYmRhNjVjY2Y0YTY5OGFiODc4ODRhYWY0YzQzOTZlZGQ4NjVkNjcwNjhjMjQyMTIzN2Q5NDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjODY3ZjRhZTVjNzUzNGQ2NTllMDdmYmQ5YjFmYWRiODM2NjM0MGViNTFlNzM0NmZiMmU4MDE5YzFlN2FlMTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdkOGViODgzZWI1MjlkMDA1NzFkMzJlZTU2ZTE0ZTBiNDhmMDA4YmUwZTk2YmE2ZDFhNTBkYTVmMDE5NGQzZTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_44259631ec0d4a2b82d80b34f74064e4",
+      "statement": "A real install or uninstall holds a non-blocking flock on <git dir>/ai-bootstrap-sidecar.lock from after preflight to the end of apply, refusing a concurrent run with 'another sidecar run is active in <target>'; a dry run takes no lock, and the empty lock file stays behind.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4023-L4046",
+          "version": "repo-lines-v1:sha256:3c2038f70154a6d09a9ae04c42588281f9630a1aebe70d6ebeaaf5775de063bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1ZTQ2MmU4NjM2NWQwYzcwZTU5NzgwMWVkY2Y4MzI2ZDVhNDIyOTNmMGI1Njk5MzYwOGQxNGM4NzM2Mjc4MzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViODk2MmE1MDc3MDFlZWI3YzdkMTY2YTE0N2FlNjUyZDYwYjIxN2Q2ZWYwYmQ0MjlkM2M2ZWI2YWYwNjgxYzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU1ODgwZWJlYmMxMDVkMWZjNGUwMDdkOWNhMzY5MTY4YzkyNzUyNTA4ZmFkZTc4YjZkYzk1NGZmYTdiNGQ5ZTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4423-L4483",
+          "version": "repo-lines-v1:sha256:7519ed9636d3430f06c23d68e52fca8673833346c502d7bf8b13662e8fc28d98:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlZjcwN2ZjNmUyNzI0OTEyZTRhNjMxZWY0NTk5ZjNiOGE0OTg5ODI0MjUxMTJkMDJhZjBmYjNjOTI1MGI2ZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwMTdlZGZmODFkMjI1NzRmODc2NjJiMGI5NjMxZDg0YzA3MWU2ODlmOTRjMjdmYWEyOGVlMjdhNjg2ZjFlOGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMzNmQ1OTVjNDI0Yjc2MDQ4NmI3NWRiZTAwMzI3MWRlMTJjZTFlMTRhNjg2MTg1MjZhNGQ2YmFkMWIwZGQxN2EifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e916c2080b7c4bce9db32b7fc366de43",
+      "statement": "Everything after preflight in install_sidecar and uninstall_sidecar runs inside one OSError handler, so a permission error, a full disk, or a folder that vanished mid-run ends with 'ABORT: filesystem error at <path>: <strerror>' and a rerun remedy instead of a traceback; the writability preflight also covers the Git directory, the parent of every takeover deletion, and the nearest existing ancestor of every preserve destination.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2467-L2474",
+          "version": "repo-lines-v1:sha256:9ae6bf1066664c9e379451a1d265c639832593a410fedacf8f232089138bcea5:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2I0ZmUwODFkNzNjYjlkYTQ0ZjYzZDlkZTI2ZTc3MzA0MWRkNmJiZjM2NjJkZjNkYTU4MzhiNmI4NjUzZjYzYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzBjMWYxODhmMTQyZWQ3YTgyNDY4MGIyMDcxNzJjNTUxOWJjNjE0YTQ4ZmRhN2NmMTY3ZWRiOGRkZjc5OTU2YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTk4YjA2M2Q5YjQ3ZTY1Mzc5NjI1NTcyY2NlMTk3NjY5ZDU3NjdlMTJjMThiZTA3NTY1MmI4Y2Q5ODFjZThkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWQ1ZTMyMjNjNjE1YjMyMzU5NGZkZjhmYmU1YTRlYzA3ZWZjYTUwN2Y5Njk0ZGEwMTQ5NjFmOGM1YzY5MGI0NCJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2671-L2718",
+          "version": "repo-lines-v1:sha256:7ca29b5fe8a27191e950e7000c8ffa39cbd1ff4f3552def83cbc4691432a7a28:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwOTRlNTgzY2E3OWEzZDE1NjI0MmZlMzcwZWNmYzljOGNkMmMyY2Y2ODVmOWNjOTZlZWQ3MDY4YjNhYmY5YjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2MDQ5MTg4NjhmNDQ5ZDg0MDVkMzg3OTg2MjA0OWZmYWNkODhjNzQ3ZTcyODkwNDRhZDFiZDY2ZDgzOTY5ZjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYxMjU2ZjIxZDBlZGNkNjMzN2E5MDQzZTY4NjM0ZTU1ZGE4YjRiYmE2MmNlODk2MmMyMzVhNTAxYTQ4NGQ0NDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4N2IwZGI1MjM3NjViNmU2NWJiODNkYzdmNTFkZWU0MjU5ZDMzY2ZmYzE5Mzg0NmRmMDlkNDYzNzdmMzkwZmEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4423-L4483",
+          "version": "repo-lines-v1:sha256:7519ed9636d3430f06c23d68e52fca8673833346c502d7bf8b13662e8fc28d98:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlZjcwN2ZjNmUyNzI0OTEyZTRhNjMxZWY0NTk5ZjNiOGE0OTg5ODI0MjUxMTJkMDJhZjBmYjNjOTI1MGI2ZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwMTdlZGZmODFkMjI1NzRmODc2NjJiMGI5NjMxZDg0YzA3MWU2ODlmOTRjMjdmYWEyOGVlMjdhNjg2ZjFlOGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMzNmQ1OTVjNDI0Yjc2MDQ4NmI3NWRiZTAwMzI3MWRlMTJjZTFlMTRhNjg2MTg1MjZhNGQ2YmFkMWIwZGQxN2EifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4809-L4869",
+          "version": "repo-lines-v1:sha256:6715c4d0eca8efa9f5c22e02b93860c9521b0379858429d9eea527591a98ff6d:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzZjVkZWRhYTE1YzI4MTRkNWI1OWQ5YWE0YjkyNGQ3ZTIzNjk2MzMyM2QyNjZkYmEwNDE4ZmE3OWQ3YTg1Y2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwMTdlZGZmODFkMjI1NzRmODc2NjJiMGI5NjMxZDg0YzA3MWU2ODlmOTRjMjdmYWEyOGVlMjdhNjg2ZjFlOGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQwYjJkZDk0MzQ1YTdlZTJmNzFmZWU1ZTg5MjlmMGEyMWNmMGMyNTg1MWVmMzU5YjFlOTQ0ZjZlNzllZDA5NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmNjFhODAzZTYyYjBmZjZhZjc5YjllMWZhMjU4ZDg4NTA1YWVjZmI5ODRkNTMyOTZjNWY4MDI2ZjQ2YzI4YjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bceb670e220c4a42a79b9559faa2f404",
+      "statement": "After uninstall un-hides retained files, _still_ignored_by_another_rule re-runs git check-ignore against the final exclude text, and _recheck_now_visible_reports rewrites the report for each file a team rule still ignores to say it is no longer hidden by the sidecar but a team rule still ignores it, instead of claiming it is visible to git add -A.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3621-L3692",
+          "version": "repo-lines-v1:sha256:819782f26a6c405b7ef078c66296b1c12ccefd80fdc68b9a176f346ef40c2d0f:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxZWYyMDFmZjEzODI5OGI0NTEyMDQyODllNWEzNjI4YWNkYmM0NGE2NTQzYmNkOTQ5YjM3YmRhMzc0OTZkMTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMzU5NjZmNjAyYmIyMjQ0MjBkYjY4YmE4Y2RmOTlhY2QyMWZiNTM3NjY0Yjc5ZDAwOWMzNmZjZGYxMjllYzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2ZjA4YTZlN2I0MzUyMGE2NTgwY2NjZjQ5NDY3ODZjNWZmMjZlZThhM2NlZGFhZTcwYmZmM2NkZjFmNmIyOGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExOTEzNzljMDE2Mzg1YjU4N2I3MWJhYThkYzg4ZjU0NGIyN2NmZTdkZmQ4YjRhMjhjZTdhNTQ1NmUyNmZkZWMifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1186-L1190",
+          "version": "repo-lines-v1:sha256:9d323a415c5a8981d97f62d1e01c4a1ab0ced4fdaf8901f5b34919e8c4d4d59a:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmRiZGE2MmEyZmE2NmI3NThhMjhmNTdlMTFkN2IwZDY2ZmNmY2U1NGJmNmFhMDhkMGM1ZTJmMzliZDZmZjllYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjk5NWU2YTEwYWFiMmY5ZjNiY2MyODY4Mjk1NjVjMTI3NWRkOGYyNDQ1ZDc0YmEyNDkyZWJkMGRiYmNmYTdiNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzQ3ZDUyMWFhNzEyNDIzYjA3NzQ4OTY3YmQ5MzU0MGIyZDE1MmQyMjBkZWJlNTliZDZlMjhkMGI5ODUxYThkYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzBlYzhlNDhmNzc0NWI5MDgyNzQ4YTUyZmRhZmY5MDIwMThhNDdhODcyMzgyNmE4MjE1M2M1NmYwNjIzYzlhOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_13b01a6a75d6405f85c27f98f2996e41",
+      "statement": "_parse_frontmatter_name reads the first 4096 bytes of a SKILL.md, decodes them with replacement so a cut inside a multibyte character does not discard the name, and strips a leading byte-order mark; a closing '---' beyond that window declares nothing.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3250-L3281",
+          "version": "repo-lines-v1:sha256:6d804eecf738518e49631965ad5517a2fdc7aa2bcf251b1e8cd3135dfa337240:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2ZTg3ZTEwNjFlZmUzNzQzYThiOGFhZjlhYjNkZDI0MzI4MzVhY2JkM2Y5YzFjZGRhNjMyOGIxMmYwZTBjZjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTYwMGE3M2QyZTAyZjM1MmI5MGZlZjFkOGQ2MzgxMWJhNGE4ZWUwYzFiZWFhN2FlNDY1OGYzNmFhMmUxOTgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OThiZTBmYjUxYmNjNWZhNzNiMjFlNzdhNmM0NzM1NzRlMjg3ZjU2ZjVmNDdmZGRkM2E3MjlhZjEzNDc1OTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxMGU4YmU4NTI0NTliMGU3MTRiMzU1YjYwZDUwZjA4ZjQ0ODllZTEyMjZmMTIzNGQzZTdiOGI0Y2RhY2U4MzQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_363e7bc1583748f0a2c6f6dd1098e60c",
+      "statement": "The manifest is schema_version 1 or 2: version 2 carries the profile the sidecar was installed for and parse_manifest rejects an unknown or missing profile there, while a version-1 manifest must carry no profile key and reads as skills; the next real run rewrites it as version 2 with no unit change.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L296-L311",
+          "version": "repo-lines-v1:sha256:0488d756041ff4e74e6d31c0a320e6808e480d09d6879282e09111df75d374d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlYjA4NjI1Zjk3YzBlMzk3MWYwYjM3MTBkNDQ3N2ZmNGQ5NWM1YzM2ZmM1NTFiOGQ1OWMxMDBjMTE3ZTdlMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk5Y2UyZGVhYTA2ZmMyNmQ5YTMwMjMzOWI5NzM4YTcxYWEyNDI4NDE5OGY3OTI5NzhlZWJjNzJkMGE0YmRjYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkMzU2MzI5ZDcyMTExYzM5YTUzOTg5OWQ4N2Q4OGI3MzAzNjM2YmYwNDBiMjFjZDdkNmI5MjhjODM0Njg3MTQifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L416-L484",
+          "version": "repo-lines-v1:sha256:78cd42b680f4ce62f4a40d165595c7f628833cda18565ea1b0cb41d661c3dbe4:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4ZThiNzEwZTA3MTg0Y2U4ZWM5ZDU4ZTVkMWFkYjJkZjk4ZTZmYTczYjhlOGQ0NjM5MGEzNDIzYzc3ZDk2MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2MGUzNWYyNTdhNTVmNGM1YmYxZmI4Njg3ZDM5NGYxZWJiZDcwNjU4YmQ4MzljY2ZhYmEzZmY1MjNkNjdkYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyNzIzZWY5ZjA2YjFlMzk1OTA2YmRjNTBmNGU5NjBlM2MyNzBjYmE3NDZhYzhjNWEwMmE1NDc5ODM1OGU4NWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L308-L348",
+          "version": "repo-lines-v1:sha256:7dc16d9fba9c2fb021560f67bf170c288a0d73f497545f647f079499c23d661d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkMWMzOWI0ZDVkYWNiMzRlOGU1YzVlZDdjZmRiMTAzNGI2M2Y3ZjE5MDEyYTdkY2FmYTQwMjYwZWViNjRiZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ3MGIxNzI0YzBmYmZmZWZmZDM2YWIzZTc3MzNiZmNlYzczMGNhYTFjOGYzMzczYTI2MTZkYjE2Y2E2YmUyNzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_78d0dc8f002243f8a7719ddce0dbd8a6",
+      "statement": "_classify_state_unit never hashes or compares a state folder: an absent folder is installed from the seed files when the active profile has a state root, an existing folder gets one seed_missing action per missing seed file and keeps its exclude line even under a profile with no state root, and under uninstall it is kept and reported RETAINED with 'kept .ai-bootstrap and its exclude line; pass --purge-state to remove it', or with purge_state preserved into the preserved-copy folder under a state--<UTC timestamp> name that appends -2, -3 while the name exists or is already reserved by another state root in the same run.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1328-L1409",
+          "version": "repo-lines-v1:sha256:45e4b697e37774cbe996a0723a6a0e47b0e58b3e549840ff0d662cc929f713c5:eyJzZWxlY3RlZExpbmVDb3VudCI6ODIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIzODIwYzU4YmE3MzkxNGEwNWIxMTU2NDMzMWFlNGUwOGM0ODg5ZTAwZjU1ZTBjMTg5OTA1OGYxMTkwZTcwMjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA0YzhlOWY4ZWQ2N2FjMWM0ODgxYTgxYzA3Y2IxNDJlZjU3MjkyM2I4ZDRkYmUzMDdlYzc1ZTE3MmRkNzc5ZmEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L250-L321",
+          "version": "repo-lines-v1:sha256:7a17dd0374bde7e7480b4c2a45276627b897fd96fce0b20a40dfda3f1d8d0547:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1NjVkM2UyYWU4MWY0YjcxMzczMDkyZTY0ZTBiM2VkMjgzMTkwYzExNmY1OGRhZDAzNzM0MzBmOGY2MTA3YjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdlYzNjYjZmNWJhNzFkNGRkNDFlNmMwYzRlYjJmZDYxZjY5NzdhMzdjZTI0NGMxNTM1ZmY2NDk3OGM4YTA2YWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmNjA2MDA0NTIwNWY4OGM5YThhMzkzZDM5MzUyZmJkYzRhN2Q5ZTRmNmJlMTZmMDVmMzI2ZGM2NjBkY2Q1M2UifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L757-L788",
+          "version": "repo-lines-v1:sha256:6e97706515e3f80721d432f5ea5c1de396bae179615ca07bc13f2d773045a669:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NTE5ZWJmNzY2ZmUzOTlkZDg4YzJkNWQ3ODI1NmUzMjcwMWYxMTIzZWRiNzBkZGFlMWZhNjZmNDFmODViN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmMWIzYTU5ODU3NGYwMWZlZWY4NjY2YzAwNzE0M2NhYmMwY2I0OGU5NWIyYmIxZjUzNjM0YWJkZDkwNzZkODEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImExYzM3NDdmNDRhMTY2MWI0YTZhNGU4MDFkN2E4NmJiZmRhZDlmMDc3YzIyNmFmODI3YTc3YzM3YmRmYmY2NDUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e87e7a5e034e4c968977b22286ffb5d6",
+      "statement": "backup_sidecar_state runs the shared preflight, so a symlinked state folder or preserved-copy folder is refused; a real backup of an existing state folder takes the run lock, copies into a temporary folder inside the preserved-copy folder, and publishes it under a fresh state--<timestamp> name with os.rename only after the copy succeeds, changing nothing else; a filesystem failure prints 'ABORT: filesystem error at <path>: <reason>' and removes only its own partial copy, and it otherwise prints 'backed up <folder> -> <destination>', or 'would back up ...' with dry_run (no lock), or 'no state folder found; nothing to back up'.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4984-L5088",
+          "version": "repo-lines-v1:sha256:2cd52c4ce8682fad8ea9d37f0610fc9c1a87abda52a0c67d08cbfec9f7be9768:eyJzZWxlY3RlZExpbmVDb3VudCI6MTA1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI0MWU5MGI3YTcxN2I5Y2MxOGI2MjI0MjVlNWQxMjI1OWZiNTQ2YTNlYzg3MGQwNzI0N2ZhMzkyZTExMDlmMjdlIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIxNjIzM2IzZmZlYTMyYTIzZGY1MzA2NTM0MzQ4ZjJkZWU3NzZhNWE2Zjc0ZmI1MzMxNzVkZGM1MzlhOGZlNDY0IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI4Y2M0YTdkMWNjNzk2YWJhM2U0NjcyMzMyN2Y1MTdlOWY4MTE5ODJkMjUwZjA3MDI5ODZlNGI1NzY0YWQ5NTg5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+        }
+      ]
+    },
+    {
+      "id": "claim_85e08cf52b7f4079b0e5b273a81be9ce",
+      "statement": "load_desired_units(source, profile) reads the profile's skills at both write roots, its single-file units, and, when the profile has a state root, the seed files as one state unit from dist/sidecar/<profile>/; the two profiles are skills (four skills, two bridges) and workflow (24 eligible skills, five agents, three rules, one Copilot instructions file, review profiles, four templates, and the .ai-bootstrap state folder at the repository root), defined in scripts/runtime_ownership.py.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L139-L232",
+          "version": "repo-lines-v1:sha256:3cacca1fc155ee8e69820b870d1c27b846d6cec6e998c0be6bfc03031b366f44:eyJzZWxlY3RlZExpbmVDb3VudCI6OTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MTFmYTJhZDBiMDdhNzY0NTRlZmJhY2Y2M2I1NWMzZTYxMTE1YzYwMDZjYjNkNjBiYjkwMDZlM2ExMWRhMGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwNmQ1ODUyY2ViMWRmYzFmNzg1MWYwYjg1YmE3NzhjMmE2MzI4Yjk5ZTdjMWFhNTZlZTJiNDU1OTAxM2NkYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1Zjc1NjE0MDg0ZTQ5YTBkODllOTFjMTVmYmI0MjdkMDk3M2U0MjU4OTNiYjA3Zjk4ZjI3ZGFlMjQ4NDNkY2YifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L540-L719",
+          "version": "repo-lines-v1:sha256:9b54087f84c1e01805262616c4529abe2af5175bae2efec0499ee510b8378d52:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI4YTA0MmE4NWRmMzA4ZWM0NDhiZmRiZjdmY2RiYjc3MWU5MmMxZGUxMmJhZWI1YzljMzFmMzRhNjkzOTI3M2NiIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI0ZmJkMDA5MzE0YmMyNzA4NDE2NzM0YTAyYWU1ZmYzOWExZTQ4YTA1MGJlOTFmNDNiMmZhYTkyMDAyYzYyYmZjIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJjYWJlODk4NzM5N2E5M2Y5OTdkMDkxODc1ZDgwOWViNzY1MTBkYmQyYjY4NTZlOWI3NTU1MGMwNDgxZDI4NGRmIn0"
+        }
+      ]
+    },
+    {
+      "id": "claim_03211f9fe3c247d1892948777769264d",
+      "statement": "Switching profiles is an ordinary update: --profile skills on a workflow install removes the workflow-only units through the remove-and-preserve rules and keeps the state folder hidden in place, --profile workflow on a skills install adds the missing units and seeds the state folder (migrating a retained, owned legacy .claude/ai-bootstrap first), a rerun without --profile keeps the manifest's profile, and the end-of-install empty-folder cleanup leaves no empty .claude/templates or similar root behind.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L661-L686",
+          "version": "repo-lines-v1:sha256:fa9e65457651843b1d10b804f49bab5e21c7399e0f9871eeda101d83150ee161:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NDZlOWQyMDQ4OTM4OTZkN2YwODZlM2QzZGM3MmFmOWMyYmY1M2U5NDRkZWQ0ZTRmYjU3NjkyNzg4YTcwZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY3YWE2YjRiMDFiMTIwODNiYjJjNzU0NWU4MWFlMDZhYTNlYWQyMzFjMWNmYmYxZDBiNjgwN2UyZjc4NWM5MTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNjQ5YmFhMmU2Y2QyMDMwYmI0MDcwOGI5NmM2ZjlmOTY5MWQ0ZWZhYzg5MThlZmRmZTVmNjFjODAyM2VkYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliZGM0YTc3NTBiZjI3MmY2MWY3MzI4NGU4MDViMGZhZTc0MTBhMDZiMzUyN2YwM2FkZjMzYzE5NDNmMmY4NTMifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2442-L2454",
+          "version": "repo-lines-v1:sha256:74fe7f5823a7b0bb2eeb607c3bf97211e9bccc0ea836a8cd5a40eca881dfd0f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNWYyMDVlZDNjYmFjODdhMjBlOTgyOTI4YmU1MjRmMWQwYjQ2NThkNDE2OTQ2YzhkZWU5NjUyMmIxYTI4MzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImViMGUxNjg1YjZjOGJjYTE1YThlYjA1OTkwMzBjZTkyMWM2YjQ3MWUxNWY4MmNkZjg0MmE2MzMzMmJiMjEyZTYifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+        }
+      ]
+    },
+    {
+      "id": "claim_72ca231b8e5940399f51c1bab7c9032c",
+      "statement": "A workflow install or update migrates a legacy .claude/ai-bootstrap state folder to .ai-bootstrap only when the sidecar's own exclude block lists the legacy root and .ai-bootstrap is absent: under the install lock it adds and proves the new exclude line (restoring info/exclude on failure), refuses a cross-filesystem move before any backup, makes a full backup, rechecks the destination, renames without merging, and then reconciles normally; it refuses before any write when both roots exist or the legacy folder is not listed.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L207-L221",
+          "version": "repo-lines-v1:sha256:c3e4f4ba5fd18143c1d6f1d0a766ac6ba117bf563bc6bad7d92f731229bf010a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyYzlhMjQ5NzJiMjEwMjExN2FlYzE4ZGM3NmIyZDZmNTIzOTc5N2ZmNmI2OGEwMGU0ZjllNWU5YTE3N2ZhN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4YjU5NmE5OGRhNjlkNTIxY2QyMjZkNWFkOGFmNjg5ZGZjNWMxMDJjOTdhOGIzZWFhYTQwMjhhNTY3MzIwNTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NzA2YjExNTExZTMxYWMwZTg5ZmNjMjY1NWI5MzJjMzZmOGMwMWMwMDFlM2E2MTgyNmQxNDlmZWY2ZmFlNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiMmFmOGExOGVlMGIyNTFhYWJmYTVlYTE2YmZiMjJhMmE1MTQyNTU1MzU0NGE1ZjJjMzY1NzYxMmMxNGViYmIifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L4262-L4422",
+          "version": "repo-lines-v1:sha256:6ce0a0a6e512dfa350fb404627e4de4639118f0971c6677507adb497ec9d1660:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYxLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI0MDVlODA1Y2U2ZDllNGRhNTA0OWFmYWE5NjJmYjg1MjViOTJkYjM3ZmQ5ZmJmMWE5OTBhN2IxNDgyMjBkMTVhIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJiZGZlMTE5NGY1MjBmZjc4YzhmMDVhNThkYTI2M2M2MzBlMzY4M2IzN2M3YmUyZTY0ZmZiM2YxOWQ4ZmUwN2VhIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5YzYxYzBjZDY5YjNhMTI0MTBkYTkzM2ZiNDVkYjNhMjgyMjUyZTUwOGQ0ZWJmOTBiYjhhZjcxZmVhYWQ1MjlmIn0"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.7.2",
+    "at": "2026-10-21T02:32:20.957Z"
+  }
+}

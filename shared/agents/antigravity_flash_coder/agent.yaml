@@ -1,0 +1,24 @@
+{
+  "id": "antigravity_flash_coder",
+  "description": "Bounded implementation specialist for Google Antigravity routing. Escalates unresolved design, root-cause, security, migration, or ownership decisions to the Pro coder.",
+  "role_type": "coder",
+  "visibility": "hidden",
+  "capabilities": [
+    "edit",
+    "execute",
+    "read",
+    "search",
+    "todo",
+    "vscode",
+    "web"
+  ],
+  "delegates": [],
+  "targets": ["google-antigravity"],
+  "prompt_base": "coder",
+  "model_intent": {
+    "google-antigravity": {
+      "model": "flash",
+      "escalate_to": "coder"
+    }
+  }
+}

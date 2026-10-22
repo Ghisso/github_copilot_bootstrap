@@ -23,9 +23,10 @@ df["voted"].fillna(False).astype(bool)  # NaN → True if not handled first
 **2. numpy.bool_ is not Python bool**
 ```python
 import numpy as np
-np.bool_(True) is True   # False — different identity
-np.bool_(True) == True   # True — equality works
-isinstance(np.bool_(True), bool)  # True — isinstance works
+np.bool_(True) is True            # False — different identity
+np.bool_(True) == True            # True — equality works
+bool(np.bool_(True)) is True      # True — bool() recovers the identity
+isinstance(np.bool_(True), bool)  # False — np.bool_ subclasses np.generic, not bool
 ```
 
 **3. CSV integer columns become float64 (with NaN)**

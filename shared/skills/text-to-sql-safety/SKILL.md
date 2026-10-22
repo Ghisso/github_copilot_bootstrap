@@ -17,10 +17,15 @@ loss, memory exhaustion, or information leakage.
 
 ---
 
-## Layer 1: Read-Only Connection (OS-Enforced)
+## Layer 1: Read-Only Connection (Connection-Level Defense)
 
-The definitive defense. SQLite URI mode `?mode=ro` is enforced at the filesystem
-level — no application-layer bug can bypass it.
+One connection-level defense among several — not a definitive one. SQLite URI
+mode `?mode=ro` is a flag enforced by the SQLite library itself, not by the
+filesystem or the OS. An application bug that opens a second writable
+connection to the same file can still bypass it. Where the deployment permits
+real filesystem permissions (a read-only file, mount, or OS user), that is a
+separate, genuinely stronger, OS-enforced boundary — layer it on top of
+`?mode=ro` rather than relying on the URI flag alone.
 
 ```python
 import sqlite3
@@ -30,14 +35,21 @@ write_conn = sqlite3.connect(db_path)
 # ... load data ...
 write_conn.close()
 
-# Query connection — read-only, enforced by SQLite/OS
+# Query connection — read-only at the SQLite-library level, not OS-enforced
 query_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 query_conn.row_factory = sqlite3.Row
 ```
 
 **Why two connections?** A single read-only connection can't load data. A single
 writable connection trusts application code to never write after loading. Separate
-connections make the invariant structural, not behavioral.
+connections make the invariant structural, not behavioral — but the invariant
+still lives inside the process, not the OS.
+
+For a stronger in-process guarantee, register a
+[`set_authorizer`](https://docs.python.org/3/library/sqlite3.html#sqlite3.Connection.set_authorizer)
+callback on the query connection that rejects any non-`SELECT` action, or
+parse the query with a SQL parser/AST library and allowlist the statement type
+before executing it — both close gaps that a read-only flag alone cannot.
 
 ---
 
@@ -64,6 +76,12 @@ def _validate_sql(self, sql: str) -> None:
 
 Don't forget the obscure ones: `ATTACH` (mount external DB), `LOAD_EXTENSION`
 (run native code), `PRAGMA` (change config), `VACUUM`/`REINDEX` (resource exhaustion).
+
+Keyword matching is a fast reject, not a complete SQL security boundary: it
+cannot enumerate every bypass (nested comments, alternate whitespace, compound
+statements chained with `;`). Pair it with Layer 1's read-only connection and,
+where the risk warrants it, the authorizer callback or a parser/AST allowlist
+— not as the last line of defense on its own.
 
 ---
 

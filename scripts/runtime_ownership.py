@@ -1,0 +1,483 @@
+"""Ownership boundaries for generated bootstrap runtime content.
+
+The generator, installer, restoration wrapper, and validators share this
+small contract.  It intentionally classifies only boundaries that affect
+bootstrap refreshes; it is not a manifest of every generated file.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Set as AbstractSet
+from pathlib import Path, PurePath, PurePosixPath
+
+
+# The source repository deliberately keeps concise root adapters tracked. They
+# describe bootstrap authoring, so they are validated by required invariants
+# rather than compared byte-for-byte with a consumer's generated adapters.
+TRACKED_AUTHORING_PATHS = ("AGENTS.md", "CLAUDE.md")
+
+# These root paths are generated in consumer repositories and copied into the
+# nested ai-state repository for restoration on a fresh machine.
+ROOT_ADAPTER_PATHS = (
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".mcp.json",
+    ".codex",
+    ".agents",
+    ".vscode/mcp.json",
+    ".vscode/tasks.json",
+)
+COPILOT_SURFACE_PATHS = (
+    ".github/agents",
+    ".github/hooks",
+    ".github/instructions",
+    ".github/copilot-instructions.md",
+)
+RESTORABLE_ROOT_PATHS = ROOT_ADAPTER_PATHS + COPILOT_SURFACE_PATHS
+RESTORE_ALLOWLIST_TOKEN = "__BOOTSTRAP_ALLOWED_ROOT_PATHS__"
+
+# These paths are intentionally mutable in every consumer.  A generated seed
+# can exist for a fresh install, but a refresh must not use it as an equality
+# target or overwrite an existing consumer copy.
+CONSUMER_STATE_PATHS = (
+    "MEMORY.md",
+    "plans",
+    "explorations",
+    "session_logs",
+    "quality_reports",
+    # Derived machine-local hook state. It is ignored/untracked by state sync
+    # and must never be restored, compared, or deleted by bootstrap refreshes.
+    ".cache",
+    "instructions/project-context.instructions.md",
+    # Machine-local client settings the bootstrap never generates. Without this
+    # every install deleted the consumer's own settings as an obsolete owned
+    # file, which is data loss, not a refresh.
+    "settings.local.json",
+    # state-sync.sh writes the nested ai-state repository's .gitignore and
+    # .gitattributes, and a consumer may extend them. The generated tree has
+    # neither, so without these entries every refresh deleted both as obsolete
+    # owned files, dropping the consumer's ignore lines before the installer's
+    # `git add -A` ran.
+    ".gitignore",
+    ".gitattributes",
+)
+
+# Each of these README files is bootstrap-authored reference documentation
+# that merely lives inside an otherwise consumer-owned state directory above.
+# Unlike the rest of that directory's content (real plans, logs, and
+# reports), it must always match the shipped copy, so a refresh regenerates
+# it even though the directory it lives in is exempt from that comparison.
+# A repeat install must still leave every sibling file in the same
+# directory untouched.
+STATE_DIR_OWNED_README_PATHS = tuple(
+    f"{state_dir}/README.md"
+    for state_dir in ("plans", "explorations", "session_logs", "quality_reports")
+)
+
+# OpenWiki's own installer takes ownership of its skill bundle inside every
+# skill-hosting surface (`.claude/skills/openwiki`, `.agents/skills/openwiki`)
+# once it runs there. Each entry is checked relative to the surface root that
+# hosts it (`.claude` or `.agents`), the same way `CONSUMER_STATE_PATHS` is
+# checked relative to `.claude`. A path shaped like one of these entries is
+# ordinary bootstrap-generated content — refreshed and drift-checked like any
+# other — until `THIRD_PARTY_SKILL_MARKER` actually exists in it; see
+# `is_third_party_skill_dir`.
+THIRD_PARTY_SKILL_PATHS = ("skills/openwiki",)
+
+# The file OpenWiki's own installer writes into a skill directory it takes
+# ownership of. Its presence, not the path shape alone, is what stops the
+# bootstrap from generating, drift-checking, or refreshing that directory.
+THIRD_PARTY_SKILL_MARKER = ".openwiki-install.json"
+
+INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"
+
+# Every root path a full install writes. A repository that tracks one of them
+# and carries no bootstrap evidence is team-owned, so a plain install refuses
+# it instead of taking it over.
+FULL_INSTALL_ROOT_PATHS = (".claude", ".devcontainer") + RESTORABLE_ROOT_PATHS
+
+# The sidecar: a private, per-clone overlay inside a team-owned harness. Paths
+# come from the native runs frozen in docs/sidecar-provider-contract.md.
+SIDECAR_SKILLS = ("debug-investigator", "humanize", "ponytail", "ponytail-review")
+SIDECAR_SKILL_WRITE_ROOTS = (".claude/skills", ".agents/skills")
+# Every repository skill folder a supported client reads. A skill name taken
+# in any of them by content the sidecar does not own is skipped everywhere,
+# so a sidecar copy never hides a team skill.
+SIDECAR_SKILL_READ_ROOTS = SIDECAR_SKILL_WRITE_ROOTS + (
+    ".github/skills",
+    ".agent/skills",
+    ".codex/skills",
+)
+# Bridge path -> the frontmatter its client needs ("" means none).
+SIDECAR_BRIDGES = {
+    ".claude/rules/ai-bootstrap-sidecar.md": "",
+    ".github/instructions/ai-bootstrap-sidecar.instructions.md": 'applyTo: "**"',
+}
+SIDECAR_MANIFEST_NAME = "ai-bootstrap-sidecar.json"
+SIDECAR_STAGING_NAME = "ai-bootstrap-sidecar-staging"
+# Edited copies of a taken skill are moved here instead of staying discoverable
+# next to a team skill (Decision 24). Never emptied by the sidecar itself.
+SIDECAR_PRESERVED_NAME = "ai-bootstrap-sidecar-preserved"
+SIDECAR_EXCLUDE_BEGIN = "# BEGIN ai-bootstrap sidecar"
+SIDECAR_EXCLUDE_END = "# END ai-bootstrap sidecar"
+
+# A future version may retire a write root or a bridge. Manifest validation
+# keeps accepting these so an existing install does not abort on schema
+# validation; a recorded unit outside the current desired set still goes
+# through the normal remove row (Decision 32). Both are empty today.
+SIDECAR_RETIRED_SKILL_WRITE_ROOTS: tuple[str, ...] = ()
+SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
+
+# Sidecar profiles (big plan sidecar-workflow-profile, Decisions 1, 2, 7, 8,
+# and 9). ``skills`` is today's overlay; ``workflow`` adds the relaxed
+# workflow: agents, rules, review profiles, templates, more skills, and one
+# namespaced state folder. Client coverage and the roots come from the
+# native runs frozen in docs/sidecar-provider-contract.md, "Workflow profile
+# evidence": Claude Code discovers ignored agents and rules; Copilot gets the
+# instructions file on the skills-profile bridge evidence; Codex gets skills
+# and state only; no ``.github/agents`` or ``.codex/agents`` unit ships.
+SIDECAR_PROFILES = ("skills", "workflow")
+SIDECAR_DEFAULT_PROFILE = "skills"
+# The 24 public skills whose text names nothing the profile does not ship;
+# shared/sidecar/workflow/skills.txt records why the others are denied.
+SIDECAR_WORKFLOW_SKILLS = (
+    "add-dependency",
+    "caveman",
+    "caveman-compress",
+    "concept-to-image",
+    "csv-driven-integration-tests",
+    "data-analysis",
+    "debug-investigator",
+    "devils-advocate",
+    "draw-io",
+    "gradio-streamlit",
+    "html-presentation",
+    "humanize",
+    "hydra-config",
+    "literature-review",
+    "md-to-pdf",
+    "pdf",
+    "pipeline-patterns",
+    "ponytail",
+    "ponytail-review",
+    "prompt-lab",
+    "rag-auditor",
+    "research-critique",
+    "review-api",
+    "text-to-sql-safety",
+)
+SIDECAR_PROFILE_SKILLS: dict[str, tuple[str, ...]] = {
+    "skills": SIDECAR_SKILLS,
+    "workflow": SIDECAR_WORKFLOW_SKILLS,
+}
+SIDECAR_WORKFLOW_AGENTS = ("orchestrator", "planner", "coder", "reviewer", "documenter")
+SIDECAR_WORKFLOW_RULES = ("workflow", "reporting", "tool-routing")
+SIDECAR_WORKFLOW_REVIEW_PROFILES = (
+    "api",
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "domain",
+    "performance",
+    "ponytail",
+    "security",
+    "tests",
+)
+SIDECAR_WORKFLOW_TEMPLATES = (
+    "plan-big.md",
+    "plan-small.md",
+    "session-log.md",
+    "quality-report.md",
+)
+# Single-file units per profile: every file the profile installs outside a
+# skill folder and the state folder. The generator renders each with the
+# frontmatter its client needs; the installer treats each as an opaque unit
+# like a bridge (Decision 9).
+SIDECAR_PROFILE_FILE_UNITS: dict[str, tuple[str, ...]] = {
+    "skills": tuple(SIDECAR_BRIDGES),
+    "workflow": (
+        *(f".claude/rules/ai-bootstrap-{rule}.md" for rule in SIDECAR_WORKFLOW_RULES),
+        ".github/instructions/ai-bootstrap-workflow.instructions.md",
+        *(f".claude/agents/{agent}.md" for agent in SIDECAR_WORKFLOW_AGENTS),
+        *(
+            f".claude/review-profiles/{profile}.md"
+            for profile in SIDECAR_WORKFLOW_REVIEW_PROFILES
+        ),
+        *(f".claude/templates/{template}" for template in SIDECAR_WORKFLOW_TEMPLATES),
+    ),
+}
+# The one namespaced state folder (Decision 2): seeded once, never compared
+# or updated, kept by --uninstall, hidden by one exclude line. Moved out of
+# `.claude/` to the consumer root (finding 1; the 2026-10-02 workflow state
+# write gate in docs/sidecar-provider-contract.md): Claude Code refuses
+# writes anywhere under `.claude/`, but accepts them here.
+SIDECAR_STATE_ROOT = ".ai-bootstrap"
+# Recognized former state root (pre-finding-1 workflow installs). Never
+# seeded or written to as a profile's own state root; kept only so the
+# installer can recognize, back up, and migrate an owned folder left there,
+# and so an old exclude line or manifest reference still parses (Decision
+# 2, 3; finding 1's migration).
+SIDECAR_LEGACY_STATE_ROOT = ".claude/ai-bootstrap"
+SIDECAR_STATE_SEED_FILES = (
+    "MEMORY.md",
+    "explorations/README.md",
+    "plans/README.md",
+    "quality_reports/README.md",
+    "session_logs/README.md",
+)
+SIDECAR_PROFILE_STATE_ROOT: dict[str, str | None] = {
+    "skills": None,
+    "workflow": SIDECAR_STATE_ROOT,
+}
+# Every folder a supported client reads single-file units from, including
+# folders the profile never writes, so a team file of the same name there
+# takes the sidecar's unit (Decision 9, frozen read roots).
+SIDECAR_FILE_UNIT_READ_ROOTS = (
+    ".claude/agents",
+    ".github/agents",
+    ".codex/agents",
+    ".agents/agents",
+    ".claude/rules",
+    ".github/instructions",
+    ".claude/review-profiles",
+    ".claude/templates",
+)
+
+# Git's own repository-local environment variables (the exact list
+# ``git rev-parse --local-env-vars`` prints on Git 2.43), plus ``GIT_NAMESPACE``
+# (not included in that list, but equally repository-local). An exported one
+# of these -- typically left behind by a wrapper script or a previous
+# ``git -C`` invocation -- silently redirects every Git call the installer
+# makes to a different repository (Decision 27; S10). Popped from the
+# process's own environment once, at the start of ``install_bootstrap.main()``,
+# before any detection or Git call.
+GIT_REPO_LOCAL_ENV_VARS: tuple[str, ...] = (
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def sidecar_source_exact_allowlist(
+    profile: str = SIDECAR_DEFAULT_PROFILE,
+) -> frozenset[str]:
+    """Return the exact set of relative POSIX paths a valid sidecar source
+    must contain (Decision 31): every skill of ``profile`` as ``SKILL.md`` at
+    every write root, ``LICENSE`` in the ``ponytail`` and ``ponytail-review``
+    folders (only when the profile still ships them) at every write root,
+    every single-file unit of the profile, and, when the profile has a state
+    folder, every state seed file under it.
+
+    Reads the profile constants fresh on every call (module globals, not
+    captured at import time), so a test that monkeypatches ``SIDECAR_SKILLS``
+    (in every module that imported it) gets a matching exact allowlist
+    without weakening this function for real installs. The ``skills`` profile
+    reads ``SIDECAR_SKILLS`` and ``SIDECAR_BRIDGES`` directly for that reason.
+    """
+    if profile not in SIDECAR_PROFILES:
+        raise ValueError(f"unknown sidecar profile: {profile!r}")
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
+    file_units = (
+        tuple(SIDECAR_BRIDGES)
+        if profile == "skills"
+        else SIDECAR_PROFILE_FILE_UNITS[profile]
+    )
+    expected: set[str] = set()
+    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+        for skill in skills:
+            expected.add(f"{write_root}/{skill}/SKILL.md")
+            if skill in ("ponytail", "ponytail-review"):
+                expected.add(f"{write_root}/{skill}/LICENSE")
+    expected.update(file_units)
+    state_root = SIDECAR_PROFILE_STATE_ROOT[profile]
+    if state_root is not None:
+        expected.update(f"{state_root}/{seed}" for seed in SIDECAR_STATE_SEED_FILES)
+    return frozenset(expected)
+
+
+def sidecar_source_violations(
+    present: AbstractSet[str], profile: str = SIDECAR_DEFAULT_PROFILE
+) -> tuple[str, ...]:
+    """Return every way a candidate sidecar source tree fails the exact
+    source contract (Decision 31; S13, S14, L2).
+
+    ``present`` is the set of relative POSIX file paths actually found in
+    the candidate tree. Shared by ``scripts/sidecar_overlay.py`` (the
+    installer's own ``--source`` check) and ``scripts/validate_targets.py``
+    (the generated-target validator), so a crafted tree gets the same
+    verdict from both: a plain set comparison against
+    ``sidecar_source_exact_allowlist()``, so a half-rendered tree that is
+    merely internally self-consistent (for example two of four skills at
+    both write roots, or no bridges at all) is refused, not silently
+    accepted as a smaller-but-valid profile.
+    """
+    expected = sidecar_source_exact_allowlist(profile)
+    violations = [f"missing {path}" for path in sorted(expected - set(present))]
+    # A shipped skill is copied whole (references, helper scripts), so any
+    # file inside a shipped skill folder is allowed; only SKILL.md and the
+    # licenses are required. Everything outside a shipped skill folder must
+    # match the exact set.
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
+    skill_prefixes = tuple(
+        f"{write_root}/{skill}/"
+        for write_root in SIDECAR_SKILL_WRITE_ROOTS
+        for skill in skills
+    )
+    violations.extend(
+        f"unexpected path: {path}"
+        for path in sorted(set(present) - expected)
+        if not path.startswith(skill_prefixes)
+    )
+    return tuple(violations)
+
+
+def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
+    """Return install-time ignore patterns for generated runtime overlays."""
+    patterns = (
+        ".claude/",
+        ".codex/",
+        ".agents/",
+        ".github/agents/",
+        ".github/hooks/",
+        ".github/instructions/",
+        ".github/copilot-instructions.md",
+        ".vscode/mcp.json",
+        ".mcp.json",
+        ".claude/quality_reports/",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".uv-cache/",
+        # Anti-forgery secret for the Context Mode cache provenance marker
+        # (context-mode-dispatch.sh), created at the consumer repository
+        # root, outside .claude/. It must never enter the consumer's main
+        # history via a routine `git add -A`. The glob also covers the
+        # `.tmp.<pid>` sibling the dispatcher writes before renaming, which a
+        # signal between write and rename can leave behind.
+        ".context-mode-provenance.secret*",
+    )
+    if not commit_copilot_surface:
+        return patterns
+    copilot_patterns = tuple(
+        f"{path}/" if "." not in path.rsplit("/", 1)[-1] else path
+        for path in COPILOT_SURFACE_PATHS
+    )
+    return tuple(pattern for pattern in patterns if pattern not in copilot_patterns)
+
+
+def bootstrap_root_paths(commit_copilot_surface: bool) -> tuple[str, ...]:
+    """Return generated root adapters copied into ``.claude/bootstrap-root``."""
+    if commit_copilot_surface:
+        return ROOT_ADAPTER_PATHS
+    return ROOT_ADAPTER_PATHS + COPILOT_SURFACE_PATHS
+
+
+def is_consumer_state_path(relative_path: str | PurePath) -> bool:
+    """Return whether a path relative to ``.claude`` belongs to the consumer."""
+    path = PurePosixPath(relative_path)
+    return any(
+        path == PurePosixPath(owner) or PurePosixPath(owner) in path.parents
+        for owner in CONSUMER_STATE_PATHS
+    )
+
+
+def is_third_party_skill_path(relative_path: str | PurePath) -> bool:
+    """Return whether a skill-surface-relative path is shaped like a
+    third-party skill bundle. Shape alone does not mean it is owned; see
+    ``is_third_party_skill_dir`` for the marker-gated ownership check."""
+    path = PurePosixPath(relative_path)
+    return any(
+        path == PurePosixPath(owner) or PurePosixPath(owner) in path.parents
+        for owner in THIRD_PARTY_SKILL_PATHS
+    )
+
+
+def is_third_party_skill_dir(dir_path: Path) -> bool:
+    """Return whether a live directory is a marker-claimed third-party bundle.
+
+    Requires both that ``dir_path`` is shaped like an entry in
+    ``THIRD_PARTY_SKILL_PATHS`` (e.g. ends in ``skills/openwiki``) and that
+    OpenWiki's own installer has already claimed it by writing
+    ``THIRD_PARTY_SKILL_MARKER`` directly inside it. Before that marker
+    exists, the directory is ordinary bootstrap-generated content.
+    """
+    posix_dir = PurePosixPath(dir_path.as_posix())
+    is_owned_shape = any(posix_dir.match(owner) for owner in THIRD_PARTY_SKILL_PATHS)
+    return is_owned_shape and (dir_path / THIRD_PARTY_SKILL_MARKER).is_file()
+
+
+def is_root_adapter_path(relative_path: str | PurePath) -> bool:
+    """Return whether a path is restored from ``.claude/bootstrap-root``."""
+    path = PurePosixPath(relative_path)
+    return any(
+        path == PurePosixPath(adapter) or PurePosixPath(adapter) in path.parents
+        for adapter in RESTORABLE_ROOT_PATHS
+    )
+
+
+def restore_manifest(
+    commit_copilot_surface: bool = False,
+) -> str:
+    """Render inert root-adapter records for the restoration shell script."""
+    paths = "\n".join(
+        f"BOOTSTRAP_ROOT_PATH={path}"
+        for path in bootstrap_root_paths(commit_copilot_surface)
+    )
+    mode = int(commit_copilot_surface)
+    return (
+        "# Generated from scripts/runtime_ownership.py.\n"
+        f"{INSTALL_MODE_KEY}={mode}\n{paths}\n"
+    )
+
+
+def install_mode_from_manifest(text: str) -> bool | None:
+    """Read the inert Copilot-surface install mode from a root manifest."""
+    mode: bool | None = None
+    paths: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(f"{INSTALL_MODE_KEY}="):
+            if mode is not None:
+                return None
+            value = line.removeprefix(f"{INSTALL_MODE_KEY}=")
+            if value not in {"0", "1"}:
+                return None
+            mode = value == "1"
+            continue
+        if not line.startswith("BOOTSTRAP_ROOT_PATH="):
+            return None
+        path = line.removeprefix("BOOTSTRAP_ROOT_PATH=")
+        if path not in RESTORABLE_ROOT_PATHS or path in paths:
+            return None
+        paths.append(path)
+
+    path_set = set(paths)
+    if mode is not None:
+        return mode if path_set == set(bootstrap_root_paths(mode)) else None
+    if path_set == set(bootstrap_root_paths(False)):
+        return False
+    if path_set == set(bootstrap_root_paths(True)):
+        return True
+    return None
+
+
+def render_restore_script(template: str) -> str:
+    """Bind the shell restorer's trusted allowlist to this ownership map."""
+    if template.count(RESTORE_ALLOWLIST_TOKEN) != 1:
+        raise ValueError("restore script must contain exactly one allowlist token")
+    return template.replace(RESTORE_ALLOWLIST_TOKEN, "|".join(RESTORABLE_ROOT_PATHS))

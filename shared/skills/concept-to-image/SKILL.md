@@ -29,6 +29,13 @@ HTML is the refineable layer between idea and image. Unlike direct canvas render
 Concept → HTML artifact (view + refine) → PNG or SVG export
 ```
 
+Use a reasonable default at each step below and proceed — don't open a
+confirmation round for choices that don't materially change the result
+(sizing, palette, layout pattern). Ask first only when a choice would
+materially change the output and can't be reasonably inferred — for
+example, specific data values for a chart that weren't provided, or a
+genuinely ambiguous target ("make an image" with no hint of subject).
+
 1. **Interpret** the user's concept — determine what kind of visual best fits (diagram, infographic, card, chart, etc.)
 2. **Design** a self-contained HTML file using inline CSS and inline SVG — zero external dependencies
 3. **Present** the HTML so the user can preview and request refinements

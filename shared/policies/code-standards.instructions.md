@@ -1,5 +1,7 @@
 ---
-applyTo: "src/**/*.py,tests/**/*.py"
+applicability:
+  - src/**/*.py
+  - tests/**/*.py
 ---
 
 # Code Standards
@@ -17,7 +19,10 @@ applyTo: "src/**/*.py,tests/**/*.py"
 - **S/B**: Security and common bugs
 - **SIM/C4**: Simplification and comprehension style
 
-Run `uv run ruff check src/ tests/` — zero violations required before commit.
+Run `uv run python .claude/scripts/verify.py fast --format json` — zero
+violations required before commit. `fast` selects the repository's real
+scope instead of assuming a `src/` layout, so it stays correct whether this
+file attached because of a `src/**/*.py` or a `tests/**/*.py` match.
 
 ---
 
@@ -39,12 +44,12 @@ Run `uv run ruff check src/ tests/` — zero violations required before commit.
 - **`pathlib.Path`** for all file ops (never `os.path`)
 - **Context managers** (`with`) for all resources
 - **`ClassVar`** for dataclass class-level constants (prevent `__init__` override attacks)
-- **`from __future__ import annotations`** NEVER — breaks Hydra dataclass introspection in Python 3.12+
+- **`from __future__ import annotations`**: fine in general modules (scripts, services, tests), but NEVER in Hydra-managed config/dataclass modules (`src/configs/**` and any ConfigStore-registered dataclass) — it stringizes annotations and breaks Hydra's dataclass introspection in Python 3.12+
 
 ## Anti-Patterns (prohibited)
 
-- **`import argparse`** — forbidden in `src/` and `gradio_app/`; use Hydra ConfigStore CLI overrides for all production entrypoints. Test harnesses (`tests/`) are the only allowed exception.
-- **YAML config files** — all config variants as Python dataclasses only (pure ConfigStore)
+- **`import argparse`** — in a project that uses Hydra, forbidden in `src/` and `gradio_app/`; use Hydra ConfigStore CLI overrides for production entrypoints, with test harnesses (`tests/`) the only exception. A project that does not use Hydra (a plain library or CLI tool) uses its own established argument parsing; do not add `hydra-core` to gain this rule.
+- **YAML config files** — in a Hydra project, all config variants are Python dataclasses only (pure ConfigStore); elsewhere, follow the configuration pattern the repository already uses.
 - **Ad-hoc `os.getenv()` arg parsing** — use Hydra config fields with env-var defaults only at system boundaries (service.py / BentoML)
 
 ---

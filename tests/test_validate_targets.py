@@ -1,0 +1,4485 @@
+"""Integration coverage for the generated-target control-plane validator."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+from copy import deepcopy
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import generate_targets as target_generator  # noqa: E402
+
+from generate_targets import (  # noqa: E402
+    CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    OPENWIKI_BEGIN_MATCHER,
+    claude_agent_frontmatter,
+    sidecar_agent_frontmatter,
+    load_shared_agents,
+    parse_policy,
+    render_claude_rule_adapter,
+    render_github_agent_adapter,
+    codex_agent_metadata_header,
+    render_codex_agent_adapter,
+    render_antigravity_agent_adapter,
+    render_antigravity_default_agent_contract,
+    render_antigravity,
+    render_github_instruction_adapter,
+    render_root_guidance,
+    render_sidecar,
+    shared_agents,
+    shared_policies,
+    transform_agent_text,
+    transform_target_paths,
+)
+from runtime_ownership import (  # noqa: E402
+    SIDECAR_LEGACY_STATE_ROOT,
+    SIDECAR_PROFILE_SKILLS,
+    SIDECAR_PROFILES,
+    SIDECAR_SKILLS,
+    SIDECAR_STATE_ROOT,
+    SIDECAR_STATE_SEED_FILES,
+    SIDECAR_WORKFLOW_AGENTS,
+    SIDECAR_WORKFLOW_REVIEW_PROFILES,
+    SIDECAR_WORKFLOW_RULES,
+    SIDECAR_WORKFLOW_TEMPLATES,
+    sidecar_source_exact_allowlist,
+)
+from validate_targets import (  # noqa: E402
+    CODEX_CODER_ESCALATION,
+    compare_dirs,
+    dirs_match,
+    CODEX_ESCALATION_CHAIN,
+    CODEX_AGENT_MODEL_INTENTS,
+    CODEX_ROLE_MODEL_INTENTS,
+    ANTIGRAVITY_AGENT_MODEL_INTENTS,
+    ANTIGRAVITY_ESCALATION_CHAIN,
+    CONTEXT_MODE_ALLOWED_TOOLS,
+    CONTEXT_MODE_BLOCKED_TOOLS,
+    CONTEXT_MODE_PINNED_VERSION,
+    ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS,
+    ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS,
+    POLICY_SCOPE_FIXTURES,
+    codex_agent_instruction_errors,
+    canonical_agent_contract_errors,
+    codex_orchestrator_attribution_errors,
+    codex_orchestrator_escalation_errors,
+    codex_orchestrator_routing_errors,
+    claude_rule_paths,
+    codex_config_contract_errors,
+    coder_incremental_intent_contract_errors,
+    copilot_instruction_paths,
+    github_agent_model_errors,
+    agent_membership_errors,
+    antigravity_agent_adapter_errors,
+    antigravity_default_agent_contract_errors,
+    mcp_server_parity_errors,
+    memory_security_authority_errors,
+    pretool_routing_errors,
+    readme_agent_contract_errors,
+    reviewer_diff_evidence_contract_errors,
+    root_guidance_errors,
+    root_mcp_adapter_errors,
+    sidecar_allowed_relative_path,
+    sidecar_forbidden_text_tokens,
+    sidecar_target_errors,
+    sidecar_text_errors,
+    tool_routing_recommendation_errors,
+    documenter_humanize_errors,
+    execution_defaults_policy_errors,
+    failure_masking_command_errors,
+    humanize_contract_errors,
+    planner_supervision_contract_errors,
+    reporting_policy_errors,
+    reporting_prompt_errors,
+    scope_matches,
+    shared_skill_integrity_errors,
+    skill_frontmatter_yaml_errors,
+    skill_local_reference_errors,
+    skill_name_errors,
+    task_lane_contract_errors,
+    task_lane_for,
+    TaskLaneInputs,
+    workflow_reporting_errors,
+    workspace_guidance_errors,
+    stale_skill_contract_errors,
+)
+
+import validate_targets as target_validator  # noqa: E402
+
+
+def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
+    """Safety handlers are scoped while the wildcard remains observer-only."""
+    hooks: dict[str, Any] = {
+        "PreToolUse": [
+            {"matcher": "Edit|Write", "hooks": [{"command": "protect-files.sh"}]},
+            {"matcher": "Bash", "hooks": [{"command": "pretool-bash-guard.sh"}]},
+            {"matcher": "*", "hooks": [{"command": "context-mode-dispatch.sh"}]},
+            {
+                "matcher": OPENWIKI_BEGIN_MATCHER,
+                "hooks": [{"command": "openwiki-guard.sh"}],
+            },
+        ]
+    }
+    assert pretool_routing_errors(hooks, "openai-codex") == []
+
+    hooks["PreToolUse"][2]["hooks"].append({"command": "git-protection.sh"})
+    errors = pretool_routing_errors(hooks, "openai-codex")
+    assert any("wildcard" in error for error in errors)
+    assert any("must contain only" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("skill", "old", "replacement"),
+    (
+        (
+            "commit",
+            "pause_session_log",
+            "pause session log",
+        ),
+        (
+            "commit",
+            "current_phase",
+            "next_phase",
+        ),
+        (
+            "plan-decomposition",
+            "paused_at",
+            "paused timestamp",
+        ),
+        (
+            "plan-decomposition",
+            "cancelled_evidence",
+            "cancellation proof",
+        ),
+        (
+            "context-status",
+            "in-progress/paused/complete/cancelled",
+            "DRAFT/APPROVED/COMPLETED",
+        ),
+        (
+            "context-status",
+            "frontmatter",
+            "directory listing",
+        ),
+        (
+            "setup-project",
+            "scripts/install_bootstrap.py <project-root>",
+            "Copy `dist/multi-agent/` into the new project root",
+        ),
+        (
+            "setup-project",
+            "git init",
+            "initialize later",
+        ),
+    ),
+)
+def test_stale_skill_contract_validation_rejects_each_obsolete_claim(
+    tmp_path: Path, skill: str, old: str, replacement: str
+) -> None:
+    """The lifecycle and installer guidance cannot silently regress in output."""
+    skill_root = tmp_path / "skills"
+    for source in (
+        REPO_ROOT / "shared" / "skills" / "commit" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "plan-decomposition" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "context-status" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "setup-project" / "SKILL.md",
+    ):
+        destination = skill_root / source.parent.name / "SKILL.md"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    target = skill_root / skill / "SKILL.md"
+    target.write_text(
+        target.read_text(encoding="utf-8").replace(old, replacement),
+        encoding="utf-8",
+    )
+
+    errors = stale_skill_contract_errors(skill_root, "fixture")
+
+    assert any(skill in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("skill", "stale_claim", "guarded_fragment"),
+    (
+        (
+            "commit",
+            "Commit exactly one completed small plan, after all gates pass",
+            "commit exactly one completed small plan, after all gates pass",
+        ),
+        (
+            "plan-decomposition",
+            "Closeout Checklist — leave the template's checklist; it gates the commit.",
+            "closeout checklist — leave the template's checklist; it gates the commit.",
+        ),
+        ("context-status", "[DRAFT/APPROVED/COMPLETED]", "[draft/approved/completed]"),
+        ("context-status", "ls -lt .claude/plans/*.md", "ls -lt .claude/plans"),
+        (
+            "setup-project",
+            "Copy `dist/multi-agent/` into the new project root",
+            "copy `dist/multi-agent/` into the new project root",
+        ),
+        (
+            "setup-project",
+            "git add .claude/ .github/ .codex/ AGENTS.md CLAUDE.md",
+            "git add .claude/ .github/ .codex/ agents.md claude.md",
+        ),
+    ),
+)
+def test_stale_skill_contract_validation_rejects_each_forbidden_claim(
+    tmp_path: Path, skill: str, stale_claim: str, guarded_fragment: str
+) -> None:
+    """Every explicitly retired lifecycle or installer phrase remains guarded."""
+    skill_root = tmp_path / "skills"
+    for source in (
+        REPO_ROOT / "shared" / "skills" / "commit" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "plan-decomposition" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "context-status" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "setup-project" / "SKILL.md",
+    ):
+        destination = skill_root / source.parent.name / "SKILL.md"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    target = skill_root / skill / "SKILL.md"
+    target.write_text(
+        target.read_text(encoding="utf-8") + f"\n{stale_claim}\n",
+        encoding="utf-8",
+    )
+
+    errors = stale_skill_contract_errors(skill_root, "fixture")
+
+    assert f"fixture {skill} skill retains stale contract: {guarded_fragment}" in errors
+
+
+def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
+    """The generated config uses documented concurrency without root model pins."""
+    agents = {"max_concurrent_threads_per_session": 6, "max_depth": 1}
+    config: dict[str, object] = {
+        "agents": agents,
+        "features": {
+            "multi_agent_v2": {
+                "hide_spawn_agent_metadata": False,
+                "tool_namespace": "agents",
+            }
+        },
+    }
+
+    assert codex_config_contract_errors(config, "fixture") == []
+    assert CODEX_ROLE_MODEL_INTENTS == {
+        "orchestrator": ("gpt-5.6-sol", "xhigh"),
+        "planner": ("gpt-5.6-sol", "xhigh"),
+        "coder": ("gpt-5.6-terra", "high"),
+        "reviewer": ("gpt-5.6-sol", "high"),
+        "documenter": ("gpt-5.6-luna", "medium"),
+    }
+    assert CODEX_CODER_ESCALATION == "sol_coder"
+    assert CODEX_ESCALATION_CHAIN == {
+        "luna_coder": "coder",
+        "coder": "sol_coder",
+    }
+    assert CODEX_AGENT_MODEL_INTENTS["luna_coder"] == ("gpt-5.6-luna", "xhigh")
+    assert CODEX_AGENT_MODEL_INTENTS["sol_coder"] == ("gpt-5.6-sol", "xhigh")
+
+    for key, value, expected_error in (
+        ("max_threads", 6, "legacy agents.max_threads"),
+        ("enabled", True, "agents.enabled"),
+    ):
+        invalid = {**config, "agents": {**agents, key: value}}
+        assert any(
+            expected_error in error
+            for error in codex_config_contract_errors(invalid, "fixture")
+        )
+    for key in ("model", "model_reasoning_effort"):
+        invalid = {**config, key: "gpt-5.6-sol"}
+        assert any(
+            key in error for error in codex_config_contract_errors(invalid, "fixture")
+        )
+
+
+def test_planner_supervision_contract_requires_bounded_evidence_and_waits() -> None:
+    """Planner prompts retain the calibrated discovery and supervision contract."""
+    planner = (REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    orchestrator = (
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    ).read_text(encoding="utf-8")
+
+    assert planner_supervision_contract_errors(planner, orchestrator) == []
+
+    missing_packet = planner.replace("orchestrator's evidence packet", "handoff", 1)
+    errors = planner_supervision_contract_errors(missing_packet, orchestrator)
+    assert any("bounded-discovery" in error for error in errors)
+
+    missing_wait = orchestrator.replace(
+        "A pending wait means no mailbox event arrived during that polling window",
+        "A completed wait means success",
+        1,
+    )
+    errors = planner_supervision_contract_errors(planner, missing_wait)
+    assert any("planner-supervision" in error for error in errors)
+
+    stale_mandates = (
+        f"{planner}\nUses a PRD-style interview to surface unknowns before drafting.\n"
+        "Show the user the sketch and ask for confirmation before proceeding.\n"
+        "Iterate at least once based on user responses.\n"
+    )
+    errors = planner_supervision_contract_errors(stale_mandates, orchestrator)
+    assert any("stale unconditional mandate" in error for error in errors)
+
+    assert any(
+        "evidence packet you give `coder` must name existing builders" in fragment
+        for fragment in ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS
+    )
+    assert any(
+        "`reviewer` has no `execute` capability" in fragment
+        for fragment in ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS
+    )
+    assert not any(
+        "evidence packet you give `coder`" in fragment
+        or "`reviewer` has no `execute` capability" in fragment
+        for fragment in ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS
+    )
+
+    missing_delegation_evidence = orchestrator.replace(
+        "`reviewer` has no `execute` capability and cannot produce this evidence itself",
+        "reviewer can gather this itself",
+        1,
+    )
+    errors = planner_supervision_contract_errors(planner, missing_delegation_evidence)
+    assert any(
+        "delegation-evidence contract" in error and "planner-supervision" not in error
+        for error in errors
+    )
+
+
+def test_incremental_intent_and_reviewer_diff_evidence_contracts() -> None:
+    """A full rebuild needs coder-reported evidence and orchestrator approval;
+    reviewer delegation must carry diff-scoped evidence, not full-file reads."""
+    coder = (REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    reviewer = (REPO_ROOT / "shared" / "agents" / "reviewer" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert coder_incremental_intent_contract_errors(coder) == []
+    assert reviewer_diff_evidence_contract_errors(reviewer) == []
+
+    missing_deviation = coder.replace(
+        "treat a full rebuild as a material deviation", "consider a rebuild", 1
+    )
+    errors = coder_incremental_intent_contract_errors(missing_deviation)
+    assert any("incremental-intent contract" in error for error in errors)
+
+    missing_diff_evidence = reviewer.replace(
+        "You have no `execute` capability, so you cannot produce this evidence yourself",
+        "You can gather this yourself",
+        1,
+    )
+    errors = reviewer_diff_evidence_contract_errors(missing_diff_evidence)
+    assert any("diff-evidence contract" in error for error in errors)
+
+
+def test_github_agent_model_contract_uses_frontmatter_not_body_substrings() -> None:
+    """GitHub model parity uses parsed frontmatter and rejects malformed inputs."""
+    path = Path(".github/agents/planner.agent.md")
+    valid = "---\nname: planner\nmodel: Claude Opus 4.6\n---\n\nmodel: wrong\n"
+
+    assert github_agent_model_errors(valid, "Claude Opus 4.6", path) == []
+    assert any(
+        "drifted" in error
+        for error in github_agent_model_errors(
+            valid.replace("Claude Opus 4.6", "GPT-5.4", 1),
+            "Claude Opus 4.6",
+            path,
+        )
+    )
+    assert any(
+        "missing frontmatter" in error
+        for error in github_agent_model_errors(
+            "model: Claude Opus 4.6\n", "Claude Opus 4.6", path
+        )
+    )
+
+
+def test_planner_model_intent_preserves_native_models_and_copilot_session_inheritance() -> (
+    None
+):
+    """Planner preserves native models and inherits the Copilot session model."""
+    planner = json.loads(
+        (REPO_ROOT / "shared" / "agents" / "planner" / "agent.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    intent = planner["model_intent"]
+
+    assert intent["github-copilot"] == "target-default"
+    assert intent["claude-code"] == {"model": "opus", "effort": "xhigh"}
+    assert intent["openai-codex"] == {
+        "model": "gpt-5.6-sol",
+        "effort": "xhigh",
+    }
+
+
+def test_root_guidance_budgets_and_structural_invariants() -> None:
+    """Concise root templates retain their unique sections and lifecycle."""
+    claude = render_root_guidance("claude-code")
+    codex = render_root_guidance("openai-codex")
+    multi_agent = render_root_guidance("multi-agent")
+
+    assert root_guidance_errors("CLAUDE.md", claude) == []
+    assert root_guidance_errors("AGENTS.md", codex) == []
+    assert root_guidance_errors("AGENTS.md", multi_agent) == []
+    assert antigravity_default_agent_contract_errors(multi_agent) == []
+    assert render_antigravity_default_agent_contract() in multi_agent
+    assert render_antigravity_default_agent_contract() not in codex
+    assert "`.claude/hooks/`" in claude
+    assert "`.github/hooks/`" in claude
+    assert "`.codex/`" in codex
+    assert "`.github/hooks/`" in codex
+    for fragment in (
+        "`.codex/config.toml`",
+        "`.codex/hooks.json`",
+        "`.codex/agents/*.toml`",
+        "`.agents/agents/`",
+        "`.agents/skills/`",
+        "`.agents/mcp_config.json`",
+        "`.agents/`",
+    ):
+        assert fragment in multi_agent
+    assert len(claude.splitlines()) <= 200
+    assert len(codex.encode()) <= 16 * 1024
+    assert len(multi_agent.encode()) <= 16 * 1024
+    missing_reporting_pointer = claude.replace(
+        ".claude/instructions/agent-reporting.instructions.md", "reporting.md", 1
+    )
+    assert any(
+        "agent-reporting.instructions.md" in error
+        for error in root_guidance_errors("CLAUDE.md", missing_reporting_pointer)
+    )
+
+
+@pytest.mark.parametrize(
+    "target,name",
+    (("claude-code", "CLAUDE.md"), ("openai-codex", "AGENTS.md")),
+)
+@pytest.mark.parametrize(
+    "authoring_phrase",
+    (
+        "Bootstrap Guidance",
+        "reusable multi-agent bootstrap",
+        "In an installed project",
+        "Bootstrap maintainers own authoring and regeneration",
+    ),
+)
+def test_root_guidance_rejects_authoring_specific_phrases(
+    target: str, name: str, authoring_phrase: str
+) -> None:
+    """Generated root guidance stays neutral to the bootstrap authoring repo."""
+    guidance = render_root_guidance(target)
+
+    assert authoring_phrase not in guidance
+    errors = root_guidance_errors(name, f"{guidance}\n{authoring_phrase}\n")
+
+    assert any(authoring_phrase in error for error in errors)
+
+
+def test_root_guidance_allows_bootstrap_when_it_is_not_an_authoring_phrase() -> None:
+    """The regression guard rejects exact phrases, not the general word."""
+    guidance = render_root_guidance("claude-code")
+
+    assert root_guidance_errors("CLAUDE.md", f"{guidance}\nbootstrap\n") == []
+
+
+def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() -> None:
+    """Structural validation rejects regressions hidden by broad substring checks."""
+    guidance = render_root_guidance("claude-code")
+    mutated = guidance.replace("## Map\n", "## Map\n\n## Map\n", 1).replace(
+        "PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "CLOSEOUT -> COMMIT -> PUSH",
+        "PRE-FLIGHT -> PLAN WHEN NEEDED -> BRANCH -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "CLOSEOUT -> COMMIT -> PUSH",
+        1,
+    )
+
+    errors = root_guidance_errors("CLAUDE.md", mutated)
+
+    assert any("exactly one '## Map' section" in error for error in errors)
+    assert any("canonical lifecycle" in error for error in errors)
+
+    missing_inventory = guidance.replace("`.github/hooks/`, ", "", 1)
+    assert any(
+        "`.github/hooks/`" in error
+        for error in root_guidance_errors("CLAUDE.md", missing_inventory)
+    )
+
+
+def test_orchestrator_checklist_rejects_stale_plan_and_comma_lifecycles() -> None:
+    """The detailed checklist must agree with the conditional root lifecycle."""
+    planner = (REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    orchestrator = (
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    ).read_text(encoding="utf-8")
+
+    assert planner_supervision_contract_errors(planner, orchestrator) == []
+    for source, replacement in (
+        (
+            "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
+            "PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
+        ),
+        (
+            "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
+            "VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY - repeat until checks pass",
+        ),
+        ("**PLAN WHEN NEEDED:**", "**PLAN:**"),
+        ("7. **CLOSEOUT:**", "7. **DOCUMENT:**"),
+        (
+            "## Core Workflow\n",
+            "## Core Workflow\n\n"
+            "PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT\n",
+        ),
+    ):
+        mutated = orchestrator.replace(source, replacement, 1)
+        assert mutated != orchestrator
+        assert planner_supervision_contract_errors(planner, mutated)
+
+    codex_missing_inventory = render_root_guidance("openai-codex").replace(
+        "`.github/hooks/`, ", "", 1
+    )
+    assert any(
+        "`.github/hooks/`" in error
+        for error in root_guidance_errors("AGENTS.md", codex_missing_inventory)
+    )
+
+
+def test_workspace_guidance_preserves_shared_git_hook_inventory() -> None:
+    """Target path rewrites retain the shared Git-hook control-plane surface."""
+    workspace = (
+        REPO_ROOT / "shared" / "policies" / "workspace.instructions.md"
+    ).read_text(encoding="utf-8")
+    for target in ("claude-code", "openai-codex"):
+        rendered = transform_target_paths(
+            workspace, target, preserve_shared_git_hooks=True
+        )
+        assert workspace_guidance_errors(rendered) == []
+
+    missing_inventory = workspace.replace("`.github/hooks/`, ", "", 1)
+    assert any(
+        "`.github/hooks/`" in error
+        for error in workspace_guidance_errors(missing_inventory)
+    )
+
+
+@pytest.mark.parametrize(
+    ("case", "inputs", "expected"),
+    (
+        (
+            "reporting request",
+            {"change_requested": False},
+            "read-only/reporting",
+        ),
+        (
+            "explicit docs typo",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("README.md",),
+                "low_risk": True,
+            },
+            "lightweight edit",
+        ),
+        (
+            "single-file behavior edit",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("src/formatter.py",),
+                "low_risk": True,
+            },
+            "lightweight edit",
+        ),
+        (
+            "dependency change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("pyproject.toml",),
+                "dependency_or_lockfile_impact": True,
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "hook change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".claude/hooks/scripts/guard.sh",),
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "runtime config change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".codex/config.toml",),
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "commit request",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("docs/guide.md",),
+                "low_risk": True,
+                "commit_or_pr_requested": True,
+            },
+            "standard implementation",
+        ),
+        (
+            "multi-file implementation",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("src/a.py", "tests/test_a.py"),
+            },
+            "control-plane/high-risk",
+        ),
+    ),
+    ids=lambda case: case,
+)
+def test_task_lane_fixtures(case: str, inputs: TaskLaneInputs, expected: str) -> None:
+    """The decision-table fixtures cover positive and safety-boundary cases."""
+    assert task_lane_for(**inputs) == expected
+
+
+def test_task_lane_contract_rejects_missing_requirement_and_stale_drift() -> None:
+    """Structural validation catches omissions and prior blanket-path wording."""
+    workflow = (
+        REPO_ROOT / "shared" / "policies" / "workflow.instructions.md"
+    ).read_text(encoding="utf-8")
+    assert task_lane_contract_errors(workflow) == []
+
+    missing = workflow.replace("No lifecycle artifacts.", "No records.", 1)
+    assert any(
+        "No lifecycle artifacts." in error
+        for error in task_lane_contract_errors(missing)
+    )
+
+    drift = workflow.replace(
+        "Do not use time or line-count thresholds to classify a lane.",
+        "Do not use time or line-count thresholds to classify a lane.\n"
+        "Skip planning only for: one-file work.",
+        1,
+    )
+    assert any(
+        "Skip planning only for:" in error for error in task_lane_contract_errors(drift)
+    )
+
+    assert workflow_reporting_errors(workflow) == []
+    legacy_reporting = workflow.replace(
+        ".claude/instructions/agent-reporting.instructions.md",
+        ".claude/instructions/agent-reporting.instructions.md\n\n"
+        "Subagents reporting back to the orchestrator should use `caveman` `full`.\n"
+        "Preserve tables, code blocks, commands, and paths literally.",
+        1,
+    )
+    assert workflow_reporting_errors(legacy_reporting)
+
+
+def test_execution_defaults_policy_contract_rejects_missing_clauses() -> None:
+    """Conditional planning and bounded indexing remain explicit policy."""
+    mutations = {
+        "workflow.instructions.md": "implementation-ready plan normally skips new plan",
+        "workspace.instructions.md": "approved implementation-ready plan follows",
+        "tool-routing.instructions.md": "contained real directory",
+    }
+    for name in target_validator.EXECUTION_DEFAULTS_POLICY_FRAGMENTS:
+        policy = (REPO_ROOT / "shared" / "policies" / name).read_text(encoding="utf-8")
+        assert execution_defaults_policy_errors(name, policy) == []
+        missing = policy.replace(mutations[name], "missing policy clause", 1)
+        assert execution_defaults_policy_errors(name, missing)
+
+
+def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:
+    """Claude and Copilot derive equivalent conditional scopes from policies."""
+    policies = shared_policies()
+
+    assert {policy.source.name for policy in policies if policy.paths} == set(
+        POLICY_SCOPE_FIXTURES
+    )
+    for policy in policies:
+        github = render_github_instruction_adapter(policy)
+        assert "applicability:" not in github
+        if not policy.paths:
+            assert copilot_instruction_paths(github) == ()
+            continue
+
+        claude = render_claude_rule_adapter(policy)
+        assert copilot_instruction_paths(github) == policy.paths
+        assert claude_rule_paths(claude) == policy.paths
+        assert "applicability:" not in claude
+        for path, expected_match in POLICY_SCOPE_FIXTURES[policy.source.name]:
+            assert scope_matches(path, policy.paths) is expected_match
+            assert (
+                scope_matches(path, copilot_instruction_paths(github)) is expected_match
+            )
+            assert scope_matches(path, claude_rule_paths(claude)) is expected_match
+
+
+def test_reporting_policy_and_agent_prompts_preserve_the_audience_boundary() -> None:
+    """The shared policy owns prose rules while each agent retains only a pointer."""
+    policy = (
+        REPO_ROOT / "shared" / "policies" / "agent-reporting.instructions.md"
+    ).read_text(encoding="utf-8")
+
+    assert reporting_policy_errors(policy) == []
+    reflowed_policy = policy.replace(
+        "does not claim\nformal ASD-STE100 compliance",
+        "does not claim formal ASD-STE100 compliance",
+        1,
+    ).replace(
+        "identifiers, API\nnames, commands",
+        "identifiers, API names, commands",
+        1,
+    )
+    assert reporting_policy_errors(reflowed_policy) == []
+    assert reporting_policy_errors(
+        policy.replace(
+            "does not claim\nformal ASD-STE100 compliance", "is compliant", 1
+        )
+    )
+    assert reporting_policy_errors(
+        policy.replace(
+            "Technical precision has priority", "Simple vocabulary has priority", 1
+        )
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nDefault to `caveman full` style for user communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman is the default for user-facing communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman full is the default for user communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman full should be the default for human-facing reports.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nUse caveman full for user-facing communication.\n"
+    )
+    assert (
+        reporting_policy_errors(
+            f"{policy}\nDo not use caveman full for user-facing communication.\n"
+        )
+        == []
+    )
+    assert (
+        reporting_policy_errors(
+            f"{policy}\nDo not default to caveman full for human communication.\n"
+        )
+        == []
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman is for orchestrator-facing status.\n"
+    )
+
+    for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
+        prompt = prompt_path.read_text(encoding="utf-8")
+        assert reporting_prompt_errors(prompt_path.parent.name, prompt) == []
+        assert reporting_prompt_errors(
+            prompt_path.parent.name,
+            prompt.replace("agent-reporting.instructions.md", "reporting.md"),
+        )
+
+    coder_prompt = (REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nDefault to `caveman full`.\n"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nPreserve tables, code blocks, commands literally.\n"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nUse active voice where practical.\n"
+    )
+
+
+def test_humanize_adaptation_preserves_the_pin_and_agent_boundary() -> None:
+    """The public adaptation stays separate from its inert upstream snapshot."""
+    humanize = (REPO_ROOT / "shared" / "skills" / "humanize" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    upstream_root = REPO_ROOT / "shared" / "third_party" / "avoid-ai-writing"
+    provenance = (upstream_root / "UPSTREAM.md").read_text(encoding="utf-8")
+
+    assert (
+        humanize_contract_errors(
+            humanize, provenance, upstream_root / "SKILL.md", upstream_root / "LICENSE"
+        )
+        == []
+    )
+    reflowed_humanize = humanize.replace(
+        "do not prove AI\nauthorship", "do not prove AI authorship", 1
+    )
+    assert (
+        humanize_contract_errors(
+            reflowed_humanize,
+            provenance,
+            upstream_root / "SKILL.md",
+            upstream_root / "LICENSE",
+        )
+        == []
+    )
+    assert len(humanize) < len((upstream_root / "SKILL.md").read_text(encoding="utf-8"))
+    assert "`../../third_party/avoid-ai-writing/`" in humanize
+    assert not (REPO_ROOT / "shared" / "skills" / "avoid-ai-writing").exists()
+    for unsupported_claim in (
+        "human typical",
+        "statistically detectable",
+        "AI text is statistically smooth",
+        "catalogued from thousands",
+        "Allow small topic expansions",
+    ):
+        assert unsupported_claim not in humanize
+
+    documenter = (
+        REPO_ROOT / "shared" / "agents" / "documenter" / "prompt.md"
+    ).read_text(encoding="utf-8")
+    assert documenter_humanize_errors(documenter) == []
+    assert (
+        documenter_humanize_errors(
+            documenter.replace("targeted `edit`\nmode", "targeted `edit` mode", 1)
+        )
+        == []
+    )
+    for agent_id in ("planner", "reviewer", "coder", "orchestrator"):
+        prompt = (REPO_ROOT / "shared" / "agents" / agent_id / "prompt.md").read_text(
+            encoding="utf-8"
+        )
+        assert "humanize" not in prompt.lower()
+
+    for root_name in ("CLAUDE.md", "AGENTS.md"):
+        root_guidance = (REPO_ROOT / root_name).read_text(encoding="utf-8")
+        semantic_root_guidance = " ".join(root_guidance.split())
+        assert "For every user-facing message" in root_guidance
+        assert "use `caveman full` with the user" in root_guidance
+        assert (
+            "Compact internal agent handoffs may still use `caveman full`"
+            in semantic_root_guidance
+        )
+
+    generated_humanize = (
+        REPO_ROOT
+        / "dist"
+        / "multi-agent"
+        / ".claude"
+        / "skills"
+        / "humanize"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "`../../third_party/avoid-ai-writing/`" in generated_humanize
+    assert (
+        REPO_ROOT
+        / "dist"
+        / "multi-agent"
+        / ".claude"
+        / "third_party"
+        / "avoid-ai-writing"
+        / "SKILL.md"
+    ).is_file()
+
+    root_guidance = render_root_guidance("claude-code")
+    assert (
+        root_guidance_errors(
+            "CLAUDE.md",
+            root_guidance.replace(
+                "Compact internal agent handoffs may still use `caveman full`",
+                "Compact internal agent handoffs may still use\n`caveman full`",
+                1,
+            ),
+        )
+        == []
+    )
+
+
+def test_policy_schema_rejects_copilot_native_or_ambiguous_scope(
+    tmp_path: Path,
+) -> None:
+    """Canonical applicability accepts only explicit always-on or path lists."""
+    policy = tmp_path / "legacy.instructions.md"
+    policy.write_text('---\napplyTo: "src/**/*.py"\n---\n\n# Legacy\n')
+
+    with pytest.raises(ValueError, match="unsupported policy frontmatter field"):
+        parse_policy(policy)
+
+    policy.write_text('---\napplicability: "src/**/*.py"\n---\n\n# Ambiguous\n')
+
+    with pytest.raises(ValueError, match="must be 'always' or a YAML list"):
+        parse_policy(policy)
+
+
+def write_scoped_agent(
+    agents_root: Path,
+    targets: list[str] | None,
+    model_intent: dict[str, object],
+    agent_id: str = "codex-only",
+    include_delegates: bool = True,
+) -> Path:
+    """Create minimal canonical metadata for target-scoping tests."""
+    agent_dir = agents_root / agent_id
+    agent_dir.mkdir(parents=True)
+    metadata: dict[str, object] = {
+        "id": agent_id,
+        "description": "Synthetic target-scoping fixture.",
+        "role_type": "fixture",
+        "visibility": "hidden",
+        "capabilities": ["read"],
+        "model_intent": model_intent,
+    }
+    if include_delegates:
+        metadata["delegates"] = []
+    if targets is not None:
+        metadata["targets"] = targets
+    (agent_dir / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+    (agent_dir / "prompt.md").write_text("Synthetic prompt.\n", encoding="utf-8")
+    return agent_dir
+
+
+def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
+    """Universal agents stay universal while providers add scoped specialists."""
+    agents = shared_agents()
+
+    universal_agents = {
+        "coder",
+        "documenter",
+        "orchestrator",
+        "planner",
+        "reviewer",
+    }
+    assert len(agents) == 8
+    assert {agent["id"] for agent, _agent_dir in agents} == {
+        *universal_agents,
+        "luna_coder",
+        "sol_coder",
+        "antigravity_flash_coder",
+    }
+    assert {
+        agent["id"] for agent, _agent_dir in shared_agents("github-copilot")
+    } == universal_agents
+    assert {
+        agent["id"] for agent, _agent_dir in shared_agents("claude-code")
+    } == universal_agents
+    assert {agent["id"] for agent, _agent_dir in shared_agents("openai-codex")} == {
+        *universal_agents,
+        "luna_coder",
+        "sol_coder",
+    }
+    assert {
+        agent["id"] for agent, _agent_dir in shared_agents("google-antigravity")
+    } == {*universal_agents, "antigravity_flash_coder"}
+
+
+def test_antigravity_flash_coder_metadata_and_adapter_are_exact() -> None:
+    """Flash is a single-provider coder with one documented Pro escalation."""
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }
+    flash, flash_dir = agents_by_id["antigravity_flash_coder"]
+    coder, _coder_dir = agents_by_id["coder"]
+
+    assert flash["targets"] == ("google-antigravity",)
+    assert flash["prompt_base"] == "coder"
+    assert flash["model_intent"] == {
+        "google-antigravity": {"model": "flash", "escalate_to": "coder"}
+    }
+    assert coder["model_intent"]["google-antigravity"] == {"model": "pro"}
+    assert ANTIGRAVITY_AGENT_MODEL_INTENTS == {
+        "orchestrator": "pro",
+        "planner": "pro",
+        "antigravity_flash_coder": "flash",
+        "coder": "pro",
+        "reviewer": "pro",
+        "documenter": "flash",
+    }
+    assert ANTIGRAVITY_ESCALATION_CHAIN == {"antigravity_flash_coder": "coder"}
+
+    supplement = (flash_dir / "prompt.google-antigravity.md").read_text(
+        encoding="utf-8"
+    )
+    assert "return only this escalation object" in supplement
+    escalation_match = re.search(r"```json\n(.*?)\n```", supplement, re.DOTALL)
+    assert escalation_match is not None
+    assert json.loads(escalation_match[1]) == {
+        "status": "escalate",
+        "reason": "unknown-root-cause",
+        "workspace_changed": False,
+        "evidence": ["concrete evidence"],
+        "needed": ["needed decision or evidence"],
+    }
+
+    rendered = render_antigravity_agent_adapter(flash)
+    assert "mainAgent: false" in rendered
+    assert "subagent: true" in rendered
+    assert "model: flash" in rendered
+    assert "inheritMcp: true" in rendered
+    assert "  - run_command" in rendered
+    assert "todo" not in rendered
+    assert "vscode" not in rendered
+
+    orchestrator, _orchestrator_dir = agents_by_id["orchestrator"]
+    rendered_orchestrator = render_antigravity_agent_adapter(orchestrator)
+    assert "mainAgent: false" in rendered_orchestrator
+    assert "subagent: false" in rendered_orchestrator
+    assert (
+        "Use the runtime's native task tracker when one is available."
+        in rendered_orchestrator
+    )
+    assert (
+        "where it is unavailable, write the same phase checklist"
+        in rendered_orchestrator
+    )
+    assert "TodoWrite" not in rendered_orchestrator
+    assert "manage_task" not in rendered_orchestrator
+    assert "schedule" not in rendered_orchestrator
+
+
+def test_antigravity_adapter_validation_rejects_unknown_schema_values(
+    tmp_path: Path,
+) -> None:
+    """Static validation has independent native tool and frontmatter allowlists."""
+    flash, _flash_dir = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }["antigravity_flash_coder"]
+    rendered = render_antigravity_agent_adapter(flash)
+    path = tmp_path / "agent.md"
+
+    path.write_text(rendered.replace("model: flash", "bogusField: true\nmodel: flash"))
+    assert any(
+        "unsupported frontmatter fields ['bogusField']" in error
+        for error in antigravity_agent_adapter_errors(path, flash)
+    )
+
+    path.write_text(
+        rendered.replace("  - grep_search", "  - invented_tool\n  - grep_search")
+    )
+    assert any(
+        "unknown native tools ['invented_tool']" in error
+        for error in antigravity_agent_adapter_errors(path, flash)
+    )
+
+    for native_tool in ("manage_task", "schedule"):
+        path.write_text(
+            rendered.replace("  - grep_search", f"  - {native_tool}\n  - grep_search")
+        )
+        assert any(
+            f"unknown native tools ['{native_tool}']" in error
+            for error in antigravity_agent_adapter_errors(path, flash)
+        )
+
+
+def test_antigravity_static_adapter_renders_canonical_mcp_skills_and_no_rules(
+    tmp_path: Path,
+) -> None:
+    """The provider adds static adapters without guessing native rule metadata."""
+    render_antigravity(tmp_path)
+
+    generated_agents = {
+        path.parent.name
+        for path in (tmp_path / ".agents" / "agents").glob("*/agent.md")
+    }
+    assert generated_agents == set(ANTIGRAVITY_AGENT_MODEL_INTENTS)
+    for path in (tmp_path / ".agents" / "agents").glob("*/agent.md"):
+        rendered = path.read_text(encoding="utf-8")
+        assert "mainAgent: false" in rendered
+        if path.parent.name == "orchestrator":
+            assert "subagent: false" in rendered
+        else:
+            assert "subagent: true" in rendered
+    assert json.loads((tmp_path / ".agents" / "mcp_config.json").read_text()) == {
+        "mcpServers": target_generator.shared_mcp_servers()
+    }
+    assert not (tmp_path / ".agents" / "rules").exists()
+    assert {
+        path.relative_to(tmp_path / ".agents" / "skills")
+        for path in (tmp_path / ".agents" / "skills").rglob("*")
+        if path.is_file()
+    } == {
+        path.relative_to(REPO_ROOT / "shared" / "skills")
+        for path in (REPO_ROOT / "shared" / "skills").rglob("*")
+        if path.is_file()
+    }
+
+
+def test_codex_coder_specialist_metadata_and_supplements_are_exact() -> None:
+    """Luna and Sol remain constrained Codex-only derivatives of coder."""
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }
+    expected_capabilities = [
+        "edit",
+        "execute",
+        "read",
+        "search",
+        "todo",
+        "vscode",
+        "web",
+    ]
+    coder, _coder_dir = agents_by_id["coder"]
+    assert coder["capabilities"] == expected_capabilities
+    assert coder["model_intent"]["openai-codex"] == {
+        "model": "gpt-5.6-terra",
+        "effort": "high",
+        "escalate_to": "sol_coder",
+    }
+
+    luna, luna_dir = agents_by_id["luna_coder"]
+    sol, sol_dir = agents_by_id["sol_coder"]
+    expected_metadata_fields = {
+        "id",
+        "description",
+        "role_type",
+        "visibility",
+        "capabilities",
+        "delegates",
+        "targets",
+        "prompt_base",
+        "model_intent",
+    }
+    for specialist in (luna, sol):
+        assert set(specialist) == expected_metadata_fields
+        assert specialist["role_type"] == "coder"
+        assert specialist["visibility"] == "hidden"
+        assert specialist["capabilities"] == expected_capabilities
+        assert specialist["delegates"] == []
+        assert specialist["prompt_base"] == "coder"
+        assert specialist["targets"] == ("openai-codex",)
+
+    assert luna["id"] == "luna_coder"
+    assert luna["description"] == (
+        "Bounded implementation specialist for deterministic Codex orchestration. "
+        "Hidden is an internal orchestration convention and does not claim native "
+        "Codex UI invisibility."
+    )
+    assert luna["model_intent"] == {
+        "openai-codex": {
+            "model": "gpt-5.6-luna",
+            "effort": "xhigh",
+            "escalate_to": "coder",
+        }
+    }
+    assert sol["id"] == "sol_coder"
+    assert sol["description"] == (
+        "Final recovery implementation specialist for deterministic Codex "
+        "orchestration. Hidden is an internal orchestration convention and does "
+        "not claim native Codex UI invisibility."
+    )
+    assert sol["model_intent"] == {
+        "openai-codex": {"model": "gpt-5.6-sol", "effort": "xhigh"}
+    }
+
+    luna_supplement = (luna_dir / "prompt.openai-codex.md").read_text(encoding="utf-8")
+    normalized_luna_supplement = " ".join(luna_supplement.split())
+    for clause in (
+        "Before editing, validate the supplied implementation packet where possible.",
+        "a clear outcome and plan-step identity;",
+        "relevant files, symbols, entry points, patterns, or failing checks;",
+        "approved constraints and must-not-change behavior;",
+        "rejected approaches when relevant; required skills;",
+        "objective acceptance criteria and verification commands;",
+        "freedom to choose the smallest maintainable local implementation body, decomposition, and algorithm.",
+        "Do not invent missing architecture, interfaces, root cause, migrations, security decisions, ownership, or unrelated refactors.",
+        "If the packet is unsafe or insufficient to implement, return only this escalation object:",
+        "`workspace_changed` must accurately report whether this agent changed the workspace.",
+        "`evidence` and `needed` must be concrete lists.",
+        "This is a prompt-enforced handoff object, not a native typed protocol.",
+    ):
+        assert clause in normalized_luna_supplement
+    escalation_match = re.search(
+        r"```json\n(?P<object>.*?)\n```", luna_supplement, flags=re.DOTALL
+    )
+    assert escalation_match is not None
+    assert json.loads(escalation_match["object"]) == {
+        "status": "escalate",
+        "reason": "unknown-root-cause",
+        "workspace_changed": False,
+        "evidence": ["concrete evidence"],
+        "needed": ["needed decision or evidence"],
+    }
+    reason_section = luna_supplement.split("`reason` must be one of ", 1)[1].split(
+        "`workspace_changed`", 1
+    )[0]
+    assert set(re.findall(r"`([^`]+)`", reason_section)) == {
+        "unresolved-design-decision",
+        "unknown-root-cause",
+        "scope-not-bounded",
+        "missing-interface-contract",
+        "security-or-migration-decision",
+        "ownership-unclear",
+    }
+
+    sol_supplement = (sol_dir / "prompt.openai-codex.md").read_text(encoding="utf-8")
+    normalized_sol_supplement = " ".join(sol_supplement.split())
+    for clause in (
+        "Inspect the existing diff and prior deterministic verification or reviewer failure evidence before editing.",
+        "Recover with the smallest safe change that addresses that evidence;",
+        "do not restart the phase or broaden scope.",
+        "Preserve any useful prior work and adapt it only when the evidence requires it.",
+        "stop recovery and return control to the orchestrator with the failure evidence and current diff state.",
+        "Do not loop, delegate further, or choose another successor.",
+    ):
+        assert clause in normalized_sol_supplement
+
+
+def test_readme_agent_contract_uses_target_eligibility_and_codex_tiers() -> None:
+    """README lists universal and Codex-only roles separately from metadata."""
+    canonical_agents = shared_agents()
+    target_agent_sets = tuple(
+        {agent["id"] for agent, _agent_dir in shared_agents(target)}
+        for target in ("github-copilot", "claude-code", "openai-codex")
+    )
+    universal_agents = sorted(set.intersection(*target_agent_sets))
+    codex_only_agents = sorted(
+        {agent["id"] for agent, _agent_dir in shared_agents("openai-codex")}
+        - {agent["id"] for agent, _agent_dir in shared_agents("github-copilot")}
+        - {agent["id"] for agent, _agent_dir in shared_agents("claude-code")}
+    )
+    codex_tiers = {
+        agent["id"]: agent["model_intent"]["openai-codex"]
+        for agent, _agent_dir in canonical_agents
+        if "openai-codex" in agent["targets"]
+    }
+    readme = (
+        "Universal agents:\n\n"
+        + "".join(f"- {agent}\n" for agent in universal_agents)
+        + "\nCodex-only agents:\n\n"
+        + "".join(f"- {agent}\n" for agent in codex_only_agents)
+        + "\n| Agent | Claude model | Claude effort | Codex model | Codex effort |\n"
+        + "| --- | --- | --- | --- | --- |\n"
+        + "".join(
+            f"| {agent} | — | — | `{intent['model']}` | `{intent['effort']}` |\n"
+            for agent, intent in sorted(codex_tiers.items())
+        )
+    )
+
+    assert readme_agent_contract_errors(readme, canonical_agents) == []
+    assert any(
+        "Codex-only agents" in error
+        for error in readme_agent_contract_errors(
+            readme.replace("- sol_coder\n", "", 1), canonical_agents
+        )
+    )
+    assert any(
+        "Universal agents" in error
+        for error in readme_agent_contract_errors(
+            readme.replace("- coder\n", "- luna_coder\n", 1), canonical_agents
+        )
+    )
+    for label, duplicate in (
+        ("Universal", "coder"),
+        ("Codex-only", "luna_coder"),
+    ):
+        duplicated = readme.replace(
+            f"- {duplicate}\n", f"- {duplicate}\n- {duplicate}\n", 1
+        )
+        assert duplicated != readme
+        assert any(
+            f"README '{label} agents' list must not contain duplicates" == error
+            for error in readme_agent_contract_errors(duplicated, canonical_agents)
+        )
+    assert any(
+        "Codex model/effort rows" in error
+        for error in readme_agent_contract_errors(
+            readme.replace("`gpt-5.6-terra`", "`gpt-5.6-sol`", 1),
+            canonical_agents,
+        )
+    )
+    documenter_model = codex_tiers["documenter"]["model"]
+    documenter_effort = codex_tiers["documenter"]["effort"]
+    documenter_row = (
+        f"| documenter | — | — | `{documenter_model}` | `{documenter_effort}` |\n"
+    )
+    for name, replacement, expected_error in (
+        (
+            "unexpected row",
+            f"{documenter_row}| unexpected | — | — | `gpt-5.6-sol` | `high` |\n",
+            "unexpected role unexpected",
+        ),
+        (
+            "duplicate row",
+            f"{documenter_row}{documenter_row}",
+            "duplicate the Codex model row",
+        ),
+        ("malformed row", f"{documenter_row}not a data row\n", "only data rows"),
+    ):
+        mutated = readme.replace(documenter_row, replacement, 1)
+        assert mutated != readme, name
+        assert any(
+            expected_error in error
+            for error in readme_agent_contract_errors(mutated, canonical_agents)
+        )
+
+
+def test_codex_orchestrator_routing_is_self_contained_and_target_isolated(
+    tmp_path: Path,
+) -> None:
+    """The named recovery route exists only in Codex's composed orchestrator prompt."""
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }
+    orchestrator, orchestrator_dir = agents_by_id["orchestrator"]
+    supplement = (orchestrator_dir / "prompt.openai-codex.md").read_text(
+        encoding="utf-8"
+    )
+    rendered_codex = tomllib.loads(render_codex_agent_adapter(orchestrator))[
+        "developer_instructions"
+    ]
+
+    assert "--- Codex role supplement: orchestrator ---" in rendered_codex
+    assert rendered_codex.count("--- Codex role supplement: orchestrator ---") == 1
+    assert supplement.strip() in rendered_codex
+    assert codex_orchestrator_routing_errors(rendered_codex) == []
+    assert codex_orchestrator_escalation_errors(rendered_codex) == []
+    normalized_codex = " ".join(rendered_codex.split())
+    for clause in (
+        "Before editing where possible, `luna_coder` validates the packet.",
+        "it returns only this prompt-enforced escalation object; this is not a native typed protocol:",
+    ):
+        assert clause in normalized_codex
+    escalation_match = re.search(
+        r"```json\n(?P<object>.*?)\n```", rendered_codex, flags=re.DOTALL
+    )
+    assert escalation_match is not None
+    assert json.loads(escalation_match["object"]) == {
+        "status": "escalate",
+        "reason": "unknown-root-cause",
+        "workspace_changed": False,
+        "evidence": ["..."],
+        "needed": ["..."],
+    }
+    reason_section = rendered_codex.split("`reason` is exactly one of ", 1)[1].split(
+        "`workspace_changed`", 1
+    )[0]
+    assert set(re.findall(r"`([^`]+)`", reason_section)) == {
+        "unresolved-design-decision",
+        "unknown-root-cause",
+        "scope-not-bounded",
+        "missing-interface-contract",
+        "security-or-migration-decision",
+        "ownership-unclear",
+    }
+    invalid_reason_values = ('"other"', "[]", "{}", "7", "null")
+    for mutated in (
+        rendered_codex.replace("Before editing where possible", "Before editing", 1),
+        *(
+            rendered_codex.replace(
+                '"reason": "unknown-root-cause"', f'"reason": {value}', 1
+            )
+            for value in invalid_reason_values
+        ),
+        rendered_codex.replace(
+            "`ownership-unclear`.", "`ownership-unclear`, or `other`.", 1
+        ),
+    ):
+        assert codex_orchestrator_escalation_errors(mutated)
+    assert any(
+        "missing Codex orchestrator routing fragment" in error
+        for error in codex_orchestrator_routing_errors(
+            rendered_codex.replace(
+                "`luna_coder` for that step", "`bounded_coder` for that step", 1
+            )
+        )
+    )
+    for prohibited in (
+        "model_reasoning_effort",
+        "spawn override",
+        "spawn-time model override",
+        "spawn-time effort override",
+        "per-call model override",
+        "per-call Luna-specific override",
+        "Luna/model-specific override",
+    ):
+        assert any(
+            "obsolete Codex" in error and "override" in error
+            for error in codex_orchestrator_routing_errors(
+                f"{rendered_codex}\n{prohibited}"
+            )
+        )
+
+    target_generator.render_claude_agents(tmp_path)
+    claude = (tmp_path / ".claude" / "agents" / "orchestrator.md").read_text(
+        encoding="utf-8"
+    )
+    copilot = render_github_agent_adapter(orchestrator, orchestrator_dir)
+    for instructions in (claude, copilot):
+        assert "luna_coder" not in instructions
+        assert "sol_coder" not in instructions
+        assert "Codex Coder Routing Supplement" not in instructions
+
+
+def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
+    """Only evidence-backed implementation failures can spend the next tier."""
+    orchestrator = next(
+        agent for agent, _agent_dir in shared_agents() if agent["id"] == "orchestrator"
+    )
+    rendered_codex = tomllib.loads(render_codex_agent_adapter(orchestrator))[
+        "developer_instructions"
+    ]
+
+    assert codex_orchestrator_attribution_errors(rendered_codex) == []
+    normalized_codex = " ".join(rendered_codex.split())
+    for clause in (
+        "`implementation`: the current implementation caused the failure; advance exactly one tier automatically.",
+        "`environment`: a missing dependency, service, credential, sandbox restriction, unavailable tool, or other execution-environment blocker; stop model escalation and report it.",
+        "`baseline`: evidence shows the failure existed on the originating branch or outside the changed scope; stop model escalation and report it.",
+        "`indeterminate`: the evidence cannot reliably attribute the failure; return to orchestrator judgment with no automatic escalation.",
+        "A deterministic verification failure alone is not sufficient for `implementation`.",
+        "A reviewer CRITICAL or MAJOR finding advances a tier only when it applies to the current implementation diff.",
+        "Infrastructure errors, flaky or unreproduced failures, and unrelated baseline findings must not spend a stronger model automatically.",
+        "The orchestrator may request focused evidence using existing agents or tools; it must not invent attribution.",
+        "Only `implementation` routes once to `sol_coder` with all prior evidence and the current diff, after an attributable Terra-produced failure.",
+    ):
+        assert clause in normalized_codex
+
+    for removed_clause in (
+        "A deterministic verification failure alone is not sufficient for `implementation`.",
+        "only when it applies to the current\nimplementation diff.",
+        "must not spend a stronger model automatically.",
+        "it must not invent attribution.",
+        "Only `implementation` routes once to\n`sol_coder` with all prior evidence and the current diff, after an attributable\nTerra-produced failure.",
+    ):
+        assert codex_orchestrator_attribution_errors(
+            rendered_codex.replace(removed_clause, "", 1)
+        )
+
+    category_mutations = (
+        (
+            "extra category",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n- `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "categories must be exactly",
+        ),
+        (
+            "missing indeterminate category",
+            "- `indeterminate`: the evidence cannot reliably attribute the failure; return\n  to orchestrator judgment with no automatic escalation.\n",
+            "",
+            "indeterminate category",
+        ),
+        (
+            "environment stop drift",
+            "or other execution-environment blocker; stop\n  model escalation and report it.",
+            "or other execution-environment blocker; advance a tier automatically.",
+            "environment category",
+        ),
+        (
+            "baseline stop drift",
+            "outside the changed scope; stop model escalation and report it.",
+            "outside the changed scope; advance a tier automatically.",
+            "baseline category",
+        ),
+    )
+    for _name, source, replacement, expected_error in category_mutations:
+        mutated = rendered_codex.replace(source, replacement, 1)
+        assert mutated != rendered_codex, _name
+        assert any(
+            expected_error in error
+            for error in codex_orchestrator_attribution_errors(mutated)
+        )
+
+    unmatched_category_mutations = (
+        (
+            "alternate asterisk bullet",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n* `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+        ),
+        (
+            "alternate plus bullet",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n+ `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+        ),
+        (
+            "numbered category bullet",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n1. `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+        ),
+        (
+            "stray prose before categories",
+            "as exactly one of:\n\n- `implementation`",
+            "as exactly one of:\n\nStray category prose.\n\n- `implementation`",
+        ),
+        (
+            "stray prose between categories",
+            "automatically.\n- `environment`",
+            "automatically.\nStray category prose.\n- `environment`",
+        ),
+        (
+            "stray prose after categories",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\nStray category prose.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+        ),
+    )
+    for name, source, replacement in unmatched_category_mutations:
+        mutated = rendered_codex.replace(source, replacement, 1)
+        assert mutated != rendered_codex, name
+        assert any(
+            "category list must contain only canonical bullets" in error
+            for error in codex_orchestrator_attribution_errors(mutated)
+        )
+
+
+def test_canonical_coder_routing_contract_rejects_roster_tier_and_graph_drift() -> None:
+    """The universal-five/Codex-seven roster and named recovery chain are closed."""
+    canonical_agents = shared_agents()
+    assert canonical_agent_contract_errors(canonical_agents) == []
+
+    def changed_agents() -> list[tuple[dict[str, object], Path]]:
+        return [(deepcopy(agent), agent_dir) for agent, agent_dir in canonical_agents]
+
+    def agent_by_id(
+        agents: list[tuple[dict[str, object], Path]], agent_id: str
+    ) -> dict[str, object]:
+        return next(agent for agent, _agent_dir in agents if agent["id"] == agent_id)
+
+    for agent_id, model, effort in (
+        ("luna_coder", "gpt-5.6-luna", "max"),
+        ("coder", "gpt-5.6-sol", "high"),
+        ("sol_coder", "gpt-5.6-sol", "high"),
+    ):
+        drifted_agents = changed_agents()
+        intent = agent_by_id(drifted_agents, agent_id)["model_intent"]
+        assert isinstance(intent, dict)
+        codex_intent = intent["openai-codex"]
+        assert isinstance(codex_intent, dict)
+        codex_intent.update(model=model, effort=effort)
+        assert any(
+            "model/effort mappings drifted" in error
+            for error in canonical_agent_contract_errors(drifted_agents)
+        )
+
+    for source, successor in (
+        ("luna_coder", "sol_coder"),
+        ("coder", "coder"),
+        ("coder", None),
+    ):
+        drifted_agents = changed_agents()
+        intent = agent_by_id(drifted_agents, source)["model_intent"]
+        assert isinstance(intent, dict)
+        codex_intent = intent["openai-codex"]
+        assert isinstance(codex_intent, dict)
+        if successor is None:
+            codex_intent.pop("escalate_to")
+        else:
+            codex_intent["escalate_to"] = successor
+        assert any(
+            "escalation contract" in error
+            for error in canonical_agent_contract_errors(drifted_agents)
+        )
+
+    for target in ("github-copilot", "claude-code"):
+        drifted_agents = changed_agents()
+        luna = agent_by_id(drifted_agents, "luna_coder")
+        luna_targets = luna["targets"]
+        assert isinstance(luna_targets, tuple)
+        luna["targets"] = (*luna_targets, target)
+        assert any(
+            f"canonical {target} agents" in error
+            for error in canonical_agent_contract_errors(drifted_agents)
+        )
+    drifted_agents = changed_agents()
+    luna = agent_by_id(drifted_agents, "luna_coder")
+    luna["targets"] = ()
+    assert any(
+        "canonical openai-codex agents" in error
+        for error in canonical_agent_contract_errors(drifted_agents)
+    )
+
+
+@pytest.mark.parametrize(
+    ("targets", "model_intent", "field"),
+    (
+        ([], {}, "targets must not be empty"),
+        (["openai-codex", "openai-codex"], {}, "targets must not contain duplicates"),
+        (["not-a-target"], {}, "targets contains unsupported target IDs"),
+        (["openai-codex"], {}, "model_intent is missing eligible targets"),
+        (
+            ["openai-codex"],
+            {"github-copilot": "target-default", "openai-codex": {}},
+            "model_intent declares ineligible targets",
+        ),
+        (["github-copilot"], {"github-copilot": 42}, "model_intent.github-copilot"),
+        (["claude-code"], {"claude-code": {}}, "model_intent.claude-code.model"),
+        (
+            ["openai-codex"],
+            {"openai-codex": {"model": "gpt-5.6-luna"}},
+            "model_intent.openai-codex.effort",
+        ),
+        (
+            ["claude-code"],
+            {"claude-code": {"model": "sonnet", "tier": "high"}},
+            "model_intent.claude-code has unsupported fields",
+        ),
+        (
+            ["google-antigravity"],
+            {"google-antigravity": {"model": "flash_lite"}},
+            "model_intent.google-antigravity.model",
+        ),
+        (
+            ["google-antigravity"],
+            {"google-antigravity": {"model": "flash", "effort": "low"}},
+            "model_intent.google-antigravity has unsupported fields",
+        ),
+    ),
+)
+def test_agent_target_metadata_rejects_invalid_scope(
+    tmp_path: Path,
+    targets: list[str],
+    model_intent: dict[str, object],
+    field: str,
+) -> None:
+    """Invalid eligibility metadata names both its file and bad field."""
+    agents_root = tmp_path / "agents"
+    write_scoped_agent(agents_root, targets, model_intent)
+
+    with pytest.raises(ValueError, match=rf"agent\.yaml: {re.escape(field)}"):
+        load_shared_agents(agents_root)
+
+
+def test_codex_only_agent_renders_only_to_codex(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A scoped agent is emitted only by its eligible target renderer."""
+    agents_root = tmp_path / "shared" / "agents"
+    write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-luna", "effort": "low"}},
+    )
+    monkeypatch.setattr(target_generator, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(target_generator, "render_root_guidance", lambda _target: "")
+    monkeypatch.setattr(target_generator, "render_codex_config", lambda _path: None)
+    monkeypatch.setattr(target_generator, "render_codex_hooks", lambda _path: None)
+    monkeypatch.setattr(target_generator, "render_copilot_instructions", lambda: "")
+    monkeypatch.setattr(target_generator, "shared_policies", lambda: [])
+    monkeypatch.setattr(
+        target_generator, "copy_file", lambda _source, _destination: None
+    )
+    monkeypatch.setattr(target_generator, "render_vscode_mcp_json", lambda _path: None)
+    monkeypatch.setattr(
+        target_generator, "render_vscode_tasks_json", lambda _path: None
+    )
+
+    target_generator.render_claude_agents(tmp_path)
+    target_generator.render_github(tmp_path)
+    target_generator.render_codex(tmp_path)
+
+    assert not (tmp_path / ".claude" / "agents" / "codex-only.md").exists()
+    assert not (tmp_path / ".github" / "agents" / "codex-only.agent.md").exists()
+    assert (tmp_path / ".codex" / "agents" / "codex-only.toml").exists()
+
+
+def test_github_only_agent_embeds_its_prompt_without_claude_reference(
+    tmp_path: Path,
+) -> None:
+    """A GitHub-only eligible agent cannot reference an absent Claude adapter."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["github-copilot"],
+        {"github-copilot": "target-default"},
+    )
+    agent = load_shared_agents(agents_root)[0][0]
+
+    rendered = render_github_agent_adapter(agent, agent_dir)
+
+    assert ".claude/agents/" not in rendered
+    assert "This file is self-contained" in rendered
+    assert "Synthetic prompt." in rendered
+
+
+def test_omitted_delegates_normalizes_to_an_empty_rendered_list(tmp_path: Path) -> None:
+    """Historical agent metadata may omit delegates without changing rendering."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["github-copilot"],
+        {"github-copilot": "target-default"},
+        include_delegates=False,
+    )
+    agent = load_shared_agents(agents_root)[0][0]
+
+    assert agent["delegates"] == []
+    assert "agents:" not in render_github_agent_adapter(agent, agent_dir)
+
+
+def test_agent_loader_preserves_malformed_json_cause(tmp_path: Path) -> None:
+    """Malformed agent metadata names its file and preserves loader safety."""
+    metadata_path = tmp_path / "agents" / "broken" / "agent.yaml"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text("{", encoding="utf-8")
+
+    with pytest.raises(
+        ValueError, match=r"agent\.yaml: invalid JSON metadata"
+    ) as error:
+        load_shared_agents(tmp_path / "agents")
+
+    assert isinstance(error.value.__cause__, json.JSONDecodeError)
+
+
+def test_agent_loader_rejects_non_object_metadata(tmp_path: Path) -> None:
+    """Canonical agent metadata must be a JSON object."""
+    metadata_path = tmp_path / "agents" / "broken" / "agent.yaml"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"agent\.yaml: metadata must be an object"):
+        load_shared_agents(tmp_path / "agents")
+
+
+def test_agent_loader_accepts_approved_underscore_stable_ids(tmp_path: Path) -> None:
+    """Stable agent IDs allow the approved underscore routing names."""
+    agents_root = tmp_path / "agents"
+    write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-luna", "effort": "low"}},
+        agent_id="luna_coder",
+    )
+
+    assert load_shared_agents(agents_root)[0][0]["id"] == "luna_coder"
+
+
+@pytest.mark.parametrize(
+    ("prompt_base", "base_prompt_base", "include_supplement", "expected"),
+    (
+        ("missing", None, True, "prompt_base references missing agent"),
+        ("derived", None, True, "prompt_base must not self-reference"),
+        ("base", "root", True, "prompt_base must not create multi-level inheritance"),
+        ("base", None, False, "derived Codex agents require prompt.openai-codex.md"),
+    ),
+)
+def test_agent_loader_rejects_invalid_one_level_prompt_composition(
+    tmp_path: Path,
+    prompt_base: str,
+    base_prompt_base: str | None,
+    include_supplement: bool,
+    expected: str,
+) -> None:
+    """Derived Codex prompts must have one real base and one supplement."""
+    agents_root = tmp_path / "agents"
+    base = write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-terra", "effort": "high"}},
+        agent_id="base",
+    )
+    if base_prompt_base is not None:
+        root = write_scoped_agent(
+            agents_root,
+            ["openai-codex"],
+            {"openai-codex": {"model": "gpt-5.6-terra", "effort": "high"}},
+            agent_id="root",
+        )
+        metadata = json.loads((base / "agent.yaml").read_text(encoding="utf-8"))
+        metadata["prompt_base"] = base_prompt_base
+        (base / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+        (root / "prompt.md").write_text("Root prompt.\n", encoding="utf-8")
+
+    derived = agents_root / "derived"
+    derived.mkdir()
+    derived_metadata = {
+        "id": "derived",
+        "description": "Derived fixture.",
+        "role_type": "coder",
+        "visibility": "hidden",
+        "capabilities": ["read"],
+        "delegates": [],
+        "targets": ["openai-codex"],
+        "prompt_base": prompt_base,
+        "model_intent": {"openai-codex": {"model": "gpt-5.6-luna", "effort": "xhigh"}},
+    }
+    (derived / "agent.yaml").write_text(json.dumps(derived_metadata), encoding="utf-8")
+    if include_supplement:
+        (derived / "prompt.openai-codex.md").write_text(
+            "Derived supplement.\n", encoding="utf-8"
+        )
+
+    with pytest.raises(ValueError, match=re.escape(expected)):
+        load_shared_agents(agents_root)
+
+
+def test_agent_loader_rejects_named_escalation_cycles(tmp_path: Path) -> None:
+    """Named Codex escalation targets cannot create a recovery loop."""
+    agents_root = tmp_path / "agents"
+    for agent_id, target_id in (("first", "second"), ("second", "first")):
+        agent_dir = write_scoped_agent(
+            agents_root,
+            ["openai-codex"],
+            {
+                "openai-codex": {
+                    "model": "gpt-5.6-terra",
+                    "effort": "high",
+                    "escalate_to": target_id,
+                }
+            },
+            agent_id=agent_id,
+        )
+        (agent_dir / "prompt.md").write_text("Prompt.\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Codex escalation cycle detected"):
+        load_shared_agents(agents_root)
+
+
+def test_agent_loader_rejects_prompt_base_cycles(tmp_path: Path) -> None:
+    """Prompt composition cycles fail before any generated prompt is read."""
+    agents_root = tmp_path / "agents"
+    for agent_id, base_id in (("first", "second"), ("second", "first")):
+        agent_dir = agents_root / agent_id
+        agent_dir.mkdir(parents=True)
+        metadata = {
+            "id": agent_id,
+            "description": "Derived fixture.",
+            "role_type": "coder",
+            "visibility": "hidden",
+            "capabilities": ["read"],
+            "delegates": [],
+            "targets": ["openai-codex"],
+            "prompt_base": base_id,
+            "model_intent": {
+                "openai-codex": {"model": "gpt-5.6-luna", "effort": "xhigh"}
+            },
+        }
+        (agent_dir / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+        (agent_dir / "prompt.openai-codex.md").write_text(
+            "Derived supplement.\n", encoding="utf-8"
+        )
+
+    with pytest.raises(ValueError, match="prompt_base cycle detected"):
+        load_shared_agents(agents_root)
+
+
+@pytest.mark.parametrize(
+    "supplement",
+    (
+        "# Header\n\nUse AGENTS.md and keep implementation focused.\n",
+        "# Header\n\nUse   AGENTS.md\n\n and\tkeep implementation\nfocused.\n",
+    ),
+    ids=("transformed-copy", "whitespace-normalized-copy"),
+)
+def test_agent_loader_rejects_transformed_or_whitespace_copied_base_prompt(
+    tmp_path: Path, supplement: str
+) -> None:
+    """A supplement cannot conceal a complete base copy behind target rewrites."""
+    agents_root = tmp_path / "agents"
+    base = write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-terra", "effort": "high"}},
+        agent_id="base",
+    )
+    (base / "prompt.md").write_text(
+        "# Header\n\nUse .github/copilot-instructions.md and keep implementation focused.\n",
+        encoding="utf-8",
+    )
+    derived = agents_root / "derived"
+    derived.mkdir()
+    metadata = {
+        "id": "derived",
+        "description": "Derived fixture.",
+        "role_type": "coder",
+        "visibility": "hidden",
+        "capabilities": ["read"],
+        "delegates": [],
+        "targets": ["openai-codex"],
+        "prompt_base": "base",
+        "model_intent": {"openai-codex": {"model": "gpt-5.6-luna", "effort": "xhigh"}},
+    }
+    (derived / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+    (derived / "prompt.openai-codex.md").write_text(supplement, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must not copy its full base prompt"):
+        load_shared_agents(agents_root)
+
+
+def test_agent_loader_allows_only_codex_normal_agent_supplements(
+    tmp_path: Path,
+) -> None:
+    """A normal prompt can add Codex-only guidance without leaking to other targets."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-sol", "effort": "xhigh"}},
+    )
+    supplement = agent_dir / "prompt.openai-codex.md"
+    supplement.write_text("Codex-only supplement.\n", encoding="utf-8")
+    assert load_shared_agents(agents_root)[0][0]["id"] == "codex-only"
+
+    metadata = json.loads((agent_dir / "agent.yaml").read_text(encoding="utf-8"))
+    metadata["targets"] = ["claude-code"]
+    metadata["model_intent"] = {"claude-code": {"model": "sonnet"}}
+    (agent_dir / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="requires Codex eligibility"):
+        load_shared_agents(agents_root)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    (
+        ("description", None, "description must be a non-empty string"),
+        ("role_type", 7, "role_type must be a non-empty string"),
+        ("visibility", "internal", "visibility must be one of"),
+        ("capabilities", ["read", "read"], "capabilities must not contain duplicates"),
+        ("capabilities", ["invent"], "capabilities contains unsupported values"),
+        (
+            "delegates",
+            ["luna_coder", "luna_coder"],
+            "delegates must not contain duplicates",
+        ),
+        ("delegates", ["not valid"], "delegates must contain stable agent IDs"),
+        (
+            "model_intent",
+            {"claude-code": {"model": "sonnet", "effort": 7}},
+            "model_intent.claude-code.effort must be a non-empty string",
+        ),
+        (
+            "model_intent",
+            {
+                "claude-code": {"model": "sonnet"},
+                "openai-codex": {
+                    "model": "gpt-5.6-luna",
+                    "effort": "low",
+                    "escalate_to": {"agent": "sol_coder"},
+                },
+            },
+            "model_intent.openai-codex.escalate_to must be a non-empty string",
+        ),
+    ),
+)
+def test_agent_loader_validates_renderer_consumed_metadata(
+    tmp_path: Path, field: str, value: object, expected: str
+) -> None:
+    """All metadata a renderer reads is validated before generation starts."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["claude-code"],
+        {"claude-code": {"model": "sonnet"}},
+    )
+    metadata_path = agent_dir / "agent.yaml"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if value is None:
+        del metadata[field]
+    else:
+        metadata[field] = value
+    if "openai-codex" in metadata["model_intent"]:
+        metadata["targets"].append("openai-codex")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=rf"agent\.yaml: {re.escape(expected)}"):
+        load_shared_agents(agents_root)
+
+
+def test_agent_membership_errors_reject_target_omission_and_leakage() -> None:
+    """Target validation independently reports both eligibility failure modes."""
+    errors = agent_membership_errors("openai-codex", {"codex-only"}, {"github-only"})
+
+    assert "openai-codex missing eligible agents: ['codex-only']" in errors
+    assert "openai-codex contains ineligible agents: ['github-only']" in errors
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "contents", "expected"),
+    (
+        (
+            ".github/agents/planner.agent.md",
+            None,
+            "github-copilot missing eligible agents: ['planner']",
+        ),
+        (
+            ".github/agents/leaked.agent.md",
+            ".github/agents/coder.agent.md",
+            "github-copilot contains ineligible agents: ['leaked']",
+        ),
+        (
+            ".github/agents/luna_coder.agent.md",
+            ".github/agents/coder.agent.md",
+            "github-copilot contains ineligible agents: ['luna_coder']",
+        ),
+        (
+            ".claude/agents/luna_coder.md",
+            ".claude/agents/coder.md",
+            "claude-code contains ineligible agents: ['luna_coder']",
+        ),
+        (
+            ".codex/agents/luna_coder.toml",
+            None,
+            "openai-codex missing eligible agents: ['luna_coder']",
+        ),
+        (
+            ".codex/agents/sol_coder.toml",
+            None,
+            "openai-codex missing eligible agents: ['sol_coder']",
+        ),
+    ),
+)
+def test_validate_agents_rejects_generated_target_omission_and_leakage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative_path: str,
+    contents: str | None,
+    expected: str,
+) -> None:
+    """The full agent validator detects generated target membership drift."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    path = target_root / relative_path
+    if contents is None:
+        path.unlink()
+    else:
+        path.write_text(
+            (target_root / contents).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert expected in errors
+
+
+@pytest.mark.parametrize("field", ("skills", "mcp_servers", "sandbox_mode"))
+def test_validate_agents_rejects_codex_agent_local_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    """Codex agents inherit skills, MCP configuration, and the sandbox instead of
+    overriding them; Codex ignores `sandbox_mode` in a custom agent file."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".codex" / "agents" / "coder.toml"
+    agent_path.write_text(
+        f"{agent_path.read_text(encoding='utf-8')}\n{field} = []\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert any(
+        "must not define per-agent overrides" in error and field in error
+        for error in errors
+    )
+
+
+@pytest.mark.parametrize(
+    "invocation",
+    (
+        "persist findings with `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`",
+        "persist findings with `record_findings.py\n--out .claude/quality_reports/findings-<current_phase>.json`",
+        "uv run python .claude/scripts/record_findings.py src/ --profile code"
+        " --profile security [--profile ponytail] --phase <current_phase>"
+        " --base-ref dev --findings-json <path-or-stdin>"
+        ' --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...]'
+        " --out .claude/quality_reports/findings-<current_phase>.json",
+    ),
+    ids=("same-line", "reflowed-newline", "canonical-long-form"),
+)
+def test_validate_agents_rejects_non_orchestrator_findings_persistence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invocation: str
+) -> None:
+    """Only the orchestrator may persist findings evidence. A synthetic
+    reviewer body gaining its own record_findings.py --out invocation must be
+    flagged, including when a markdown reflow wraps it across a line break."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "reviewer.md"
+    agent_path.write_text(
+        f"{agent_path.read_text(encoding='utf-8')}\n\n{invocation}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert any(
+        "only the orchestrator may persist findings evidence" in error
+        and str(agent_path) in error
+        for error in errors
+    )
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    (
+        ("{", "invalid JSON metadata"),
+        (
+            json.dumps(
+                {
+                    "id": "github_only",
+                    "description": "Malformed model-intent fixture.",
+                    "role_type": "fixture",
+                    "visibility": "hidden",
+                    "capabilities": ["read"],
+                    "delegates": [],
+                    "targets": ["github-copilot"],
+                    "model_intent": {"github-copilot": 42},
+                }
+            ),
+            "model_intent.github-copilot must be a non-empty string",
+        ),
+    ),
+)
+def test_validate_agents_reports_canonical_loader_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    metadata: str,
+    expected: str,
+) -> None:
+    """The full validator reports malformed canonical metadata without crashing."""
+    metadata_path = tmp_path / "shared" / "agents" / "broken" / "agent.yaml"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text(metadata, encoding="utf-8")
+    monkeypatch.setattr(target_generator, "REPO_ROOT", tmp_path)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert errors == [f"{metadata_path}: {expected}"]
+
+
+def test_claude_generated_agents_never_name_runtime_disabled_tools() -> None:
+    """`TodoWrite` (disabled by default) and `MultiEdit` (no tool definition)
+    must never regenerate into Claude agent frontmatter."""
+    claude_agents = sorted(
+        (REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents").glob("*.md")
+    )
+    assert claude_agents
+    for path in claude_agents:
+        text = path.read_text(encoding="utf-8")
+        assert "TodoWrite" not in text, f"{path} names disabled tool TodoWrite"
+        assert "MultiEdit" not in text, f"{path} names nonexistent tool MultiEdit"
+
+
+def test_render_claude_tools_skips_todo_and_maps_delegate_to_agent() -> None:
+    """`todo` has no Claude tool mapping; `delegate` resolves to `Agent`."""
+    assert target_generator.render_claude_tools(["todo"]) == ""
+
+    orchestrator, _orchestrator_dir = next(
+        (agent, agent_dir)
+        for agent, agent_dir in shared_agents()
+        if agent["id"] == "orchestrator"
+    )
+    assert orchestrator["capabilities"] == [
+        "delegate",
+        "edit",
+        "execute",
+        "read",
+        "search",
+        "todo",
+    ]
+    assert target_generator.render_claude_tools(orchestrator["capabilities"]) == (
+        "Agent, Edit, Write, Bash, Read, Grep, Glob, "
+        "mcp__semble, mcp__context-mode, mcp__context7"
+    )
+
+
+def test_claude_agents_list_context7_exactly_when_they_have_search() -> None:
+    """GR-006: every generated Claude agent with the `search` capability grants
+    `mcp__context7`; an agent without `search` does not."""
+    agents_dir = REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents"
+    searching = [
+        agent
+        for agent, _agent_dir in shared_agents("claude-code")
+        if "search" in agent["capabilities"]
+    ]
+    assert searching
+    for agent in searching:
+        tools_line = next(
+            line
+            for line in (agents_dir / f"{agent['id']}.md")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith("tools:")
+        )
+        assert "mcp__context7" in tools_line.split(", "), agent["id"]
+
+    no_search = {"id": "reader", "description": "d", "capabilities": ["read", "edit"]}
+    frontmatter = claude_agent_frontmatter(no_search)
+    assert "tools: Read, Edit, Write" in frontmatter
+    assert "mcp__context7" not in "\n".join(frontmatter)
+
+
+def test_claude_agent_grant_check_requires_context7(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GR-006: a generated Claude agent that loses `mcp__context7` is reported,
+    and only that grant."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "coder.md"
+    text = agent_path.read_text(encoding="utf-8")
+    assert ", mcp__context7" in text
+    agent_path.write_text(text.replace(", mcp__context7", "", 1), encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert f"Claude agent must allow mcp__context7 MCP: {agent_path}" in errors
+    assert not any("must allow mcp__semble" in error for error in errors)
+    assert not any("must allow mcp__context-mode" in error for error in errors)
+
+
+def test_claude_role_agents_emit_nonempty_tools_line() -> None:
+    """A `tools:` field that resolves to nothing is a documented Claude Code
+    spawn error; dropping the `todo` mapping must not zero out any agent."""
+    for agent_id in ("coder", "orchestrator", "planner"):
+        path = (
+            REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents" / f"{agent_id}.md"
+        )
+        tools_line = next(
+            (
+                line
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.startswith("tools:")
+            ),
+            "",
+        )
+        assert tools_line, f"{agent_id} is missing a tools: line"
+        assert tools_line.removeprefix("tools:").strip()
+
+
+def test_claude_agent_native_tool_allowlist_is_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unsupported native tool name injected into `tools:` must be reported,
+    paired with a permitted addition that must not be."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "coder.md"
+    text = agent_path.read_text(encoding="utf-8")
+    tools_line = next(line for line in text.splitlines() if line.startswith("tools:"))
+    mutated_line = f"{tools_line}, Agent, TodoWrite"
+    agent_path.write_text(text.replace(tools_line, mutated_line, 1), encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert (
+        f"Claude agent has unknown native tools ['TodoWrite']: {agent_path}" in errors
+    )
+
+
+def test_claude_agent_tool_allowlist_runs_without_the_routing_string(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The native-tool allowlist must not be gated on the unrelated
+    tool-routing.instructions.md substring: an agent prompt that omits it
+    entirely must still be checked for an unsupported tool name."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "coder.md"
+    text = agent_path.read_text(encoding="utf-8")
+    assert "tool-routing.instructions.md" in text
+    tools_line = next(line for line in text.splitlines() if line.startswith("tools:"))
+    mutated_text = text.replace("tool-routing.instructions.md", "removed-for-test")
+    mutated_text = mutated_text.replace(tools_line, f"{tools_line}, TodoWrite", 1)
+    assert "tool-routing.instructions.md" not in mutated_text
+    agent_path.write_text(mutated_text, encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert (
+        f"Claude agent has unknown native tools ['TodoWrite']: {agent_path}" in errors
+    )
+
+
+def test_todo_capability_unchanged_for_other_runtimes() -> None:
+    """The `todo` capability keeps its existing Copilot, Antigravity, and Codex
+    meaning; only the Claude mapping was removed."""
+    assert target_generator.COPILOT_TOOL_MAP["todo"] == ["todo", "todos"]
+    assert "todo" not in target_generator.ANTIGRAVITY_TOOL_MAP
+
+    orchestrator, _orchestrator_dir = next(
+        (agent, agent_dir)
+        for agent, agent_dir in shared_agents()
+        if agent["id"] == "orchestrator"
+    )
+    assert "todo" not in render_antigravity_agent_adapter(orchestrator)
+    assert codex_agent_metadata_header(orchestrator).endswith(
+        "capability intents: delegate, edit, execute, read, search, todo."
+    )
+
+
+def test_validate_targets() -> None:
+    """The real generated-target validator accepts the current repository."""
+    result = subprocess.run(
+        [sys.executable, "scripts/validate_targets.py"],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS generated target is structurally valid" in result.stdout
+
+
+def test_mcp_server_parity_errors_fail_independently() -> None:
+    """A single drifted/missing server must fail on its own, never bundled
+    with, or masked by, an unrelated server's result."""
+    shared_mcp = {
+        "semble": {"command": "uvx", "args": ["semble"]},
+        "context7": {"command": "npx", "args": ["context7"]},
+        "context-mode": {"command": "bash", "args": ["dispatch.sh", "server"]},
+    }
+
+    only_semble_drifted = dict(shared_mcp, semble={"command": "uvx", "args": ["WRONG"]})
+    assert mcp_server_parity_errors(only_semble_drifted, shared_mcp, "target") == [
+        "target MCP server drifted from shared source: semble"
+    ]
+
+    only_context7_missing = {
+        key: value for key, value in shared_mcp.items() if key != "context7"
+    }
+    assert mcp_server_parity_errors(only_context7_missing, shared_mcp, "target") == [
+        "target missing MCP server: context7"
+    ]
+
+    only_context_mode_drifted = dict(
+        shared_mcp, **{"context-mode": {"command": "node", "args": []}}
+    )
+    assert mcp_server_parity_errors(
+        only_context_mode_drifted, shared_mcp, "target"
+    ) == ["target MCP server drifted from shared source: context-mode"]
+
+    assert mcp_server_parity_errors(shared_mcp, shared_mcp, "target") == []
+
+
+ROOT_MCP_ADAPTER_PATHS = (".mcp.json", ".vscode/mcp.json", ".codex/config.toml")
+
+
+def write_root_mcp_adapters(root: Path, entries: dict[str, dict[str, Any]]) -> None:
+    """Write the three root MCP adapters, each with its own Context Mode entry."""
+    (root / ".vscode").mkdir(exist_ok=True)
+    (root / ".codex").mkdir(exist_ok=True)
+    (root / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"context-mode": entries[".mcp.json"]}}),
+        encoding="utf-8",
+    )
+    (root / ".vscode" / "mcp.json").write_text(
+        json.dumps({"servers": {"context-mode": entries[".vscode/mcp.json"]}}),
+        encoding="utf-8",
+    )
+    codex = entries[".codex/config.toml"]
+    lines = ["[mcp_servers.context-mode]", f"command = {json.dumps(codex['command'])}"]
+    if "args" in codex:
+        lines.append(f"args = {json.dumps(codex['args'])}")
+    (root / ".codex" / "config.toml").write_text("\n".join(lines), encoding="utf-8")
+
+
+@pytest.mark.parametrize("direct_path", ROOT_MCP_ADAPTER_PATHS)
+def test_root_mcp_adapters_reject_a_direct_context_mode_start(
+    tmp_path: Path, direct_path: str
+) -> None:
+    """GR-005: each tracked root adapter must carry the shared guarded route; a
+    direct `context-mode` command in any one of them fails on its own."""
+    shared_mcp = target_generator.shared_mcp_servers()
+    guarded = shared_mcp["context-mode"]
+    entries = {path: guarded for path in ROOT_MCP_ADAPTER_PATHS}
+
+    write_root_mcp_adapters(tmp_path, entries)
+    assert root_mcp_adapter_errors(tmp_path, shared_mcp) == []
+
+    write_root_mcp_adapters(
+        tmp_path, entries | {direct_path: {"command": "context-mode"}}
+    )
+    errors = root_mcp_adapter_errors(tmp_path, shared_mcp)
+    assert len(errors) == 1
+    assert direct_path in errors[0]
+
+
+@pytest.mark.parametrize(
+    ("path", "wrong_key"),
+    [(".mcp.json", "servers"), (".vscode/mcp.json", "mcpServers")],
+)
+def test_root_mcp_adapters_read_each_file_with_its_own_key(
+    tmp_path: Path, path: str, wrong_key: str
+) -> None:
+    """GR-005: the guarded route under another client's key does not count."""
+    shared_mcp = target_generator.shared_mcp_servers()
+    guarded = shared_mcp["context-mode"]
+    write_root_mcp_adapters(
+        tmp_path, {adapter: guarded for adapter in ROOT_MCP_ADAPTER_PATHS}
+    )
+    (tmp_path / path).write_text(
+        json.dumps({wrong_key: {"context-mode": guarded}}), encoding="utf-8"
+    )
+
+    errors = root_mcp_adapter_errors(tmp_path, shared_mcp)
+
+    assert len(errors) == 1
+    assert path in errors[0]
+
+
+def test_validate_mcp_and_hooks_runs_the_root_adapter_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GR-005: the root adapter check is wired into the generated-target
+    validator with the authoring repository root and the shared servers, not
+    the generated target root."""
+    calls: list[tuple[Path, dict[str, Any]]] = []
+
+    def record(root: Path, servers: dict[str, Any]) -> list[str]:
+        calls.append((root, servers))
+        return ["root adapter drift"]
+
+    monkeypatch.setattr(target_validator, "root_mcp_adapter_errors", record)
+    errors: list[str] = []
+
+    target_validator.validate_mcp_and_hooks(errors)
+
+    assert "root adapter drift" in errors
+    assert len(calls) == 1
+    root, servers = calls[0]
+    assert root == REPO_ROOT
+    assert (
+        servers["context-mode"] == target_generator.shared_mcp_servers()["context-mode"]
+    )
+
+
+def test_context_mode_tool_surface_is_exactly_four_tools_everywhere() -> None:
+    """The approved allowlist is exact and closed: exactly four tools, pinned
+    to 1.0.169, and no blocked tool name reaches any generated routing or
+    permission surface (agent tool grants, MCP server configs, hook
+    scripts)."""
+    assert CONTEXT_MODE_ALLOWED_TOOLS == (
+        "ctx_index",
+        "ctx_search",
+        "ctx_stats",
+        "ctx_doctor",
+    )
+    assert CONTEXT_MODE_PINNED_VERSION == "1.0.169"
+
+    target_root = REPO_ROOT / "dist" / "multi-agent"
+    surfaces = [
+        *sorted((target_root / ".claude" / "agents").glob("*.md")),
+        *sorted((target_root / ".codex" / "agents").glob("*.toml")),
+        *sorted((target_root / ".github" / "agents").glob("*.agent.md")),
+        target_root / ".mcp.json",
+        target_root / ".vscode" / "mcp.json",
+        target_root / ".codex" / "config.toml",
+        target_root / ".claude" / "hooks" / "scripts" / "context-mode-dispatch.sh",
+        target_root / ".claude" / "hooks" / "scripts" / "context-mode-mcp-filter.mjs",
+    ]
+    for path in surfaces:
+        text = path.read_text()
+        for blocked in CONTEXT_MODE_BLOCKED_TOOLS:
+            assert blocked not in text, (
+                f"{path} names blocked Context Mode tool {blocked}"
+            )
+
+    filter_text = (
+        REPO_ROOT / "shared/hooks/scripts/context-mode-mcp-filter.mjs"
+    ).read_text()
+    allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
+    assert f"new Set([{allowed}])" in filter_text
+
+
+def test_reviewer_stays_read_search_only_without_execute() -> None:
+    """The reviewer keeps read/search capabilities; execute access must not
+    reappear anywhere it is declared."""
+    agent_yaml = json.loads(
+        (REPO_ROOT / "shared" / "agents" / "reviewer" / "agent.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert set(agent_yaml["capabilities"]) == {"read", "search"}
+
+    generated_reviewer = (
+        REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents" / "reviewer.md"
+    )
+    if generated_reviewer.exists():
+        tools_line = next(
+            line
+            for line in generated_reviewer.read_text(encoding="utf-8").splitlines()
+            if line.startswith("tools:")
+        )
+        assert "Bash" not in tools_line and "execute" not in tools_line.lower()
+
+
+def test_tool_routing_states_only_callable_tools_without_host_precedence_claim() -> (
+    None
+):
+    """Generated tool-routing guidance says agents use only tools actually
+    callable in their runtime and never claims precedence over host-injected
+    context, and it never recommends a filtered Context Mode operation."""
+    target_root = REPO_ROOT / "dist" / "multi-agent"
+    tool_routing_path = (
+        target_root / ".claude" / "instructions" / "tool-routing.instructions.md"
+    )
+    if not tool_routing_path.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    text = tool_routing_path.read_text(encoding="utf-8").lower()
+
+    assert (
+        "agents use only tools their own runtime actually exposes as callable" in text
+    )
+    assert (
+        "does not claim precedence over host-injected system or developer context"
+        in text
+    )
+    assert tool_routing_recommendation_errors(text) == []
+
+
+def test_tool_routing_recommendation_errors_catches_paraphrases_and_spares_negation() -> (
+    None
+):
+    """The recommendation scan survives backtick formatting and synonym/gap
+    paraphrasing, and does not flag a genuine negated prohibition."""
+    backtick_violation = "Reviewers should recommend `ctx_execute` for this."
+    errors = tool_routing_recommendation_errors(backtick_violation, ["ctx_execute"])
+    assert any("ctx_execute" in error for error in errors)
+
+    synonym_and_gap_violation = (
+        "You should leverage the built-in ctx_batch_execute capability here."
+    )
+    errors = tool_routing_recommendation_errors(
+        synonym_and_gap_violation, ["ctx_batch_execute"]
+    )
+    assert any("ctx_batch_execute" in error for error in errors)
+
+    negated_prohibition = "Never call or recommend ctx_purge; it stays filtered."
+    assert tool_routing_recommendation_errors(negated_prohibition, ["ctx_purge"]) == []
+
+    explicit_negated_use = "Agents must not use `ctx_insight` for any reason."
+    assert (
+        tool_routing_recommendation_errors(explicit_negated_use, ["ctx_insight"]) == []
+    )
+
+
+def test_tool_routing_recommendation_errors_survives_sentence_boundary_misfires() -> (
+    None
+):
+    """Reproductions of the three sentence-boundary misfires from the prior
+    review round must not be flagged, while a genuine violation inside one
+    sentence is still caught."""
+    long_clause_negation = (
+        "Agents should never, under any special or unusual circumstances "
+        "whatsoever, use ctx_execute."
+    )
+    assert (
+        tool_routing_recommendation_errors(long_clause_negation, ["ctx_execute"]) == []
+    )
+
+    sentence_boundary = (
+        "Prefer the four allowed tools; you may use others sparingly. "
+        "ctx_execute stays blocked regardless."
+    )
+    assert tool_routing_recommendation_errors(sentence_boundary, ["ctx_execute"]) == []
+
+    punctuation_between_negation_and_verb = "Do not, ever, use ctx_execute for this."
+    assert (
+        tool_routing_recommendation_errors(
+            punctuation_between_negation_and_verb, ["ctx_execute"]
+        )
+        == []
+    )
+
+    still_caught_within_one_sentence = (
+        "Some say you could invoke ctx_purge here, which is wrong."
+    )
+    errors = tool_routing_recommendation_errors(
+        still_caught_within_one_sentence, ["ctx_purge"]
+    )
+    assert any("ctx_purge" in error for error in errors)
+
+
+def test_memory_security_authority_contract_requires_headings_and_links() -> None:
+    """The threat model stays discoverable without pinning native-memory settings."""
+    security = (REPO_ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    architecture = (REPO_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+    target_mapping = (REPO_ROOT / "docs" / "target-mapping.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        memory_security_authority_errors(security, readme, architecture, target_mapping)
+        == []
+    )
+
+    missing_heading = security.replace("## Credential Handling", "## Credentials", 1)
+    assert any(
+        "Credential Handling" in error
+        for error in memory_security_authority_errors(
+            missing_heading, readme, architecture, target_mapping
+        )
+    )
+
+    missing_link = readme.replace("[SECURITY.md](SECURITY.md)", "SECURITY.md", 1)
+    assert any(
+        "README.md" in error and "SECURITY.md" in error
+        for error in memory_security_authority_errors(
+            security, missing_link, architecture, target_mapping
+        )
+    )
+
+
+def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads() -> (
+    None
+):
+    """Codex agents are self-contained while inheriting project MCP configuration."""
+    for agent, agent_dir in shared_agents("openai-codex"):
+        rendered = render_codex_agent_adapter(agent)
+        instructions = tomllib.loads(rendered)["developer_instructions"]
+        prompt_base = agent.get("prompt_base")
+        supplement_path = agent_dir / "prompt.openai-codex.md"
+        if isinstance(prompt_base, str) or supplement_path.exists():
+            base_prompt = transform_agent_text(
+                (
+                    REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md"
+                    if isinstance(prompt_base, str)
+                    else agent_dir / "prompt.md"
+                ).read_text(encoding="utf-8"),
+                "openai-codex",
+            ).strip()
+            supplement = transform_agent_text(
+                supplement_path.read_text(encoding="utf-8"),
+                "openai-codex",
+            ).strip()
+            role_delimiter = {
+                "luna_coder": "--- Codex role supplement: luna_coder ---",
+                "sol_coder": "--- Codex role supplement: sol_coder ---",
+                "orchestrator": "--- Codex role supplement: orchestrator ---",
+            }[agent["id"]]
+            expected_body = f"{base_prompt}\n\n{role_delimiter}\n\n{supplement}"
+        else:
+            expected_body = transform_agent_text(
+                (agent_dir / "prompt.md").read_text(encoding="utf-8"),
+                "openai-codex",
+            ).strip()
+
+        assert instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) == 1
+        assert (
+            instructions.split(CODEX_AGENT_INSTRUCTIONS_DELIMITER, 1)[1].strip()
+            == expected_body
+        )
+        assert "Before doing the task, read `.claude/agents/" not in instructions
+        assert "[mcp_servers." not in rendered
+        assert codex_agent_instruction_errors(agent, instructions) == []
+        if isinstance(prompt_base, str) or supplement_path.exists():
+            assert instructions.count(role_delimiter) == 1
+        else:
+            assert "--- Codex role supplement:" not in instructions
+
+        legacy = (
+            "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"
+            f"Before doing the task, read `.claude/agents/{agent['id']}.md`.\n"
+        )
+        assert any(
+            "legacy Claude-native runtime read" in error
+            for error in codex_agent_instruction_errors(agent, legacy)
+        )
+
+        mutated_body = instructions.replace(
+            expected_body, f"{expected_body}\nchanged", 1
+        )
+        assert any(
+            "exactly match" in error
+            for error in codex_agent_instruction_errors(agent, mutated_body)
+        )
+
+        assert instructions.startswith(codex_agent_metadata_header(agent))
+
+
+# --- Phase C: skill-library validation contract -----------------------------
+#
+# The tests below cover two different things and are labeled accordingly:
+# (1) the validator's own new hard rules (pure-function unit tests using the
+#     established tmp_path + monkeypatch fixture pattern already used above
+#     for TARGET_ROOT-scoped tests), and (2) the Phase A/B content
+#     corrections, which are prose facts re-verified by targeted textual or
+#     structural assertions - not runtime behavior - except where an existing
+#     executable helper already provides real execution coverage (noted
+#     below).
+
+
+def test_shared_skill_integrity_errors_accepts_the_real_skill_library() -> None:
+    """The extended skill-integrity gate accepts the current, already-clean
+    canonical skill tree (dist must be generated first, matching the
+    documented Verify order)."""
+    assert shared_skill_integrity_errors(REPO_ROOT / "shared" / "skills") == []
+
+
+@pytest.mark.parametrize(
+    "raw_text",
+    (
+        "no frontmatter at all\n",
+        "---\nname: broken\ndescription: missing closing delimiter\n",
+        "---\nname: broken\n\tdescription: tab-indented key\n---\n",
+        "---\nname: broken\nname: duplicated\ndescription: x\n---\n",
+    ),
+    ids=("missing-delimiters", "unclosed-delimiter", "tab-character", "duplicate-key"),
+)
+def test_skill_frontmatter_yaml_errors_rejects_malformed_frontmatter(
+    raw_text: str,
+) -> None:
+    """R-SKILL-01: malformed frontmatter is a hard, actionable failure."""
+    errors = skill_frontmatter_yaml_errors(
+        Path("shared/skills/broken/SKILL.md"), raw_text
+    )
+    assert errors
+    assert all("SKILL_FRONTMATTER_INVALID" in error for error in errors)
+    assert all("shared/skills/broken/SKILL.md" in error for error in errors)
+
+
+def test_skill_frontmatter_yaml_errors_accepts_well_formed_frontmatter() -> None:
+    raw_text = "---\nname: ok\nvisibility: public\ndescription: |\n  Multi-line.\n  Body.\n---\n\nBody\n"
+    assert (
+        skill_frontmatter_yaml_errors(Path("shared/skills/ok/SKILL.md"), raw_text) == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("frontmatter", "skill_path", "expected_fragment"),
+    (
+        (
+            "visibility: public\n",
+            Path("shared/skills/foo/SKILL.md"),
+            "SKILL_NAME_MISSING",
+        ),
+        (
+            "name: wrong-name\nvisibility: public\n",
+            Path("shared/skills/foo/SKILL.md"),
+            "SKILL_NAME_MISMATCH",
+        ),
+    ),
+    ids=("missing-name", "mismatched-name"),
+)
+def test_skill_name_errors_rejects_missing_or_mismatched_name(
+    frontmatter: str, skill_path: Path, expected_fragment: str
+) -> None:
+    """R-SKILL-02: frontmatter `name` must match the skill's directory."""
+    errors = skill_name_errors(skill_path, frontmatter)
+    assert any(expected_fragment in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "scalar",
+    ("foo", '"foo"', "'foo'", "foo  # explanatory note"),
+    ids=("bare", "double-quoted", "single-quoted", "trailing-comment"),
+)
+def test_skill_name_errors_accepts_normalized_matching_name(scalar: str) -> None:
+    """R-SKILL-02: matching YAML scalar forms name the skill directory."""
+    assert (
+        skill_name_errors(Path("shared/skills/foo/SKILL.md"), f"name: {scalar}\n") == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("visibility", "scalar"),
+    (
+        ("public", "public"),
+        ("public", '"public"'),
+        ("public", "'public'"),
+        ("background", "background"),
+        ("background", '"background"'),
+        ("background", "'background'"),
+    ),
+    ids=(
+        "public-bare",
+        "public-double-quoted",
+        "public-single-quoted",
+        "background-bare",
+        "background-double-quoted",
+        "background-single-quoted",
+    ),
+)
+def test_shared_skill_integrity_errors_accepts_normalized_visibility(
+    tmp_path: Path, visibility: str, scalar: str
+) -> None:
+    """R-SKILL-02: recognized visibility values accept YAML scalar quoting."""
+    skill_dir = tmp_path / "skills" / "example"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: example\n"
+        f"visibility: {scalar}\n"
+        f"description: {visibility} visibility.\n---\n",
+        encoding="utf-8",
+    )
+
+    assert shared_skill_integrity_errors(skill_dir.parent) == []
+
+
+def test_shared_skill_integrity_errors_rejects_a_skill_directory_with_no_root_skill_md(
+    tmp_path: Path,
+) -> None:
+    """R-SKILL-04: every shared/skills/* directory must have a root SKILL.md."""
+    skill_library_root = tmp_path / "skills"
+    good = skill_library_root / "good-skill"
+    good.mkdir(parents=True)
+    (good / "SKILL.md").write_text(
+        "---\nname: good-skill\nvisibility: public\ndescription: A skill.\n---\n\nBody\n",
+        encoding="utf-8",
+    )
+    empty = skill_library_root / "empty-skill"
+    empty.mkdir()
+
+    errors = shared_skill_integrity_errors(skill_library_root)
+
+    assert any(
+        "SKILL_MISSING_ROOT" in error and "empty-skill" in error for error in errors
+    )
+    assert not any("good-skill" in error for error in errors)
+
+
+def test_shared_skill_integrity_errors_rejects_duplicate_descriptions(
+    tmp_path: Path,
+) -> None:
+    """Duplicate descriptions break description-match loading of background
+    skills, so a second skill reusing one is a hard failure."""
+    skill_library_root = tmp_path / "skills"
+    for name in ("skill-one", "skill-two"):
+        skill_dir = skill_library_root / name
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: {name}\nvisibility: background\n"
+            "description: Exactly the same description.\n---\n\nBody\n",
+            encoding="utf-8",
+        )
+
+    errors = shared_skill_integrity_errors(skill_library_root)
+
+    assert any("duplicate skill description" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("reference", "make_target_exist", "expect_error"),
+    (
+        ("shared/scripts/real.py", True, False),
+        ("shared/scripts/missing.py", False, True),
+        (".claude/instructions/real.instructions.md", True, False),
+        (".claude/instructions/missing.instructions.md", False, True),
+        ("references/real.md", True, False),
+        ("references/missing.md", False, True),
+        ("pyproject.toml", False, False),  # bare filename: no repo-file claim
+        ("shared/skills/**/SKILL.md", False, False),  # glob placeholder
+        ("tests/test_[feature].py", False, False),  # bracket placeholder
+        ("shared/skills/<your-skill>/SKILL.md", False, False),  # placeholder
+        ("scripts/validate_skills.py", False, True),  # concrete missing path
+        (
+            ".claude/instructions/project-context.instructions.md",
+            False,
+            False,
+        ),  # named exception: consumer/onboarding-populated, not generated
+    ),
+    ids=(
+        "repo-root-existing",
+        "repo-root-missing",
+        "target-root-existing",
+        "target-root-missing",
+        "skill-relative-existing",
+        "skill-relative-missing",
+        "bare-filename-skipped",
+        "glob-placeholder-skipped",
+        "bracket-placeholder-skipped",
+        "angle-placeholder-skipped",
+        "concrete-missing-rejected",
+        "known-exception-skipped",
+    ),
+)
+def test_skill_local_reference_errors_resolves_known_roots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    make_target_exist: bool,
+    expect_error: bool,
+) -> None:
+    """R-SKILL-03: a backtick-quoted path naming a known repository root must
+    resolve; bare illustrative filenames and glob/placeholder patterns make
+    no repository-file claim and are not checked; a small named-exception set
+    covers legitimately consumer-populated runtime paths."""
+    fake_repo_root = tmp_path / "repo"
+    fake_target_root = tmp_path / "dist" / "multi-agent"
+    skill_path = fake_repo_root / "shared" / "skills" / "example" / "SKILL.md"
+    skill_path.parent.mkdir(parents=True)
+    (fake_repo_root / "shared" / "scripts").mkdir(parents=True)
+    (fake_target_root / ".claude" / "instructions").mkdir(parents=True)
+
+    if make_target_exist:
+        if reference.startswith(".claude/"):
+            (fake_target_root / reference).write_text("x", encoding="utf-8")
+        elif reference.startswith("references/"):
+            (skill_path.parent / "references").mkdir()
+            (skill_path.parent / reference).write_text("x", encoding="utf-8")
+        else:
+            (fake_repo_root / reference).write_text("x", encoding="utf-8")
+
+    monkeypatch.setattr(target_validator, "REPO_ROOT", fake_repo_root)
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", fake_target_root)
+
+    raw_text = f"Reference: `{reference}`\n"
+    errors = skill_local_reference_errors(skill_path, raw_text)
+
+    if expect_error:
+        assert any("SKILL_BROKEN_REFERENCE" in error for error in errors)
+    else:
+        assert errors == []
+
+
+def test_compare_dirs_flags_a_stale_generated_skill_copy(tmp_path: Path) -> None:
+    """Canonical-versus-generated synchronization expectation: if a generated
+    copy diverges from a fresh regeneration, `compare_dirs` (the mechanism
+    `validate_determinism` uses tree-wide) must reject it rather than pass
+    silently."""
+    fresh = tmp_path / "fresh"
+    stale = tmp_path / "stale"
+    (fresh / ".claude" / "skills" / "example").mkdir(parents=True)
+    (stale / ".claude" / "skills" / "example").mkdir(parents=True)
+    (fresh / ".claude" / "skills" / "example" / "SKILL.md").write_text(
+        "---\nname: example\nvisibility: public\ndescription: current.\n---\n",
+        encoding="utf-8",
+    )
+    (stale / ".claude" / "skills" / "example" / "SKILL.md").write_text(
+        "---\nname: example\nvisibility: public\ndescription: stale copy.\n---\n",
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    compare_dirs(stale, fresh, errors)
+
+    assert any("rerun scripts/generate_targets.py --all" in error for error in errors)
+
+
+def test_ponytail_provenance_checks_tolerate_a_whitespace_only_rewrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bonus normalization (see report): the two Ponytail provenance checks
+    used to match literal-newline substrings, so an unchanged re-wrap of the
+    same prose used to fail the gate - this exact brittleness cost a cycle in
+    Phase B. They must now survive a re-wrap that does not change the words."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    upstream_path = target_root / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"
+    original = upstream_path.read_text(encoding="utf-8")
+    old_wrap = (
+        "The fork retains Ponytail's behavior and safety boundaries. The canonical\n"
+        "workflow and review-routing policies decide lifecycle placement and whether the\n"
+        "conditional `ponytail` review profile runs. `ponytail-review` remains an\n"
+        "imported skill, not a profile or lifecycle ceremony."
+    )
+    assert old_wrap in original  # sanity: matches the real current wrap
+    new_wrap = (
+        "The fork retains Ponytail's behavior and\n"
+        "safety boundaries. The canonical workflow and review-routing policies\n"
+        "decide lifecycle placement and whether the conditional `ponytail` review\n"
+        "profile runs. `ponytail-review` remains an imported\n"
+        "skill, not a profile or lifecycle ceremony."
+    )
+    rewrapped = original.replace(old_wrap, new_wrap, 1)
+    assert rewrapped != original
+    upstream_path.write_text(rewrapped, encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_skills_and_paths(errors)
+
+    assert not any("preserve canonical workflow authority" in error for error in errors)
+    assert not any("distinguish the review profile" in error for error in errors)
+
+
+def test_pandas_nan_bool_coercion_documents_the_corrected_isinstance_claim() -> None:
+    """Phase A correction: `isinstance(np.bool_(True), bool)` must be
+    documented as `False` (np.bool_ subclasses np.generic, not Python bool),
+    not the original wrong claim that it returns `True`.
+
+    Textual assertion only: numpy is not installed in this repository's test
+    environment, so this cannot be a runtime `isinstance` check without
+    adding a dependency (itself a control-plane change). See the plan's
+    explicit note accepting this limitation.
+    """
+    text = (
+        REPO_ROOT / "shared" / "skills" / "pandas-nan-bool-coercion" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "isinstance(np.bool_(True), bool)  # False" in text
+    assert "isinstance(np.bool_(True), bool)  # True" not in text
+
+
+def test_run_tests_e2e_step_propagates_failure_instead_of_masking_it() -> None:
+    """Phase A correction: a failing example command under `examples/run_*.py`
+    must surface as a failure, never be reported as though no scripts existed.
+
+    Structural/textual assertion on the embedded shell snippet, not an
+    execution test: `run-tests/SKILL.md` is prose with an illustrative code
+    fence, and this repository only executes a skill's shell logic where a
+    real standalone helper script exists (as it does for
+    `caveman-compress/scripts/detect.py`, covered by
+    tests/test_caveman_compress_detect.py).
+    """
+    text = (REPO_ROOT / "shared" / "skills" / "run-tests" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "status=0" in text
+    assert "status=1" in text
+    assert '"E2E scripts FAILED"' in text
+    assert re.search(r"exit 1\b", text)
+    # The "no scripts" message must stay distinct from the failure message -
+    # a real failure must never be reported as an absent script.
+    assert "No E2E scripts" in text
+    assert '"No E2E scripts FAILED"' not in text
+
+
+DEPRECATION_CHECK_STEPS = (
+    pytest.param("run-tests", "## Step 5: Deprecation Check", id="run-tests"),
+    pytest.param("add-dependency", "## Step 5: Check for Issues", id="add-dependency"),
+)
+DEPRECATION_LINE = "DeprecationWarning: old_call is deprecated"
+
+
+def _first_bash_block(skill: str, heading: str) -> str:
+    text = (REPO_ROOT / "shared" / "skills" / skill / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    section = text.split(heading, 1)[1]
+    match = re.search(r"```bash\n(.*?)\n```", section, re.DOTALL)
+    assert match is not None, f"{skill}: no bash block under {heading}"
+    return match.group(1)
+
+
+def _run_with_fake_uv(
+    tmp_path: Path,
+    snippet: str,
+    pytest_status: int,
+    pytest_output: str,
+    python_status: int = 0,
+) -> subprocess.CompletedProcess[str]:
+    """Run a skill's shell block with a fake `uv` standing in for pytest and
+    for `uv run python`, so the block's own exit handling is what is tested."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_uv = fake_bin / "uv"
+    fake_uv.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "$2" == "pytest" ]]; then\n'
+        '  printf "%s\\n" "$FAKE_PYTEST_OUTPUT"\n'
+        '  exit "$FAKE_PYTEST_STATUS"\n'
+        "fi\n"
+        'exit "$FAKE_PYTHON_STATUS"\n',
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+    return subprocess.run(
+        ["bash", "-c", snippet],
+        text=True,
+        capture_output=True,
+        check=False,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            "FAKE_PYTEST_OUTPUT": pytest_output,
+            "FAKE_PYTEST_STATUS": str(pytest_status),
+            "FAKE_PYTHON_STATUS": str(python_status),
+        },
+    )
+
+
+@pytest.mark.parametrize("skill, heading", DEPRECATION_CHECK_STEPS)
+@pytest.mark.parametrize(
+    "pytest_status, pytest_output, expect_deprecation",
+    (
+        pytest.param(3, "FAILED tests/test_x.py::test_y\n1 failed", False, id="fails"),
+        pytest.param(1, f"{DEPRECATION_LINE}\n1 failed", True, id="fails-deprecated"),
+        pytest.param(0, "1 passed", False, id="passes"),
+        pytest.param(0, f"{DEPRECATION_LINE}\n1 passed", True, id="passes-deprecated"),
+    ),
+)
+def test_deprecation_check_steps_keep_pytests_exit_status(
+    tmp_path: Path,
+    skill: str,
+    heading: str,
+    pytest_status: int,
+    pytest_output: str,
+    expect_deprecation: bool,
+) -> None:
+    """GR-010: the deprecation step used to end in `|| echo "Clean"`, which
+    printed "Clean" and exited 0 when pytest itself failed."""
+    snippet = _first_bash_block(skill, heading)
+
+    result = _run_with_fake_uv(tmp_path, snippet, pytest_status, pytest_output)
+
+    assert result.returncode == pytest_status, result.stderr
+    assert "Clean" not in result.stdout
+    if expect_deprecation:
+        assert DEPRECATION_LINE in result.stdout
+        assert "No deprecation warnings" not in result.stdout
+    else:
+        assert "No deprecation warnings" in result.stdout
+
+
+def test_add_dependency_step_fails_when_the_import_check_fails(tmp_path: Path) -> None:
+    snippet = _first_bash_block("add-dependency", "## Step 5: Check for Issues")
+
+    result = _run_with_fake_uv(tmp_path, snippet, 0, "1 passed", python_status=1)
+
+    assert result.returncode == 1, result.stderr
+
+
+def _write_shared_markdown(root: Path, relative: str, text: str) -> None:
+    path = root / "shared" / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def test_failure_masking_check_reports_each_masked_check_with_file_and_line(
+    tmp_path: Path,
+) -> None:
+    """GR-010 positive case: every shape the rule names, in a `bash` and a `sh`
+    block, across all five shipped source directories."""
+    _write_shared_markdown(
+        tmp_path,
+        "skills/demo/SKILL.md",
+        "# Demo\n"
+        "```bash\n"
+        "uv run pytest tests/ || true\n"
+        "uv run mypy src || :\n"
+        'uv run ruff check . || echo "lint failed"\n'
+        "uv run python .claude/scripts/verify.py fast || true\n"
+        "```\n"
+        "```sh\n"
+        'uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i deprecat || echo "Clean"\n'
+        "```\n",
+    )
+    for directory in ("policies", "agents/demo", "templates", "sidecar"):
+        _write_shared_markdown(
+            tmp_path,
+            f"{directory}/note.md",
+            "```bash\nuv run pytest tests/ || true\n```\n",
+        )
+
+    errors = failure_masking_command_errors(tmp_path)
+
+    assert [error.split(": ", 1)[0] for error in errors] == [
+        "shared/skills/demo/SKILL.md:3",
+        "shared/skills/demo/SKILL.md:4",
+        "shared/skills/demo/SKILL.md:5",
+        "shared/skills/demo/SKILL.md:6",
+        "shared/skills/demo/SKILL.md:9",
+        "shared/policies/note.md:2",
+        "shared/agents/demo/note.md:2",
+        "shared/templates/note.md:2",
+        "shared/sidecar/note.md:2",
+    ]
+    assert all("hides a failed check" in error for error in errors)
+
+
+def test_failure_masking_check_accepts_commands_that_keep_their_status(
+    tmp_path: Path,
+) -> None:
+    """GR-010 negative case: a check that fails stays failed, and masked text
+    that is not a fenced shell line or does not run a check is not flagged."""
+    _write_shared_markdown(
+        tmp_path,
+        "skills/demo/SKILL.md",
+        "# Demo\n"
+        "Run `uv run pytest tests/ || true` is shown here as prose.\n"
+        "uv run pytest tests/ || true\n"
+        "```bash\n"
+        "uv run pytest tests/ -q\n"
+        "uv run pytest tests/ || exit 1\n"
+        "uv run ruff check . && uv run mypy src\n"
+        'status=$?; printf "%s" "$out" | grep -i deprecat || echo "none"\n'
+        "rg pattern . || true\n"
+        "pytest_cache_dir=1 || true\n"
+        "```\n"
+        "```text\n"
+        "uv run pytest tests/ || true\n"
+        "```\n",
+    )
+
+    assert failure_masking_command_errors(tmp_path) == []
+
+
+def test_shipped_shared_text_has_no_failure_masking_check() -> None:
+    assert failure_masking_command_errors(REPO_ROOT) == []
+
+
+def test_validate_skills_and_paths_runs_the_failure_masking_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GR-010: the check is wired into the generated-target validator with the
+    authoring repository root."""
+    calls: list[Path] = []
+
+    def record(root: Path) -> list[str]:
+        calls.append(root)
+        return ["masked check"]
+
+    monkeypatch.setattr(target_validator, "failure_masking_command_errors", record)
+    errors: list[str] = []
+
+    target_validator.validate_skills_and_paths(errors)
+
+    assert "masked check" in errors
+    assert calls == [REPO_ROOT]
+
+
+def test_code_review_skill_keeps_a_surviving_minor_advisory() -> None:
+    """Phase A correction: canonical policy makes a surviving MINOR finding
+    advisory with an explicit disposition and reason, not something that
+    must be fixed like CRITICAL/MAJOR."""
+    text = (REPO_ROOT / "shared" / "skills" / "code-review" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(text.split()).lower()
+    assert (
+        "a surviving minor is advisory but needs an explicit disposition and a "
+        "non-empty reason" in normalized
+    )
+    assert (
+        "fix findings by severity: critical, then major, then minor" not in normalized
+    )
+
+
+def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
+    """Phase B correction: UPSTREAM.md must describe the real, large
+    divergence (dropped sections, line-count deltas) rather than claiming
+    the change is limited to formatting and frontmatter."""
+    text = (
+        REPO_ROOT / "shared" / "third_party" / "ponytail" / "UPSTREAM.md"
+    ).read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
+    assert "85 lines against upstream" in normalized
+    assert "65 lines against upstream" in normalized
+    assert "limited to formatting, the bootstrap's required" not in normalized
+
+
+def test_pyvis_xss_skill_assigns_html_escaping_to_the_application() -> None:
+    """Textual assertion only: the skill must not claim pyvis escapes HTML."""
+    text = (
+        REPO_ROOT / "shared" / "skills" / "pyvis-xss-testing" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    normalized = " ".join(
+        line.lstrip().removeprefix("# ").strip() for line in text.splitlines()
+    ).lower()
+
+    assert (
+        "the calling application must html-escape it before handing it to pyvis"
+        in normalized
+    )
+    assert "pyvis escapes neither `title` nor `label`" in normalized
+    assert "so pyvis html-escapes it before json-encoding it" not in normalized
+
+
+def test_data_analysis_skill_is_still_present_and_public() -> None:
+    """Non-goal guard: data-analysis must not have been removed; it is a
+    public, task-triggered skill whose standing context cost is only its
+    description block."""
+    skill_path = REPO_ROOT / "shared" / "skills" / "data-analysis" / "SKILL.md"
+    assert skill_path.is_file()
+    frontmatter = skill_path.read_text(encoding="utf-8")
+    assert "\nvisibility: public" in f"\n{frontmatter}"
+
+
+# --- Sidecar workflow profile (small plan Phase B steps 2-3) ---------------
+
+# Captured by hashing dist/sidecar/ produced by this repository's own
+# render_sidecar(target_root) -- the single-profile signature, immediately
+# before it gained a `profile` parameter and the `dist/sidecar/skills/` vs.
+# `dist/sidecar/workflow/` split. Acceptance Criteria: "dist/sidecar/skills/
+# equals today's dist/sidecar/ byte for byte." Any edit to one of the four
+# shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
+# changes this hash and needs the same re-capture, as does the vendored
+# Ponytail LICENSE (copied into both shipped ponytail skills); the last one
+# was the backlog-followups Phase E merging Ponytail v5.3.2 into both shipped
+# Ponytail skills (the earlier one, Phase A step 8, restored that LICENSE
+# verbatim from upstream: `DietrichGebert`, one trailing newline).
+SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
+    "1cb7a738bd4e3b7c331949134b91a5f37b11dfa0efb204cffb6de4fc763979c7"
+)
+
+
+def _sha256_manifest_hash(root: Path) -> str:
+    """Hash every file under `root` by relative path and content, so the
+    digest changes if any file's path or bytes change."""
+    digest = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        relative = path.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def test_sidecar_skills_profile_output_matches_pre_workflow_profile_snapshot(
+    tmp_path: Path,
+) -> None:
+    """Guard: render_sidecar's "skills" branch must still produce the exact
+    bytes today's single-profile render_sidecar(target_root) produced."""
+    render_sidecar(tmp_path, "skills")
+    assert _sha256_manifest_hash(tmp_path) == SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256
+
+
+def _unmatched_sidecar_anchors(skill_texts: dict[str, str]) -> list[str]:
+    """List each `SIDECAR_TEXT_REPLACEMENTS` phrase found in no skill text.
+
+    The replacement is a plain `str.replace`, and the validator rejects only a
+    leftover old phrase, so an anchor that stops matching (a re-wrapped
+    paragraph) would ship the unreplaced text without failing anything.
+    """
+    return [
+        old
+        for old, _new in target_generator.SIDECAR_TEXT_REPLACEMENTS
+        if not any(old in text for text in skill_texts.values())
+    ]
+
+
+def _sidecar_skill_texts() -> dict[str, str]:
+    return {
+        name: (REPO_ROOT / "shared" / "skills" / name / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        for name in SIDECAR_SKILLS
+    }
+
+
+def test_every_sidecar_text_replacement_anchor_matches_a_shipped_skill() -> None:
+    """Each anchor occurs, line breaks included, in a sidecar skill."""
+    assert _unmatched_sidecar_anchors(_sidecar_skill_texts()) == []
+
+
+def test_sidecar_anchor_check_fails_on_a_rewrapped_persistence_paragraph() -> None:
+    """Re-wrapping the `## Persistence` paragraph breaks its anchor, and the
+    check reports exactly that anchor."""
+    anchor = next(
+        old
+        for old, _new in target_generator.SIDECAR_TEXT_REPLACEMENTS
+        if "review profile still runs" in old
+    )
+    texts = _sidecar_skill_texts()
+    assert anchor in texts["ponytail"]
+    texts["ponytail"] = texts["ponytail"].replace(anchor, anchor.replace("\n", " "))
+    assert _unmatched_sidecar_anchors(texts) == [anchor]
+
+
+def test_sidecar_workflow_skill_set_equals_public_skills_minus_the_denylist() -> None:
+    """Guard: SIDECAR_WORKFLOW_SKILLS (frozen in runtime_ownership.py) must
+    stay exactly the public skills minus shared/sidecar/workflow/skills.txt
+    (big plan Decision 8)."""
+    denylist_path = REPO_ROOT / "shared" / "sidecar" / "workflow" / "skills.txt"
+    denylist = {
+        line.split(":", 1)[0].strip()
+        for line in denylist_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    public_skills = set()
+    for skill_dir in (REPO_ROOT / "shared" / "skills").iterdir():
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        if re.search(
+            r"^visibility:\s*public\s*$",
+            skill_md.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        ):
+            public_skills.add(skill_dir.name)
+    expected = sorted(public_skills - denylist)
+    assert list(SIDECAR_PROFILE_SKILLS["workflow"]) == expected
+
+
+def test_render_sidecar_workflow_profile_ships_every_frozen_unit(
+    tmp_path: Path,
+) -> None:
+    """New behavior: before this change, `render_sidecar` took only one
+    argument, so `render_sidecar(tmp_path, "workflow")` raised
+    `TypeError: render_sidecar() takes 1 positional argument but 2 were
+    given` -- the failing-first evidence for every test below that passes a
+    profile to `render_sidecar`. Checks every frozen unit is present; it does
+    not assert no other file exists, because several shipped skills carry
+    files beyond SKILL.md/LICENSE that the frozen
+    sidecar_source_exact_allowlist() does not yet list (reported, not fixed
+    here; see the coder's handback report)."""
+    render_sidecar(tmp_path, "workflow")
+    present = {
+        path.relative_to(tmp_path).as_posix()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    expected = sidecar_source_exact_allowlist("workflow")
+    missing = expected - present
+    assert not missing, f"missing workflow units: {sorted(missing)}"
+
+
+def test_render_sidecar_workflow_profile_ships_no_copilot_or_codex_agent_units(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the workflow profile's agent write root is Claude
+    Code's `.claude/agents/` only (Decision 7: Codex discovery unverified;
+    Copilot agents dropped until a native run exists)."""
+    render_sidecar(tmp_path, "workflow")
+    assert not (tmp_path / ".github" / "agents").exists()
+    assert not (tmp_path / ".codex" / "agents").exists()
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        assert (tmp_path / ".claude" / "agents" / f"{agent_id}.md").is_file()
+
+
+def test_render_sidecar_workflow_agents_reuse_the_full_installs_claude_frontmatter(
+    tmp_path: Path,
+) -> None:
+    """New behavior: each workflow agent's frontmatter must be exactly
+    `sidecar_agent_frontmatter(agent)`: the full install's
+    `claude_agent_frontmatter` minus every `mcp__*` tool grant, because the
+    sidecar ships no MCP configuration (Decision 6 and the `mcp__` token)."""
+    render_sidecar(tmp_path, "workflow")
+    agents_by_id = {agent["id"]: agent for agent, _dir in shared_agents("claude-code")}
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        text = (tmp_path / ".claude" / "agents" / f"{agent_id}.md").read_text(
+            encoding="utf-8"
+        )
+        expected_frontmatter = "\n".join(
+            sidecar_agent_frontmatter(agents_by_id[agent_id])
+        )
+        assert text.startswith(expected_frontmatter + "\n\n")
+        assert "mcp__" not in expected_frontmatter
+        full_frontmatter = "\n".join(claude_agent_frontmatter(agents_by_id[agent_id]))
+        assert "mcp__" in full_frontmatter, "the full install still grants MCP tools"
+
+
+def test_render_sidecar_workflow_agents_use_the_workflow_prompt_not_the_canonical_one(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the body must come from workflow-prompt.md, never
+    prompt.md (Decision 6)."""
+    render_sidecar(tmp_path, "workflow")
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        agent_dir = REPO_ROOT / "shared" / "agents" / agent_id
+        canonical_body = (agent_dir / "prompt.md").read_text(encoding="utf-8")
+        workflow_body = (agent_dir / "workflow-prompt.md").read_text(encoding="utf-8")
+        rendered = (tmp_path / ".claude" / "agents" / f"{agent_id}.md").read_text(
+            encoding="utf-8"
+        )
+        assert workflow_body.strip() in rendered
+        assert canonical_body.strip() not in rendered
+
+
+def test_render_sidecar_workflow_rules_and_instructions_are_self_contained(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the profile's own authored rules and Copilot
+    instructions file (authored fresh for this profile under
+    shared/sidecar/workflow/) carry the frontmatter Decision 5 requires and
+    zero forbidden-token references."""
+    render_sidecar(tmp_path, "workflow")
+    for rule in SIDECAR_WORKFLOW_RULES:
+        text = (tmp_path / ".claude" / "rules" / f"ai-bootstrap-{rule}.md").read_text(
+            encoding="utf-8"
+        )
+        assert not text.startswith("---\n")
+        assert sidecar_text_errors(PurePosixPath("rule"), text, "workflow") == []
+    instructions_text = (
+        tmp_path / ".github" / "instructions" / "ai-bootstrap-workflow.instructions.md"
+    ).read_text(encoding="utf-8")
+    assert instructions_text.startswith('---\napplyTo: "**"\n---\n\n')
+    assert (
+        sidecar_text_errors(
+            PurePosixPath("instructions"), instructions_text, "workflow"
+        )
+        == []
+    )
+
+
+def test_render_sidecar_workflow_agent_bodies_are_self_contained(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the body of each shipped agent (workflow-prompt.md,
+    excluding the reused full-install frontmatter, which legitimately grants
+    `mcp__` tools -- see the coder's handback report) carries zero
+    forbidden-token references."""
+    render_sidecar(tmp_path, "workflow")
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        body = (
+            REPO_ROOT / "shared" / "agents" / agent_id / "workflow-prompt.md"
+        ).read_text(encoding="utf-8")
+        assert sidecar_text_errors(PurePosixPath("agent"), body, "workflow") == []
+
+
+def _collapsed(text: str) -> str:
+    """Normalize whitespace so an assertion survives an 80-column rewrap."""
+    return " ".join(text.split())
+
+
+def test_render_sidecar_workflow_planner_and_reviewer_return_text_not_save_it(
+    tmp_path: Path,
+) -> None:
+    """Finding 8: the planner's and reviewer's Claude tools (shared
+    `agent.yaml` capabilities) grant no Write or Edit, so their rendered
+    prompts must tell them to return the plan/report as reply text, never
+    to save a file themselves (the planner still has Bash, so the prompt
+    must not claim it has no way to write)."""
+    render_sidecar(tmp_path, "workflow")
+    planner_text = _collapsed(
+        (tmp_path / ".claude" / "agents" / "planner.md").read_text(encoding="utf-8")
+    )
+    assert "Return the finished plan as your reply text" in planner_text
+    assert "do not write it to a file yourself" in planner_text
+    assert "no tool to save" not in planner_text
+    assert "save it under `.ai-bootstrap/plans/`" not in planner_text
+    assert "save the plan" not in planner_text.lower()
+
+    reviewer_text = _collapsed(
+        (tmp_path / ".claude" / "agents" / "reviewer.md").read_text(encoding="utf-8")
+    )
+    assert "Return the finished report as your reply text" in reviewer_text
+    assert "do not write it to a file yourself" in reviewer_text
+    assert "Save the report as `.ai-bootstrap" not in reviewer_text
+
+
+def test_render_sidecar_workflow_orchestrator_and_rules_say_the_caller_saves(
+    tmp_path: Path,
+) -> None:
+    """Findings 6 and 8: the orchestrator prompt and the shared workflow
+    rule both say the caller -- the orchestrator, or the current agent when
+    no specialist exists -- saves the planner's or reviewer's returned
+    text, and both delegate only to a role actually available this
+    session."""
+    render_sidecar(tmp_path, "workflow")
+    orchestrator_text = _collapsed(
+        (tmp_path / ".claude" / "agents" / "orchestrator.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "you save it under `.ai-bootstrap/plans/`" in orchestrator_text
+    assert (
+        "you save that report yourself under `.ai-bootstrap/quality_reports/`"
+        in orchestrator_text
+    )
+    assert "write the plan yourself instead" in orchestrator_text
+    assert "review the diff yourself" in orchestrator_text
+    assert "implement the change yourself instead" in orchestrator_text
+
+    rule_text = _collapsed(
+        (tmp_path / ".claude" / "rules" / "ai-bootstrap-workflow.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "you save it under `.ai-bootstrap/plans/`" in rule_text
+    assert "you save that report under" in rule_text
+    assert "write the plan yourself instead" in rule_text
+    assert "review the diff yourself against the review profiles" in rule_text
+
+
+def _section(text: str, heading: str) -> str:
+    """Return the body under `heading`, up to the next heading of equal or
+    higher level; an empty string when the heading is absent. A bold label
+    without `#` (the planner's `**Phase 1 ...**`) ends at the next bold label
+    or heading."""
+    level = len(heading) - len(heading.lstrip("#"))
+    end = rf"^#{{1,{level}}} " if level else r"^\*\*|^#{1,6} "
+    match = re.search(
+        rf"^{re.escape(heading)}[ \t]*\n(.*?)(?={end}|\Z)",
+        text,
+        re.DOTALL | re.MULTILINE,
+    )
+    return match.group(1) if match else ""
+
+
+def _guidance_errors(
+    texts: dict[str, str], guidance: tuple[tuple[str, str, tuple[str, ...]], ...]
+) -> list[str]:
+    """List each key phrase missing from its named section of its asset.
+
+    Phrases are short and whitespace-normalized, so a rewrap passes but
+    removing the guidance (or moving it out of its section) fails.
+    """
+    errors: list[str] = []
+    for asset, heading, phrases in guidance:
+        body = _collapsed(_section(texts[asset], heading))
+        errors.extend(
+            f"{asset} {heading!r} lacks {phrase!r}"
+            for phrase in phrases
+            if phrase not in body
+        )
+    return errors
+
+
+# (asset, section heading, key phrases) for the full-install guidance:
+# REQ-004 (review against approved requirements and scope changes) and
+# REQ-005 (independent test expectations, original-symptom verification).
+FULL_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "orchestrator",
+        "## Delegation Rules",
+        (
+            "the approved plan/spec requirements and non-goals, the approved scope-change records",
+            "must also carry the approved requirements, non-goals, and approved scope-change records",
+            "the verification results already obtained",
+            "A `WARN` report with open requests is not a clean review",
+            "or, when it cannot be produced, the plain reason",
+            "supply it, or say it does not exist",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Inputs",
+        ("approved plan/spec requirements", "approved scope-change records"),
+    ),
+    (
+        "reviewer",
+        "## Review Flow",
+        (
+            "compare the diff against the supplied approved requirements",
+            "valid alternative implementation of an approved requirement is not a deviation",
+            "never as a requirement you invent",
+            "Also check the tests",
+            "as an open request",
+            "You cannot pause to ask the caller",
+            "answer `WARN`, not `PASS`, while any request is open",
+            "under `### Open Requests` just before `### Gate Result`",
+            "keep them out of the Findings JSON",
+            "is closed: record it in the report as an unverified limitation",
+            "not only the diff",
+        ),
+    ),
+    ("reviewer", "### Open Requests", ("only when a request is open",)),
+    ("reviewer", "## Findings JSON", ("but only when no request is open",)),
+    (
+        "coder",
+        "## Mandatory Skills-First Rule",
+        ("callers, tests, fixtures, config",),
+    ),
+    (
+        "coder",
+        "## Execution Rules",
+        (
+            "approved scope-change records",
+            "Do not silently rewrite approved requirements",
+            "rerun the original reproduction",
+            "A green test suite alone is not original-symptom verification",
+        ),
+    ),
+    (
+        "debug-investigator",
+        "### Phase 6: Resolution Documentation",
+        ("Rerun the original reproduction", 'unverified limitation, not "resolved"'),
+    ),
+    (
+        "debug-investigator",
+        "### Resolution",
+        ("Original symptom after fix", "why it could not be rerun"),
+    ),
+    (
+        "code-profile",
+        "## Checklist",
+        (
+            "supplied approved requirements and scope-change records",
+            "outside the diff",
+        ),
+    ),
+    (
+        "tests-profile",
+        "## Checklist",
+        (
+            "independent of the implementation under test",
+            "targeted negative control",
+            "report it as still needed",
+            "original reproduction now behaves correctly",
+        ),
+    ),
+    # Ponytail 5 adoption (audit A2): the coder maps callers, tests, fixtures,
+    # and config before writing; the review skill reads the touched code, not
+    # only the diff. `reuse:` ships in the skill and the profile together.
+    (
+        "ponytail-skill",
+        "## Before you write",
+        ("callers, tests, fixtures, config",),
+    ),
+    ("ponytail-review-skill", "## Read first", ("not only the diff",)),
+    ("ponytail-review-skill", "## Findings", ("`reuse:`",)),
+    ("ponytail-profile", "## Finding Format", ("`reuse:`",)),
+)
+
+# The same guidance in the relaxed sidecar's advisory wording. The reviewer
+# still returns text and its caller saves it under `.ai-bootstrap/`.
+SIDECAR_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "orchestrator",
+        "## The relaxed loop",
+        ("rerun the original reproduction",),
+    ),
+    (
+        "orchestrator",
+        "## Delegation",
+        (
+            "the approved requirements and any approved scope changes",
+            "it compares the diff against them",
+            "a rerun of the original reproduction, or a negative control",
+            "run it yourself and hand back the output",
+            "you save that report yourself under `.ai-bootstrap/quality_reports/`",
+        ),
+    ),
+    (
+        "coder",
+        "## Skills to load first",
+        ("callers, tests, fixtures, config",),
+    ),
+    (
+        "coder",
+        "## Implementing",
+        ("Do not rewrite the approved requirements", "as a scope change"),
+    ),
+    (
+        "coder",
+        "## Verification",
+        (
+            "rerun the original reproduction",
+            "a passing test suite alone does not show the original symptom is gone",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Inputs you need",
+        (
+            "approved requirements and any approved scope changes",
+            "the request itself is the requirement",
+            "do not reconstruct it from the diff",
+            "list what you still need at the end of your report",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Review flow",
+        (
+            "compare the diff against the approved requirements and scope changes",
+            "valid alternative way to meet a requirement is not a deviation",
+            "never invent one",
+            "list it at the end of your report for the caller",
+            "not only the diff",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Report",
+        (
+            "as your reply text",
+            "do not write it to a file yourself",
+            "when you still need something, a short list of it at the end",
+        ),
+    ),
+    (
+        "rule",
+        "## Run the project's own checks",
+        ("rerun the original reproduction",),
+    ),
+    (
+        "rule",
+        "## Review non-trivial diffs",
+        (
+            "approved requirements and any approved scope changes",
+            "the request itself is the requirement",
+            "you save that report under `.ai-bootstrap/quality_reports/`",
+        ),
+    ),
+    (
+        "instructions",
+        "## Workflow",
+        (
+            "rerun the original reproduction",
+            "approved requirements and any approved scope changes",
+            "the request itself is the requirement",
+        ),
+    ),
+    (
+        "debug-investigator",
+        "### Phase 6: Resolution Documentation",
+        ("Rerun the original reproduction",),
+    ),
+    (
+        "code-profile",
+        "## Checklist",
+        ("approved requirements and scope-change records",),
+    ),
+    ("tests-profile", "## Checklist", ("targeted negative control",)),
+)
+
+
+def _source_texts() -> dict[str, str]:
+    """Read the shared source assets the full-install guidance lives in."""
+    paths = {
+        "orchestrator": "agents/orchestrator/prompt.md",
+        "reviewer": "agents/reviewer/prompt.md",
+        "coder": "agents/coder/prompt.md",
+        "debug-investigator": "skills/debug-investigator/SKILL.md",
+        "code-profile": "review-profiles/code.md",
+        "tests-profile": "review-profiles/tests.md",
+        "ponytail-profile": "review-profiles/ponytail.md",
+        "ponytail-skill": "skills/ponytail/SKILL.md",
+        "ponytail-review-skill": "skills/ponytail-review/SKILL.md",
+    }
+    return {
+        asset: (REPO_ROOT / "shared" / path).read_text(encoding="utf-8")
+        for asset, path in paths.items()
+    }
+
+
+def test_shared_review_guidance_names_approved_requirements_and_original_symptom() -> (
+    None
+):
+    """REQ-004/REQ-005: in their named sections, the orchestrator's general and
+    reviewer-specific delegation rules, the reviewer's Inputs and review
+    steps, the coder's rules, the debug resolution, and the code and tests
+    profiles carry the approved-requirement comparison and the
+    original-symptom check."""
+    assert _guidance_errors(_source_texts(), FULL_REVIEW_GUIDANCE) == []
+
+
+def test_review_guidance_check_fails_when_text_is_removed_or_moved() -> None:
+    """The guidance check is section-scoped: deleting a phrase, or leaving it
+    only outside its named section, is reported."""
+    texts = _source_texts()
+    phrase = "approved scope-change records"
+    reviewer = texts["reviewer"]
+    inputs = _section(reviewer, "## Inputs")
+    assert phrase in inputs
+    # Moved: cut the phrase out of Inputs and append it under another section.
+    reviewer = reviewer.replace(inputs, inputs.replace(phrase, "records", 1), 1)
+    texts["reviewer"] = reviewer.replace(
+        "## Retrieval\n", f"## Retrieval\n{phrase}\n", 1
+    )
+    assert phrase in texts["reviewer"]  # a whole-file search would still pass
+    # Removed: drop the debug resolution step outright.
+    texts["debug-investigator"] = texts["debug-investigator"].replace(
+        "Rerun the original reproduction", "Check the fix", 1
+    )
+    errors = _guidance_errors(texts, FULL_REVIEW_GUIDANCE)
+    assert any("reviewer '## Inputs'" in error for error in errors)
+    assert any("Resolution Documentation" in error for error in errors)
+    assert len(errors) == 2
+
+
+@pytest.mark.parametrize("surface", ["claude", "codex"])
+def test_generated_full_output_carries_review_guidance(
+    tmp_path: Path, surface: str
+) -> None:
+    """REQ-004/REQ-005: the generated Claude files (agents, debug and Ponytail
+    skills, review profiles) and the Codex agent `developer_instructions`
+    carry the same guidance as the shared source."""
+    roles = ("orchestrator", "reviewer", "coder")
+    if surface == "claude":
+        target_generator.render_shared_basis(tmp_path, "multi-agent")
+        target_generator.render_claude_agents(tmp_path)
+        claude = tmp_path / ".claude"
+        texts = {
+            **{
+                role: (claude / "agents" / f"{role}.md").read_text(encoding="utf-8")
+                for role in roles
+            },
+            "debug-investigator": (
+                claude / "skills" / "debug-investigator" / "SKILL.md"
+            ).read_text(encoding="utf-8"),
+            "code-profile": (claude / "review-profiles" / "code.md").read_text(
+                encoding="utf-8"
+            ),
+            "tests-profile": (claude / "review-profiles" / "tests.md").read_text(
+                encoding="utf-8"
+            ),
+            "ponytail-profile": (claude / "review-profiles" / "ponytail.md").read_text(
+                encoding="utf-8"
+            ),
+            "ponytail-skill": (claude / "skills" / "ponytail" / "SKILL.md").read_text(
+                encoding="utf-8"
+            ),
+            "ponytail-review-skill": (
+                claude / "skills" / "ponytail-review" / "SKILL.md"
+            ).read_text(encoding="utf-8"),
+        }
+    else:
+        agents = {agent["id"]: agent for agent, _dir in shared_agents()}
+        texts = {
+            role: tomllib.loads(render_codex_agent_adapter(agents[role]))[
+                "developer_instructions"
+            ]
+            for role in roles
+        }
+    guidance = tuple(item for item in FULL_REVIEW_GUIDANCE if item[0] in texts)
+    assert guidance
+    assert _guidance_errors(texts, guidance) == []
+
+
+def test_render_sidecar_workflow_carries_advisory_review_guidance(
+    tmp_path: Path,
+) -> None:
+    """REQ-004/REQ-005/REQ-009: the relaxed workflow sidecar's agents, rule,
+    Copilot instructions, debug skill, and review profiles carry concise
+    approved-requirement and original-symptom guidance, while the reviewer
+    still returns text for its caller to save under `.ai-bootstrap/`."""
+    render_sidecar(tmp_path, "workflow")
+    claude = tmp_path / ".claude"
+    texts = {
+        **{
+            role: (claude / "agents" / f"{role}.md").read_text(encoding="utf-8")
+            for role in ("orchestrator", "coder", "reviewer")
+        },
+        "rule": (claude / "rules" / "ai-bootstrap-workflow.md").read_text(
+            encoding="utf-8"
+        ),
+        "instructions": (
+            tmp_path
+            / ".github"
+            / "instructions"
+            / "ai-bootstrap-workflow.instructions.md"
+        ).read_text(encoding="utf-8"),
+        "debug-investigator": (
+            claude / "skills" / "debug-investigator" / "SKILL.md"
+        ).read_text(encoding="utf-8"),
+        "code-profile": (claude / "review-profiles" / "code.md").read_text(
+            encoding="utf-8"
+        ),
+        "tests-profile": (claude / "review-profiles" / "tests.md").read_text(
+            encoding="utf-8"
+        ),
+    }
+    assert _guidance_errors(texts, SIDECAR_REVIEW_GUIDANCE) == []
+    assert "**Requirements:**" in (
+        claude / "templates" / "quality-report.md"
+    ).read_text(encoding="utf-8")
+
+
+# Planning, reporting, and learning guidance: REQ-001 (decisive assumptions
+# before decomposition), REQ-002 (optional spec and requirement map), REQ-003
+# (existing contracts and test strategy), REQ-007 (phase-boundary summary),
+# and REQ-008 (a failure routes to a regression). The planner's phases are
+# bold labels, not headings.
+PLANNER_PHASE_1 = "**Phase 1 — Bounded Discovery**"
+PLANNER_PHASE_2 = "**Phase 2 — Focused Clarification (only when needed)**"
+PLANNER_PHASE_4 = "**Phase 4 — Plan Draft**"
+
+# The two plan templates read the same in the full install and the relaxed
+# sidecar, so both tables share these entries. Anchors are short terms, not
+# sentences, and each is matched only inside its named section.
+TEMPLATE_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("plan-big", "## Non-Goals and Constraints (optional)", ("will not do",)),
+    (
+        "plan-big",
+        "## Requirement Map (optional)",
+        ("Owning phase", "span several phases", "not frontmatter fields"),
+    ),
+    ("plan-small", "## Scope", ("requirement IDs",)),
+)
+
+FULL_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "planner",
+        PLANNER_PHASE_1,
+        (
+            "decisive assumption",
+            "bounded experiment",
+            "authorizes production",
+            "shortcuts",
+            "Known facts",
+            "integration-gate-spike",
+        ),
+    ),
+    ("planner", PLANNER_PHASE_2, ("retention period", "streaming")),
+    (
+        "planner",
+        PLANNER_PHASE_4,
+        (
+            "existing contracts",
+            "negative cases",
+            "no available verification",
+            "Delegation Rules",
+        ),
+    ),
+    (
+        "orchestrator",
+        "## Completion Protocol (Mandatory)",
+        ("agent-reporting.instructions.md",),
+    ),
+    (
+        "reporting-policy",
+        "## Phase-boundary summary",
+        (
+            "deviations",
+            "link to its evidence",
+            "next operation",
+            "not a new record",
+            "paused",
+        ),
+    ),
+    ("workflow-policy", "## Plan-First Protocol", ("decisive technical assumptions",)),
+    ("plan-decomposition", "### Step 1: Identify Phases", ("decisive assumption",)),
+    ("plan-decomposition", "### Step 3: Write the Big Plan", ("requirement map",)),
+    (
+        "learn",
+        "## Phase 1: Evaluate",
+        (
+            "reproduction",
+            "regression",
+            "existing test or skill",
+            "Example with no new instruction",
+        ),
+    ),
+    (
+        "requirements-spec",
+        "# Requirements Specification — [FEATURE NAME]",
+        ("no separate spec",),
+    ),
+    ("requirements-spec", "## Non-Goals and Constraints", ("Non-goals",)),
+    ("requirements-spec", "## Success Criteria", ("Owning phase",)),
+    *TEMPLATE_PLANNING_GUIDANCE,
+)
+
+# The same guidance in the relaxed sidecar's advisory wording. The planner
+# still returns text and its caller saves it under `.ai-bootstrap/plans/`.
+SIDECAR_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "planner",
+        "## Plan content",
+        (
+            "decisive assumption",
+            "production code",
+            "retention period",
+            "negative case",
+        ),
+    ),
+    ("orchestrator", "## The relaxed loop", ("decisive assumption",)),
+    ("orchestrator", "## Ending a task", ("guarding test", "short summary")),
+    ("documenter", "## Memory and session log", ("guarding test",)),
+    (
+        "rule",
+        "## Decide whether a plan helps",
+        ("decisive assumption", "production code", "requirement map"),
+    ),
+    ("rule", "## At the end of a task", ("guarding test",)),
+    (
+        "instructions",
+        "## Workflow",
+        ("decisive assumption", "requirement map", "guarding test", "short summary"),
+    ),
+    *TEMPLATE_PLANNING_GUIDANCE,
+)
+
+
+def _drop(text: str, phrase: str) -> str:
+    """Delete `phrase` wherever it occurs, however the source wrapped it."""
+    return re.sub(r"\s+".join(re.escape(word) for word in phrase.split()), "", text)
+
+
+def _read_shared(paths: dict[str, str]) -> dict[str, str]:
+    """Read the named files under `shared/` keyed by asset name."""
+    return {
+        asset: (REPO_ROOT / "shared" / path).read_text(encoding="utf-8")
+        for asset, path in paths.items()
+    }
+
+
+def _planning_source_texts() -> dict[str, str]:
+    """Read the shared source assets the full-install planning guidance lives in."""
+    return _read_shared(
+        {
+            "planner": "agents/planner/prompt.md",
+            "orchestrator": "agents/orchestrator/prompt.md",
+            "reporting-policy": "policies/agent-reporting.instructions.md",
+            "workflow-policy": "policies/workflow.instructions.md",
+            "plan-decomposition": "skills/plan-decomposition/SKILL.md",
+            "learn": "skills/learn/SKILL.md",
+            "requirements-spec": "templates/requirements-spec.md",
+            "plan-big": "templates/plan-big.md",
+            "plan-small": "templates/plan-small.md",
+        }
+    )
+
+
+def _sidecar_planning_source_texts() -> dict[str, str]:
+    """Read the shared source assets the sidecar planning guidance lives in."""
+    return _read_shared(
+        {
+            "planner": "agents/planner/workflow-prompt.md",
+            "orchestrator": "agents/orchestrator/workflow-prompt.md",
+            "documenter": "agents/documenter/workflow-prompt.md",
+            "rule": "sidecar/workflow/rules/workflow.md",
+            "instructions": "sidecar/workflow/instructions.md",
+            "plan-big": "sidecar/workflow/templates/plan-big.md",
+            "plan-small": "sidecar/workflow/templates/plan-small.md",
+        }
+    )
+
+
+def test_shared_planning_guidance_names_risk_contracts_summary_and_learning() -> None:
+    """REQ-001/002/003/007/008: in their named sections, the planner phases,
+    the reporting policy, the plan-first policy, the LEARN evaluation step, the
+    templates, and the sidecar prompts, rule, instructions, and templates carry
+    the risk and evidence decision, optional specs and IDs, contract and test
+    strategy, boundary summary, and failure route."""
+    assert _guidance_errors(_planning_source_texts(), FULL_PLANNING_GUIDANCE) == []
+    assert (
+        _guidance_errors(_sidecar_planning_source_texts(), SIDECAR_PLANNING_GUIDANCE)
+        == []
+    )
+
+
+def test_planner_settles_risk_and_evidence_before_splitting_phases() -> None:
+    """REQ-001: the risk and evidence decision sits in Phase 1, ahead of the
+    Phase 4 contract and test-strategy step that splits the work."""
+    planner = _planning_source_texts()["planner"]
+    assert planner.index(PLANNER_PHASE_1) < planner.index(PLANNER_PHASE_4)
+    assert "decisive assumption" in _section(planner, PLANNER_PHASE_1)
+
+
+def test_planning_guidance_check_fails_when_text_is_removed_or_moved() -> None:
+    """The guidance check is section-scoped: deleting an anchor, or leaving it
+    only outside its named section, is reported."""
+    texts = _planning_source_texts()
+    phrase = "bounded experiment"
+    phase_1 = _section(texts["planner"], PLANNER_PHASE_1)
+    assert phrase in phase_1
+    # Moved: cut the anchor out of Phase 1 and append it under Phase 2.
+    moved = texts["planner"].replace(phase_1, _drop(phase_1, phrase), 1)
+    texts["planner"] = moved.replace(
+        PLANNER_PHASE_2, f"{PLANNER_PHASE_2}\n- {phrase}", 1
+    )
+    assert phrase in _section(texts["planner"], PLANNER_PHASE_2)  # whole-file passes
+    # Removed: drop the LEARN failure route's durable-home anchor outright.
+    removed = "existing test or skill"
+    assert removed in _section(texts["learn"], "## Phase 1: Evaluate")
+    texts["learn"] = _drop(texts["learn"], removed)
+    assert _guidance_errors(texts, FULL_PLANNING_GUIDANCE) == [
+        f"planner {PLANNER_PHASE_1!r} lacks {phrase!r}",
+        f"learn '## Phase 1: Evaluate' lacks {removed!r}",
+    ]
+
+
+@pytest.mark.parametrize("surface", ["claude", "codex"])
+def test_generated_full_output_carries_planning_guidance(
+    tmp_path: Path, surface: str
+) -> None:
+    """REQ-001/002/003/007/008: the generated Claude agents, skills, policies,
+    and templates, and the Codex planner and orchestrator
+    `developer_instructions`, carry the same guidance as the shared source."""
+    roles = ("planner", "orchestrator")
+    if surface == "claude":
+        target_generator.render_shared_basis(tmp_path, "multi-agent")
+        target_generator.render_claude_agents(tmp_path)
+        claude = tmp_path / ".claude"
+        paths = {
+            **{role: f"agents/{role}.md" for role in roles},
+            "reporting-policy": "instructions/agent-reporting.instructions.md",
+            "workflow-policy": "instructions/workflow.instructions.md",
+            "plan-decomposition": "skills/plan-decomposition/SKILL.md",
+            "learn": "skills/learn/SKILL.md",
+            **{
+                name: f"templates/{name}.md"
+                for name in ("requirements-spec", "plan-big", "plan-small")
+            },
+        }
+        texts = {
+            asset: (claude / path).read_text(encoding="utf-8")
+            for asset, path in paths.items()
+        }
+    else:
+        agents = {agent["id"]: agent for agent, _dir in shared_agents()}
+        texts = {
+            role: tomllib.loads(render_codex_agent_adapter(agents[role]))[
+                "developer_instructions"
+            ]
+            for role in roles
+        }
+    guidance = tuple(item for item in FULL_PLANNING_GUIDANCE if item[0] in texts)
+    assert guidance
+    assert _guidance_errors(texts, guidance) == []
+
+
+def test_render_sidecar_workflow_carries_advisory_planning_guidance(
+    tmp_path: Path,
+) -> None:
+    """REQ-001/002/007/008/009: the relaxed workflow sidecar's agents, rule,
+    Copilot instructions, and templates carry concise planning, summary, and
+    failure-route guidance. The planner still returns text for its caller to
+    save under `.ai-bootstrap/plans/`, and the sidecar names no unshipped
+    requirements-spec file."""
+    render_sidecar(tmp_path, "workflow")
+    claude = tmp_path / ".claude"
+    texts = {
+        **{
+            role: (claude / "agents" / f"{role}.md").read_text(encoding="utf-8")
+            for role in ("planner", "orchestrator", "documenter")
+        },
+        "rule": (claude / "rules" / "ai-bootstrap-workflow.md").read_text(
+            encoding="utf-8"
+        ),
+        "instructions": (
+            tmp_path
+            / ".github"
+            / "instructions"
+            / "ai-bootstrap-workflow.instructions.md"
+        ).read_text(encoding="utf-8"),
+        **{
+            name: (claude / "templates" / f"{name}.md").read_text(encoding="utf-8")
+            for name in ("plan-big", "plan-small")
+        },
+    }
+    assert _guidance_errors(texts, SIDECAR_PLANNING_GUIDANCE) == []
+    assert "Return the finished plan as your reply text" in _collapsed(texts["planner"])
+    assert "you save it under `.ai-bootstrap/plans/`" in _collapsed(
+        texts["orchestrator"]
+    )
+    assert all("requirements-spec" not in text for text in texts.values())
+    assert not (claude / "templates" / "requirements-spec.md").exists()
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+
+
+# Paths and scripts that exist only in this authoring repository, so a template
+# installed into a consumer must not send the reader to them.
+AUTHORING_ONLY_TEXT = (
+    "shared/policies/",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "scripts/check_runtime.py",
+)
+
+
+def test_rendered_templates_carry_no_stale_authoring_paths_or_pause_text(
+    tmp_path: Path,
+) -> None:
+    """No rendered full or sidecar template cites an authoring-only path or
+    script, and the relaxed sidecar plan-small names no pause fields and no
+    hooks (the sidecar has neither)."""
+    target_generator.render_shared_basis(tmp_path / "full", "multi-agent")
+    render_sidecar(tmp_path / "sidecar", "workflow")
+    rendered = {
+        path.relative_to(tmp_path).as_posix(): path.read_text(encoding="utf-8")
+        for root in ("full", "sidecar")
+        for path in (tmp_path / root / ".claude" / "templates").glob("*.md")
+    }
+    assert {
+        "full/.claude/templates/plan-big.md",
+        "full/.claude/templates/skill-template.md",
+        "sidecar/.claude/templates/plan-big.md",
+        "sidecar/.claude/templates/plan-small.md",
+    } <= rendered.keys()
+    stale = {
+        name: [text for text in AUTHORING_ONLY_TEXT if text in body]
+        for name, body in rendered.items()
+    }
+    assert {name: found for name, found in stale.items() if found} == {}
+    plan_small = rendered["sidecar/.claude/templates/plan-small.md"].lower()
+    assert [word for word in ("pause", "hook") if word in plan_small] == []
+
+
+def test_render_sidecar_workflow_review_profiles_and_templates_are_shipped(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the ten review profiles and the four templates all
+    render; the two relaxed templates come from
+    shared/sidecar/workflow/templates/, not shared/templates/."""
+    render_sidecar(tmp_path, "workflow")
+    for name in SIDECAR_WORKFLOW_REVIEW_PROFILES:
+        assert (tmp_path / ".claude" / "review-profiles" / f"{name}.md").is_file()
+    for template_name in SIDECAR_WORKFLOW_TEMPLATES:
+        assert (tmp_path / ".claude" / "templates" / template_name).is_file()
+    session_log = (tmp_path / ".claude" / "templates" / "session-log.md").read_text(
+        encoding="utf-8"
+    )
+    canonical_session_log = (
+        REPO_ROOT / "shared" / "templates" / "session-log.md"
+    ).read_text(encoding="utf-8")
+    relaxed_session_log = (
+        REPO_ROOT / "shared" / "sidecar" / "workflow" / "templates" / "session-log.md"
+    ).read_text(encoding="utf-8")
+    assert session_log == relaxed_session_log
+    assert session_log != canonical_session_log
+
+
+def test_apply_sidecar_workflow_path_replacements_rewrites_the_five_state_paths() -> (
+    None
+):
+    """New behavior: the review profiles' and the two plan templates' own
+    text rewrite (Decision 2) turns each full-install state path into its
+    namespaced equivalent."""
+    text = (
+        "See .claude/plans/, .claude/session_logs/, .claude/quality_reports/, "
+        ".claude/MEMORY.md, and .claude/explorations/."
+    )
+    rewritten = target_generator.apply_sidecar_workflow_path_replacements(text)
+    assert rewritten == (
+        "See .ai-bootstrap/plans/, .ai-bootstrap/session_logs/, "
+        ".ai-bootstrap/quality_reports/, .ai-bootstrap/MEMORY.md, "
+        "and .ai-bootstrap/explorations/."
+    )
+
+
+def test_render_sidecar_workflow_state_seeds_are_present(tmp_path: Path) -> None:
+    """New behavior: every state seed is copied under the one namespaced
+    state root, unmodified (Decision 2-3: seeded once by the installer,
+    never compared here)."""
+    render_sidecar(tmp_path, "workflow")
+    for seed in SIDECAR_STATE_SEED_FILES:
+        seed_path = tmp_path / SIDECAR_STATE_ROOT / seed
+        assert seed_path.is_file()
+        source_path = REPO_ROOT / "shared" / "sidecar" / "workflow" / "state" / seed
+        assert seed_path.read_text(encoding="utf-8") == source_path.read_text(
+            encoding="utf-8"
+        )
+
+
+def test_sidecar_generation_is_deterministic_for_both_profiles(tmp_path: Path) -> None:
+    """New behavior: rendering the same profile twice produces byte-identical
+    trees (a crash-convergence/idempotence precondition)."""
+    for profile in SIDECAR_PROFILES:
+        first = tmp_path / f"{profile}-1"
+        second = tmp_path / f"{profile}-2"
+        render_sidecar(first, profile)
+        render_sidecar(second, profile)
+        assert dirs_match(first, second)
+
+
+def test_sidecar_allowed_relative_path_differs_by_profile() -> None:
+    """New behavior: a workflow-only unit is disallowed for the skills
+    profile, a shared skill is allowed for both, and a rule missing the
+    ai-bootstrap- prefix is disallowed for workflow."""
+    workflow_agent = PurePosixPath(".claude/agents/coder.md")
+    assert sidecar_allowed_relative_path(workflow_agent, "workflow")
+    assert not sidecar_allowed_relative_path(workflow_agent, "skills")
+
+    shared_skill = PurePosixPath(".claude/skills/debug-investigator/SKILL.md")
+    assert sidecar_allowed_relative_path(shared_skill, "skills")
+    assert sidecar_allowed_relative_path(shared_skill, "workflow")
+
+    rule_without_prefix = PurePosixPath(".claude/rules/workflow.md")
+    assert not sidecar_allowed_relative_path(rule_without_prefix, "workflow")
+
+
+def test_sidecar_forbidden_text_tokens_differ_by_profile() -> None:
+    """New behavior: MEMORY.md and .claude/review-profiles/ are legitimate,
+    profile-shipped references for workflow (Decision 2, 9) but stay
+    forbidden for skills; the tokens Decision 11 adds for workflow stay out
+    of the skills list; every other token both profiles still forbid."""
+    skills_tokens = sidecar_forbidden_text_tokens("skills")
+    workflow_tokens = sidecar_forbidden_text_tokens("workflow")
+    assert "MEMORY.md" in skills_tokens
+    assert "MEMORY.md" not in workflow_tokens
+    assert ".claude/review-profiles/" in skills_tokens
+    assert ".claude/review-profiles/" not in workflow_tokens
+    for token in ("settings.json", "core.hooksPath", "ai-state", "state-sync"):
+        assert token in workflow_tokens
+        assert token not in skills_tokens
+    for token in (".claude/instructions/", "verify.py", "mcp__", "openwiki"):
+        assert token in skills_tokens
+        assert token in workflow_tokens
+
+
+def test_sidecar_target_errors_rejects_a_workflow_rule_without_the_prefix(
+    tmp_path: Path,
+) -> None:
+    """New behavior (adversarial case: a rule file without the
+    ai-bootstrap- prefix): a stray copy under the profile's own bootstrap-
+    only-free name must be rejected as a disallowed path."""
+    render_sidecar(tmp_path, "workflow")
+    (tmp_path / ".claude" / "rules" / "workflow.md").write_text(
+        "stray\n", encoding="utf-8"
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(
+        "disallowed path" in error and "workflow.md" in error for error in errors
+    )
+
+
+def test_sidecar_target_errors_rejects_a_missing_workflow_unit(tmp_path: Path) -> None:
+    """New behavior (adversarial case: a missing unit): deleting a shipped
+    review profile must be rejected as incomplete."""
+    render_sidecar(tmp_path, "workflow")
+    (tmp_path / ".claude" / "review-profiles" / "tests.md").unlink()
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(
+        "incomplete" in error and "missing" in error and "tests.md" in error
+        for error in errors
+    )
+
+
+def test_sidecar_target_errors_rejects_an_extra_workflow_unit(tmp_path: Path) -> None:
+    """New behavior (adversarial case: an extra unit): a 6th agent file not
+    among SIDECAR_WORKFLOW_AGENTS must be rejected as disallowed and
+    unexpected."""
+    render_sidecar(tmp_path, "workflow")
+    (tmp_path / ".claude" / "agents" / "extra.md").write_text(
+        "stray\n", encoding="utf-8"
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any("disallowed path" in error and "extra.md" in error for error in errors)
+
+
+def test_sidecar_target_errors_rejects_an_agent_naming_verify_py(
+    tmp_path: Path,
+) -> None:
+    """New behavior (adversarial case: an agent text naming a receipt or
+    verify.py): a forbidden-token leak in an agent file must be rejected."""
+    render_sidecar(tmp_path, "workflow")
+    agent_path = tmp_path / ".claude" / "agents" / "coder.md"
+    agent_path.write_text(
+        agent_path.read_text(encoding="utf-8")
+        + "\nRun `uv run python .claude/scripts/verify.py`.\n",
+        encoding="utf-8",
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any("still references" in error for error in errors)
+
+
+def test_real_generated_workflow_tree_has_no_retired_state_path(
+    tmp_path: Path,
+) -> None:
+    """Finding 1: the active, generated workflow content never mentions
+    the retired state root again, anywhere -- the real render, not a
+    synthetic fixture, so a path left un-rewritten in a shared source file
+    or the generator's own rewrite table would fail this."""
+    render_sidecar(tmp_path, "workflow")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+    for path in tmp_path.rglob("*"):
+        if path.is_file():
+            assert SIDECAR_LEGACY_STATE_ROOT not in path.read_text(
+                encoding="utf-8", errors="replace"
+            ), path
+
+
+def test_sidecar_target_errors_rejects_a_leftover_legacy_state_path(
+    tmp_path: Path,
+) -> None:
+    """New behavior (adversarial case: a leftover retired state path): a
+    rendered file mentioning the old ``.claude/ai-bootstrap`` root must be
+    rejected, the same way any other leftover bootstrap-only reference is
+    -- outside this explicit legacy-handling test, active generated
+    content must never reference it again."""
+    render_sidecar(tmp_path, "workflow")
+    rule_path = tmp_path / ".claude" / "rules" / "ai-bootstrap-workflow.md"
+    rule_path.write_text(
+        rule_path.read_text(encoding="utf-8")
+        + f"\nSee `{SIDECAR_LEGACY_STATE_ROOT}/MEMORY.md`.\n",
+        encoding="utf-8",
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(
+        "still references" in error and SIDECAR_LEGACY_STATE_ROOT in error
+        for error in errors
+    )

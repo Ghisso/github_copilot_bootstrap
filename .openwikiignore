@@ -1,0 +1,39 @@
+# OpenWiki traversal excludes for github_copilot_bootstrap.
+#
+# Gitignore-compatible syntax (verified against openwiki's own
+# dist/agent/openwiki-ignore.js): blank lines and `#` comments are dropped,
+# `*`/`**`/`?` glob, a leading `/` or any embedded `/` anchors the pattern to
+# the repository root, a trailing `/` scopes it to directories (and
+# everything nested under them), and later `!` lines can re-include a path an
+# earlier rule excluded. Matching is always case-insensitive, by that file's
+# own design. `.git/` is always skipped by OpenWiki itself and does not need
+# a line here. Do not add a rule for `openwiki/` itself — it is the output.
+
+# Generated multi-target build output — never source for this repository.
+dist/
+
+# Generated or installed runtime adapters. What they are generated from
+# (shared/policies, shared/agents, shared/skills, shared/hooks) stays in
+# scope, so hiding the adapters does not hide any evidence.
+.claude/
+.codex/
+.agents/
+.github/hooks/
+.devcontainer/
+
+# Root entrypoint adapters generated from scripts/generate_targets.py; the
+# canonical guidance they summarize lives under shared/.
+/AGENTS.md
+/CLAUDE.md
+
+# Caches, local secrets, and Python build output.
+.context-mode/
+.context-mode-provenance.secret*
+.uv-cache/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.pyo

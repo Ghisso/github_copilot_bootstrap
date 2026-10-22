@@ -42,6 +42,8 @@ This skill covers how to design tests. The authoritative hard rules are `.claude
 uv run pytest tests/ -q --tb=short
 uv run pytest tests/ --cov=src --cov-report=term-missing
 ```
+Use `--cov=shared --cov=scripts` instead of `--cov=src` in this bootstrap's
+own authoring repository.
 
 If the policy and this skill disagree, follow `.claude/instructions/tests.instructions.md`.
 

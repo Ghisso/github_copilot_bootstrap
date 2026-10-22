@@ -148,17 +148,9 @@ FAILED test_route[42] - Q: "List resolutions mentioning Syria"
 
 This tells you: need `\blist\b.*\bresolutions?\b` pattern (not just `\blist\s+all\b`).
 
-**Common pattern gaps discovered empirically:**
-- "list resolutions" (not just "list all")
-- "which resolutions" (structured lookup)
-- Superlatives with intervening words: "latest resolution on Libya" ≠ "latest resolution"
-- Standalone "abstain" without "voted"
-- Junction lookups: "what countries/subjects/topics"
-- Plural variants: "meeting records" not just "meeting record"
-
-**Common BOTH pattern mistakes:**
-- `\bwhat\b.*\b(?:latest|most recent)\b` is too broad — matches pure SQL superlatives
-- Tighten to require content words: `\b(?:latest|most recent)\b.*\b(?:say|about|content|discuss)\b`
+Use the failing question text to write the missing regex alternation, then
+rerun the parametrized suite. See `references/case-study.md` for a worked
+example of pattern gaps found this way and the before/after pass numbers.
 
 ## Verification
 
@@ -175,10 +167,5 @@ uv run -m pytest tests/ -v
 
 ## Example
 
-CSV-driven tests with 64 test cases across 11 categories revealed:
-- 6 missing SQL patterns in a regex classifier
-- 1 overly-broad BOTH pattern that stole SQL classifications
-- 1 GROUP BY validation false positive in test assertions
-
-Net result: classifier went from 43/64 → 64/64 correct after fixes.
-Full regression: all tests passed, 0 failures.
+See `references/case-study.md` for a full worked case study (a UN Security
+Council resolution classifier) applying this method end-to-end.

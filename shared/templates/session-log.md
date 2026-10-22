@@ -1,59 +1,59 @@
-# Session Log — [DATE]
+# Session: [short description]
 
-## Session Info
+**Date:** YYYY-MM-DD
+**Plan:** [link to small-plan file]
+**Status:** IN-PROGRESS | PAUSED | COMPLETED | CANCELLED | BLOCKED
 
-| Field       | Value                              |
-|-------------|------------------------------------|
-| Date        | YYYY-MM-DD                         |
-| Status      | IN PROGRESS / COMPLETED / BLOCKED  |
-| Objective   | [What we set out to accomplish]     |
-| Plan        | [Link to plan in .claude/plans/]    |
+Use `**Status:** COMPLETED` when the planned work finished and passed closeout.
+Use `**Status:** CANCELLED` when an authorized plan or phase will never run.
+Use `**Status:** PAUSED` only for an explicit user-requested checkpoint that
+will resume later. A PAUSED log must record the pause reason, completed work,
+verification already run, known failures or incomplete checks, remaining work,
+the exact resume-next step, and a useful resume command, config, or model
+identifier when applicable.
 
----
+## Goal
 
-## Changes Made
-
-| File | Change Type | Quality Score |
-|------|-------------|---------------|
-| `src/...` | New / Modified / Deleted | --/100 |
-
----
-
-## Design Decisions
-
-| Decision | Rationale | Alternatives Considered |
-|----------|-----------|------------------------|
-| [What was decided] | [Why] | [What else was considered] |
-
----
+[What this session aims to accomplish]
 
 ## Work Log
 
-<!-- Timestamped entries, most recent at bottom -->
+<!-- At a phase boundary, add the short summary shape defined in
+     `.claude/instructions/agent-reporting.instructions.md`. -->
 
-- **HH:MM** — [What was done, what was decided, what was learned]
+- **HH:MM** - [What was done, what was decided, what was learned]
 
----
+## [LEARN] Entries
 
-## Learnings
+Add one bullet per real lesson, formatted as `[LEARN:category] what was
+learned`. If nothing new was learned this session, use the exact
+no-new-lessons marker documented in `.claude/session_logs/README.md`
+instead. Delete this paragraph; an untouched template with no bullet line
+here fails closeout.
 
-<!-- Move these to .claude/MEMORY.md at end of session -->
+## Verification
 
-- [LEARN:category] [description]
+Paste the required items' `PASS <duration> <item>` summary lines that
+`verify closeout --format text` printed. Then record every optional item's
+outcome, one line per item: `- optional <n>: PASS|FAIL|NOT RUN — <detail>`;
+a `NOT RUN` line needs a non-empty `<detail>`. See the Verification Evidence
+Contract in `.claude/instructions/workflow.instructions.md` for the full rules.
 
----
+```text
+# verify closeout --format text summary lines
+# verify.py phase/closeout receipt path
+```
 
-## Verification Results
+## Open Questions / Next Steps
 
-| Check | Status | Details |
-|-------|--------|---------|
-| Unit tests | PASS/FAIL | X/Y passed |
-| mypy | PASS/FAIL | errors |
-| ruff | PASS/FAIL | violations |
-| E2E | PASS/FAIL/SKIP | details |
+- [Question or next step]
 
----
+## Pause Checkpoint (PAUSED only)
 
-## Open Questions
-
-- [ ] [Question that needs answering]
+- **Pause reason:**
+- **Completed work:**
+- **Verification already run:**
+- **Known failures or incomplete checks:**
+- **Remaining work:**
+- **Resume next:**
+- **Resume command/config/model:**

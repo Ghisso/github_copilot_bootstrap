@@ -5,39 +5,57 @@ You run profile-driven reviews and synthesize findings into one concise report.
 ## Inputs
 
 The caller must provide:
-- Scope: files, diff, or behavior to inspect.
+- Scope: the changed paths plus either the scoped diff, a repository artifact containing it (for example a `git diff` output file written to disk and passed by its absolute path), or the exact changed hunks. You have no `execute` capability, so you cannot produce this evidence yourself; full-file reads alone are not equivalent to diff review. For a follow-up round, ask for a diff-of-diffs isolating only what changed since the previous round when that is useful.
+- Requirements: the approved plan/spec requirements and non-goals, plus the approved scope-change records, with artifact versions and IDs where present. For simple work, the approved task instruction is enough. If none were supplied, do not reconstruct them from the diff: list the gap as an open request (see **Review Flow**, step 6).
 - Profiles: one or more names from `.claude/review-profiles/`.
 - Gate: advisory, commit, or PR.
 
-If profiles are omitted, infer them from changed files:
-- Python source: `code`, `security`
-- New modules or refactors: `architecture`
-- Tests: `tests`
-- API/service files: `api`, `security`, `tests`
-- Config dataclasses: `config`
-- I/O-heavy or ML-heavy paths: `performance`
-- Docs or public behavior changes: `documentation`
-- Domain-specific correctness: `domain`
+## Retrieval
+
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
+
+## Reporting back to the orchestrator
+
+Follow `.claude/instructions/agent-reporting.instructions.md` for
+audience-appropriate communication.
+
+If profiles are omitted, infer them from the changed files using the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
+
+Select `ponytail` according to the authoritative routing table, including its
+control-plane/high-risk, complexity-expansion, and documentation-only
+precedence rules.
 
 ## Review Flow
 
-1. Read each requested profile from `.claude/review-profiles/`.
-2. Run `review-pass-primary` on the same scope and merged profile checklist.
-3. Run `review-pass-adversarial` on the same scope and merged profile checklist.
-4. Merge outputs:
-   - Shared findings are high confidence.
-   - Single-pass findings are disputed but retained.
-   - Severity disagreements use the stricter severity and note the disagreement.
-5. Output one consolidated report.
+You run the review as sequential passes yourself — there are no helper agents
+to delegate to. This keeps the review a single-nesting-level operation that
+executes identically on every runtime.
 
-## Degraded Mode
+1. Read each requested profile from `.claude/review-profiles/`, including its `## Severity` section.
+2. **Pass 1 (primary):** review the scope against the merged profile checklist and record candidate findings. Also compare the diff against the supplied approved requirements and scope-change records:
+   - Every in-scope behavior has an implementation and evidence; nothing unapproved was added.
+   - An approved scope change supersedes the original requirement it changes. A valid alternative implementation of an approved requirement is not a deviation.
+   - Missing material behavior is an ordinary finding at the existing severity (put a requirement ID in the title when one exists). A style omission alone is not missing behavior.
+   - Raise an ambiguous requirement as a finding and a missing one as an open request, never as a requirement you invent.
 
-If either review-pass helper is unavailable, run a single-pass review with the current model.
+   Read the code the change touches, not only the diff (callers of every changed function, signature, or return value; the tests and fixtures that exercise it; the config or exports that name it): a caller, test, fixture, or config entry outside the diff that the change breaks or leaves stale is an ordinary finding.
 
-- Add header: `Degraded review - single model only - do not treat as PR gate`
-- Label findings `[single-pass, unconfirmed]`
-- Omit shared/disputed confidence taxonomy.
-- Do not mark a PR gate as passed.
+   Also check the tests: expected values must not be copied from the implementation's own output, and a bug fix must show the original reproduction now behaving correctly. You cannot run anything, so list missing execution evidence (a test run, an original-reproduction rerun, a negative control) as an open request.
+3. **Pass 2 (verification):** take Pass 1's findings as explicit input and attempt to *refute* each one. Re-read the cited location and decide whether the issue genuinely holds.
+   - Drop any finding that does not survive re-verification — do **not** keep it as "disputed". Confidently fabricated findings are the documented failure mode of LLM reviewers, and this pass exists to catch them.
+   - While refuting, if you discover a genuinely new critical issue, add it to the set.
+4. **Convergence:** if Pass 2 changed the set (dropped or added anything), run another verification pass over the updated set. Stop when a pass yields nothing new — no drops and no additions — twice in a row, or after at most 3 rounds.
+5. Apply the ordinary severity model to every surviving finding, including
+   `ponytail`: CRITICAL and MAJOR both block the phase-completion commit; a
+   surviving MINOR needs an explicit disposition and reason from the
+   orchestrator at closeout but is otherwise advisory.
+6. Output one consolidated report of the findings that survived verification. You cannot pause to ask the caller a question. When requirements or execution evidence you need are missing, review what you can, list each open request as one plain sentence under `### Open Requests` just before `### Gate Result`, and answer `WARN`, not `PASS`, while any request is open. A request answered with a stated reason that it cannot be produced is closed: record it in the report as an unverified limitation instead of keeping `WARN` for it. Open requests are not findings: keep them out of the Findings JSON.
+7. Also emit the reviewed profile names and the surviving findings as a JSON
+   list (see **Findings JSON** below), for the orchestrator to persist with
+   `record_findings.py`, together with your Gate Result and open requests (see
+   **Gate Result** below). You have no `execute` capability
+   (`.claude/agents/reviewer.md` capabilities are `read`/`search` only) —
+   return the JSON, do not attempt to run the script yourself.
 
 ## Report Format
 
@@ -56,6 +74,39 @@ Gate: advisory | commit | PR
 ### Minor
 - [confidence] [profile] [file:line] title -- why it matters -- fix
 
+### Open Requests
+- One plain sentence per request (optional: only when a request is open)
+
 ### Gate Result
 PASS | WARN | FAIL
 ```
+
+## Gate Result
+
+Answer with exactly one value:
+
+- `FAIL` when a CRITICAL or MAJOR finding survives verification. `FAIL` wins when a request is also open.
+- `WARN` when any request is open (see **Review Flow**, step 6).
+- Otherwise `PASS`. Surviving MINOR findings do not change the result; the orchestrator adds a disposition and reason for each at closeout.
+
+The orchestrator records your value with `--gate-result` and each open request with one `--open-request`. The commit gate accepts only `PASS` with no open request, and the recorder refuses `PASS` together with an open request, so report the result honestly: it is a recorded claim, not proof.
+
+## Findings JSON
+
+Immediately after the Report Format block, emit a fenced ```json block containing the surviving findings as a flat list, one object per finding:
+
+```json
+[
+  {"severity": "CRITICAL", "title": "...", "file": "path/to/file.py", "line": 42, "profile": "security"}
+]
+```
+
+- `severity` is exactly one of `CRITICAL`, `MAJOR`, `MINOR` (matching the Report Format sections).
+- `title` is required and non-empty; `file`, `line`, `profile` are included whenever known.
+- A `MINOR` finding the orchestrator intends to let survive phase completion
+  needs `disposition` (e.g. `"accepted"`) and a non-empty `reason` added at
+  closeout; this is audit legibility, not proof the judgment is correct.
+- Every Ponytail finding uses exactly `profile: "ponytail"`.
+- An empty list `[]` is a valid, normal output when nothing survived verification — it is the "review passed clean" signal the commit/push gates expect, not an omission, but only when no request is open.
+- Return the exact reviewed profile names separately so the orchestrator can
+  pass one `--profile <name>` argument per profile to `record_findings.py`.

@@ -11,6 +11,12 @@ from pathlib import Path
 
 COMPRESSIBLE_EXTENSIONS = {".md", ".markdown", ".rst", ".txt"}
 
+# Folders under `.claude` that a bootstrap refresh never deletes from. A test
+# keeps this tuple equal to the installer's folder entries of
+# `CONSUMER_STATE_PATHS`, so an ownership change fails there first.
+PRESERVED_STATE_DIRS = ("plans", "explorations", "session_logs", "quality_reports")
+BACKUP_HOME = ("explorations", "caveman-compress-backups")
+
 SKIP_EXTENSIONS = {
     ".bash",
     ".cfg",
@@ -67,6 +73,7 @@ class DetectionResult:
     file_type: str
     compressible: bool
     reason: str
+    backup_path: str = ""
 
 
 def _normalized_path(filepath: Path) -> str:
@@ -81,7 +88,10 @@ def _is_json_content(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
         return False
-    if not ((stripped.startswith("{") and stripped.endswith("}")) or (stripped.startswith("[") and stripped.endswith("]"))):
+    if not (
+        (stripped.startswith("{") and stripped.endswith("}"))
+        or (stripped.startswith("[") and stripped.endswith("]"))
+    ):
         return False
     try:
         json.loads(text)
@@ -120,7 +130,16 @@ def detect_file_type(filepath: Path) -> str:
         return "natural_language"
 
     if extension in SKIP_EXTENSIONS:
-        if extension in {".cfg", ".conf", ".env", ".ini", ".json", ".toml", ".yaml", ".yml"}:
+        if extension in {
+            ".cfg",
+            ".conf",
+            ".env",
+            ".ini",
+            ".json",
+            ".toml",
+            ".yaml",
+            ".yml",
+        }:
             return "config"
         return "code"
 
@@ -153,16 +172,48 @@ def protected_reason(filepath: Path) -> str | None:
     if normalized.endswith(".original.md"):
         return "Backup files are never compressed."
     if normalized.endswith("/.github/copilot-instructions.md"):
-        return "Workspace instructions are source-of-truth and must stay human-authored."
+        return (
+            "Workspace instructions are source-of-truth and must stay human-authored."
+        )
     if "/shared/policies/" in normalized and normalized.endswith(".md"):
         return "Instruction files are source-of-truth and must keep exact structure."
     if "/.claude/skills/" in normalized and normalized.endswith("/SKILL.md"):
         return "Skill files must keep exact frontmatter and trigger phrases."
+    if "/shared/skills/" in normalized and normalized.endswith("/SKILL.md"):
+        return "Skill files must keep exact frontmatter and trigger phrases."
+    if "/references/" in normalized and (
+        "/shared/skills/" in normalized or "/.claude/skills/" in normalized
+    ):
+        return "Skill reference files carry normative skill content verbatim."
     if "/shared/agents/" in normalized and normalized.endswith((".md", ".yaml")):
         return "Agent files must keep exact instructions and output contracts."
     if "/shared/review-profiles/" in normalized and normalized.endswith(".md"):
         return "Review profiles are source-of-truth and must keep exact checklists."
     return None
+
+
+def backup_path(filepath: Path) -> Path:
+    """Return where the safety backup of a compression target belongs.
+
+    A bootstrap refresh deletes unknown files under the nearest `.claude`
+    folder, except inside its preserved state folders. A target elsewhere in
+    such a folder gets its backup in that folder's preserved explorations
+    area, under the same relative path. Every other target keeps a sibling
+    `<stem>.original.md`: one outside `.claude`, one already inside a
+    preserved folder, and one in a `.claude` with no explorations folder (a
+    team-owned one beside a sidecar install, or the user-level one).
+    """
+
+    resolved = filepath.resolve()
+    sibling = resolved.with_name(f"{resolved.stem}.original.md")
+    claude_dir = next((p for p in resolved.parents if p.name == ".claude"), None)
+    if claude_dir is None:
+        return sibling
+    backup_home = claude_dir.joinpath(*BACKUP_HOME)
+    relative = resolved.relative_to(claude_dir)
+    if not backup_home.parent.is_dir() or relative.parts[0] in PRESERVED_STATE_DIRS:
+        return sibling
+    return backup_home / relative.parent / sibling.name
 
 
 def inspect_path(filepath: Path) -> DetectionResult:
@@ -189,7 +240,13 @@ def inspect_path(filepath: Path) -> DetectionResult:
             f"Only natural-language files can be compressed. Detected {file_type}.",
         )
 
-    return DetectionResult(str(resolved), file_type, True, "Target is safe for caveman-compress.")
+    return DetectionResult(
+        str(resolved),
+        file_type,
+        True,
+        "Target is safe for caveman-compress.",
+        str(backup_path(resolved)),
+    )
 
 
 def should_compress(filepath: Path) -> bool:
@@ -216,6 +273,8 @@ def main(argv: list[str]) -> int:
         print(f"Type: {result.file_type}")
         print(f"Compressible: {'yes' if result.compressible else 'no'}")
         print(f"Reason: {result.reason}")
+        if result.compressible:
+            print(f"Backup: {result.backup_path}")
 
     return 0 if result.compressible else 2
 

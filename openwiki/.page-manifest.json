@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "pages": {
+    "/openwiki/architecture/agents-and-skills.md": {
+      "gitHead": "61c30d6689732a4b014a17f9501df9808f89de9c",
+      "sourceFingerprint": "sha256:a22070621f6a9aae9160dc6179091b8dcc239cd22f25a9fd3e66a1f3e817047a",
+      "pageVersion": "sha256:749f87b458de10d3b25877f403f47289b802bd059777055615cb5fb7803a24ff",
+      "completedBy": "claude-code",
+      "completedRunId": "898c38a6-7dd2-4cc2-b43c-a50054e9a11d"
+    },
+    "/openwiki/architecture/hooks-and-guardrails.md": {
+      "pageVersion": "sha256:957b1a9a857a941596ae77a9fd3552f263675835c5d12e1bc9b4bdd6ef9d3cf5",
+      "completedBy": "claude-code",
+      "completedRunId": "018f99df-4278-4b0d-904f-e3f054eb4fc6",
+      "gitHead": "61c30d6689732a4b014a17f9501df9808f89de9c",
+      "sourceFingerprint": "sha256:80f2054df40db29d6259a54cbb69700192e7c62763b756cb23b8d8c832928bba"
+    },
+    "/openwiki/architecture/source-generated-consumer-layout.md": {
+      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
+      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
+      "pageVersion": "sha256:a813f56bab957f18addf46e2970dd12430fb671bcc72ab07724ccbd04c854d1a",
+      "completedBy": "claude-code",
+      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+    },
+    "/openwiki/operations/context-mode-dispatcher.md": {
+      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
+      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
+      "pageVersion": "sha256:511e0890a5482e4bda91c2ffd42fee89b3645caa8428bd86375a05769df85f7d",
+      "completedBy": "claude-code",
+      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+    },
+    "/openwiki/operations/deterministic-verification.md": {
+      "gitHead": "61c30d6689732a4b014a17f9501df9808f89de9c",
+      "sourceFingerprint": "sha256:a22070621f6a9aae9160dc6179091b8dcc239cd22f25a9fd3e66a1f3e817047a",
+      "pageVersion": "sha256:c1ff6dc5d13b35b9e003031377260bc153e348f9a77bd6cff25fa83013d01ebc",
+      "completedBy": "claude-code",
+      "completedRunId": "898c38a6-7dd2-4cc2-b43c-a50054e9a11d"
+    },
+    "/openwiki/operations/git-backed-ai-state-sync.md": {
+      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
+      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
+      "pageVersion": "sha256:d1eee783062ea3564b132ec06c85cdb8da0dd8a43ae5c67451fc23e00a9ca37e",
+      "completedBy": "claude-code",
+      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+    },
+    "/openwiki/operations/install-ownership-and-runtime-checks.md": {
+      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
+      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
+      "pageVersion": "sha256:f5746ca39e19a41c56eeeb9dcec98edb30c8a06637548ea717702e38d471ef96",
+      "completedBy": "claude-code",
+      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+    },
+    "/openwiki/operations/sidecar-overlay.md": {
+      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
+      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
+      "pageVersion": "sha256:e19b4ddca67278732e4abcd8efdd9aea72cbd3b83b3538d6d7b0194c0429b2dc",
+      "completedBy": "claude-code",
+      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+    },
+    "/openwiki/quickstart.md": {
+      "gitHead": "61c30d6689732a4b014a17f9501df9808f89de9c",
+      "sourceFingerprint": "sha256:a22070621f6a9aae9160dc6179091b8dcc239cd22f25a9fd3e66a1f3e817047a",
+      "pageVersion": "sha256:f5db1f611d37d95cef03d33bc9176b35ede82ffa67a85d60ae4ed7c08213af0b",
+      "completedBy": "claude-code",
+      "completedRunId": "898c38a6-7dd2-4cc2-b43c-a50054e9a11d"
+    },
+    "/openwiki/workflows/lifecycle-and-task-lanes.md": {
+      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
+      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
+      "pageVersion": "sha256:428eb397c14bbfbd29618e14bef796310bf9cb300589823350eb6becca4fba40",
+      "completedBy": "claude-code",
+      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+    }
+  }
+}

@@ -23,10 +23,12 @@ This skill is a short implementation reminder. The authoritative policy is `.cla
 4. Verify with:
 
 ```bash
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
-uv run mypy src/ --ignore-missing-imports --explicit-package-bases
+uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`fast` selects the repository's real scope instead of assuming a `src/`
+layout, so it stays correct in both the bootstrap authoring repository and an
+installed consumer.
 
 If the policy and this skill disagree, follow the policy file.
 

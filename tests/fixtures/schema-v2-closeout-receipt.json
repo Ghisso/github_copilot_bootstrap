@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "mode": "closeout",
+  "status": "PASS",
+  "checks": [
+    {"id": "VFY-STATUS-001", "status": "PASS", "summary": "legacy measured", "applicable": true},
+    {"id": "VFY-STATUS-002", "status": "PASS", "summary": "legacy measured", "applicable": true},
+    {"id": "VFY-RUFF-001", "status": "NOT_APPLICABLE", "summary": "legacy reuse", "applicable": false},
+    {"id": "VFY-MYPY-001", "status": "NOT_APPLICABLE", "summary": "legacy reuse", "applicable": false},
+    {"id": "VFY-PYTEST-001", "status": "NOT_APPLICABLE", "summary": "legacy reuse", "applicable": false},
+    {"id": "VFY-FRESH-001", "status": "PASS", "summary": "legacy measured", "applicable": true},
+    {"id": "VFY-FRESH-002", "status": "PASS", "summary": "legacy measured", "applicable": true},
+    {"id": "VFY-CONTROL-001", "status": "PASS", "summary": "legacy measured", "applicable": true},
+    {"id": "VFY-GEN-001", "status": "NOT_APPLICABLE", "summary": "legacy reuse", "applicable": false},
+    {"id": "VFY-DETERMINISM-001", "status": "PASS", "summary": "legacy measured", "applicable": true},
+    {"id": "VFY-RECEIPT-001", "status": "PASS", "summary": "legacy measured", "applicable": true}
+  ],
+  "metadata": {
+    "generated_at": "2026-08-29T00:00:00Z", "base_ref": "dev", "branch": "legacy_implementation",
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "merge_base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree_sha": "cccccccccccccccccccccccccccccccccccccccc", "phase": "phase-one",
+    "content_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "tracked_state_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "changed_paths": [], "relevant_paths": [], "path_discovery_ok": true
+  },
+  "artifacts": {
+    "phase_receipt": {"path": ".claude/quality_reports/verification-phase-phase-one.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "score": {"path": ".claude/quality_reports/score-legacy.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "findings": {"path": ".claude/quality_reports/findings-legacy.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "closeout_log": {"path": ".claude/session_logs/phase-one-closeout.md", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "documentation": {"status": "NOT_APPLICABLE", "reason": "legacy fixture"}
+  }
+}

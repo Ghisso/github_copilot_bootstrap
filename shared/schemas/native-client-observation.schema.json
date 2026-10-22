@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Native client instruction-sentinel observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "root_instruction",
+    "scoped_instruction",
+    "workflow_contract",
+    "hooks"
+  ],
+  "properties": {
+    "root_instruction": {"type": "boolean"},
+    "scoped_instruction": {"type": "boolean"},
+    "workflow_contract": {"type": "boolean"},
+    "hooks": {"type": "boolean"}
+  }
+}

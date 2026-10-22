@@ -1,0 +1,6114 @@
+"""Falsifier regressions for the deterministic verification receipt."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import types
+from pathlib import Path
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "shared" / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import validate_plan_frontmatter as lint  # noqa: E402
+import verify  # noqa: E402
+from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
+    bootstrap_root_paths,
+    restore_manifest,
+)
+
+
+HISTORICAL_SCHEMA_V2_SOURCE_COMMIT = "e2753a9f2fd24dd2fc952e20929a9c7bbb1eeb37"
+HISTORICAL_SCHEMA_V2_RUNTIME_SHA256 = (
+    "9abc7edbd1d31ab89c232ad451583867b5943ad42af7eee45d58ff60fbe35fad"
+)
+HISTORICAL_SCHEMA_V2_RECEIPTS = {
+    "schema-v2-receipt.json": "15c78e5320e23b1bb59c6751d165a87d2e74d146b431fd7320639bafd87e5c76",
+    "schema-v2-closeout-receipt.json": "5cf5c3477016200a817e0fa0de4db13aef06a84c64b791d3a90f51f90cb72f15",
+}
+HISTORICAL_SCHEMA_V2_RUNTIME = (
+    REPO_ROOT / "tests" / "fixtures" / "schema-v2-verify.py.txt"
+)
+HISTORICAL_SCHEMA_V2_SOURCE = REPO_ROOT / "tests" / "fixtures" / "schema-v2-source.json"
+
+HISTORICAL_SCHEMA_V3_SOURCE_COMMIT = "b9a235f7d13b0d45a4383ee908ff2f18eb732692"
+HISTORICAL_SCHEMA_V3_RUNTIME_SHA256 = (
+    "c1ee21871bd2ee3956bf8ec277f3042a315e23cf3cba7ea1a90de7bf8c89f595"
+)
+HISTORICAL_SCHEMA_V3_RECEIPTS = {
+    "schema-v3-receipt.json": "262805a16d2f98eef94bd28408c5ec12f12c7e9534278f68ea05bd1f79512c71",
+    "schema-v3-closeout-receipt.json": "19acbf5f5181c19c865a9b3a1b00c6e23f3f62c902abbd6bc654142c3ee7e82b",
+}
+HISTORICAL_SCHEMA_V3_RUNTIME = (
+    REPO_ROOT / "tests" / "fixtures" / "schema-v3-verify.py.txt"
+)
+HISTORICAL_SCHEMA_V3_SOURCE = REPO_ROOT / "tests" / "fixtures" / "schema-v3-source.json"
+
+
+def test_verifier_disables_runtime_bytecode_cache() -> None:
+    """Running the managed verifier must not create unmanaged runtime files."""
+    source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
+    assert "sys.dont_write_bytecode = True" in source
+    assert "import quality_score" not in source
+
+
+def test_quality_score_module_is_deleted_everywhere() -> None:
+    """The deleted score-era measurement module must not be reintroduced in
+    canonical source or in the generated consumer runtime."""
+    assert not (REPO_ROOT / "shared" / "scripts" / "quality_score.py").exists()
+    generated = REPO_ROOT / "dist" / "multi-agent" / ".claude" / "scripts"
+    if generated.is_dir():
+        assert not (generated / "quality_score.py").exists()
+
+
+def test_phase_text_format_reports_deterministic_per_check_detail() -> None:
+    """`verify.py phase --format text` stays a compact human-readable
+    PASS/FAIL summary: one line per deterministic check plus an overall
+    result line, with no numeric score anywhere in that output shape."""
+    source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
+    assert "print(f\"{args.mode}: {receipt['status']}\")" in source
+    assert "print(f\"{item['id']}: {item['status']} - {item['summary']}\")" in source
+
+
+def test_verifier_uses_python39_compatible_utc_clock() -> None:
+    """Hook-side receipt reading imports without Python 3.11's datetime.UTC."""
+    source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
+    assert "from datetime import UTC" not in source
+    assert "timezone.utc" in source
+
+
+def test_completed_receipts_are_immutable_per_phase(tmp_path: Path) -> None:
+    """Later phases cannot overwrite earlier completed receipt locations."""
+    assert verify.receipt_path(
+        tmp_path, "closeout", "phase-one"
+    ) != verify.receipt_path(tmp_path, "closeout", "phase-two")
+
+
+def _metadata(content_hash: str = "relevant") -> dict[str, object]:
+    """Return the minimum strict receipt metadata."""
+    return {
+        "base_ref": "dev",
+        "branch": "verification-test",
+        "head_sha": "head",
+        "merge_base_sha": "base",
+        "tree_sha": "tree",
+        "phase": "phase-one",
+        "content_hash": content_hash,
+        "tracked_state_hash": "whole-state",
+        "generated_at": "2026-08-29T00:00:00Z",
+        "changed_paths": [],
+        "relevant_paths": [],
+        "path_discovery_ok": True,
+        "control_plane_provenance": {
+            "schema_version": verify.CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+            "nested_head": "a" * 40,
+            "runtime_fingerprint": "b" * 64,
+            "tracked_state_fingerprint": "c" * 64,
+            "big_plan_digest": "",
+            "small_plan_digest": "",
+        },
+    }
+
+
+def _receipt(status: str = "PASS", content_hash: str = "relevant") -> dict[str, object]:
+    """Build a complete receipt with controllable aggregate status."""
+    checks = [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.check(check_id, status, "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+    return verify.build_receipt("phase", checks, _metadata(content_hash))
+
+
+# Every phase 1-5 receipt already on disk was persisted with exactly this
+# fixed check set. It is a literal, independent of ``verify.CHECK_IDS``, on
+# purpose: every other receipt fixture in this file derives its check list
+# from ``verify.CHECK_IDS`` (``for check_id in verify.CHECK_IDS``), which
+# means those fixtures always mirror whatever the schema is *today* and can
+# never see a schema change break an *already-persisted* receipt. Adding
+# ``VFY-FMT-001`` to ``CHECK_IDS`` passed 1225 green tests for exactly this
+# reason while invalidating every real phase 1-5 receipt on disk. This
+# literal is the regression guard: if a future change adds, removes, or
+# renames a check ID without a compatibility path, this receipt - built the
+# way real historical receipts were - stops validating against current code.
+_PERSISTED_PHASE_1_5_CHECK_IDS = (
+    "VFY-RUFF-001",
+    "VFY-MYPY-001",
+    "VFY-PYTEST-001",
+    "VFY-FRESH-001",
+    "VFY-FRESH-002",
+    "VFY-GEN-001",
+    "VFY-RECEIPT-001",
+)
+
+
+def test_validate_receipt_accepts_the_already_persisted_check_schema() -> None:
+    """A receipt built with the historical check set must still validate.
+
+    `CHECK_IDS` is part of the receipt schema the gate validates its own
+    history against (`validate_receipt` requires exact set equality), so
+    this must keep holding for any change that does not also migrate every
+    already-persisted receipt.
+    """
+    checks = [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in _PERSISTED_PHASE_1_5_CHECK_IDS
+    ]
+    receipt = verify.build_receipt("phase", checks, _metadata())  # must not raise
+    assert verify.validate_receipt(receipt)["schema_version"] == verify.SCHEMA_VERSION
+
+
+def _exec_historical_verify(
+    monkeypatch: pytest.MonkeyPatch, source: bytes, path: Path
+) -> types.ModuleType:
+    """Execute a byte-pinned historical verify.py that still imports the
+    deleted sibling measurement module; only schema/receipt validation is
+    exercised below, so a harmless stand-in module satisfies that legacy
+    import without needing the deleted file's bytes."""
+    monkeypatch.setitem(sys.modules, "quality_score", types.ModuleType("quality_score"))
+    historical = types.ModuleType("historical_verify")
+    historical.__file__ = str(path)
+    exec(compile(source, historical.__file__, "exec"), historical.__dict__)
+    return historical
+
+
+def test_historical_schema_v2_receipts_are_rejected_before_v3_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pinned local v2 receipts are valid there, never current authority."""
+    source = HISTORICAL_SCHEMA_V2_RUNTIME.read_bytes()
+    source_metadata = json.loads(HISTORICAL_SCHEMA_V2_SOURCE.read_text())
+    assert source_metadata == {
+        "source_commit": HISTORICAL_SCHEMA_V2_SOURCE_COMMIT,
+        "runtime_sha256": HISTORICAL_SCHEMA_V2_RUNTIME_SHA256,
+    }
+    assert hashlib.sha256(source).hexdigest() == HISTORICAL_SCHEMA_V2_RUNTIME_SHA256
+    historical = _exec_historical_verify(
+        monkeypatch, source, REPO_ROOT / "shared" / "scripts" / "verify.py"
+    )
+    assert historical.SCHEMA_VERSION == 2
+    for fixture, digest in HISTORICAL_SCHEMA_V2_RECEIPTS.items():
+        raw = (REPO_ROOT / "tests" / "fixtures" / fixture).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == digest
+        receipt = json.loads(raw)
+        assert historical.validate_receipt(receipt) == receipt
+        with pytest.raises(
+            ValueError, match=r"^receipt has an unsupported schema_version$"
+        ):
+            verify.validate_receipt(receipt)
+
+
+def test_historical_schema_v3_receipts_are_rejected_before_v4_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pinned local v3 receipts are valid there, never current (v4) authority."""
+    source = HISTORICAL_SCHEMA_V3_RUNTIME.read_bytes()
+    source_metadata = json.loads(HISTORICAL_SCHEMA_V3_SOURCE.read_text())
+    assert source_metadata == {
+        "source_commit": HISTORICAL_SCHEMA_V3_SOURCE_COMMIT,
+        "runtime_sha256": HISTORICAL_SCHEMA_V3_RUNTIME_SHA256,
+    }
+    assert hashlib.sha256(source).hexdigest() == HISTORICAL_SCHEMA_V3_RUNTIME_SHA256
+    historical = _exec_historical_verify(
+        monkeypatch, source, REPO_ROOT / "shared" / "scripts" / "verify.py"
+    )
+    assert historical.SCHEMA_VERSION == 3
+    for fixture, digest in HISTORICAL_SCHEMA_V3_RECEIPTS.items():
+        raw = (REPO_ROOT / "tests" / "fixtures" / fixture).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == digest
+        receipt = json.loads(raw)
+        assert historical.validate_receipt(receipt) == receipt
+        with pytest.raises(
+            ValueError, match=r"^receipt has an unsupported schema_version$"
+        ):
+            verify.validate_receipt(receipt)
+
+
+def test_mid_plan_schema_refresh_fails_closed_then_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale pre-refresh phase receipt fails closed; re-running `phase`
+    under the current runtime recovers without any manual receipt edit or
+    bypass - the only supported v3 -> v4 mid-plan upgrade path."""
+    source = HISTORICAL_SCHEMA_V3_RUNTIME.read_bytes()
+    historical = _exec_historical_verify(
+        monkeypatch, source, REPO_ROOT / "shared" / "scripts" / "verify.py"
+    )
+    stale_metadata = _metadata()
+    stale_checks = [
+        historical.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else historical.check(check_id, "PASS", "legacy measured")
+        for check_id in historical.CHECK_IDS
+    ]
+    stale_receipt = historical.build_receipt("phase", stale_checks, stale_metadata)
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase_path.write_text(json.dumps(stale_receipt), encoding="utf-8")
+
+    # Fail closed: the current (v4) runtime refuses the stale v3 receipt with
+    # a clear, diagnosable message rather than crashing or accepting it.
+    stale_checks_result = verify.closeout_checks(tmp_path, _metadata())
+    stale_reused = next(
+        item for item in stale_checks_result if item["id"] == "VFY-RECEIPT-001"
+    )
+    assert stale_reused["status"] == "FAIL"
+    assert "schema_version" in stale_reused["summary"]
+
+    # Recover: re-running `phase --persist` under the current runtime (no
+    # manual receipt edit, no bypass) regenerates a valid current-schema
+    # receipt at the same deterministic path.
+    fresh_receipt = _receipt()
+    phase_path.write_text(json.dumps(fresh_receipt), encoding="utf-8")
+    recovered_checks = verify.closeout_checks(tmp_path, _metadata())
+    recovered_reused = next(
+        item for item in recovered_checks if item["id"] == "VFY-RECEIPT-001"
+    )
+    assert recovered_reused["status"] == "PASS"
+
+
+def test_gate_rejects_a_schema_v3_closeout_receipt_at_the_fixed_path(
+    tmp_path: Path,
+) -> None:
+    """The literal git-hook scenario: a consumer completed a v3 closeout,
+    refreshed the runtime, and now attempts the checkpoint transition commit.
+    `gate_receipt_errors` is the function the real commit-msg/pre-push git
+    hooks call (via `verify.py gate`); it must fail closed on the pinned v3
+    closeout receipt rather than accepting or crashing on it."""
+    raw = (
+        REPO_ROOT / "tests" / "fixtures" / "schema-v3-closeout-receipt.json"
+    ).read_bytes()
+    receipt = json.loads(raw)
+    branch = receipt["metadata"]["branch"]
+    phase = receipt["metadata"]["phase"]
+    closeout_path = verify.receipt_path(tmp_path, "closeout", phase)
+    closeout_path.parent.mkdir(parents=True)
+    closeout_path.write_bytes(raw)
+
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch=branch,
+        phase=phase,
+        head="0" * 40,
+        head_relation="exact",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=True,
+    )
+    assert len(errors) == 1
+    assert "schema_version" in errors[0]
+
+
+def _write_root_adapter_pairs(root: Path, mode: bool = True) -> None:
+    """Write one complete mode-specific ownership inventory and its mirrors."""
+    for relative in bootstrap_root_paths(mode):
+        for base in (root, root / ".claude" / "bootstrap-root"):
+            path = base / relative
+            if Path(relative).suffix:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("adapter\n", encoding="utf-8")
+            else:
+                (path / "fixture.txt").parent.mkdir(parents=True, exist_ok=True)
+                (path / "fixture.txt").write_text("adapter\n", encoding="utf-8")
+    manifest = root / ".claude" / "bootstrap-ownership.env"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(restore_manifest(mode), encoding="utf-8")
+
+
+def _closeout_receipt(
+    verification_items: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    """Build minimal syntactically valid completed evidence references.
+
+    ``verification_items`` builds ``extensions.verification_items`` only
+    when given, so a caller testing G1 (a receipt with no extensions at
+    all) still gets that by omitting it.
+    """
+    checks = [
+        verify.not_applicable(check_id, "closeout reuses phase evidence")
+        if check_id
+        in {
+            "VFY-RUFF-001",
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-GEN-001",
+        }
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+    digest = "a" * 64
+    extensions = (
+        {"verification_items": verification_items}
+        if verification_items is not None
+        else None
+    )
+    return verify.build_receipt(
+        "closeout",
+        checks,
+        _metadata(),
+        {
+            "phase_receipt": {
+                "path": ".claude/quality_reports/verification-phase-phase-one.json",
+                "sha256": digest,
+            },
+            "findings": {
+                "path": ".claude/quality_reports/findings-phase-one.json",
+                "sha256": digest,
+            },
+            "closeout_log": {
+                "path": ".claude/session_logs/phase-one-closeout.md",
+                "sha256": digest,
+            },
+            "documentation": {
+                "status": "NOT_APPLICABLE",
+                "reason": "no documentation paths changed",
+            },
+        },
+        extensions,
+    )
+
+
+def test_confined_path_rejects_symlink_components(tmp_path: Path) -> None:
+    """Receipt children cannot escape through an otherwise in-repo symlink."""
+    outside = tmp_path.parent / "outside-evidence.json"
+    outside.write_text("{}", encoding="utf-8")
+    (tmp_path / "reports").symlink_to(tmp_path.parent, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        verify.confined_path(tmp_path, "reports/outside-evidence.json", regular=True)
+
+
+@pytest.mark.parametrize("symlink_parent", (False, True), ids=("receipt", "parent"))
+def test_gate_rejects_symlinked_closeout_receipt(
+    tmp_path: Path, symlink_parent: bool
+) -> None:
+    """The authoritative receipt and each parent directory must be real paths."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    receipt_name = "verification-closeout-phase-one.json"
+    (outside / receipt_name).write_text(
+        json.dumps(_closeout_receipt()), encoding="utf-8"
+    )
+    reports = tmp_path / ".claude/quality_reports"
+    if symlink_parent:
+        reports.parent.mkdir(parents=True)
+        reports.symlink_to(outside, target_is_directory=True)
+    else:
+        reports.mkdir(parents=True)
+        (reports / receipt_name).symlink_to(outside / receipt_name)
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch="verification-test",
+        phase="phase-one",
+        head="head",
+        head_relation="exact",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=False,
+    )
+    assert errors and "symlink" in errors[0]
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ("2026-02-30T00:00:00Z", "2026-08-29T00:00:00+00:00", "later"),
+)
+def test_receipt_rejects_noncanonical_or_impossible_timestamp(timestamp: str) -> None:
+    """Receipt timestamps use one parseable UTC-second representation."""
+    receipt = _receipt()
+    receipt["metadata"]["generated_at"] = timestamp  # type: ignore[index]
+    with pytest.raises(ValueError, match="UTC timestamp"):
+        verify.validate_receipt(receipt)
+
+
+def test_closeout_requires_explicit_documentation_na(tmp_path: Path) -> None:
+    """No documentation diff is not evidence that documentation is unnecessary."""
+    with pytest.raises(ValueError, match="--documentation-na"):
+        verify.closeout_artifacts(tmp_path, _metadata())
+
+
+def _closeout_log_setup(tmp_path: Path, log_text: str) -> tuple[Path, str, Path]:
+    """Write a minimal phase plan + closeout log pair for closeout_log_errors."""
+    phase = "phase-one"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / f"{phase}.md").write_text(
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        "parent_plan: big\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    log_path = tmp_path / ".claude" / "session_logs" / f"{phase}-closeout.md"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(log_text, encoding="utf-8")
+    return tmp_path, phase, log_path
+
+
+def test_closeout_log_requires_learn_section(tmp_path: Path) -> None:
+    """A completed closeout log missing the ``## [LEARN] Entries`` heading
+    entirely fails closeout, regardless of any other content."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path, "# Session\n\n**Status:** COMPLETED\n"
+    )
+    errors = verify.closeout_log_errors(root, phase, log_path)
+    assert any("[LEARN] Entries" in error for error in errors)
+
+
+def test_closeout_log_accepts_exact_no_lessons_marker(tmp_path: Path) -> None:
+    """The exact sanctioned no-new-lessons marker satisfies LEARN evidence."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_accepts_real_learn_entries(tmp_path: Path) -> None:
+    """One or more explicit ``[LEARN:category]`` entries satisfy LEARN
+    evidence without the exact no-lessons marker."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] use the shared helper\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_rejects_empty_learn_section(tmp_path: Path) -> None:
+    """A present but empty LEARN section - no marker, no entries - still
+    fails; the heading alone is not evidence."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n## Verification Results\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_memory_mtime_does_not_satisfy_learn(tmp_path: Path) -> None:
+    """``MEMORY.md``'s mtime being fresher than the plan must not substitute
+    for session-log LEARN evidence - the removed shortcut this phase closes."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path, "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+    )
+    memory = root / ".claude" / "MEMORY.md"
+    memory.write_text("# Memory\n", encoding="utf-8")
+    future = time.time() + 3600
+    os.utime(memory, (future, future))
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_learn_entry_inside_fenced_code_block(
+    tmp_path: Path,
+) -> None:
+    """An illustrative example of the entry format placed inside a fenced
+    code block is not real evidence - the fence must be scanned past, not
+    scanned into."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN:category] example entry\n```\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_unedited_template_learn_section(tmp_path: Path) -> None:
+    """The canonical session-log template's own ``## [LEARN] Entries``
+    section, copied verbatim and unedited into a closeout log, must not
+    itself satisfy LEARN evidence - its example text names the format, it is
+    not a well-formed entry the acceptance regex should match."""
+    template_text = (REPO_ROOT / "shared" / "templates" / "session-log.md").read_text(
+        encoding="utf-8"
+    )
+    section = re.search(
+        r"^## \[LEARN\] Entries.*?(?=^## |\Z)", template_text, re.MULTILINE | re.DOTALL
+    )
+    assert section is not None, "template must define a ## [LEARN] Entries section"
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path, "# Session\n\n**Status:** COMPLETED\n\n" + section.group(0)
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_marker_inside_fenced_code_block(tmp_path: Path) -> None:
+    """The sanctioned no-lessons marker only counts outside a fence too."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN] none - no new lessons this session\n```\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_accepts_real_entry_alongside_fenced_example(
+    tmp_path: Path,
+) -> None:
+    """A fenced example does not poison a genuine entry elsewhere in the
+    same section."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN:category] [what was learned]\n```\n"
+        "- [LEARN:workflow] actually learned this\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_rejects_learn_entry_inside_tilde_fenced_code_block(
+    tmp_path: Path,
+) -> None:
+    """GFM's alternate ``~~~`` fence syntax must be recognized too, not
+    just triple-backtick fences."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "~~~\n- [LEARN:category] example entry via tilde fence\n~~~\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_learn_entry_inside_unterminated_fence(
+    tmp_path: Path,
+) -> None:
+    """An unterminated fence must strip to the end of the section - content
+    inside a never-closed fence is not evidence, so this fails closed
+    rather than leaving it exposed to the scanner."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN:category] fence never closes\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_learn_entry_inside_indented_fence(
+    tmp_path: Path,
+) -> None:
+    """A fence delimiter indented with leading whitespace must still be
+    recognized as a fence, not treated as literal prose. The delimiters are
+    indented while the fake entry line inside is not, which is exactly the
+    case a fence matcher anchored to column 0 fails to recognize as a
+    fence at all - leaving the column-0 entry line exposed to the scanner."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "  ```\n"
+        "- [LEARN:category] fake entry, fence delimiter indented but content is not\n"
+        "  ```\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_is_final_phase_true_for_the_big_plans_last_declared_phase(
+    tmp_path: Path,
+) -> None:
+    root, phase, _ = _closeout_log_setup(tmp_path, "# Session\n")
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    assert verify.is_final_phase(root, phase) is True
+
+
+def test_is_final_phase_false_for_a_non_final_phase(tmp_path: Path) -> None:
+    root, phase, _ = _closeout_log_setup(tmp_path, "# Session\n")
+    _write_big_plan(root, slug="big", phases=[phase, "phase-two"])
+    assert verify.is_final_phase(root, phase) is False
+
+
+def test_is_final_phase_false_when_the_big_plan_is_missing(tmp_path: Path) -> None:
+    """``parent_plan: big`` names a big plan that does not exist on disk;
+    finality must not be guessed from that ambiguous state."""
+    root, phase, _ = _closeout_log_setup(tmp_path, "# Session\n")
+    assert verify.is_final_phase(root, phase) is False
+
+
+def test_closeout_log_requires_stale_claims_section_on_final_phase(
+    tmp_path: Path,
+) -> None:
+    """The big plan's final phase must additionally record the standing
+    documentation, memory, and LEARN audit's checked surfaces."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n",
+    )
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    errors = verify.closeout_log_errors(root, phase, log_path)
+    assert any("Stale-claims surfaces checked" in error for error in errors)
+
+
+def test_closeout_log_rejects_empty_stale_claims_section_on_final_phase(
+    tmp_path: Path,
+) -> None:
+    """The heading alone, with no recorded surfaces, is not evidence."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n\n"
+        "## Stale-claims surfaces checked\n\n",
+    )
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    errors = verify.closeout_log_errors(root, phase, log_path)
+    assert any("Stale-claims surfaces checked" in error for error in errors)
+
+
+def test_closeout_log_accepts_stale_claims_section_on_final_phase(
+    tmp_path: Path,
+) -> None:
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n\n"
+        "## Stale-claims surfaces checked\n\n"
+        "Checked README.md, docs/, and .claude/MEMORY.md; no stale claims found.\n",
+    )
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_does_not_require_stale_claims_section_on_non_final_phase(
+    tmp_path: Path,
+) -> None:
+    """A phase that is not the big plan's last declared phase never needs
+    the standing audit section - the new check must not fire early."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n",
+    )
+    _write_big_plan(root, slug="big", phases=[phase, "phase-two"])
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_strip_fenced_code_blocks_recognizes_crlf_terminated_fence() -> None:
+    """A CRLF-terminated closing fence must be recognized as a close, not
+    treated as unterminated - the shipped verifier runs in consumer
+    repositories whose line-ending settings are not controlled here. This
+    calls the scanner directly with literal CRLF input: going through
+    ``closeout_log_errors`` instead would round-trip the text through
+    ``Path.read_text()``, whose universal-newlines mode silently normalizes
+    CRLF to LF before the scanner ever runs, masking the very condition
+    under test. The explicit CRLF/CR/LF split consumes the full ``\\r\\n``
+    pair as one separator, so no ``\\r`` remains attached to either kept
+    line."""
+    text = "before\r\n```\r\n- [LEARN:category] example entry\r\n```\r\nafter\r\n"
+    assert verify._strip_fenced_code_blocks(text) == "before\nafter\n"
+
+
+def test_strip_fenced_code_blocks_swallows_unterminated_crlf_fence() -> None:
+    """A genuinely unterminated fence opened with a CRLF line ending must
+    still swallow to the end of the text, preserving the fail-closed
+    posture for CRLF input the same as for LF."""
+    text = "before\r\n```\r\n- [LEARN:category] fence never closes\r\n"
+    assert verify._strip_fenced_code_blocks(text) == "before"
+
+
+def test_strip_fenced_code_blocks_recognizes_lone_cr_terminated_fence() -> None:
+    """A lone-CR line ending (classic pre-OS X Mac) is a line boundary too,
+    not just CRLF - splitting only on ``"\\n"`` would treat a lone-CR
+    document as a single unsplit line, so a fenced example inside it would
+    never be recognized as a fence at all and would leak straight into the
+    scanner unstripped."""
+    text = "before\r```\r- [LEARN:category] example entry\r```\rafter\r"
+    stripped = verify._strip_fenced_code_blocks(text)
+    assert "[LEARN:category] example entry" not in stripped
+
+
+def test_strip_fenced_code_blocks_swallows_unterminated_lone_cr_fence() -> None:
+    """A genuinely unterminated fence opened with a lone-CR line ending
+    must still swallow to the end of the text, preserving the fail-closed
+    posture for lone-CR input the same as for LF and CRLF."""
+    text = "before\r```\r- [LEARN:category] fence never closes\r"
+    assert verify._strip_fenced_code_blocks(text) == "before"
+
+
+def test_strip_fenced_code_blocks_keeps_real_entry_after_closed_lone_cr_fence() -> None:
+    """A real LEARN entry after a properly-closed lone-CR fence must survive
+    stripping, matching the CRLF and LF cases."""
+    text = (
+        "before\r```\r- [LEARN:category] example entry\r```\r"
+        "- [LEARN:workflow] actually learned this\r"
+    )
+    stripped = verify._strip_fenced_code_blocks(text)
+    assert "[LEARN:category] example entry" not in stripped
+    assert "[LEARN:workflow] actually learned this" in stripped
+
+
+def _findings_report(**updates: object) -> dict[str, object]:
+    """Return a findings report suitable for focused schema checks."""
+    report: dict[str, object] = {
+        "branch": "verification-test",
+        "phase": "phase-one",
+        "base_ref": "dev",
+        "head_sha": "head",
+        "merge_base_sha": "base",
+        "dirty": False,
+        "generated_at": "2026-08-29T00:00:00Z",
+        "target": ".",
+        "changed_files": [],
+        "content_hash": "hash",
+        "profiles_reviewed": ["code"],
+        "findings": [],
+        "counts": {"critical": 0, "major": 0, "minor": 0},
+    }
+    report.update(updates)
+    return report
+
+
+def _findings_errors(
+    tmp_path: Path,
+    report: dict[str, object],
+    *,
+    require_major: bool = False,
+    require_ponytail: bool = False,
+    head_relation: str = "exact",
+) -> list[str]:
+    """Persist and validate one focused findings fixture."""
+    path = tmp_path / "findings.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return verify.report_errors(
+        path,
+        branch="verification-test",
+        phase="phase-one",
+        head="head",
+        head_relation=head_relation,
+        expected_base="base",
+        root=tmp_path,
+        require_major=require_major,
+        require_ponytail=require_ponytail,
+        verify_current_content=False,
+    )
+
+
+def test_findings_rejects_nonstring_changed_file(tmp_path: Path) -> None:
+    """Changed-file evidence cannot contain untyped JSON values."""
+    errors = _findings_errors(tmp_path, _findings_report(changed_files=[1]))
+    assert "findings report changed_files must be a list of strings" in errors
+
+
+def _major_finding() -> dict[str, object]:
+    return {
+        "severity": "MAJOR",
+        "profile": "code",
+        "title": "unresolved MAJOR finding",
+    }
+
+
+def test_open_major_blocks_only_when_phase_completion_is_required(
+    tmp_path: Path,
+) -> None:
+    """An open MAJOR finding blocks phase-completion (require_major=True) but
+    is not, by itself, a blocking reason for a non-completion validation pass
+    (require_major=False) - the distinction Phase 2 must draw correctly."""
+    report = _findings_report(
+        findings=[_major_finding()], counts={"critical": 0, "major": 1, "minor": 0}
+    )
+    completion_errors = _findings_errors(tmp_path, report, require_major=True)
+    assert any("MAJOR findings" in error for error in completion_errors)
+
+    intermediate_errors = _findings_errors(tmp_path, report, require_major=False)
+    assert not any("MAJOR findings" in error for error in intermediate_errors)
+
+
+def _minor_finding(**updates: object) -> dict[str, object]:
+    finding: dict[str, object] = {
+        "severity": "MINOR",
+        "profile": "code",
+        "title": "advisory MINOR finding",
+    }
+    finding.update(updates)
+    return finding
+
+
+def test_minor_finding_without_disposition_blocks_completion(tmp_path: Path) -> None:
+    """A surviving MINOR finding with no disposition fails phase completion."""
+    report = _findings_report(
+        findings=[_minor_finding()], counts={"critical": 0, "major": 0, "minor": 1}
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert any("explicit disposition and reason" in error for error in errors)
+
+
+def test_minor_finding_with_empty_reason_blocks_completion(tmp_path: Path) -> None:
+    """A disposition without meaningful reason text still fails completion."""
+    report = _findings_report(
+        findings=[_minor_finding(disposition="accepted", reason="   ")],
+        counts={"critical": 0, "major": 0, "minor": 1},
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert any("explicit disposition and reason" in error for error in errors)
+
+
+def test_minor_finding_with_disposition_and_reason_passes(tmp_path: Path) -> None:
+    """An explicit disposition and non-empty reason satisfies the contract."""
+    report = _findings_report(
+        findings=[
+            _minor_finding(disposition="accepted", reason="tracked for a later phase")
+        ],
+        counts={"critical": 0, "major": 0, "minor": 1},
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert not any("disposition" in error for error in errors)
+
+
+def test_minor_disposition_is_not_required_outside_phase_completion(
+    tmp_path: Path,
+) -> None:
+    """Non-completion validation (require_major=False) does not demand a
+    MINOR disposition; that contract is phase-completion-specific."""
+    report = _findings_report(
+        findings=[_minor_finding()], counts={"critical": 0, "major": 0, "minor": 1}
+    )
+    errors = _findings_errors(tmp_path, report, require_major=False)
+    assert not any("disposition" in error for error in errors)
+
+
+def test_forged_counts_inconsistent_with_findings_are_rejected(tmp_path: Path) -> None:
+    """An independently asserted count must match the derived finding list."""
+    report = _findings_report(
+        findings=[_minor_finding(disposition="accepted", reason="tracked")],
+        counts={"critical": 0, "major": 0, "minor": 0},
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert "findings report counts do not match findings" in errors
+
+
+@pytest.mark.parametrize(
+    ("updates", "expected"),
+    (
+        ({"gate_result": "WARN", "open_requests": []}, "gate_result is 'WARN'"),
+        ({"gate_result": "FAIL", "open_requests": []}, "gate_result is 'FAIL'"),
+        (
+            {"gate_result": "PASS", "open_requests": ["show the reproduction"]},
+            "show the reproduction",
+        ),
+        ({}, "re-record it with record_findings.py --gate-result before closeout"),
+        ({"gate_result": "PASS"}, "open_requests must be a list of non-empty strings"),
+    ),
+    ids=("warn", "fail", "pass-with-open-request", "missing-field", "missing-requests"),
+)
+def test_commit_gate_blocks_an_unclean_gate_result(
+    tmp_path: Path, updates: dict[str, object], expected: str
+) -> None:
+    """GR-001: phase completion needs PASS with no open request; a report
+    recorded before the field existed is told to re-record."""
+    errors = _findings_errors(tmp_path, _findings_report(**updates), require_major=True)
+    assert any(expected in error for error in errors)
+
+
+def test_commit_gate_accepts_a_pass_with_no_open_request(tmp_path: Path) -> None:
+    """GR-001 negative control: the clean schema-2 report raises no gate error."""
+    report = _findings_report(schema_version=2, gate_result="PASS", open_requests=[])
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert errors == []
+
+
+def test_gate_result_is_not_required_outside_phase_completion(tmp_path: Path) -> None:
+    """GR-001: intermediate validation (require_major=False) skips the fields."""
+    errors = _findings_errors(tmp_path, _findings_report(), require_major=False)
+    assert not any("gate_result" in error for error in errors)
+
+
+@pytest.mark.parametrize("head_relation", ("ancestor", "certified"))
+def test_push_gates_do_not_rejudge_a_schema_1_report(
+    tmp_path: Path, head_relation: str
+) -> None:
+    """GR-001: a phase recorded before the upgrade (no schema_version, no
+    gate_result) stays valid at the push gates."""
+    errors = _findings_errors(
+        tmp_path, _findings_report(), require_major=True, head_relation=head_relation
+    )
+    assert not any("gate_result" in error for error in errors)
+
+
+@pytest.mark.parametrize("head_relation", ("ancestor", "certified"))
+@pytest.mark.parametrize(
+    ("updates", "expected"),
+    (
+        (
+            {"schema_version": 2, "gate_result": "WARN", "open_requests": ["x"]},
+            "gate_result is 'WARN'",
+        ),
+        ({"schema_version": 2}, "has no gate_result"),
+        *(
+            (
+                {
+                    "schema_version": malformed,
+                    "gate_result": "WARN",
+                    "open_requests": ["x"],
+                },
+                "gate_result is 'WARN'",
+            )
+            for malformed in ("1", True, 1.0, None)
+        ),
+    ),
+    ids=(
+        "schema-2-warn",
+        "schema-2-missing-field",
+        "malformed-schema-string",
+        "malformed-schema-bool",
+        "malformed-schema-float",
+        "malformed-schema-null",
+    ),
+)
+def test_push_gates_apply_the_gate_result_to_schema_2_reports(
+    tmp_path: Path, head_relation: str, updates: dict[str, object], expected: str
+) -> None:
+    """GR-001: from schema 2 on, the push gates apply the same rule."""
+    errors = _findings_errors(
+        tmp_path,
+        _findings_report(**updates),
+        require_major=True,
+        head_relation=head_relation,
+    )
+    assert any(expected in error for error in errors)
+
+
+def test_report_requires_a_fresh_ponytail_review_when_the_gate_says_so(
+    tmp_path: Path,
+) -> None:
+    """GR-003: a high-risk diff (require_ponytail) with no ponytail profile in
+    the report is refused; a report that ran Ponytail is not."""
+    refused = _findings_errors(tmp_path, _findings_report(), require_ponytail=True)
+    assert any("requires a fresh Ponytail review" in error for error in refused)
+
+    reviewed = _findings_report(
+        profiles_reviewed=["code", "ponytail"],
+        ponytail_reviewed=True,
+        ponytail_findings=0,
+    )
+    accepted = _findings_errors(tmp_path, reviewed, require_ponytail=True)
+    assert not any("Ponytail" in error for error in accepted)
+
+
+_ALL_FIVE_PROFILES = {"code", "architecture", "security", "tests", "ponytail"}
+
+
+@pytest.mark.parametrize(
+    ("paths", "expected"),
+    (
+        (["docs/guide.md", "README.md"], set()),
+        (["src/pkg/mod.py"], set()),
+        (["tests/test_x.py"], {"tests"}),
+        (["tests/fixtures/x.json"], {"tests"}),
+        (["tests/fixtures/behavioral/requirement-review/requirements.md"], {"tests"}),
+        (["pkg/conftest.py"], {"tests"}),
+        (["pkg/mod_test.py"], {"tests"}),
+        (["scripts/test_helper.py"], {"tests"}),
+        (["scripts/x.py"], _ALL_FIVE_PROFILES),
+        (["shared/x.md"], _ALL_FIVE_PROFILES),
+        ([".mcp.json"], _ALL_FIVE_PROFILES),
+        ([".vscode/mcp.json"], _ALL_FIVE_PROFILES),
+        (["uv.lock"], _ALL_FIVE_PROFILES),
+        (["pyproject.toml"], _ALL_FIVE_PROFILES),
+        (["services/api/requirements-dev.txt"], _ALL_FIVE_PROFILES),
+        (["requirements.in"], _ALL_FIVE_PROFILES),
+        (["docs/guide.md", "tests/test_x.py"], {"tests"}),
+        (["tests/test_x.py", "scripts/x.py"], _ALL_FIVE_PROFILES),
+    ),
+    ids=(
+        "docs-only",
+        "ordinary-code",
+        "test-file",
+        "test-fixture-json",
+        "test-fixture-markdown",
+        "conftest",
+        "suffix-test-file",
+        "test-file-in-scripts-is-checked-first",
+        "scripts",
+        "shared",
+        "claude-mcp",
+        "copilot-mcp",
+        "lockfile",
+        "pyproject",
+        "requirements-txt",
+        "requirements-in",
+        "docs-plus-test",
+        "test-plus-script",
+    ),
+)
+def test_required_review_profiles_by_changed_surface(
+    paths: list[str], expected: set[str]
+) -> None:
+    """GR-002: expected profiles come from the plan's table, not the code."""
+    assert verify.required_review_profiles(paths) == frozenset(expected)
+
+
+def _git(args: list[str], cwd: Path) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _init_repo(root: Path) -> None:
+    _git(["init", "-q"], root)
+    _git(["config", "user.email", "test@example.com"], root)
+    _git(["config", "user.name", "Test"], root)
+
+
+def _commit_all(root: Path, message: str) -> str:
+    """Commit the current working tree (or an empty commit) and return its sha."""
+    _git(["add", "-A"], root)
+    _git(["commit", "-q", "--allow-empty", "-m", message], root)
+    return _git(["rev-parse", "HEAD"], root)
+
+
+def _write_big_plan(root: Path, *, slug: str, phases: list[str]) -> None:
+    plans = root / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    phase_lines = "\n".join(f"  - {phase}" for phase in phases)
+    (plans / f"{slug}.md").write_text(
+        "---\n"
+        f"name: {slug}\n"
+        "type: big-plan\n"
+        "status: in-progress\n"
+        "originating_branch: dev\n"
+        f"implementation_branch: {slug}_implementation\n"
+        "phases:\n"
+        f"{phase_lines}\n"
+        f"current_phase: {phases[-1]}\n"
+        "---\n\n# Big Plan\n",
+        encoding="utf-8",
+    )
+
+
+def _historical_metadata(
+    *, branch: str, phase: str, head_sha: str, tree_sha: str
+) -> dict[str, object]:
+    metadata = _metadata()
+    metadata.update(
+        {"branch": branch, "phase": phase, "head_sha": head_sha, "tree_sha": tree_sha}
+    )
+    metadata["control_plane_provenance"] = {
+        "schema_version": verify.CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+        "nested_head": "a" * 40,
+        "runtime_fingerprint": "b" * 64,
+        "tracked_state_fingerprint": "c" * 64,
+        "big_plan_digest": "d" * 64,
+        "small_plan_digest": "e" * 64,
+    }
+    return metadata
+
+
+def _write_historical_phase(
+    root: Path,
+    *,
+    branch: str,
+    phase: str,
+    parent_plan: str,
+    head_sha: str,
+    tree_sha: str,
+) -> None:
+    """Write one complete, hash-consistent historical completed-phase fixture."""
+    plans = root / ".claude" / "plans"
+    reports = root / ".claude" / "quality_reports"
+    logs = root / ".claude" / "session_logs"
+    for directory in (plans, reports, logs):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    (plans / f"{phase}.md").write_text(
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        f"parent_plan: {parent_plan}\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    phase_receipt_bytes = f"phase-receipt-for-{phase}\n".encode()
+    findings_bytes = json.dumps(
+        {"findings": [], "counts": {"critical": 0, "major": 0, "minor": 0}}
+    ).encode()
+    log_bytes = b"**Status:** COMPLETED\n"
+    (reports / f"verification-phase-{phase}.json").write_bytes(phase_receipt_bytes)
+    (reports / f"findings-{phase}.json").write_bytes(findings_bytes)
+    (logs / f"{phase}-closeout.md").write_bytes(log_bytes)
+
+    checks = [
+        verify.not_applicable(check_id, "closeout reuses phase evidence")
+        if check_id
+        in {
+            "VFY-RUFF-001",
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-GEN-001",
+        }
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+    receipt = verify.build_receipt(
+        "closeout",
+        checks,
+        _historical_metadata(
+            branch=branch, phase=phase, head_sha=head_sha, tree_sha=tree_sha
+        ),
+        {
+            "phase_receipt": {
+                "path": f".claude/quality_reports/verification-phase-{phase}.json",
+                "sha256": hashlib.sha256(phase_receipt_bytes).hexdigest(),
+            },
+            "findings": {
+                "path": f".claude/quality_reports/findings-{phase}.json",
+                "sha256": hashlib.sha256(findings_bytes).hexdigest(),
+            },
+            "closeout_log": {
+                "path": f".claude/session_logs/{phase}-closeout.md",
+                "sha256": hashlib.sha256(log_bytes).hexdigest(),
+            },
+            "documentation": {"status": "NOT_APPLICABLE", "reason": "no docs changed"},
+        },
+    )
+    (reports / f"verification-closeout-{phase}.json").write_text(
+        json.dumps(receipt), encoding="utf-8"
+    )
+
+
+def _historical_chain_fixture(tmp_path: Path) -> tuple[str, str]:
+    """Build one valid two-phase historical chain; return (parent_sha, sha_b).
+
+    Mirrors the real closeout lifecycle: a phase's closeout receipt is
+    generated before its completion commit (stage everything, generate
+    reports and receipts, then commit), so the receipt's ``head_sha`` is the
+    *parent* commit and ``tree_sha`` is the tree of the commit that phase's
+    completion commit actually introduced - never the same commit's own
+    tree. Real file changes are committed at each step so the parent,
+    phase-one, and phase-two trees are genuinely distinct.
+    """
+    _init_repo(tmp_path)
+    parent_sha = _commit_all(tmp_path, "base commit")
+    (tmp_path / "phase-one.txt").write_text("phase one content\n", encoding="utf-8")
+    sha_a = _commit_all(tmp_path, "phase one commit")
+    (tmp_path / "phase-two.txt").write_text("phase two content\n", encoding="utf-8")
+    sha_b = _commit_all(tmp_path, "phase two commit")
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=parent_sha,
+        tree_sha=_git(["rev-parse", f"{sha_a}^{{tree}}"], tmp_path),
+    )
+    return parent_sha, sha_b
+
+
+def test_historical_chain_accepts_ordered_completed_phase(tmp_path: Path) -> None:
+    """A single earlier completed phase, built the way the real lifecycle
+    produces it - head_sha is the phase's parent commit, tree_sha is the
+    tree its own completion commit introduced, not head_sha's own tree -
+    produces no historical chain errors."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert errors == []
+
+
+def test_historical_chain_rejects_missing_receipt_head(tmp_path: Path) -> None:
+    """A historical receipt whose head_sha does not resolve to a commit fails."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["metadata"]["head_sha"] = "0" * 40
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("does not resolve to a commit" in error for error in errors)
+
+
+def test_historical_chain_rejects_missing_receipt_file(tmp_path: Path) -> None:
+    """A completed historical phase with no closeout receipt at all must fail
+    closed. This is the legacy/migration boundary: a phase predating receipts
+    gets no implicit pass from the terminal receipt covering it."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt_path.unlink()
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("phase-one receipt is invalid" in error for error in errors)
+
+
+def test_historical_chain_rejects_tree_sha_mismatch(tmp_path: Path) -> None:
+    """A historical receipt whose tree_sha matches nothing real must fail."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["metadata"]["tree_sha"] = "f" * 40
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any(
+        "tree_sha does not match the tree introduced by its certified completion "
+        "commit" in error
+        for error in errors
+    )
+
+
+def test_historical_chain_rejects_certified_commit_tree_mismatch(
+    tmp_path: Path,
+) -> None:
+    """A historical receipt's tree_sha must match the tree its certified
+    completion commit introduced, not the tree of head_sha itself. head_sha
+    is the *parent* of the commit the receipt certifies (receipts are
+    generated before their completion commit), so a receipt that instead
+    claims head_sha's own tree - the old, wrong assumption this check used
+    to make - is rejected."""
+    parent_sha, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["metadata"]["tree_sha"] = _git(
+        ["rev-parse", f"{parent_sha}^{{tree}}"], tmp_path
+    )
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any(
+        "tree_sha does not match the tree introduced by its certified completion "
+        "commit" in error
+        for error in errors
+    )
+
+
+def test_historical_chain_accepts_real_lifecycle_receipt(tmp_path: Path) -> None:
+    """Reproduces the exact real-lifecycle window: stage a phase's changes,
+    capture tree_sha via ``git write-tree`` against that dirty index while
+    head_sha is still the parent commit (as closeout does, since receipts
+    are generated before the completion commit), then commit. The resulting
+    receipt must be accepted once its staged tree becomes a real commit."""
+    _init_repo(tmp_path)
+    parent_sha = _commit_all(tmp_path, "base commit")
+    (tmp_path / "phase-one.txt").write_text("phase one content\n", encoding="utf-8")
+    _git(["add", "-A"], tmp_path)
+    staged_tree = _git(["write-tree"], tmp_path)
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=parent_sha,
+        tree_sha=staged_tree,
+    )
+    _git(["commit", "-q", "-m", "phase one commit"], tmp_path)
+    sha_a = _git(["rev-parse", "HEAD"], tmp_path)
+    assert _git(["rev-parse", f"{sha_a}^{{tree}}"], tmp_path) == staged_tree
+    (tmp_path / "phase-two.txt").write_text("phase two content\n", encoding="utf-8")
+    sha_b = _commit_all(tmp_path, "phase two commit")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert errors == []
+
+
+def test_historical_chain_rejects_tampered_artifact_bytes(tmp_path: Path) -> None:
+    """Changed findings bytes since the historical receipt was bound must fail."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    findings_path = tmp_path / ".claude/quality_reports/findings-phase-one.json"
+    findings_path.write_text('{"tampered": true}', encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("was tampered with" in error for error in errors)
+
+
+def test_historical_chain_rejects_mutated_closed_session_log(tmp_path: Path) -> None:
+    """A closed, receipt-bound session log must be byte-immutable: editing it
+    after closeout - not just findings/phase-receipt bytes - fails the
+    historical chain, since historical hashes depend on log byte stability."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    log_path = tmp_path / ".claude/session_logs/phase-one-closeout.md"
+    log_path.write_text(
+        "**Status:** COMPLETED\n\nedited after closeout\n", encoding="utf-8"
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("closeout_log" in error and "tampered" in error for error in errors)
+
+
+def test_historical_chain_tolerates_sibling_errata_file(tmp_path: Path) -> None:
+    """A sibling ``<log>.errata.md`` correction file living next to a closed
+    log does not invalidate that log's own receipt-bound hash - errata uses a
+    new file, never a rewrite of the original."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    errata_path = tmp_path / ".claude/session_logs/phase-one-closeout.md.errata.md"
+    errata_path.write_text(
+        "# Errata for phase-one-closeout.md\n\n"
+        "- 2026-09-02\n"
+        "  - Supersedes: stale claim\n"
+        "  - Corrected conclusion: fixed\n"
+        "  - Evidence/reference: phase-two\n",
+        encoding="utf-8",
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert errors == []
+
+
+def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
+    """Two earlier completed phases whose actual commit order contradicts the
+    big plan's declared phase order fail the chain, even though each
+    individual receipt uses the real lifecycle shape - head_sha is each
+    phase's own parent commit, tree_sha is that phase's own completion
+    commit's tree, per ``_historical_chain_fixture`` - with genuinely
+    distinct trees per commit, so the failure cannot be a tree mismatch or a
+    tree-equality coincidence; it must be the ordering-specific ancestor
+    check."""
+    _init_repo(tmp_path)
+    base_sha = _commit_all(tmp_path, "base commit")
+    (tmp_path / "phase-two.txt").write_text("phase two content\n", encoding="utf-8")
+    sha_two = _commit_all(tmp_path, "phase two commit")  # completed first in history
+    (tmp_path / "phase-one.txt").write_text("phase one content\n", encoding="utf-8")
+    sha_one = _commit_all(
+        tmp_path, "phase one commit"
+    )  # declared first, completed second
+    (tmp_path / "phase-three.txt").write_text("phase three content\n", encoding="utf-8")
+    sha_three = _commit_all(tmp_path, "phase three commit")
+    _write_big_plan(
+        tmp_path, slug="big", phases=["phase-one", "phase-two", "phase-three"]
+    )
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=sha_two,
+        tree_sha=_git(["rev-parse", f"{sha_one}^{{tree}}"], tmp_path),
+    )
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-two",
+        parent_plan="big",
+        head_sha=base_sha,
+        tree_sha=_git(["rev-parse", f"{sha_two}^{{tree}}"], tmp_path),
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-three",
+        receipt_head=sha_three,
+    )
+    assert any("is not an ancestor of" in error for error in errors)
+
+
+def test_historical_chain_rejects_ambiguous_merge_topology(tmp_path: Path) -> None:
+    """A receipt's ``head_sha`` with two divergent children that reconverge
+    in a merge before the next completed phase's head must fail closed.
+    Position inside ``git rev-list --ancestry-path`` does not prove which
+    side is the true completion commit that ``tree_sha`` certifies, so an
+    ambiguous topology must be diagnosed rather than silently resolved by
+    whichever commit happens to sort first."""
+    _init_repo(tmp_path)
+    parent_sha = _commit_all(tmp_path, "base commit")
+    _git(["checkout", "-q", "-b", "side-a"], tmp_path)
+    (tmp_path / "side-a.txt").write_text("side a content\n", encoding="utf-8")
+    sha_a = _commit_all(tmp_path, "side a commit")
+    _git(["checkout", "-q", "-b", "side-b", parent_sha], tmp_path)
+    (tmp_path / "side-b.txt").write_text("side b content\n", encoding="utf-8")
+    _commit_all(tmp_path, "side b commit")
+    _git(["checkout", "-q", "side-a"], tmp_path)
+    _git(
+        ["merge", "-q", "--no-ff", "side-b", "-m", "merge side-b into side-a"],
+        tmp_path,
+    )
+    sha_merge = _git(["rev-parse", "HEAD"], tmp_path)
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=parent_sha,
+        tree_sha=_git(["rev-parse", f"{sha_a}^{{tree}}"], tmp_path),
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-two",
+        receipt_head=sha_merge,
+    )
+    assert any("candidate" in error for error in errors)
+
+
+def test_gate_receipt_errors_wires_in_historical_chain_validation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The public gate entrypoint - not just the internal helper - calls the
+    historical chain validator once a terminal receipt head is known."""
+    receipt = _closeout_receipt()
+    metadata = receipt["metadata"]
+    assert isinstance(metadata, dict)
+    branch, phase, head = metadata["branch"], metadata["phase"], metadata["head_sha"]
+    assert isinstance(branch, str) and isinstance(phase, str) and isinstance(head, str)
+    closeout_path = verify.receipt_path(tmp_path, "closeout", phase)
+    closeout_path.parent.mkdir(parents=True)
+    closeout_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    monkeypatch.setattr(
+        verify, "historical_chain_errors", lambda *a, **k: ["SENTINEL-HISTORICAL-ERROR"]
+    )
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch=branch,
+        phase=phase,
+        head=head,
+        head_relation="exact",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=False,
+    )
+    assert "SENTINEL-HISTORICAL-ERROR" in errors
+
+
+def test_historical_chain_rejects_ancestor_failure(tmp_path: Path) -> None:
+    """A historical receipt head that is not an ancestor of the next
+    completed phase's head fails the chain."""
+    _init_repo(tmp_path)
+    sha_a = _commit_all(tmp_path, "phase one commit")
+    # sha_b is a sibling branch commit, not a descendant of sha_a.
+    _git(["checkout", "-q", "--orphan", "sibling"], tmp_path)
+    sha_b = _commit_all(tmp_path, "unrelated sibling commit")
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=sha_a,
+        # Deliberately never read: the ancestor check runs before the tree
+        # check, so this value must not matter. A sentinel makes that explicit
+        # and fails loudly if the check order ever changes, rather than quietly
+        # depending on the old tree_sha == head_sha^{tree} assumption.
+        tree_sha="0" * 40,
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("is not an ancestor of" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "updates",
+    (
+        {"ponytail_reviewed": True, "ponytail_findings": 0},
+        {"profiles_reviewed": ["code", "ponytail"]},
+        {
+            "profiles_reviewed": ["code", "ponytail"],
+            "ponytail_reviewed": True,
+            "ponytail_findings": 1,
+        },
+    ),
+    ids=("profile-missing", "authority-missing", "count-mismatch"),
+)
+def test_findings_rejects_contradictory_ponytail_metadata(
+    tmp_path: Path, updates: dict[str, object]
+) -> None:
+    """Ponytail authority must agree with selected profiles and findings."""
+    errors = _findings_errors(tmp_path, _findings_report(**updates))
+    assert any("Ponytail" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda receipt: receipt.pop("metadata"),
+        lambda receipt: receipt["checks"].pop(),
+        lambda receipt: receipt["checks"].__setitem__(
+            0, {**receipt["checks"][0], "status": "MAYBE"}
+        ),
+        lambda receipt: receipt["checks"].__setitem__(
+            0, {**receipt["checks"][0], "status": "NOT_APPLICABLE"}
+        ),
+    ),
+    ids=("missing-field", "missing-check", "unknown-status", "freeform-na"),
+)
+def test_receipt_validation_rejects_malformed_required_contract(
+    mutate: object,
+) -> None:
+    """Strict receipts reject omitted checks, unknown states, and free-form N/A."""
+    receipt = _receipt()
+    mutate(receipt)  # type: ignore[operator]
+    with pytest.raises(ValueError):
+        verify.validate_receipt(receipt)
+
+
+def test_closeout_receipt_rejects_missing_or_unsafe_artifact_references() -> None:
+    """Completed evidence has exact, safe references instead of report discovery."""
+    receipt = _closeout_receipt()
+    artifacts = receipt["artifacts"]
+    assert isinstance(artifacts, dict)
+    artifacts["findings"] = {"path": "../findings.json", "sha256": "a" * 64}
+    with pytest.raises(ValueError, match="artifact findings is invalid"):
+        verify.validate_receipt(receipt)
+
+
+@pytest.mark.parametrize(
+    ("stdout", "returncode", "expected"),
+    (
+        ("", 1, "UNVERIFIED"),
+        ("not json", 1, "UNVERIFIED"),
+        ("[]", 0, "PASS"),
+        ("[]", 1, "UNVERIFIED"),
+    ),
+    ids=("empty-nonzero", "malformed-json", "clean-json", "empty-failure"),
+)
+def test_ruff_measurement_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, stdout: str, returncode: int, expected: str
+) -> None:
+    """Ruff cannot turn a failed or malformed measurement into PASS."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (returncode, stdout, "")
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["status"] == expected
+
+
+def test_ruff_missing_executable_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing verification tool is unverified rather than clean."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("uv")),
+    )
+    assert verify.measure_ruff(REPO_ROOT, ["shared"])["status"] == "UNVERIFIED"
+
+
+def test_timeout_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A timed out command cannot be accepted as a passing check."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired(["uv"], 1)
+        ),
+    )
+    assert verify.measure_ruff(REPO_ROOT, ["shared"])["status"] == "UNVERIFIED"
+
+
+@pytest.mark.parametrize(
+    ("stdout", "returncode", "expected"),
+    (
+        ("", 1, "UNVERIFIED"),
+        ("1 file already formatted\n", 1, "UNVERIFIED"),
+        ("1 file already formatted\n", 0, "PASS"),
+        (
+            "Would reformat: shared/scripts/verify.py\n"
+            "1 file would be reformatted, 0 files already formatted\n",
+            1,
+            "FAIL",
+        ),
+        (
+            "Would reformat: shared/scripts/verify.py\n"
+            "1 file would be reformatted, 0 files already formatted\n",
+            0,
+            "UNVERIFIED",
+        ),
+    ),
+    ids=(
+        "empty-nonzero",
+        "clean-output-nonzero",
+        "clean-output-success",
+        "reformat-failure",
+        "reformat-with-success-exit",
+    ),
+)
+def test_ruff_format_measurement_helper_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, stdout: str, returncode: int, expected: str
+) -> None:
+    """The private Ruff-format helper cannot turn a failed measurement into PASS."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (returncode, stdout, "")
+    )
+    status, _detail = verify._ruff_format_measurement(["shared"], cwd=str(REPO_ROOT))
+    assert status == expected
+
+
+def test_ruff_format_measurement_helper_missing_executable_is_unverified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing verification tool is unverified rather than clean."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("uv")),
+    )
+    status, _detail = verify._ruff_format_measurement(["shared"], cwd=str(REPO_ROOT))
+    assert status == "UNVERIFIED"
+
+
+def test_ruff_format_measurement_helper_abnormal_exit_is_unverified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-0/1 Ruff format exit is not accepted as a passing or failing check."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (2, "", "internal error"),
+    )
+    status, _detail = verify._ruff_format_measurement(["shared"], cwd=str(REPO_ROOT))
+    assert status == "UNVERIFIED"
+
+
+def _fake_ruff_run(
+    *,
+    lint_rc: int,
+    lint_stdout: str,
+    format_rc: int,
+    format_stdout: str,
+):
+    """Return a `_run` stand-in that answers `ruff check` and `ruff format --check`
+    calls differently, keyed on the literal `"format"` argument the format
+    invocation carries and the lint invocation never does."""
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        if "format" in args:
+            return format_rc, format_stdout, ""
+        return lint_rc, lint_stdout, ""
+
+    return fake_run
+
+
+def test_measure_ruff_folds_lint_and_format_into_one_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """VFY-RUFF-001 stays the single check ID and reports both PASS."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=0,
+            lint_stdout="[]",
+            format_rc=0,
+            format_stdout="1 file already formatted\n",
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "PASS"
+    assert "lint:" in result["summary"] and "format:" in result["summary"]
+
+
+def test_measure_ruff_fails_on_lint_violation_and_names_lint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lint-only failure still fails VFY-RUFF-001, and the summary says why."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=1,
+            lint_stdout='[{"code": "F401"}]',
+            format_rc=0,
+            format_stdout="1 file already formatted\n",
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "FAIL"
+    assert "violation" in result["summary"]
+
+
+def test_measure_ruff_fails_on_format_drift_and_names_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A format-only failure still fails VFY-RUFF-001, and the summary says why."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=0,
+            lint_stdout="[]",
+            format_rc=1,
+            format_stdout=(
+                "Would reformat: shared/scripts/verify.py\n"
+                "1 file would be reformatted, 0 files already formatted\n"
+            ),
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "FAIL"
+    assert "reformat" in result["summary"]
+
+
+def test_measure_ruff_is_unverified_when_either_half_is_unmeasurable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A tool failure on either half stays UNVERIFIED, never a silent PASS."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=2,
+            lint_stdout="",
+            format_rc=0,
+            format_stdout="1 file already formatted\n",
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "UNVERIFIED"
+
+
+def test_mypy_abnormal_exit_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mypy operational failures remain distinct from type errors."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (2, "", "internal error"),
+    )
+    assert verify.measure_mypy(REPO_ROOT, ["shared"])["status"] == "UNVERIFIED"
+
+
+def test_pytest_infrastructure_exit_is_unverified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """pytest collection/tool errors are not represented as ordinary failures."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (2, "", "collection error"),
+    )
+    assert verify.measure_pytest(REPO_ROOT)["status"] == "UNVERIFIED"
+
+
+def test_repository_has_test_files_detects_pytest_naming_patterns(
+    tmp_path: Path,
+) -> None:
+    """Both accepted pytest test-module naming patterns are detected."""
+    assert verify.repository_has_test_files(tmp_path) is False
+    (tmp_path / "test_alpha.py").write_text("", encoding="utf-8")
+    assert verify.repository_has_test_files(tmp_path) is True
+    (tmp_path / "test_alpha.py").unlink()
+    nested = tmp_path / "pkg"
+    nested.mkdir()
+    (nested / "alpha_test.py").write_text("", encoding="utf-8")
+    assert verify.repository_has_test_files(tmp_path) is True
+
+
+def test_repository_has_test_files_skips_claude_venv_and_git(tmp_path: Path) -> None:
+    """AI-state, virtualenv, and Git internals never count as project tests."""
+    for skipped in (".claude", ".venv", ".git"):
+        directory = tmp_path / skipped
+        directory.mkdir()
+        (directory / "test_hidden.py").write_text("", encoding="utf-8")
+    assert verify.repository_has_test_files(tmp_path) is False
+
+
+def test_repository_has_test_files_is_inconclusive_on_a_permission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unreadable subtree could hold the only tests, so the walk must be
+    treated as inconclusive (None, keeping pytest UNVERIFIED rather than
+    NOT_APPLICABLE) and say so, instead of silently reporting absence or
+    claiming test files exist."""
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses directory permissions")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    (locked / "test_hidden.py").write_text("", encoding="utf-8")
+    locked.chmod(0o000)
+    try:
+        assert verify.repository_has_test_files(tmp_path) is None
+        monkeypatch.setattr(
+            verify, "_run", lambda *_args, **_kwargs: (5, "no tests ran", "")
+        )
+        status, detail = verify._pytest_measurement(cwd=str(tmp_path))
+    finally:
+        locked.chmod(0o755)
+    assert status == "UNVERIFIED"
+    assert "could not be read" in detail
+    assert "although test files exist" not in detail
+
+
+def test_pytest_exit_5_without_test_files_is_not_applicable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A brand-new project with no test files yet can still reach a clean
+    receipt: pytest's exit 5 ("no tests collected") is an honest absence,
+    not a tool failure."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (5, "no tests ran in 0.01s", "")
+    )
+    status, detail = verify._pytest_measurement(cwd=str(tmp_path))
+    assert status == "NOT_APPLICABLE"
+    assert "no test files" in detail
+
+    pytest_check = verify.measure_pytest(tmp_path)
+    assert pytest_check["status"] == "NOT_APPLICABLE"
+    assert pytest_check["applicable"] is False
+    assert verify.aggregate_status([pytest_check]) == "NOT_APPLICABLE"
+    passing_check = verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+    assert verify.aggregate_status([pytest_check, passing_check]) == "PASS"
+
+
+def test_pytest_exit_5_with_uncollected_test_files_is_unverified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Existing test files pytest still fails to collect are a configuration
+    problem, so they must keep blocking rather than reading as an absence."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_x.py").write_text(
+        "def test_x() -> None:\n    assert True\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (5, "no tests ran in 0.01s", "")
+    )
+    status, detail = verify._pytest_measurement(cwd=str(tmp_path))
+    assert status == "UNVERIFIED"
+    assert "testpaths" in detail
+
+
+@pytest.mark.parametrize(
+    ("stdout", "expected"),
+    (
+        ("12 passed in 0.34s", "12 passed in 0.34s"),
+        ("===== 3 failed, 9 passed in 1.02s =====", "3 failed, 9 passed in 1.02s"),
+        ("5 passed, 1 skipped in 0.12s", "5 passed, 1 skipped in 0.12s"),
+        ("no summary line here", ""),
+    ),
+    ids=("passed", "failed-and-passed", "skipped", "no-match"),
+)
+def test_pytest_result_summary_extracts_trailing_counts(
+    stdout: str, expected: str
+) -> None:
+    """The pytest detail line carries a test count, matching ruff/mypy."""
+    assert verify._pytest_result_summary(stdout) == expected
+
+
+def test_pytest_measurement_includes_test_count_in_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A passing pytest measurement reports its count, like ruff/mypy do."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (0, "12 passed in 0.34s\n", "")
+    )
+    status, detail = verify._pytest_measurement(cwd=".")
+    assert status == "PASS"
+    assert detail == "pytest completed (12 passed in 0.34s)"
+
+
+def test_closeout_rejects_stale_relevant_evidence(tmp_path: Path) -> None:
+    """Code/config/control evidence is stale when its scoped fingerprint changes."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase_path.write_text(json.dumps(_receipt(content_hash="old")), encoding="utf-8")
+    checks = verify.closeout_checks(tmp_path, _metadata(content_hash="new"))
+    fresh = next(item for item in checks if item["id"] == "VFY-FRESH-001")
+    assert fresh["status"] == "FAIL"
+
+
+def test_closeout_rejects_tampered_phase_receipt(tmp_path: Path) -> None:
+    """Malformed referenced evidence cannot produce a closeout PASS."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    receipt = _receipt()
+    receipt["checks"][0]["unexpected"] = "edited after measurement"  # type: ignore[index]
+    phase_path.write_text(json.dumps(receipt), encoding="utf-8")
+    checks = verify.closeout_checks(tmp_path, _metadata())
+    reused = next(item for item in checks if item["id"] == "VFY-RECEIPT-001")
+    assert reused["status"] == "FAIL"
+
+
+def test_closeout_rejects_non_passing_phase_receipt(tmp_path: Path) -> None:
+    """A closeout receipt cannot reuse phase evidence that recorded a failure."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase = _receipt()
+    checks = phase["checks"]
+    assert isinstance(checks, list) and isinstance(checks[0], dict)
+    checks[0] = {**checks[0], "status": "FAIL", "summary": "measurement failed"}
+    phase["status"] = "FAIL"
+    phase_path.write_text(json.dumps(phase), encoding="utf-8")
+    checks = verify.closeout_checks(tmp_path, _metadata())
+    reused = next(item for item in checks if item["id"] == "VFY-RECEIPT-001")
+    assert reused["status"] == "FAIL"
+
+
+def test_closeout_rejects_different_git_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Equal diff hashes do not cross branch/base/head freshness boundaries."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase = _receipt()
+    phase_path.write_text(json.dumps(phase), encoding="utf-8")
+    monkeypatch.setattr(verify, "phase_checks", lambda *_args: phase["checks"])
+    current = _metadata()
+    current["merge_base_sha"] = "different-base"
+    checks = verify.closeout_checks(tmp_path, current)
+    fresh = next(item for item in checks if item["id"] == "VFY-FRESH-001")
+    assert fresh["status"] == "FAIL"
+
+
+def test_closeout_rejects_stale_control_plane_provenance(tmp_path: Path) -> None:
+    """Changing a governing runtime or plan fingerprint stales phase evidence."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase_path.write_text(json.dumps(_receipt()), encoding="utf-8")
+    current = _metadata()
+    provenance = current["control_plane_provenance"]
+    assert isinstance(provenance, dict)
+    current["control_plane_provenance"] = {
+        **provenance,
+        "runtime_fingerprint": "d" * 64,
+    }
+
+    checks = verify.closeout_checks(tmp_path, current)
+
+    fresh = next(item for item in checks if item["id"] == "VFY-FRESH-002")
+    assert fresh["status"] == "FAIL"
+
+
+def test_control_plane_provenance_binds_runtime_and_active_plans(
+    tmp_path: Path,
+) -> None:
+    """Nested runtime and active plan changes invalidate only governing evidence."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    (nested / "scripts").mkdir(parents=True)
+    plans.mkdir()
+    _write_root_adapter_pairs(tmp_path)
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    big_plan = plans / "consumer-proof.md"
+    small_plan = plans / "phase-one.md"
+    big_plan.write_text(
+        "status: in-progress\ncurrent_phase: phase-one\n", encoding="utf-8"
+    )
+    small_plan.write_text("status: in-progress\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "runtime",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert verify.has_control_plane_provenance(
+        {"branch": "consumer-proof_implementation", "control_plane_provenance": before}
+    )
+
+    (nested / "quality_reports").mkdir()
+    (nested / "quality_reports" / "score.json").write_text(
+        "mutable\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "add", "quality_reports/score.json"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "evidence"],
+        cwd=nested,
+        check=True,
+    )
+    after_evidence = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert after_evidence["nested_head"] != before["nested_head"]
+    assert verify.control_plane_provenance_matches(
+        {"branch": "consumer-proof_implementation", "control_plane_provenance": before},
+        {
+            "branch": "consumer-proof_implementation",
+            "control_plane_provenance": after_evidence,
+        },
+    )
+
+    runtime_file = nested / "scripts" / "verify.py"
+    runtime_file.write_text("runtime = staged\n", encoding="utf-8")
+    subprocess.run(["git", "add", "scripts/verify.py"], cwd=nested, check=True)
+    runtime_file.write_text("runtime = 1\n", encoding="utf-8")
+    index_only = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert index_only["runtime_fingerprint"] == before["runtime_fingerprint"]
+    assert (
+        index_only["tracked_state_fingerprint"] != before["tracked_state_fingerprint"]
+    )
+    subprocess.run(["git", "add", "scripts/verify.py"], cwd=nested, check=True)
+
+    original_small_plan = small_plan.read_text(encoding="utf-8")
+    small_plan.write_text("status: staged\n", encoding="utf-8")
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    small_plan.write_text(original_small_plan, encoding="utf-8")
+    staged_plan = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert staged_plan["small_plan_digest"] == before["small_plan_digest"]
+    assert (
+        staged_plan["tracked_state_fingerprint"] != before["tracked_state_fingerprint"]
+    )
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+
+    small_plan.write_text("status: complete\n", encoding="utf-8")
+    plan_changed = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert plan_changed["small_plan_digest"] != before["small_plan_digest"]
+    assert plan_changed["runtime_fingerprint"] == before["runtime_fingerprint"]
+
+    runtime_file.write_text("runtime = 2\n", encoding="utf-8")
+    runtime_changed = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert runtime_changed["runtime_fingerprint"] != before["runtime_fingerprint"]
+    assert (
+        runtime_changed["tracked_state_fingerprint"]
+        != before["tracked_state_fingerprint"]
+    )
+
+
+def test_control_plane_provenance_binds_owned_live_root_adapters(
+    tmp_path: Path,
+) -> None:
+    """Every manifest-owned live root adapter must equal its nested mirror."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    (plans / "consumer-proof.md").write_text("big plan\n", encoding="utf-8")
+    (plans / "phase-one.md").write_text("small plan\n", encoding="utf-8")
+    adapters = {
+        "CLAUDE.md": "claude\n",
+        "AGENTS.md": "agents\n",
+        ".mcp.json": "{}\n",
+        ".codex/hooks.json": "{}\n",
+        ".agents/agents/coder.md": "coder\n",
+        ".vscode/mcp.json": "{}\n",
+        ".github/hooks/hooks.json": "{}\n",
+    }
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    for relative, content in adapters.items():
+        for base in (tmp_path, nested / "bootstrap-root"):
+            path = base / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "runtime",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": before,
+    }
+    assert verify.has_control_plane_provenance(metadata)
+
+    for relative, content in adapters.items():
+        live = tmp_path / relative
+        live.write_text(content + "drift\n", encoding="utf-8")
+        after = verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        )
+        assert not verify.control_plane_provenance_matches(
+            metadata, {**metadata, "control_plane_provenance": after}
+        )
+        live.write_text(content, encoding="utf-8")
+
+    (tmp_path / ".mcp.json").unlink()
+    assert not verify.has_control_plane_provenance(
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        }
+    )
+    (tmp_path / ".mcp.json").mkdir()
+    assert not verify.has_control_plane_provenance(
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        }
+    )
+    (tmp_path / ".mcp.json").rmdir()
+    (tmp_path / ".mcp.json").symlink_to(nested / "bootstrap-root" / ".mcp.json")
+    assert not verify.has_control_plane_provenance(
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("mode", "manifest"),
+    (
+        (True, "BOOTSTRAP_COMMIT_COPILOT_SURFACE=1\nBOOTSTRAP_ROOT_PATH=.mcp.json\n"),
+        (
+            False,
+            "BOOTSTRAP_COMMIT_COPILOT_SURFACE=0\n"
+            "BOOTSTRAP_ROOT_PATH=.mcp.json\nBOOTSTRAP_ROOT_PATH=foreign\n",
+        ),
+    ),
+)
+def test_root_adapter_manifest_requires_complete_mode_inventory(
+    tmp_path: Path, mode: bool, manifest: str
+) -> None:
+    """Incomplete or foreign root ownership records cannot establish provenance."""
+    _write_root_adapter_pairs(tmp_path, mode)
+    (tmp_path / ".claude" / "bootstrap-ownership.env").write_text(
+        manifest, encoding="utf-8"
+    )
+
+    assert verify.manifest_bootstrap_root_paths(tmp_path) is None
+
+
+@pytest.mark.parametrize("mirror", (False, True))
+def test_root_adapter_rejects_ancestor_symlink_escape(
+    tmp_path: Path, mirror: bool
+) -> None:
+    """A link in either adapter ancestry cannot redirect hashing outside the repo."""
+    _write_root_adapter_pairs(tmp_path)
+    ancestor = (
+        tmp_path / ".claude" / "bootstrap-root" / ".codex"
+        if mirror
+        else tmp_path / ".codex"
+    )
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    shutil.rmtree(ancestor)
+    ancestor.symlink_to(outside, target_is_directory=True)
+
+    assert verify.bootstrap_root_fingerprint(tmp_path) == ""
+
+
+def test_root_adapter_diagnostics_name_safe_paths_and_recovery_only_when_valid(
+    tmp_path: Path,
+) -> None:
+    """Live drift names its adapter and recovery without exposing adapter bytes."""
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    live = tmp_path / ".github" / "agents"
+    shutil.rmtree(live)
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert fingerprint == ""
+    assert diagnostics == (
+        {
+            "path": ".github/agents",
+            "side": "live",
+            "category": "missing-or-unsafe",
+        },
+    )
+    assert ".github/agents: live missing-or-unsafe" in detail
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+    assert "adapter\n" not in detail
+    assert str(tmp_path) not in detail
+
+
+def test_root_adapter_diagnostics_report_content_difference_for_same_shape_pair(
+    tmp_path: Path,
+) -> None:
+    """A live/mirror pair with matching shape but differing bytes is reported
+    as `content-difference` and still offers restoration, without disclosing
+    either side's bytes or the filesystem path."""
+    _write_root_adapter_pairs(tmp_path)
+    relative = ".mcp.json"
+    (tmp_path / relative).write_text("live-only-bytes\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert fingerprint == ""
+    assert diagnostics == (
+        {"path": relative, "side": "pair", "category": "content-difference"},
+    )
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+    assert "live-only-bytes" not in detail
+    assert "adapter\n" not in detail
+    assert str(tmp_path) not in detail
+
+
+def test_root_adapter_diagnostics_offer_recovery_for_fully_missing_parent_directory(
+    tmp_path: Path,
+) -> None:
+    """A wholly-missing intermediate parent (`.github/` itself, not just
+    `.github/agents`) stays replaceable, since restore-root-adapters.sh's
+    ensure_destination_parent() creates missing parents. Regression for the
+    originating consumer bug: missing `.github/` adapters."""
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    shutil.rmtree(tmp_path / ".github")
+
+    assert verify.adapter_destination_is_replaceable(tmp_path, ".github/agents")
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert diagnostics and all(
+        item["side"] == "live" and item["category"] == "missing-or-unsafe"
+        for item in diagnostics
+    )
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+
+
+def test_root_adapter_diagnostics_offer_recovery_when_live_is_subset_of_mirror(
+    tmp_path: Path,
+) -> None:
+    """A live directory adapter missing a file the mirror still has is still
+    exactly replaceable: restore-root-adapters.sh only adds and overwrites
+    from the mirror, it never deletes, so restoring in place fills the gap
+    with no extras left behind. Regression for the ordinary consumer-upgrade
+    case: the bootstrap gained a new adapter file the consumer has not
+    picked up yet."""
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    relative = ".github/agents"
+    live_agents = tmp_path / relative
+    mirror_agents = tmp_path / ".claude" / "bootstrap-root" / relative
+    for base in (live_agents, mirror_agents):
+        (base / "new-agent.md").write_text("new adapter file\n", encoding="utf-8")
+    (live_agents / "new-agent.md").unlink()
+
+    assert verify.adapter_destination_is_replaceable(tmp_path, relative)
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert {
+        "path": relative,
+        "side": "pair",
+        "category": "content-difference",
+    } in diagnostics
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    (
+        (
+            "missing-mirror",
+            {"side": "mirror", "category": "missing-or-unsafe"},
+        ),
+        (
+            "unsupported-live",
+            {"side": "live", "category": "unsupported-file-type"},
+        ),
+    ),
+)
+def test_root_adapter_diagnostics_do_not_offer_recovery_for_invalid_sources(
+    tmp_path: Path, mutation: str, expected: dict[str, str]
+) -> None:
+    """Invalid ownership sources remain diagnostic-only, never false recovery hints."""
+    _write_root_adapter_pairs(tmp_path)
+    relative = ".agents"
+    target = (
+        tmp_path / ".claude" / "bootstrap-root" / relative
+        if mutation == "missing-mirror"
+        else tmp_path / relative
+    )
+    shutil.rmtree(target)
+    if mutation == "unsupported-live":
+        target.mkdir()
+        os.mkfifo(target / "unsupported")
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert {**expected, "path": relative} in diagnostics
+    assert "restore-root-adapters.sh" not in detail
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "symlink",
+        "tracked-drift",
+        "extra-live-entry",
+        "root-kind-mismatch",
+        "nested-kind-mismatch",
+        "nested-symlink",
+    ),
+)
+def test_root_adapter_diagnostics_skip_nonreplaceable_live_recovery(
+    tmp_path: Path, mutation: str
+) -> None:
+    """Recovery advice never promises to replace unsafe, tracked, extra, or
+    shape-mismatched live state."""
+    _write_root_adapter_pairs(tmp_path)
+    adapter = tmp_path / ".agents"
+    if mutation == "symlink":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        shutil.rmtree(adapter)
+        adapter.symlink_to(outside, target_is_directory=True)
+    elif mutation == "tracked-drift":
+        managed = adapter / "fixture.txt"
+        managed.write_text("tracked drift\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "add", ".agents/fixture.txt"], check=True
+        )
+    elif mutation == "extra-live-entry":
+        (adapter / "extra.txt").write_text("extra\n", encoding="utf-8")
+    elif mutation == "root-kind-mismatch":
+        # Same relative path (the adapter root itself) on both sides, but a
+        # different kind: live is a plain file where the mirror is still a
+        # directory. `regular_tree_fingerprint_diagnostic` succeeds on both
+        # sides (each is individually valid), so this reaches
+        # `adapter_destination_is_replaceable` as `("pair", "content-difference")`
+        # rather than being rejected earlier as unsafe or unsupported.
+        shutil.rmtree(adapter)
+        adapter.write_text("not a directory\n", encoding="utf-8")
+    elif mutation == "nested-kind-mismatch":
+        # Same relative path one level down, different kind: live's
+        # `fixture.txt` becomes a directory where the mirror keeps it a file.
+        (adapter / "fixture.txt").unlink()
+        (adapter / "fixture.txt").mkdir()
+        (adapter / "fixture.txt" / "nested.txt").write_text(
+            "nested\n", encoding="utf-8"
+        )
+    else:
+        # nested-symlink: the adapter root stays an ordinary directory, but
+        # one entry inside it is a symlink. Distinct from the "symlink" case
+        # above, which replaces the adapter root itself and is caught by the
+        # earlier `candidate.is_symlink()` check before `regular_tree_layout`
+        # ever runs. This one surfaces as `("live", "missing-or-unsafe")` and
+        # reaches `regular_tree_layout`, which returns `None` for the whole
+        # tree -- proving the `None` guard in
+        # `adapter_destination_is_replaceable` is load-bearing, not dead code.
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (adapter / "link").symlink_to(outside, target_is_directory=True)
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert not verify.adapter_destination_is_replaceable(tmp_path, ".agents")
+    assert "restore-root-adapters.sh" not in detail
+
+
+def test_bootstrap_root_fingerprint_ignores_marker_claimed_skill_bundle(
+    tmp_path: Path,
+) -> None:
+    """A marker-claimed `.agents/skills/openwiki` bundle never breaks the
+    live/mirror pairing, whether it exists on only one side or with
+    different bytes on each side -- OpenWiki, not the bootstrap installer,
+    owns writes to it once it claims it (Step I2b)."""
+    _write_root_adapter_pairs(tmp_path)
+    # A real generated `.agents` already has a `skills/` directory shared
+    # identically by both sides (the other, ordinary bootstrap-generated
+    # skills); create the same matching shape here so the only difference
+    # introduced below is the bundle itself, not this fixture's own gap.
+    for base in (tmp_path, tmp_path / ".claude" / "bootstrap-root"):
+        other_skill = base / ".agents" / "skills" / "some-skill" / "SKILL.md"
+        other_skill.parent.mkdir(parents=True)
+        other_skill.write_text("shared skill\n", encoding="utf-8")
+    baseline = verify.bootstrap_root_fingerprint(tmp_path)
+    assert baseline != ""
+
+    live_bundle = tmp_path / ".agents" / "skills" / "openwiki"
+    live_bundle.mkdir(parents=True)
+    (live_bundle / "SKILL.md").write_text("openwiki-managed v1\n", encoding="utf-8")
+    (live_bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    assert diagnostics == ()
+    assert fingerprint == baseline
+
+    mirror_bundle = (
+        tmp_path / ".claude" / "bootstrap-root" / ".agents" / "skills" / "openwiki"
+    )
+    mirror_bundle.mkdir(parents=True)
+    (mirror_bundle / "SKILL.md").write_text(
+        "openwiki-managed v2 (drifted)\n", encoding="utf-8"
+    )
+    (mirror_bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    fingerprint_with_drifted_mirror, diagnostics = (
+        verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    )
+    assert diagnostics == ()
+    assert fingerprint_with_drifted_mirror == baseline
+
+
+def test_bootstrap_root_fingerprint_still_flags_unmarked_extra_directory(
+    tmp_path: Path,
+) -> None:
+    """Without OpenWiki's own marker file, an extra `.agents/skills/openwiki`
+    directory is ordinary unrecognized drift, exactly as before this
+    exemption existed."""
+    _write_root_adapter_pairs(tmp_path)
+    live_bundle = tmp_path / ".agents" / "skills" / "openwiki"
+    live_bundle.mkdir(parents=True)
+    (live_bundle / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+
+    assert fingerprint == ""
+    assert {
+        "path": ".agents",
+        "side": "pair",
+        "category": "content-difference",
+    } in diagnostics
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    (
+        "name: wrong-phase",
+        "parent_plan: another-plan",
+        "phase_index: not-a-number",
+        "status: in-progress",
+        "closeout_session_log:",
+        "closeout_session_log: ../escape.md",
+        "type:\n  - small-plan",
+    ),
+)
+def test_terminal_small_plan_requires_complete_well_formed_identity(
+    replacement: str,
+) -> None:
+    """Terminal exceptions accept only the receipt's complete current plan."""
+    source = (
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n"
+    )
+    key = replacement.partition(":")[0]
+    original = next(line for line in source.splitlines() if line.startswith(f"{key}:"))
+    assert not verify.is_complete_small_plan(
+        source.replace(original, replacement).encode(), "phase-one", "consumer-proof"
+    )
+
+
+def test_terminal_plan_transition_provenance(
+    tmp_path: Path,
+) -> None:
+    """Only the hook's unstaged final-plan transition may follow closeout."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    (nested / "scripts").mkdir(parents=True)
+    plans.mkdir()
+    _write_root_adapter_pairs(tmp_path)
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        """---
+name: consumer-proof
+type: big-plan
+status: in-progress
+current_phase: phase-one
+phases:
+  - phase-one
+review_profiles:
+  - code
+  - security
+---
+""",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "closeout state",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": before,
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    terminal = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    assert verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        metadata,
+        {**metadata, "control_plane_provenance": terminal},
+    )
+
+    big_plan.write_text(big_plan.read_text(encoding="utf-8") + "# changed\n")
+    assert not verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        metadata,
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        },
+    )
+
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    phase_one = plans / "phase-one.md"
+    phase_one.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: in-progress\n---\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    subprocess.run(["git", "commit", "-qm", "unfinished phase"], cwd=nested, check=True)
+    unfinished_metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert not verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        unfinished_metadata,
+        {
+            **unfinished_metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        },
+    )
+
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8").replace(
+            "  - phase-one", "  - phase-one\n  - phase-two"
+        ),
+        encoding="utf-8",
+    )
+    phase_one.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    phase_two = plans / "phase-two.md"
+    cancelled_evidence = nested / "session_logs" / "phase-two-cancelled.md"
+    cancelled_evidence.parent.mkdir(exist_ok=True)
+    cancelled_evidence.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    phase_two.write_text(
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: cancelled\n"
+        "cancelled_at: 2026-08-31T00:00:00Z\n"
+        "cancelled_reason: Later work is no longer needed\n"
+        "cancelled_evidence: .claude/session_logs/phase-two-cancelled.md\n---\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "terminal precondition"], cwd=nested, check=True
+    )
+    later_metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    phase_two.write_text(phase_two.read_text(encoding="utf-8") + "# dirty\n")
+    assert not verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    subprocess.run(["git", "reset", "--", "plans/phase-two.md"], cwd=nested, check=True)
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    phase_two.write_text(phase_two.read_text(encoding="utf-8") + "# staged\n")
+    subprocess.run(["git", "add", "plans/phase-two.md"], cwd=nested, check=True)
+    assert not verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    subprocess.run(["git", "reset", "--", "plans/phase-two.md"], cwd=nested, check=True)
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans/consumer-proof.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "terminal transition"], cwd=nested, check=True
+    )
+    assert verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    phase_two.write_text(phase_two.read_text(encoding="utf-8") + "# checkpoint dirty\n")
+    subprocess.run(["git", "add", "plans/phase-two.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "later phase mutation"], cwd=nested, check=True
+    )
+    assert not verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+
+
+def test_terminal_predicates_refuse_outer_plan_mirror_without_nested_repository(
+    tmp_path: Path,
+) -> None:
+    """The measured fail-open: an outer repository mirroring the nested plan
+    paths at its top level must never satisfy the terminal predicates when
+    ``.claude`` has no ``.git`` of its own.
+
+    Before the guard, ``git show`` and ``git status`` run with cwd inside
+    ``.claude`` walked up to the outer repository and resolved these
+    outer-mirror paths as if they were nested state -- including reading the
+    outer ``plans/phase-two.md`` as cancelled while the nested file on disk
+    was still in progress.
+    """
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    _write_root_adapter_pairs(tmp_path)
+
+    big_plan_text = (
+        "---\nname: consumer-proof\ntype: big-plan\nstatus: in-progress\n"
+        "current_phase: phase-one\nphases:\n  - phase-one\n  - phase-two\n---\n"
+        "# Big\n"
+    )
+    phase_one_text = (
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n"
+    )
+    (plans / "consumer-proof.md").write_text(big_plan_text, encoding="utf-8")
+    (plans / "phase-one.md").write_text(phase_one_text, encoding="utf-8")
+    (plans / "phase-two.md").write_text(
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: in-progress\n---\n",
+        encoding="utf-8",
+    )
+    logs = nested / "session_logs"
+    logs.mkdir(parents=True)
+    (logs / "phase-one.md").write_bytes(b"**Status:** COMPLETED\n")
+    (logs / "phase-two.md").write_bytes(b"**Status:** CANCELLED\n")
+
+    outer_plans = tmp_path / "plans"
+    outer_plans.mkdir(parents=True)
+    (outer_plans / "consumer-proof.md").write_text(big_plan_text, encoding="utf-8")
+    (outer_plans / "phase-one.md").write_text(phase_one_text, encoding="utf-8")
+    (outer_plans / "phase-two.md").write_text(
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: cancelled\n"
+        "cancelled_at: 2026-09-11T00:00:00Z\n"
+        "cancelled_reason: descoped\n"
+        "cancelled_evidence: .claude/session_logs/phase-two.md\n---\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "outer state")
+    _git(["checkout", "-q", "-b", "consumer-proof_implementation"], tmp_path)
+    branch = "consumer-proof_implementation"
+
+    before = verify.control_plane_provenance(tmp_path, branch, "phase-one")
+    meta: dict[str, object] = {"branch": branch, "control_plane_provenance": before}
+
+    big_plan = plans / "consumer-proof.md"
+    terminal_text = big_plan_text.replace(
+        "status: in-progress", "status: complete"
+    ).replace("current_phase: phase-one", "current_phase: ")
+    big_plan.write_text(terminal_text, encoding="utf-8")
+    outer_big_plan = outer_plans / "consumer-proof.md"
+    outer_big_plan.write_text(
+        outer_big_plan.read_text(encoding="utf-8") + "# outer noise\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        verify.has_only_terminal_big_plan_change(tmp_path, branch, "phase-one", meta)
+        is False
+    )
+    assert (
+        verify.terminal_control_plane_provenance_matches(
+            tmp_path,
+            branch,
+            "phase-one",
+            meta,
+            {
+                **meta,
+                "control_plane_provenance": verify.control_plane_provenance(
+                    tmp_path, branch, "phase-one"
+                ),
+            },
+        )
+        is False
+    )
+
+    outer_big_plan.write_text(terminal_text, encoding="utf-8")
+    _commit_all(tmp_path, "outer terminal")
+    assert (
+        verify.has_only_checkpointed_terminal_big_plan_change(
+            tmp_path, branch, "phase-one", meta
+        )
+        is False
+    )
+
+
+@pytest.mark.parametrize(
+    ("replacement", "evidence"),
+    (
+        ("cancelled_at:", "**Status:** CANCELLED\n"),
+        ("cancelled_at: invalid", "**Status:** CANCELLED\n"),
+        ("cancelled_reason: [not prose]", "**Status:** CANCELLED\n"),
+        ("cancelled_evidence: ../escape.md", "**Status:** CANCELLED\n"),
+        ("cancelled_evidence: .claude/session_logs/cancelled.md", "not cancelled\n"),
+    ),
+)
+def test_terminal_paths_require_valid_cancelled_evidence(
+    tmp_path: Path, replacement: str, evidence: str
+) -> None:
+    """Both terminal paths require the full audited cancellation contract."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    _write_root_adapter_pairs(tmp_path)
+    (plans / "consumer-proof.md").write_text(
+        "---\nname: consumer-proof\ntype: big-plan\nstatus: in-progress\n"
+        "current_phase: phase-one\nphases:\n  - phase-one\n  - phase-two\n---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    base_cancelled = (
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: cancelled\ncancelled_at: 2026-08-31T00:00:00Z\n"
+        "cancelled_reason: Later work is unnecessary\n"
+        "cancelled_evidence: .claude/session_logs/cancelled.md\n---\n"
+    )
+    key = replacement.partition(":")[0]
+    original = next(
+        line for line in base_cancelled.splitlines() if line.startswith(f"{key}:")
+    )
+    (plans / "phase-two.md").write_text(
+        base_cancelled.replace(original, replacement), encoding="utf-8"
+    )
+    cancelled_log = nested / "session_logs" / "cancelled.md"
+    cancelled_log.parent.mkdir()
+    cancelled_log.write_text(evidence, encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        cwd=nested,
+        check=True,
+    )
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert not verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    subprocess.run(["git", "add", "plans/consumer-proof.md"], cwd=nested, check=True)
+    subprocess.run(["git", "commit", "-qm", "terminal"], cwd=nested, check=True)
+    assert not verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+
+
+def test_checkpointed_terminal_accepts_receipt_bound_dirty_closeout_state(
+    tmp_path: Path,
+) -> None:
+    """A receipt may precede one checkpoint that persists its completed plan."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    _write_root_adapter_pairs(tmp_path)
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        "---\nname: consumer-proof\ntype: big-plan\nstatus: in-progress\n"
+        "current_phase: phase-one\nphases:\n  - phase-one\n---\n",
+        encoding="utf-8",
+    )
+    small_plan = plans / "phase-one.md"
+    small_plan.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: in-progress\n---\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "config", "user.name", "Verifier"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "verifier@example.com"],
+        cwd=nested,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        cwd=nested,
+        check=True,
+    )
+    small_plan.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    evidence = nested / "quality_reports" / "verification-phase-phase-one.json"
+    evidence.parent.mkdir()
+    evidence.write_text("receipt\n", encoding="utf-8")
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    subprocess.run(
+        ["git", "add", "plans/phase-one.md", "quality_reports"], cwd=nested, check=True
+    )
+    subprocess.run(
+        ["git", "commit", "-qm", "closeout evidence checkpoint"],
+        cwd=nested,
+        check=True,
+    )
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans/consumer-proof.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "closeout checkpoint"], cwd=nested, check=True
+    )
+
+    assert verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    small_plan.write_text(small_plan.read_text(encoding="utf-8") + "# mutated\n")
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "post-receipt mutation"], cwd=nested, check=True
+    )
+    assert not verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+
+
+def test_receipt_rejects_missing_control_plane_provenance() -> None:
+    """Schema validation cannot silently accept receipts without nested evidence."""
+    receipt = _receipt()
+    metadata = receipt["metadata"]
+    assert isinstance(metadata, dict)
+    metadata.pop("control_plane_provenance")
+
+    with pytest.raises(ValueError, match="authoritative fields"):
+        verify.validate_receipt(receipt)
+
+
+def test_docs_only_scope_preserves_code_evidence_but_control_markdown_does_not() -> (
+    None
+):
+    """Only ordinary documentation is excluded from the scoped freshness hash."""
+    assert verify.scoped_paths(["docs/guide.md"]) == []
+    assert (
+        verify.classify_path(".claude/instructions/workflow.instructions.md")
+        == "control-plane"
+    )
+    assert verify.scoped_paths([".claude/instructions/workflow.instructions.md"])
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "shared/policies/workflow.instructions.md",
+        "shared/hooks/scripts/enforce-commit-gate.sh",
+        "shared/agents/orchestrator/AGENT.md",
+        "shared/skills/ponytail/SKILL.md",
+        "shared/review-profiles/security.md",
+    ),
+)
+def test_canonical_shared_sources_are_control_plane(path: str) -> None:
+    """Generated canonical sources always invalidate relevant evidence."""
+    assert verify.classify_path(path) == "control-plane"
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "service/uv.lock",
+        "requirements-dev.txt",
+        "frontend/package.json",
+        "deployment/Dockerfile",
+        "rust/Cargo.lock",
+        "go/go.mod",
+    ),
+)
+def test_dependency_and_build_inputs_are_config(path: str) -> None:
+    """Dependency, lock, and build inputs always stale relevant evidence."""
+    assert verify.classify_path(path) == "config"
+
+
+@pytest.mark.parametrize(
+    "path",
+    (".gitignore", "Makefile", "src/app.ts", "db/schema.sql", "bin/deploy.sh"),
+)
+def test_unknown_source_and_build_paths_fail_closed(path: str) -> None:
+    """Unknown non-document paths remain evidence-relevant by default."""
+    assert verify.classify_path(path) != "documentation-only"
+
+
+def test_ordinary_documentation_remains_reusable() -> None:
+    """Only narrow ordinary documentation paths are excluded from code evidence."""
+    assert verify.classify_path("docs/guide.md") == "documentation-only"
+
+
+def test_errata_sibling_file_binds_under_the_normal_receipt_mechanism() -> None:
+    """A sibling ``<log>.errata.md`` file lives under ``.claude/session_logs/``
+    and therefore classifies as evidence-relevant control-plane state, not
+    excluded documentation - the discovering phase's own ``content_hash``
+    already covers it with no dedicated errata receipt ceremony needed."""
+    path = ".claude/session_logs/phase-one-closeout.md.errata.md"
+    assert verify.classify_path(path) == "control-plane"
+    assert verify.scoped_paths([path]) == [path]
+
+
+def test_phase_receipt_rejects_required_check_marked_not_applicable() -> None:
+    """Changing both status and applicability cannot bypass a phase check."""
+    receipt = _receipt()
+    checks = receipt["checks"]
+    assert isinstance(checks, list)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    ruff.update(status="NOT_APPLICABLE", applicable=False)
+    with pytest.raises(ValueError, match="invalid applicability"):
+        verify.validate_receipt(receipt)
+
+
+def _phase_checks_with_pytest_not_applicable(
+    *, ruff_not_applicable: bool = False
+) -> list[dict[str, object]]:
+    """Build a phase check list with a genuinely test-less pytest result."""
+    return [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.not_applicable(
+            check_id,
+            "pytest collected no tests and the repository has no test files yet",
+        )
+        if check_id == "VFY-PYTEST-001"
+        else verify.not_applicable(check_id, "test-induced")
+        if ruff_not_applicable and check_id == "VFY-RUFF-001"
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+
+
+def test_phase_receipt_permits_pytest_not_applicable_for_a_test_less_repository() -> (
+    None
+):
+    """A test-less consumer's honest pytest NOT_APPLICABLE must not turn
+    building a phase receipt into an uncaught ValueError."""
+    checks = _phase_checks_with_pytest_not_applicable()
+    receipt = verify.build_receipt("phase", checks, _metadata())  # must not raise
+    assert receipt["status"] == "PASS"
+
+
+def test_phase_receipt_still_rejects_other_checks_marked_not_applicable() -> None:
+    """The pytest carve-out is exact: a NOT_APPLICABLE VFY-RUFF-001 in phase
+    mode still raises, even alongside a genuinely inapplicable pytest check."""
+    checks = _phase_checks_with_pytest_not_applicable(ruff_not_applicable=True)
+    with pytest.raises(ValueError, match="invalid applicability"):
+        verify.build_receipt("phase", checks, _metadata())
+
+
+def test_missing_git_binding_is_not_fresh_evidence() -> None:
+    """Freshness cannot pass when Git did not supply a head/base binding."""
+    metadata = _metadata()
+    metadata["head_sha"] = ""
+    assert not verify.metadata_is_bound(metadata)
+
+
+def test_git_paths_and_hash_include_untracked_files(tmp_path: Path) -> None:
+    """New source files participate in changed-path and freshness evidence."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True
+    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, check=True)
+    tracked = tmp_path / "tracked.txt"
+    tracked.write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "branch", "dev"], cwd=tmp_path, check=True)
+    untracked = tmp_path / "new.py"
+    untracked.write_text("VALUE = 1\n", encoding="utf-8")
+    paths = verify.git_paths(tmp_path, "dev")
+    assert paths == ["new.py"]
+    before = verify.hash_paths(tmp_path, paths)
+    untracked.write_text("VALUE = 2\n", encoding="utf-8")
+    assert verify.hash_paths(tmp_path, paths) != before
+
+
+def test_failed_git_path_discovery_clears_freshness_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A partial or failed Git inventory cannot produce fresh evidence."""
+    monkeypatch.setattr(
+        verify,
+        "run_process",
+        lambda args, _root: subprocess.CompletedProcess(
+            args,
+            0
+            if args[1:3] in (["merge-base", "dev"], ["rev-parse", "--abbrev-ref"])
+            or args[1:2] == ["rev-parse"]
+            else 2,
+            "head\n",
+            "",
+        ),
+    )
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert metadata["path_discovery_ok"] is False
+    assert not verify.metadata_is_bound(metadata)
+
+
+def test_git_paths_preserve_newline_filename(tmp_path: Path) -> None:
+    """NUL-delimited Git output preserves quoted and newline path identity."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    unusual = tmp_path / "odd\nname.py"
+    unusual.write_text("VALUE = 1\n", encoding="utf-8")
+    paths = verify.git_paths(tmp_path, "dev")
+    assert paths == ["odd\nname.py"]
+    before = verify.hash_paths(tmp_path, paths)
+    unusual.write_text("VALUE = 2\n", encoding="utf-8")
+    assert verify.hash_paths(tmp_path, paths) != before
+
+
+def test_existing_paths_filters_only_deleted_entries(tmp_path: Path) -> None:
+    """existing_paths keeps files still on disk and drops the rest, nothing
+    more - it is the sole gate between a changed-path list and a tool that
+    must open each target."""
+    (tmp_path / "present.py").write_text("VALUE = 1\n", encoding="utf-8")
+    assert verify.existing_paths(tmp_path, ["present.py", "gone.py"]) == ["present.py"]
+
+
+def test_fast_checks_skips_ruff_when_all_python_paths_are_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reproduces the real defect: a tracked Python file deleted since the
+    base ref (as Phase 1 deleted shared/scripts/quality_score.py) is a
+    legitimate changed path, so VFY-RUFF-001 stays applicable, but it must
+    never be handed to Ruff as an open target - and with no surviving
+    Python path, Ruff must not run at all (an empty target list would
+    silently widen its scope to the whole tree)."""
+    _init_repo(tmp_path)
+    (tmp_path / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(tmp_path, "add module")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "mod.py").unlink()
+    _commit_all(tmp_path, "delete module")
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert metadata["relevant_paths"] == ["mod.py"]
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> tuple[int, str, str]:
+        raise AssertionError("Ruff must not run with no surviving targets")
+
+    monkeypatch.setattr(verify, "_run", fail_if_called)
+    checks = verify.fast_checks(tmp_path, metadata)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    assert ruff["applicable"] is True
+    assert ruff["status"] == "PASS"
+
+
+def test_fast_checks_excludes_deleted_paths_from_ruff_target_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deleted Python path must be dropped from the actual Ruff
+    invocation while a surviving changed Python path is still measured."""
+    _init_repo(tmp_path)
+    (tmp_path / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(tmp_path, "add module")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "mod.py").unlink()
+    (tmp_path / "kept.py").write_text("VALUE = 2\n", encoding="utf-8")
+    _commit_all(tmp_path, "delete mod.py, add kept.py")
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert set(metadata["relevant_paths"]) == {"mod.py", "kept.py"}
+
+    seen_targets: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        seen_targets.extend(arg for arg in args if arg.endswith(".py"))
+        return 0, "[]", ""
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    checks = verify.fast_checks(tmp_path, metadata)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    assert ruff["applicable"] is True
+    assert ruff["status"] == "PASS"
+    # VFY-RUFF-001 folds `ruff check` and `ruff format --check` into one
+    # check, so the surviving target list reaches Ruff twice - once per
+    # sub-measurement - and "mod.py" must be absent from both.
+    assert seen_targets == ["kept.py", "kept.py"]
+
+
+def test_fast_checks_still_fails_a_real_violation_beside_a_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Filtering a deleted path out of Ruff's target list must not weaken a
+    genuine violation reported for a file that still exists."""
+    _init_repo(tmp_path)
+    (tmp_path / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(tmp_path, "add module")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "mod.py").unlink()
+    (tmp_path / "bad.py").write_text("import os\n", encoding="utf-8")
+    _commit_all(tmp_path, "delete mod.py, add bad.py")
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert set(metadata["relevant_paths"]) == {"mod.py", "bad.py"}
+    violation = [
+        {
+            "cell": None,
+            "code": "F401",
+            "end_location": {"column": 1, "row": 1},
+            "filename": str(tmp_path / "bad.py"),
+            "fix": None,
+            "location": {"column": 1, "row": 1},
+            "message": "`os` imported but unused",
+            "noqa_row": 1,
+            "severity": "error",
+            "url": "https://docs.astral.sh/ruff/rules/unused-import",
+        }
+    ]
+    monkeypatch.setattr(
+        verify, "_run", lambda *_a, **_k: (1, json.dumps(violation), "")
+    )
+    checks = verify.fast_checks(tmp_path, metadata)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    assert ruff["status"] == "FAIL"
+
+
+def test_hash_paths_includes_mode_and_symlink_identity(tmp_path: Path) -> None:
+    """Executable bits and link targets participate in freshness evidence."""
+    script = tmp_path / "mode.sh"
+    script.write_text("exit 0\n", encoding="utf-8")
+    script.chmod(0o644)
+    before_mode = verify.hash_paths(tmp_path, ["mode.sh"])
+    script.chmod(0o755)
+    assert verify.hash_paths(tmp_path, ["mode.sh"]) != before_mode
+
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.write_text("same\n", encoding="utf-8")
+    second.write_text("same\n", encoding="utf-8")
+    link = tmp_path / "current"
+    link.symlink_to("first")
+    before_link = verify.hash_paths(tmp_path, ["current"])
+    link.unlink()
+    link.symlink_to("second")
+    assert verify.hash_paths(tmp_path, ["current"]) != before_link
+
+
+def test_generation_check_detects_drift(tmp_path: Path) -> None:
+    """Source/generated verifier byte drift is a failing ownership check."""
+    source = tmp_path / "shared/scripts/verify.py"
+    generated = tmp_path / ".claude/scripts/verify.py"
+    source.parent.mkdir(parents=True)
+    generated.parent.mkdir(parents=True)
+    source.write_text("source\n", encoding="utf-8")
+    generated.write_text("generated\n", encoding="utf-8")
+    assert verify.generation_check(tmp_path)["status"] == "FAIL"
+
+
+def test_generation_check_requires_generated_verifier(tmp_path: Path) -> None:
+    """A missing generated verifier file remains unverified."""
+    source = tmp_path / "shared/scripts/verify.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("same\n", encoding="utf-8")
+    assert verify.generation_check(tmp_path)["status"] == "UNVERIFIED"
+
+
+# --- OpenWiki managed-state backstop (Phase G, Step G2) ---
+
+
+def test_openwiki_managed_state_violations_empty_on_a_clean_tree(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+@pytest.mark.parametrize("adapter", ["AGENTS.md", "CLAUDE.md"])
+def test_openwiki_managed_state_violations_flags_a_live_managed_block(
+    tmp_path: Path, adapter: str
+) -> None:
+    (tmp_path / adapter).write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(v.startswith(f"{adapter} still carries") for v in violations)
+
+
+def test_openwiki_managed_state_violations_flags_an_untracked_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith(".github/workflows/openwiki-update.yml is untracked")
+        for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_flags_a_staged_new_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith(".github/workflows/openwiki-update.yml is staged as a new file")
+        for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_accepts_a_tracked_unchanged_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_openwiki_managed_state_violations_accepts_a_staged_modification_to_a_tracked_workflow_file(
+    tmp_path: Path,
+) -> None:
+    """A staged edit to an already-tracked workflow file is not "staged as
+    new" - only a brand-new file staged for the first time is."""
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+    workflow.write_text("name: openwiki\non: [push]\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_openwiki_managed_state_violations_flags_a_tracked_run_json(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith("openwiki/.run.json is tracked or staged") for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_accepts_an_untracked_run_json(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_generation_check_fails_on_a_live_managed_block(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert "AGENTS.md" in str(result["summary"])
+
+
+def test_generation_check_fails_on_an_untracked_openwiki_workflow(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert ".github/workflows/openwiki-update.yml" in str(result["summary"])
+
+
+def test_generation_check_fails_on_a_tracked_run_json(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert "openwiki/.run.json" in str(result["summary"])
+
+
+def test_gate_flags_a_live_managed_block_under_exact(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any("openwiki-managed-state: AGENTS.md" in error for error in errors)
+
+
+def test_gate_message_for_a_live_managed_block_says_the_user_runs_the_restore(
+    tmp_path: Path,
+) -> None:
+    """An agent cannot run the restore: the guard denies a command that names a
+    hook script. The message names the exact command, says the user runs it in
+    their own shell, and says why, on one line."""
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    (message,) = [e for e in errors if "openwiki-managed-state: AGENTS.md" in e]
+    assert "\n" not in message
+    assert "still carries an OpenWiki managed block" in message
+    assert "bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null" in message
+    assert "in their own shell" in message
+    assert "the guard denies an agent command that names a hook script" in message
+
+
+def test_gate_does_not_flag_a_managed_block_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_an_untracked_workflow_file_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: .github/workflows/openwiki-update.yml is untracked"
+        in error
+        for error in errors
+    )
+
+
+def test_gate_does_not_flag_an_untracked_workflow_file_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_a_staged_new_workflow_file_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: .github/workflows/openwiki-update.yml is staged "
+        "as a new file" in error
+        for error in errors
+    )
+
+
+def test_gate_accepts_a_tracked_unchanged_workflow_file(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+    _write_gate_phase_plan(tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_a_tracked_run_json_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: openwiki/.run.json is tracked or staged" in error
+        for error in errors
+    )
+
+
+def test_gate_does_not_flag_a_tracked_run_json_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_accepts_an_untracked_run_json(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_canonical_serialization_is_stable() -> None:
+    """Receipt output has stable object-key ordering for machine consumers."""
+    assert verify.canonical_json({"b": 1, "a": 2}) == '{"a":2,"b":1}'
+
+
+@pytest.mark.parametrize(
+    ("runner", "result", "status"),
+    (
+        (verify._ruff_measurement, (1, "", ""), "UNVERIFIED"),
+        (verify._ruff_measurement, (1, "{", ""), "UNVERIFIED"),
+        (verify._ruff_measurement, (1, "[]", ""), "UNVERIFIED"),
+        (verify._mypy_measurement, (2, "", "internal error"), "UNVERIFIED"),
+    ),
+    ids=(
+        "quality-ruff-empty",
+        "quality-ruff-malformed",
+        "quality-ruff-empty-failure",
+        "quality-mypy-abnormal",
+    ),
+)
+def test_measurement_does_not_report_failed_measurement_clean(
+    monkeypatch: pytest.MonkeyPatch,
+    runner: object,
+    result: tuple[int, str, str],
+    status: str,
+) -> None:
+    """Fail-open tool exits never resolve to a clean measurement state."""
+    monkeypatch.setattr(verify, "_run", lambda *_args, **_kwargs: result)
+    measured_status, _detail = runner("shared")  # type: ignore[operator]
+    assert measured_status == status
+
+
+def _spawn_failure(tool: str) -> tuple[int, str, str]:
+    """Return the real `uv run <tool>` result when `uv` is present but
+    `tool` is not: a non-zero exit with a "Failed to spawn" stderr, never
+    a raised exception."""
+    return (
+        2,
+        "",
+        f"error: Failed to spawn: `{tool}`\n"
+        "  Caused by: No such file or directory (os error 2)",
+    )
+
+
+@pytest.mark.parametrize(
+    ("runner", "kwargs", "tool_name", "fake_run"),
+    (
+        (
+            verify._ruff_measurement,
+            {},
+            "Ruff",
+            lambda *_a, **_k: _spawn_failure("ruff"),
+        ),
+        (
+            verify._ruff_format_measurement,
+            {},
+            "Ruff",
+            lambda *_a, **_k: _spawn_failure("ruff"),
+        ),
+        (
+            verify._mypy_measurement,
+            {},
+            "mypy",
+            lambda *_a, **_k: _spawn_failure("mypy"),
+        ),
+        (
+            verify._pytest_measurement,
+            {"cwd": "."},
+            "pytest",
+            lambda *_a, **_k: _spawn_failure("pytest"),
+        ),
+        (
+            verify._mypy_measurement,
+            {},
+            "mypy",
+            lambda *_a, **_k: (_ for _ in ()).throw(FileNotFoundError("uv")),
+        ),
+    ),
+    ids=(
+        "ruff-check-spawn-failure",
+        "ruff-format-spawn-failure",
+        "mypy-spawn-failure",
+        "pytest-spawn-failure",
+        "uv-itself-missing",
+    ),
+)
+def test_missing_executable_names_the_dev_dependency_fix(
+    monkeypatch: pytest.MonkeyPatch,
+    runner: object,
+    kwargs: dict[str, str],
+    tool_name: str,
+    fake_run: object,
+) -> None:
+    """Both the real failure mode - `uv run <tool>` failing to spawn an
+    uninstalled `tool` while `uv` itself is present - and `uv` itself being
+    absent (`FileNotFoundError`) get an install fix, not a raw, unhelpful
+    exit code or OSError string."""
+    monkeypatch.setattr(verify, "_run", fake_run)
+    if kwargs:
+        status, detail = runner(**kwargs)  # type: ignore[operator]
+    else:
+        status, detail = runner(["shared"])  # type: ignore[operator]
+    assert status == "UNVERIFIED"
+    assert "uv add --dev ruff mypy pytest" in detail
+    assert f"{tool_name} is not installed in the project environment" in detail
+
+
+def test_generic_os_error_keeps_the_raw_error_text_not_the_install_fix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An OSError that is not a missing executable stays diagnosable as the
+    real underlying error, instead of being mistaken for an absent tool."""
+
+    def fail(*_args: object, **_kwargs: object) -> tuple[int, str, str]:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(verify, "_run", fail)
+    status, detail = verify._mypy_measurement(["shared"])
+    assert status == "UNVERIFIED"
+    assert "disk full" in detail
+    assert "uv add --dev" not in detail
+
+
+def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Consumer linting adds the runtime exclusion without bypassing Ruff config.
+
+    `--config extend-exclude=[...]`, not the bare `--extend-exclude` flag:
+    `ruff check` accepts `--extend-exclude` but `ruff format` rejects it, so
+    both sub-measurements share the `--config` form (see
+    `_ruff_exclude_config_args`) instead of each growing its own flag
+    construction that can silently diverge.
+    """
+    captured: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        captured.extend(args)
+        assert cwd == "consumer"
+        return 0, "[]", ""
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    status, _detail = verify._ruff_measurement(
+        ["."], cwd="consumer", extend_exclude=[".claude"]
+    )
+
+    assert status == "PASS"
+    assert captured == [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        ".",
+        "--output-format=json",
+        "--config",
+        'extend-exclude=[".claude"]',
+    ]
+
+
+def test_consumer_ruff_format_scope_uses_the_same_config_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The format half builds its exclude args identically to the lint half."""
+    captured: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        captured.extend(args)
+        assert cwd == "consumer"
+        return 0, "1 file already formatted\n", ""
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    status, _detail = verify._ruff_format_measurement(
+        ["."], cwd="consumer", extend_exclude=[".claude"]
+    )
+
+    assert status == "PASS"
+    assert captured == [
+        "uv",
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        ".",
+        "--config",
+        'extend-exclude=[".claude"]',
+    ]
+    assert "--extend-exclude" not in captured
+
+
+def test_ruff_exclude_config_args_reports_an_unsafe_pattern_instead_of_dropping_it() -> (
+    None
+):
+    """A pattern that cannot round-trip through valid UTF-8 text (an
+    unpaired surrogate) is reported rather than silently dropped."""
+    args, error = verify._ruff_exclude_config_args(["\udc80"])
+    assert args == []
+    assert error == "Ruff exclude pattern cannot be safely represented in TOML"
+
+
+def test_ruff_exclude_config_args_escapes_a_quote_in_the_pattern() -> None:
+    """A pattern containing a double quote produces valid, escaped TOML."""
+    args, error = verify._ruff_exclude_config_args(['weird"name'])
+    assert error is None
+    assert args == ["--config", 'extend-exclude=["weird\\"name"]']
+
+
+def _write_consumer_project(root: Path) -> None:
+    """Write the minimum real files a consumer repo has for Ruff to run."""
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "example-consumer"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    (root / "pkg").mkdir()
+
+
+def test_measure_ruff_passes_against_real_ruff_with_excluded_dotclaude(
+    tmp_path: Path,
+) -> None:
+    """End-to-end against installed Ruff, no mocked `_run`.
+
+    A consumer-shaped repo with real, tracked-shaped content passes both
+    halves of VFY-RUFF-001 even though `.claude/` contains a file Ruff would
+    otherwise reformat and flag, proving the `--config` exclusion
+    construction genuinely works against real Ruff. Every prior
+    consumer-scope test either mocked `_run` (argument shape only) or
+    mocked `measure_ruff` itself (`phase_checks` wiring only), which is
+    exactly the gap that let a format-flag regression (`--extend-exclude`
+    on `ruff format`, which real Ruff rejects) survive 1230 green tests.
+    """
+    _write_consumer_project(tmp_path)
+    (tmp_path / "pkg" / "clean.py").write_text(
+        '"""Clean module."""\n\n\ndef greet() -> str:\n    return "hi"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "unformatted.py").write_text("x=1\n", encoding="utf-8")
+
+    result = verify.measure_ruff(tmp_path, ["."], extend_exclude=[".claude"])
+
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "PASS", result["summary"]
+
+
+def test_measure_ruff_still_fails_for_unformatted_file_outside_dotclaude(
+    tmp_path: Path,
+) -> None:
+    """The `.claude` exclusion is scoped, not a blanket pass.
+
+    An unformatted file outside `.claude/` still fails VFY-RUFF-001 against
+    real Ruff, in the same repo shape that would otherwise silently pass if
+    the exclusion construction were broken in the opposite direction (too
+    broad instead of not working at all).
+    """
+    _write_consumer_project(tmp_path)
+    (tmp_path / "pkg" / "unformatted.py").write_text("x=1\n", encoding="utf-8")
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "also_unformatted.py").write_text("y=2\n", encoding="utf-8")
+
+    result = verify.measure_ruff(tmp_path, ["."], extend_exclude=[".claude"])
+
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "FAIL"
+    assert "format" in result["summary"]
+
+
+@pytest.mark.parametrize(
+    ("filename", "contents"),
+    (
+        ("mypy.ini", "[mypy]\nfiles = src\n"),
+        (".mypy.ini", "[mypy]\npackages = example_consumer\n"),
+        ("pyproject.toml", '[tool.mypy]\nfiles = ["lib", "tests"]\n'),
+        ("setup.cfg", "[mypy]\nmodules = example_consumer.cli\n"),
+    ),
+    ids=("mypy-ini", "dot-mypy-ini", "pyproject", "setup-cfg"),
+)
+def test_consumer_mypy_scope_prefers_valid_native_configuration(
+    tmp_path: Path, filename: str, contents: str
+) -> None:
+    """Valid native Mypy syntax delegates scope to Mypy's own config parser."""
+    (tmp_path / filename).write_text(contents, encoding="utf-8")
+
+    assert verify.consumer_mypy_targets(tmp_path) == []
+
+
+def test_consumer_mypy_scope_respects_mypy_config_precedence(tmp_path: Path) -> None:
+    """A higher-precedence config without scope suppresses lower config targets."""
+    (tmp_path / "mypy.ini").write_text("[mypy]\nwarn_unused_configs = True\n")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nfiles = ["lib"]\n', encoding="utf-8"
+    )
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_skips_non_mypy_config_files(tmp_path: Path) -> None:
+    """Mypy discovery continues after a valid config that has no Mypy section."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "example-consumer"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "setup.cfg").write_text("[mypy]\nfiles = src\n", encoding="utf-8")
+
+    assert verify.consumer_mypy_targets(tmp_path) == []
+
+
+def test_consumer_mypy_scope_rejects_invalid_selected_config(tmp_path: Path) -> None:
+    """Malformed selected config cannot fall through to a lower-precedence file."""
+    (tmp_path / "mypy.ini").write_text("[mypy\nfiles = src\n")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nfiles = ["lib"]\n', encoding="utf-8"
+    )
+    (tmp_path / "src").mkdir()
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_does_not_parse_toml_text_as_config(tmp_path: Path) -> None:
+    """Valid TOML strings cannot masquerade as Mypy configuration sections."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.example]\nnote = "[tool.mypy] files = [\\"src\\"]"\n',
+        encoding="utf-8",
+    )
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_falls_back_only_to_src(tmp_path: Path) -> None:
+    """Without native Mypy targets, only the conventional source root is trusted."""
+    assert verify.consumer_mypy_targets(tmp_path) is None
+    (tmp_path / "src").mkdir()
+    assert verify.consumer_mypy_targets(tmp_path) == ["src"]
+
+
+def test_consumer_phase_checks_exclude_bootstrap_runtime_and_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Consumers use native project targets and never guess a Mypy scope."""
+    ruff_calls: list[tuple[list[str], list[str] | None]] = []
+    mypy_calls: list[list[str] | None] = []
+    pytest_calls: list[list[str] | None] = []
+
+    def fake_ruff(
+        _root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+    ) -> dict[str, object]:
+        ruff_calls.append((targets, extend_exclude))
+        return verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+
+    def fake_mypy(_root: Path, targets: list[str] | None) -> dict[str, object]:
+        mypy_calls.append(targets)
+        return verify.check("VFY-MYPY-001", "PASS", "mypy completed")
+
+    def fake_pytest(_root: Path, targets: list[str] | None = None) -> dict[str, object]:
+        pytest_calls.append(targets)
+        return verify.check("VFY-PYTEST-001", "PASS", "pytest completed")
+
+    monkeypatch.setattr(verify, "measure_ruff", fake_ruff)
+    monkeypatch.setattr(verify, "measure_mypy", fake_mypy)
+    monkeypatch.setattr(verify, "measure_pytest", fake_pytest)
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda _root: verify.check("VFY-GEN-001", "PASS", "installed"),
+    )
+    metadata = _metadata()
+    checks = verify.phase_checks(tmp_path, metadata)
+
+    assert ruff_calls == [(["."], [".claude"])]
+    assert mypy_calls == []
+    assert pytest_calls == [[]]
+    mypy_result = next(item for item in checks if item["id"] == "VFY-MYPY-001")
+    assert mypy_result == verify.check(
+        "VFY-MYPY-001",
+        "UNVERIFIED",
+        "mypy has no scope: add a src/ directory or set [tool.mypy] "
+        "files, packages, or modules in pyproject.toml",
+    )
+    assert "src/" in mypy_result["summary"]
+    assert "[tool.mypy]" in mypy_result["summary"]
+
+
+def test_bootstrap_phase_checks_keep_explicit_authoring_targets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The authoring checkout retains its existing fixed verification groups."""
+    ruff_calls: list[tuple[list[str], list[str] | None]] = []
+    mypy_calls: list[list[str] | None] = []
+    pytest_calls: list[list[str] | None] = []
+
+    def fake_ruff(
+        _root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+    ) -> dict[str, object]:
+        ruff_calls.append((targets, extend_exclude))
+        return verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+
+    def fake_mypy(_root: Path, targets: list[str] | None) -> dict[str, object]:
+        mypy_calls.append(targets)
+        return verify.check("VFY-MYPY-001", "PASS", "mypy completed")
+
+    def fake_pytest(_root: Path, targets: list[str] | None = None) -> dict[str, object]:
+        pytest_calls.append(targets)
+        return verify.check("VFY-PYTEST-001", "PASS", "pytest completed")
+
+    monkeypatch.setattr(verify, "measure_ruff", fake_ruff)
+    monkeypatch.setattr(verify, "measure_mypy", fake_mypy)
+    monkeypatch.setattr(verify, "measure_pytest", fake_pytest)
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda _root: verify.check("VFY-GEN-001", "PASS", "generated"),
+    )
+
+    verify.phase_checks(REPO_ROOT, _metadata())
+
+    assert ruff_calls == [(["shared", "scripts", "tests"], None)]
+    assert mypy_calls == [["shared", "scripts", "tests"]]
+    assert pytest_calls == [["tests/"]]
+
+
+def _write_inactive_phase_repo(
+    tmp_path: Path,
+    *,
+    slug: str = "sample-plan",
+    current_phase: str = "",
+    branch: str | None = None,
+    detach: bool = False,
+    big_plan_text: str | None = None,
+) -> None:
+    """Build one full repo with otherwise-valid nested control-plane
+    provenance, matching the plan's measured reproduction: only phase
+    resolution fails, nothing else. ``branch`` overrides the checked-out
+    branch name (default: the implementation branch for ``slug``);
+    ``detach`` checks out that branch's commit directly, detached."""
+    _write_root_adapter_pairs(tmp_path)
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / f"{slug}.md").write_text(
+        big_plan_text
+        if big_plan_text is not None
+        else (
+            "---\n"
+            f"name: {slug}\n"
+            "type: big-plan\n"
+            "status: complete\n"
+            f"current_phase: {current_phase}\n"
+            "phases:\n"
+            "  - phase-one\n"
+            "---\n\n# Big Plan\n"
+        ),
+        encoding="utf-8",
+    )
+    _init_repo(nested)
+    _commit_all(nested, "nested state")
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _git(["checkout", "-q", "-b", branch or f"{slug}_implementation"], tmp_path)
+    head = _commit_all(tmp_path, "outer state")
+    if detach:
+        _git(["checkout", "-q", head], tmp_path)
+
+
+def _skip_if_root() -> None:
+    """chmod 000 does not deny reads for root; skip cleanly rather than pass
+    for the wrong reason."""
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("chmod 000 does not deny root reads")
+
+
+@pytest.mark.parametrize("mode", ("fast", "phase", "closeout"))
+def test_inactive_phase_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mode: str,
+) -> None:
+    """A completed big plan with a blank current_phase must produce a clean
+    non-zero exit and a diagnostic naming the condition, never a traceback,
+    for every receipt-producing mode."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", mode, "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "malformed" in captured.err.lower()
+    assert "phase-one.md could not be read" in captured.err
+
+
+def test_malformed_active_phase_reports_distinct_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A current_phase naming a plan file that does not exist is a different
+    condition from no phase being active, and must say so distinctly."""
+    _write_inactive_phase_repo(
+        tmp_path, slug="sample-plan", current_phase="missing-phase"
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "phase", "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "malformed" in captured.err.lower()
+    assert "no active phase" not in captured.err.lower()
+
+
+def test_unresolved_phase_reason_distinguishes_cases(tmp_path: Path) -> None:
+    """No-active-phase and malformed-active-phase are reported distinctly,
+    and a resolved phase (or a non-implementation branch) is left alone."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+
+    # Not an implementation branch and the mode does not require a phase
+    # (fast): left alone.
+    assert (
+        verify.unresolved_phase_reason(tmp_path, "dev", "", requires_phase=False)
+        is None
+    )
+
+    # No big plan file is bound to this branch yet.
+    no_plan = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+    assert no_plan is not None
+    assert "no active phase" in no_plan
+
+    (plans / "sample-plan.md").write_text(
+        "---\nname: sample-plan\n---\n", encoding="utf-8"
+    )
+
+    # A big plan exists but current_phase is blank.
+    no_phase = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+    assert no_phase is not None
+    assert "no active phase" in no_phase
+
+    # current_phase names a phase with no matching plan file: malformed,
+    # not "no active phase" - a different diagnostic for a different cause.
+    malformed = verify.unresolved_phase_reason(
+        tmp_path, branch, "missing-phase", requires_phase=True
+    )
+    assert malformed is not None
+    assert "malformed" in malformed
+    assert "no active phase" not in malformed
+
+    # A resolvable phase leaves nothing to diagnose.
+    (plans / "phase-one.md").write_text("---\nname: phase-one\n---\n", encoding="utf-8")
+    assert (
+        verify.unresolved_phase_reason(
+            tmp_path, branch, "phase-one", requires_phase=True
+        )
+        is None
+    )
+
+
+def test_unresolved_phase_reason_names_last_completed_phase_for_refresh(
+    tmp_path: Path,
+) -> None:
+    """A terminal plan offers optional recovery for its final completed phase."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\n"
+        "status: complete\n"
+        "phases:\n"
+        "  - phase-one\n"
+        "  - phase-two\n"
+        "  - phase-cancelled\n"
+        "current_phase: \n"
+        "---\n",
+        encoding="utf-8",
+    )
+    for phase, status in (
+        ("phase-one", "complete"),
+        ("phase-two", "complete"),
+        ("phase-cancelled", "cancelled"),
+    ):
+        (plans / f"{phase}.md").write_text(
+            f"---\nstatus: {status}\n---\n", encoding="utf-8"
+        )
+
+    reason = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+
+    assert reason is not None
+    assert "big plan is complete" in reason
+    assert "--phase phase-two" in reason
+    assert "open the next small plan" not in reason
+
+
+@pytest.mark.parametrize(
+    ("phase_text", "expected"),
+    (
+        (None, "could not be read"),
+        ("not frontmatter\n", "is malformed"),
+        ("---\nstatus: unknown\n---\n", "has invalid status"),
+    ),
+)
+def test_complete_plan_recovery_validates_each_declared_phase(
+    tmp_path: Path, phase_text: str | None, expected: str
+) -> None:
+    """Complete-plan recovery never recommends a receipt from invalid phase state."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\nstatus: complete\nphases:\n  - phase-one\ncurrent_phase: \n---\n",
+        encoding="utf-8",
+    )
+    if phase_text is not None:
+        (plans / "phase-one.md").write_text(phase_text, encoding="utf-8")
+
+    reason = verify.unresolved_phase_reason(
+        tmp_path, "sample-plan_implementation", "", requires_phase=True
+    )
+
+    assert reason is not None
+    assert expected in reason
+    assert "receipt refresh" not in reason
+
+
+@pytest.mark.parametrize(
+    ("later_phase", "expected"),
+    (
+        (None, "phase-two.md could not be read"),
+        ("not frontmatter\n", "phase-two.md is malformed"),
+        ("---\nstatus: unknown\n---\n", "phase-two.md has invalid status"),
+        ("---\nstatus: in-progress\n---\n", "phase-two.md has nonterminal status"),
+        ("---\nstatus: paused\n---\n", "phase-two.md has nonterminal status"),
+    ),
+)
+def test_complete_plan_recovery_rejects_later_invalid_phase_before_refresh(
+    tmp_path: Path, later_phase: str | None, expected: str
+) -> None:
+    """Later declared phase faults outrank an earlier receipt recommendation."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\n"
+        "status: complete\n"
+        "phases:\n"
+        "  - phase-one\n"
+        "  - phase-two\n"
+        "current_phase: \n"
+        "---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\nstatus: complete\n---\n", encoding="utf-8"
+    )
+    if later_phase is not None:
+        (plans / "phase-two.md").write_text(later_phase, encoding="utf-8")
+
+    reason = verify.unresolved_phase_reason(
+        tmp_path, "sample-plan_implementation", "", requires_phase=True
+    )
+
+    assert reason is not None
+    assert expected in reason
+    assert "--phase phase-one" not in reason
+    assert "receipt refresh" not in reason
+
+
+def test_unresolved_phase_reason_requires_phase_off_implementation_branch(
+    tmp_path: Path,
+) -> None:
+    """phase/closeout need an active phase even off an implementation
+    branch (including detached HEAD, which git reports as branch 'HEAD');
+    fast does not."""
+    for branch in ("dev", "HEAD"):
+        reason = verify.unresolved_phase_reason(
+            tmp_path, branch, "", requires_phase=True
+        )
+        assert reason is not None
+        assert "no active phase" in reason
+        assert (
+            verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=False)
+            is None
+        )
+
+
+def test_unresolved_phase_reason_allows_explicit_phase_override(
+    tmp_path: Path,
+) -> None:
+    """An explicit --phase on a non-implementation branch is the supported
+    consumer-native path (no bootstrap plan machinery required) and must
+    not be diagnosed as an inactive phase."""
+    assert (
+        verify.unresolved_phase_reason(
+            tmp_path, "dev", "consumer-native-fixture", requires_phase=True
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("mode", ("phase", "closeout"))
+def test_phase_and_closeout_report_diagnostic_on_non_implementation_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mode: str,
+) -> None:
+    """phase/closeout must not crash on a branch that never named a plan
+    at all - they still require an active phase and must say so cleanly."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", branch="dev")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", mode, "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "no active phase" in captured.err.lower()
+
+
+def test_fast_is_unaffected_on_non_implementation_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """fast never required plan provenance and must keep working normally
+    off an implementation branch."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", branch="dev")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "fast", "--format", "text"])
+    exit_code = verify.main()
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert exit_code == 0
+
+
+def test_phase_reports_diagnostic_on_detached_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A detached HEAD (git reports branch 'HEAD') must not crash phase."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", detach=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "phase", "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "no active phase" in captured.err.lower()
+
+
+def test_unreadable_small_plan_reports_malformed_not_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A small-plan file that exists but cannot be read (permission drift,
+    UID mismatch) must be caught by an actual read attempt, not the
+    file-type check alone, and must not crash the run."""
+    _skip_if_root()
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="phase-one")
+    small_plan = tmp_path / ".claude" / "plans" / "phase-one.md"
+    small_plan.write_text("---\nname: phase-one\n---\n", encoding="utf-8")
+    small_plan.chmod(0o000)
+    try:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["verify.py", "fast", "--format", "text"])
+        exit_code = verify.main()
+        assert exit_code not in (0, None)
+        captured = capsys.readouterr()
+        assert "Traceback" not in captured.err
+        assert "malformed" in captured.err.lower()
+    finally:
+        small_plan.chmod(0o644)
+
+
+def test_unresolved_phase_reason_reports_unreadable_big_plan_distinctly(
+    tmp_path: Path,
+) -> None:
+    """An unreadable big plan is reported as malformed metadata, not as
+    'no active phase' - the plan may have a valid current_phase that we
+    simply could not read to confirm."""
+    _skip_if_root()
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    big_plan = plans / "sample-plan.md"
+    big_plan.write_text("---\nname: sample-plan\n---\n", encoding="utf-8")
+    big_plan.chmod(0o000)
+    try:
+        reason = verify.unresolved_phase_reason(
+            tmp_path, branch, "", requires_phase=True
+        )
+        assert reason is not None
+        assert "malformed" in reason
+        assert "complete or not yet started" not in reason
+    finally:
+        big_plan.chmod(0o644)
+
+
+def test_unresolved_phase_reason_reports_unparseable_frontmatter_distinctly(
+    tmp_path: Path,
+) -> None:
+    """A big plan with no parseable frontmatter block is reported as
+    malformed metadata, not conflated with a legitimately blank phase."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "not a frontmatter document at all\n", encoding="utf-8"
+    )
+    reason = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+    assert reason is not None
+    assert "malformed" in reason
+    assert "complete or not yet started" not in reason
+
+
+@pytest.mark.parametrize(
+    "unsafe_phase", ("../../etc/passwd", "has/a/slash", "-leading-dash")
+)
+def test_unresolved_phase_reason_diagnoses_unsafe_explicit_override(
+    tmp_path: Path, unsafe_phase: str
+) -> None:
+    """An unsafe explicit --phase on a non-implementation branch is
+    diagnosed as malformed, not treated as resolved: it is untested, not
+    resolved. A safe override on the same branch is unaffected."""
+    reason = verify.unresolved_phase_reason(
+        tmp_path, "dev", unsafe_phase, requires_phase=True
+    )
+    assert reason is not None
+    assert "malformed" in reason
+    assert (
+        verify.unresolved_phase_reason(
+            tmp_path, "dev", "consumer-native-fixture", requires_phase=True
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("mode", ("phase", "closeout"))
+def test_unsafe_phase_override_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mode: str,
+) -> None:
+    """An unsafe --phase on a non-implementation branch must not crash
+    phase/closeout with an unhandled ValueError from receipt validation."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", branch="dev")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify.py", mode, "--format", "text", "--phase", "../../etc/passwd"],
+    )
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "malformed" in captured.err.lower()
+
+
+def test_missing_documentation_na_reason_distinguishes_cases() -> None:
+    """The pre-check mirrors closeout_artifacts's own requirement exactly:
+    a reason is needed only when no documentation-only path changed and no
+    --documentation-na was given."""
+    no_docs: dict[str, object] = {"changed_paths": []}
+    assert verify.missing_documentation_na_reason(no_docs, "") is not None
+    assert verify.missing_documentation_na_reason(no_docs, "explained") is None
+    assert verify.missing_documentation_na_reason(no_docs, "   ") is not None
+
+    with_docs: dict[str, object] = {"changed_paths": ["docs/readme.md"]}
+    assert verify.missing_documentation_na_reason(with_docs, "") is None
+
+
+def test_closeout_missing_documentation_na_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """closeout without --documentation-na, when no documentation changed,
+    must report a clean diagnostic instead of crashing - this fires on a
+    fully valid active phase, unrelated to phase resolution."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="phase-one")
+    (tmp_path / ".claude" / "plans" / "phase-one.md").write_text(
+        "---\nname: phase-one\n---\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "closeout", "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "--documentation-na" in captured.err
+
+
+def test_closeout_artifacts_accepts_documentation_na_unchanged(
+    tmp_path: Path,
+) -> None:
+    """A correct --documentation-na reason still produces the same
+    artifact set as before: the fix only changed how the missing-reason
+    case is reported, never the requirement or the success path."""
+    phase = "phase-one"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / f"{phase}.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: big\n"
+        "phase_index: 1\nstatus: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    reports = tmp_path / ".claude" / "quality_reports"
+    reports.mkdir(parents=True)
+    (reports / f"verification-phase-{phase}.json").write_text("{}", encoding="utf-8")
+    (reports / f"findings-{phase}.json").write_text("{}", encoding="utf-8")
+    logs = tmp_path / ".claude" / "session_logs"
+    logs.mkdir(parents=True)
+    (logs / f"{phase}-closeout.md").write_text(
+        "**Status:** COMPLETED\n", encoding="utf-8"
+    )
+    metadata = _metadata()  # defaults to phase "phase-one", no changed paths
+    assert verify.missing_documentation_na_reason(metadata, "reason recorded") is None
+    artifacts = verify.closeout_artifacts(tmp_path, metadata, "reason recorded")
+    # Assert the whole artifact set, not just the documentation key: the
+    # docstring claims the success path is unchanged, so the other three
+    # bound artifacts have to be checked for that claim to mean anything.
+    assert set(artifacts) == {
+        "phase_receipt",
+        "findings",
+        "closeout_log",
+        "documentation",
+    }
+    assert artifacts["documentation"] == {
+        "status": "NOT_APPLICABLE",
+        "reason": "reason recorded",
+    }
+    for key, relative in (
+        ("phase_receipt", f".claude/quality_reports/verification-phase-{phase}.json"),
+        ("findings", f".claude/quality_reports/findings-{phase}.json"),
+        ("closeout_log", f".claude/session_logs/{phase}-closeout.md"),
+    ):
+        bound = artifacts[key]
+        assert isinstance(bound, dict)
+        assert bound["path"] == relative
+        assert re.fullmatch(r"[0-9a-f]{64}", str(bound["sha256"]))
+
+
+# Each closeout artifact for phase "phase-one": repository-relative path and
+# the step that creates it, exactly as the missing-evidence diagnostic names it.
+_CLOSEOUT_EVIDENCE = {
+    "phase-receipt": (
+        ".claude/quality_reports/verification-phase-phase-one.json",
+        "verify.py phase --format json --persist",
+    ),
+    "findings": (
+        ".claude/quality_reports/findings-phase-one.json",
+        "record_findings.py",
+    ),
+    "closeout-log": (
+        ".claude/session_logs/phase-one-closeout.md",
+        "closeout_session_log",
+    ),
+}
+
+
+def _write_closeout_evidence(tmp_path: Path, missing: str = "") -> None:
+    """Write phase-one's plan and closeout artifacts, leaving out ``missing``."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: big\n"
+        "phase_index: 1\nstatus: complete\n"
+        f"closeout_session_log: {_CLOSEOUT_EVIDENCE['closeout-log'][0]}\n---\n",
+        encoding="utf-8",
+    )
+    for key, (relative, _step) in _CLOSEOUT_EVIDENCE.items():
+        if key != missing:
+            artifact = tmp_path / relative
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text("{}\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("missing", tuple(_CLOSEOUT_EVIDENCE))
+def test_closeout_artifacts_names_missing_evidence_and_its_creating_step(
+    tmp_path: Path, missing: str
+) -> None:
+    """A missing artifact is reported by repository-relative path with the
+    step that creates it, not as an 'outside repository' rejection."""
+    _write_closeout_evidence(tmp_path, missing)
+    relative, step = _CLOSEOUT_EVIDENCE[missing]
+    with pytest.raises(ValueError, match="missing") as caught:
+        verify.closeout_artifacts(tmp_path, _metadata(), "reason recorded")
+    message = str(caught.value)
+    assert relative in message
+    assert step in message
+    assert "outside repository" not in message
+
+
+@pytest.mark.parametrize(
+    ("kind", "reason"),
+    (("symlink", "symlink"), ("directory", "regular file")),
+)
+def test_closeout_artifacts_rejection_says_which_reason(
+    tmp_path: Path, kind: str, reason: str
+) -> None:
+    """A symlinked or non-regular artifact stays rejected, and the message
+    names that reason instead of calling it missing or outside the repo."""
+    _write_closeout_evidence(tmp_path)
+    findings = tmp_path / _CLOSEOUT_EVIDENCE["findings"][0]
+    findings.unlink()
+    if kind == "symlink":
+        real = tmp_path / "real-findings.json"
+        real.write_text("{}\n", encoding="utf-8")
+        findings.symlink_to(real)
+    else:
+        findings.mkdir()
+    with pytest.raises(ValueError, match=reason) as caught:
+        verify.closeout_artifacts(tmp_path, _metadata(), "reason recorded")
+    assert "missing" not in str(caught.value)
+    assert "outside repository" not in str(caught.value)
+
+
+def test_closeout_missing_findings_report_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A valid phase with a documentation reason but no findings report
+    exits 2 with one line naming the report and record_findings.py, and
+    persists no closeout receipt."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="phase-one")
+    _write_closeout_evidence(tmp_path, missing="findings")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--documentation-na",
+            "no documentation change needed",
+        ],
+    )
+    exit_code = verify.main()
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Traceback" not in captured.err
+    assert ".claude/quality_reports/findings-phase-one.json" in captured.err
+    assert "record_findings.py" in captured.err
+    assert len(captured.err.strip().splitlines()) == 1
+    assert not verify.receipt_path(tmp_path, "closeout", "phase-one").exists()
+
+
+def _write_terminal_precondition_repo(
+    tmp_path: Path,
+    *,
+    slug: str = "sample-plan",
+    phase: str = "phase-one",
+    big_plan_status: str = "in-progress",
+    current_phase: str = "",
+    checkpoint: bool = False,
+    nested_repo: bool = True,
+    plain_nested_directory: bool = False,
+) -> None:
+    """Build a nested-state repo plus an outer ``<slug>_implementation`` repo
+    with one resolvable phase, matching the real closeout precondition shape.
+
+    ``checkpoint`` commits the big plan into nested Git before the outer
+    branch is created; leaving it ``False`` reproduces the measured Phase A
+    defect exactly - the big plan ticked complete during closeout is dirty
+    in nested Git at the moment a closeout receipt would be persisted, with
+    no intervening commit to have absorbed it. ``nested_repo=False`` omits
+    ``.claude`` entirely; ``plain_nested_directory=True`` builds it as a real
+    directory holding plan content but never runs ``git init`` in it, which is
+    the documented ``migrate-from-hf`` consumer shape.
+    """
+    resolved_current_phase = current_phase or phase
+    big_plan_text = (
+        "---\n"
+        f"name: {slug}\n"
+        "type: big-plan\n"
+        f"status: {big_plan_status}\n"
+        f"current_phase: {resolved_current_phase}\n"
+        "phases:\n"
+        f"  - {phase}\n"
+        "---\n\n# Big Plan\n"
+    )
+    small_plan_status = "complete" if big_plan_status == "complete" else "in-progress"
+    small_plan_text = (
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        f"parent_plan: {slug}\n"
+        "phase_index: 1\n"
+        f"status: {small_plan_status}\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n"
+    )
+    if plain_nested_directory:
+        # ".claude" has real content but no ".git" of its own. This is the
+        # shape that must skip the precondition: `git -C <repo>/.claude
+        # rev-parse HEAD` walks up and resolves the *outer* HEAD here, so a
+        # check built on `nested_git_head` truthiness would refuse every
+        # closeout for this consumer.
+        _write_root_adapter_pairs(tmp_path)
+        nested = tmp_path / ".claude"
+        plans = nested / "plans"
+        for directory in (plans, nested / "quality_reports", nested / "session_logs"):
+            directory.mkdir(parents=True, exist_ok=True)
+        (plans / f"{phase}.md").write_text(small_plan_text, encoding="utf-8")
+        (plans / f"{slug}.md").write_text(big_plan_text, encoding="utf-8")
+        (nested / "session_logs" / f"{phase}-closeout.md").write_bytes(
+            b"**Status:** COMPLETED\n"
+        )
+    elif nested_repo:
+        _write_root_adapter_pairs(tmp_path)
+        nested = tmp_path / ".claude"
+        plans = nested / "plans"
+        reports = nested / "quality_reports"
+        logs = nested / "session_logs"
+        for directory in (plans, reports, logs):
+            directory.mkdir(parents=True, exist_ok=True)
+        (plans / f"{phase}.md").write_text(small_plan_text, encoding="utf-8")
+        (reports / f"verification-phase-{phase}.json").write_bytes(
+            f"phase-receipt-for-{phase}\n".encode()
+        )
+        (reports / f"findings-{phase}.json").write_bytes(
+            json.dumps(
+                {"findings": [], "counts": {"critical": 0, "major": 0, "minor": 0}}
+            ).encode()
+        )
+        (logs / f"{phase}-closeout.md").write_bytes(b"**Status:** COMPLETED\n")
+        _init_repo(nested)
+        if checkpoint:
+            (plans / f"{slug}.md").write_text(big_plan_text, encoding="utf-8")
+            _commit_all(nested, "nested state")
+        else:
+            _commit_all(nested, "nested state before the big plan exists")
+            (plans / f"{slug}.md").write_text(big_plan_text, encoding="utf-8")
+    # When nested_repo is False, ".claude" is left entirely absent. The
+    # walk-up hazard that shape sidesteps is covered directly by
+    # plain_nested_directory above.
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _git(["checkout", "-q", "-b", f"{slug}_implementation"], tmp_path)
+    _commit_all(tmp_path, "outer state")
+    # A base "dev" ref lets state_metadata resolve a real merge_base_sha,
+    # which build_receipt requires to be non-empty for phase/closeout mode.
+    _git(["branch", "dev"], tmp_path)
+
+
+def test_unpublishable_closeout_reason_flags_dirty_big_plan(tmp_path: Path) -> None:
+    """A big plan not yet retrievable from nested HEAD is refused, matching
+    the measured Phase A shape exactly: no nested commit absorbed the
+    ticked-complete plan before the closeout receipt was to be persisted."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=False)
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    reason = verify.unpublishable_closeout_reason(tmp_path, metadata)
+    assert reason is not None
+    assert "git -C .claude add -A" in reason
+    assert "state-sync.sh checkpoint" in reason
+
+
+def test_unpublishable_closeout_reason_allows_checkpointed_big_plan(
+    tmp_path: Path,
+) -> None:
+    """Committing the big plan into nested Git before persisting makes the
+    recorded digest retrievable, so the precondition is satisfied."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=True)
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_unpublishable_closeout_reason_skips_without_nested_repository(
+    tmp_path: Path,
+) -> None:
+    """A consumer with no nested state repository keeps working unchanged:
+    the precondition only applies when nested provenance is available."""
+    _write_terminal_precondition_repo(tmp_path, nested_repo=False)
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_unpublishable_closeout_reason_skips_for_plain_nested_directory(
+    tmp_path: Path,
+) -> None:
+    """A consumer whose ``.claude`` holds content but is not its own Git
+    repository must keep working unchanged.
+
+    ``nested_git_head`` never walks up to the outer repository's HEAD: it
+    reports absence for this shape, matching ``nested_state_repository``, so
+    a precondition gated on ``nested_state_repository`` (not on
+    ``nested_git_head`` truthiness) skips instead of refusing every closeout
+    on this branch and forcing an unrequested nested-repository migration.
+    """
+    _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
+    assert (tmp_path / ".claude").is_dir()
+    assert not (tmp_path / ".claude" / ".git").exists()
+    assert verify.nested_git_head(tmp_path) == ""
+    assert verify.nested_state_repository(tmp_path) is False
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_nested_readers_report_absence_for_plain_nested_directory(
+    tmp_path: Path,
+) -> None:
+    """Each of the five nested-state readers must report absence -- never
+    outer repository content -- when ``.claude`` is a plain directory, even
+    though an outer top-level file at the identical relative path exists and
+    would satisfy a walk-up: ``git show :plans/sample-plan.md`` and
+    ``git status --porcelain`` both resolve paths from the repository root,
+    not from the nested working directory, when Git walks up."""
+    _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
+    outer_plans = tmp_path / "plans"
+    outer_plans.mkdir(parents=True, exist_ok=True)
+    (outer_plans / "sample-plan.md").write_text(
+        "---\nname: outer-mirror\ntype: big-plan\nstatus: complete\n---\n"
+        "# Outer plan, not the nested one\n",
+        encoding="utf-8",
+    )
+    outer_head = _commit_all(tmp_path, "outer top-level plan mirror")
+
+    active_paths = frozenset({"plans/sample-plan.md"})
+    assert verify.nested_git_head(tmp_path) == ""
+    assert verify.nested_tracked_state_fingerprint(tmp_path, active_paths) == ""
+    assert verify.indexed_nested_file(tmp_path, "plans/sample-plan.md") is None
+    assert (
+        verify.nested_revision_file(tmp_path, outer_head, "plans/sample-plan.md")
+        is None
+    )
+    assert verify.relevant_nested_status_changes(tmp_path, active_paths) is None
+
+    metadata = {
+        "branch": "sample-plan_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "sample-plan_implementation", "phase-one"
+        ),
+    }
+    assert verify.has_control_plane_provenance(metadata) is False
+
+
+def test_main_reports_missing_nested_repository_plainly(tmp_path: Path) -> None:
+    """``.claude`` present but not its own Git repository must exit 2 with
+    one plain diagnostic on stderr, never the uncaught ``ValueError`` that
+    ``validate_receipt`` used to raise for a missing nested repository."""
+    _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "shared" / "scripts" / "verify.py"),
+            "fast",
+            "--format",
+            "text",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "not its own Git repository" in result.stderr
+    assert "git -C .claude add -A" in result.stderr
+    assert "state-sync.sh checkpoint" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_unpublishable_closeout_reason_allows_repersist_after_terminal_transition(
+    tmp_path: Path,
+) -> None:
+    """A re-persist after the terminal transition needs no special case: once
+    the completed big plan's bytes are checkpointed, the working tree,
+    index, and nested HEAD blob all agree."""
+    _write_terminal_precondition_repo(
+        tmp_path, big_plan_status="complete", current_phase="", checkpoint=True
+    )
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_closeout_persist_refuses_while_big_plan_is_dirty_in_nested_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The full CLI path: closeout --persist must refuse and write nothing
+    while the big plan is dirty in nested state."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+    exit_code = verify.main()
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "git -C .claude add -A" in captured.err
+    assert "state-sync.sh checkpoint" in captured.err
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert not receipt_path.exists()
+
+
+def test_closeout_persist_succeeds_once_nested_state_is_checkpointed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The full CLI path: closeout --persist must succeed once nested state
+    is checkpointed, and must actually write the receipt."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+    exit_code = verify.main()
+    assert exit_code != 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert receipt_path.is_file()
+
+
+def _write_closeout_ready_repo(tmp_path: Path, *, phase: str = "phase-one") -> None:
+    """Build the smallest fully-provisioned repo where closeout/phase mode
+    can reach the persist block with genuinely valid control-plane
+    provenance (``build_receipt`` rejects a receipt without it,
+    unconditionally): nested Git state plus the root-adapter ownership
+    manifest real metadata capture needs, and one resolvable, complete
+    phase plan with its receipt/log artifacts. Stays on the repo's default
+    branch, deliberately not ``<slug>_implementation``, so the big-plan
+    precondition and terminal predicates never engage - this isolates the
+    persist-guard and recovery-message behavior under test from the
+    separate nested-state precondition covered above."""
+    _write_root_adapter_pairs(tmp_path)
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    reports = nested / "quality_reports"
+    logs = nested / "session_logs"
+    for directory in (plans, reports, logs):
+        directory.mkdir(parents=True, exist_ok=True)
+    (plans / f"{phase}.md").write_text(
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        "parent_plan: sample-plan\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    (reports / f"verification-phase-{phase}.json").write_bytes(
+        f"phase-receipt-for-{phase}\n".encode()
+    )
+    (reports / f"findings-{phase}.json").write_bytes(
+        json.dumps(
+            {"findings": [], "counts": {"critical": 0, "major": 0, "minor": 0}}
+        ).encode()
+    )
+    (logs / f"{phase}-closeout.md").write_bytes(b"**Status:** COMPLETED\n")
+    _init_repo(nested)
+    _commit_all(nested, "nested state")
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial commit")
+    # A base "dev" ref lets state_metadata resolve a real merge_base_sha,
+    # which build_receipt requires to be non-empty for phase/closeout mode.
+    _git(["branch", "dev"], tmp_path)
+
+
+def test_unresolved_phase_reason_recovery_names_both_modes_in_order(
+    tmp_path: Path,
+) -> None:
+    """The complete-big-plan recovery message must name both recommended
+    commands, phase before closeout, since the closeout run heals the
+    binding the phase run invalidates."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\nstatus: complete\nphases:\n  - phase-two\ncurrent_phase: \n---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-two.md").write_text(
+        "---\nstatus: complete\n---\n", encoding="utf-8"
+    )
+    reason = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+    assert reason is not None
+    phase_index = reason.find("phase --persist --phase phase-two")
+    closeout_index = reason.find("closeout --persist --phase phase-two")
+    assert phase_index != -1
+    assert closeout_index != -1
+    assert phase_index < closeout_index
+    assert "the working tree" in reason
+
+
+def test_phase_then_closeout_refresh_heals_phase_receipt_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Following the corrected recovery sequence - phase --persist, then
+    closeout --persist - leaves no tampered phase_receipt binding, unlike
+    running phase --persist alone (the old, misleading recommendation)."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "measure_ruff",
+        lambda *a, **k: verify.check("VFY-RUFF-001", "PASS", "ok"),
+    )
+    monkeypatch.setattr(
+        verify,
+        "measure_mypy",
+        lambda *a, **k: verify.check("VFY-MYPY-001", "PASS", "ok"),
+    )
+    monkeypatch.setattr(
+        verify,
+        "measure_pytest",
+        lambda *a, **k: verify.check("VFY-PYTEST-001", "PASS", "ok"),
+    )
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda *a, **k: verify.check("VFY-GEN-001", "PASS", "ok"),
+    )
+
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    initial_checks = verify.closeout_checks(tmp_path, metadata)
+    initial_artifacts = verify.closeout_artifacts(tmp_path, metadata, "fixture reason")
+    initial_receipt = verify.build_receipt(
+        "closeout", initial_checks, metadata, initial_artifacts
+    )
+    closeout_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    closeout_path.parent.mkdir(parents=True, exist_ok=True)
+    closeout_path.write_text(
+        verify.canonical_json(initial_receipt) + "\n", encoding="utf-8"
+    )
+    original_reference = initial_receipt["artifacts"]["phase_receipt"]  # type: ignore[index]
+
+    # Running phase --persist alone (the old, misleading recommendation)
+    # rewrites the phase receipt file, tampering the existing closeout
+    # receipt's bound phase_receipt hash.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify.py", "phase", "--format", "text", "--persist", "--phase", "phase-one"],
+    )
+    verify.main()
+    tampered_errors, _ = verify.artifact_reference_errors(
+        tmp_path, "phase-one", "phase_receipt", original_reference
+    )
+    assert any("was tampered with" in error for error in tampered_errors)
+
+    # closeout --persist, run second as the corrected recommendation says,
+    # rebinds the closeout receipt to the now-refreshed phase receipt.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+    verify.main()
+    healed_receipt = verify.load_receipt(closeout_path)
+    healed_reference = healed_receipt["artifacts"]["phase_receipt"]  # type: ignore[index]
+    healed_errors, _ = verify.artifact_reference_errors(
+        tmp_path, "phase-one", "phase_receipt", healed_reference
+    )
+    assert healed_errors == []
+
+
+def _phase_check_list(status: str) -> list[dict[str, object]]:
+    """Build one schema-valid phase check list with every applicable check at
+    ``status``, matching phase mode's fixed applicability - only
+    VFY-RECEIPT-001 must stay NOT_APPLICABLE."""
+    return [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.check(check_id, status, "fixture")
+        for check_id in verify.CHECK_IDS
+    ]
+
+
+def _closeout_check_list(status: str) -> list[dict[str, object]]:
+    """Build one schema-valid closeout check list with every applicable
+    check at ``status`` (PASS or FAIL), matching closeout mode's fixed
+    applicability - VFY-RUFF/MYPY/PYTEST/GEN-001 must stay NOT_APPLICABLE."""
+    return [
+        verify.not_applicable(check_id, "closeout reuses phase evidence")
+        if check_id in {"VFY-RUFF-001", "VFY-MYPY-001", "VFY-PYTEST-001", "VFY-GEN-001"}
+        else verify.check(check_id, status, "fixture")
+        for check_id in verify.CHECK_IDS
+    ]
+
+
+def test_persist_guard_refuses_overwriting_passing_receipt_with_failing_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--persist must never replace a passing receipt with a failing one."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+
+    seed_metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    seed_artifacts = verify.closeout_artifacts(tmp_path, seed_metadata, "seed reason")
+    seed_receipt = verify.build_receipt(
+        "closeout", _closeout_check_list("PASS"), seed_metadata, seed_artifacts
+    )
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_bytes = (verify.canonical_json(seed_receipt) + "\n").encode("utf-8")
+    receipt_path.write_bytes(seed_bytes)
+
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("FAIL"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "already passed" in captured.err
+    assert receipt_path.read_bytes() == seed_bytes
+
+
+def test_persist_guard_protects_a_passing_phase_receipt_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The guard is documented as covering every mode, not only closeout."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+
+    seed_metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    seed_receipt = verify.build_receipt(
+        "phase", _phase_check_list("PASS"), seed_metadata, {}
+    )
+    receipt_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_bytes = (verify.canonical_json(seed_receipt) + "\n").encode("utf-8")
+    receipt_path.write_bytes(seed_bytes)
+
+    monkeypatch.setattr(
+        verify, "phase_checks", lambda *_args: _phase_check_list("FAIL")
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify.py", "phase", "--format", "text", "--persist", "--phase", "phase-one"],
+    )
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    assert "already passed" in capsys.readouterr().err
+    assert receipt_path.read_bytes() == seed_bytes
+
+
+def test_persist_guard_allows_failing_receipt_when_no_prior_passing_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--persist must still persist a failing receipt when no passing
+    receipt exists yet - the guard only protects an existing pass."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("FAIL"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+    exit_code = verify.main()
+
+    assert exit_code != 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert receipt_path.is_file()
+    persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert persisted["status"] == "FAIL"
+
+
+# --- Verification Evidence Contract: run_verification_items / gate ---
+
+
+def test_plan_verification_items_matches_the_lint_copy() -> None:
+    """The extractor is mirrored on purpose (see its own docstring); this
+    guards the two copies from drifting apart."""
+    import inspect
+
+    assert inspect.getsource(verify.plan_verification_items) == inspect.getsource(
+        lint.plan_verification_items
+    )
+
+
+def test_phase_a_plan_verification_block_has_five_passing_commands() -> None:
+    """The runner only ever reads the ``## Verification`` block itself; all
+    five of Phase A's real listed commands are ordinary and none of them is
+    the hedge, proving the lint - not the runner - is what would have
+    caught Phase A."""
+    source = (
+        REPO_ROOT
+        / ".claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md"
+    ).read_text(encoding="utf-8")
+    required, _optional = verify.plan_verification_items(source)
+    assert len(required) == 5
+    assert not any("devcontainer" in item for item in required)
+
+
+def test_plan_verification_items_joins_backslash_continuation_before_a_comment_line() -> (
+    None
+):
+    """A comment line right after a backslash continuation is joined into
+    the same logical command and then cut as a trailing comment, matching
+    real bash: the newline after the comment is real, so the next line is
+    still a separate item."""
+    text = "## Verification\n\n```bash\necho foo \\\n# a real comment\necho bar\n```\n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["echo foo", "echo bar"]
+
+
+def test_plan_verification_items_ignores_hash_inside_quotes_but_cuts_real_comment() -> (
+    None
+):
+    text = '## Verification\n\n```bash\ngit commit -m "Fix bug # 123" # note\n```\n'
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ['git commit -m "Fix bug # 123"']
+
+
+def test_plan_verification_items_accepts_tilde_fences_same_as_backtick_fences() -> None:
+    """Both fence styles were already symmetric in the extraction regex
+    (same alternation, backreferenced closing mark); this pins that as
+    intended behavior rather than an accident. Report to the canonical-text
+    owner (Step F2.1): the policy text should say both count, not
+    backtick-only."""
+    text = "## Verification\n\n~~~bash\ntrue\n~~~\n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["true"]
+
+
+def test_plan_verification_items_handles_crlf_line_endings() -> None:
+    text = "## Verification\r\n\r\n```bash\r\ntrue\r\necho hello\r\n```\r\n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["true", "echo hello"]
+
+
+def test_plan_verification_items_continues_past_an_h3_subheading() -> None:
+    """A ``### `` sub-heading does not match the ``^## `` section-boundary
+    lookahead, so items on either side of it still count as one section."""
+    text = (
+        "## Verification\n\n```bash\nfirst\n```\n\n"
+        "### Details\n\nSome prose.\n\n```bash\nsecond\n```\n"
+    )
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["first", "second"]
+
+
+def test_plan_verification_items_tolerates_trailing_spaces_on_fence_lines() -> None:
+    text = "## Verification\n\n```bash   \ntrue\n```   \n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["true"]
+
+
+def test_names_closeout_matches_the_lint_copy() -> None:
+    """``_names_closeout`` is duplicated for the same reason as
+    ``plan_verification_items``; guard it the same way."""
+    import inspect
+
+    assert inspect.getsource(verify._names_closeout) == inspect.getsource(
+        lint._names_closeout
+    )
+
+
+def test_shell_flatten_matches_the_lint_copy() -> None:
+    """``_shell_flatten`` is duplicated for the same reason as
+    ``plan_verification_items``; guard it the same way."""
+    import inspect
+
+    assert inspect.getsource(verify._shell_flatten) == inspect.getsource(
+        lint._shell_flatten
+    )
+
+
+def _write_runner_plan(tmp_path: Path, phase: str, verification_block: str) -> None:
+    """Write the smallest plan ``run_verification_items`` can read."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / f"{phase}.md").write_text(
+        f"---\nname: {phase}\ntype: small-plan\n---\n\n# Phase\n\n"
+        f"## Verification\n\n{verification_block}",
+        encoding="utf-8",
+    )
+
+
+def test_run_verification_items_all_pass_with_tail_and_positive_duration(
+    tmp_path: Path,
+) -> None:
+    _write_runner_plan(tmp_path, "phase-one", "```bash\ntrue\necho hello\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert [result["item"] for result in results] == ["true", "echo hello"]
+    assert all(result["status"] == "PASS" for result in results)
+    assert all(result["exit_code"] == 0 for result in results)
+    assert all(
+        isinstance(result["duration_seconds"], float) and result["duration_seconds"] > 0
+        for result in results
+    )
+    assert results[1]["output_tail"] == "hello"
+
+
+def test_run_verification_items_stops_at_first_failure(tmp_path: Path) -> None:
+    _write_runner_plan(tmp_path, "phase-one", "```bash\nexit 3\ntrue\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["exit_code"] == 3
+    assert results[1] == {
+        "item": "true",
+        "status": "NOT RUN",
+        "exit_code": None,
+        "duration_seconds": 0.0,
+        "output_tail": "",
+    }
+
+
+def test_run_verification_items_times_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(verify, "VERIFICATION_ITEM_TIMEOUT_SECONDS", 1)
+    _write_runner_plan(tmp_path, "phase-one", "```bash\nsleep 2\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "TIMEOUT"
+    assert results[0]["exit_code"] is None
+
+
+@pytest.mark.parametrize(
+    "closeout_item",
+    [
+        "uv run python .claude/scripts/verify.py closeout --format json",
+        'uv run python .claude/scripts/verify.py "closeout" --format json',
+        'uv run python .claude/scripts/verify.py clos""eout --format json',
+        "uv run python .claude/scripts/verify.py --format json closeout",
+        r"uv run python .claude/scripts/verify.py clos\eout --format json",
+    ],
+    ids=(
+        "plain",
+        "quoted",
+        "split-quotes",
+        "mode-after-options",
+        "backslash-broken",
+    ),
+)
+def test_run_verification_items_refuses_closeout_unexecuted(
+    tmp_path: Path, closeout_item: str
+) -> None:
+    _write_runner_plan(tmp_path, "phase-one", f"```bash\n{closeout_item}\ntrue\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["output_tail"] == "closeout may not list itself"
+    assert results[0]["exit_code"] is None
+    assert results[0]["duration_seconds"] == 0.0
+    assert results[1]["status"] == "NOT RUN"
+
+
+def test_run_verification_items_item_write_changes_tree_sha(tmp_path: Path) -> None:
+    """Proves why the runner must precede metadata collection: an item's own
+    file write changes what ``state_metadata`` later observes."""
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial commit")
+    _git(["branch", "dev"], tmp_path)
+    before = verify.state_metadata(tmp_path, "dev", "")["tree_sha"]
+    _write_runner_plan(
+        tmp_path,
+        "phase-one",
+        "```bash\necho hi > touched.txt && git add touched.txt\n```\n",
+    )
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "PASS"
+    after = verify.state_metadata(tmp_path, "dev", "")["tree_sha"]
+    assert before != after
+
+
+def test_run_verification_items_output_tail_truncates_to_twenty_lines(
+    tmp_path: Path,
+) -> None:
+    _write_runner_plan(
+        tmp_path,
+        "phase-one",
+        '```bash\npython3 -c "[print(i) for i in range(40)]"\n```\n',
+    )
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    tail = results[0]["output_tail"]
+    assert isinstance(tail, str)
+    lines = tail.splitlines()
+    assert len(lines) == 20
+    assert lines[0] == "20"
+    assert lines[-1] == "39"
+
+
+def test_run_verification_items_output_tail_caps_at_2000_characters(
+    tmp_path: Path,
+) -> None:
+    _write_runner_plan(
+        tmp_path, "phase-one", "```bash\npython3 -c \"print('x' * 5000)\"\n```\n"
+    )
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    tail = results[0]["output_tail"]
+    assert isinstance(tail, str)
+    assert len(tail) == 2000
+
+
+def test_run_verification_items_empty_block_yields_empty_list(tmp_path: Path) -> None:
+    _write_runner_plan(tmp_path, "phase-one", "")
+
+    assert verify.run_verification_items(tmp_path, "phase-one") == []
+
+
+def test_closeout_persists_empty_results_for_an_empty_verification_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A plan with no ``## Verification`` block (the default fixture shape)
+    yields an empty results list and a passing closeout."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("PASS"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "json",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 0
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert persisted["extensions"]["verification_items"] == []
+
+
+def test_closeout_persist_writes_no_receipt_when_a_required_item_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8")
+        + "\n## Verification\n\n```bash\nexit 3\ntrue\n```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert not receipt_path.exists()
+    captured = capsys.readouterr()
+    assert "FAIL" in captured.err
+    assert "NOT RUN" in captured.err
+
+
+def test_closeout_persist_leaves_existing_passing_receipt_unchanged_on_item_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8")
+        + "\n## Verification\n\n```bash\nexit 1\n```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_bytes = (json.dumps(_closeout_receipt()) + "\n").encode("utf-8")
+    receipt_path.write_bytes(seed_bytes)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    assert receipt_path.read_bytes() == seed_bytes
+
+
+def test_closeout_persist_binds_tree_sha_after_a_passing_items_file_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A required item's own tracked-file write lands inside the tree_sha
+    the persisted closeout receipt binds, proving the runner precedes
+    metadata collection end to end through ``main()``, not just at the
+    ``run_verification_items`` unit level."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8") + "\n## Verification\n\n"
+        "```bash\necho hi > touched.txt && git add touched.txt\n```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("PASS"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "json",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 0
+    assert (tmp_path / "touched.txt").is_file()
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert persisted["metadata"]["tree_sha"] == _git(["write-tree"], tmp_path)
+
+
+def test_closeout_refuses_a_quoted_closeout_self_reference_at_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8") + "\n## Verification\n\n"
+        '```bash\nuv run python .claude/scripts/verify.py "closeout" --format json\n```\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert not receipt_path.exists()
+    assert "closeout may not list itself" in capsys.readouterr().err
+
+
+def _write_gate_phase_plan(
+    tmp_path: Path,
+    *,
+    verification_block: str = "```bash\ntrue\n```\n",
+    optional_block: str = "",
+    log_verification_section: str = "",
+) -> None:
+    """Write the ``phase-one`` plan (matching ``_metadata``/
+    ``_closeout_receipt``'s phase) with a ``## Verification`` block plus its
+    closeout log, for ``verification_items_errors``/gate testing."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    optional_section = (
+        f"\n## Optional Verification\n\n{optional_block}\n" if optional_block else ""
+    )
+    (plans / "phase-one.md").write_text(
+        "---\n"
+        "name: phase-one\n"
+        "type: small-plan\n"
+        "parent_plan: big\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one-closeout.md\n"
+        "---\n\n# Phase\n\n"
+        f"## Verification\n\n{verification_block}"
+        f"{optional_section}",
+        encoding="utf-8",
+    )
+    log_path = tmp_path / ".claude" / "session_logs" / "phase-one-closeout.md"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+        "- [LEARN] none - no new lessons this session\n\n"
+        f"## Verification\n\n{log_verification_section}",
+        encoding="utf-8",
+    )
+
+
+def _run_gate(
+    tmp_path: Path, receipt: dict[str, object], **overrides: object
+) -> list[str]:
+    closeout_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    closeout_path.parent.mkdir(parents=True, exist_ok=True)
+    closeout_path.write_text(json.dumps(receipt), encoding="utf-8")
+    kwargs: dict[str, object] = {
+        "branch": "verification-test",
+        "phase": "phase-one",
+        "head": "head",
+        "head_relation": "exact",
+        "require_major": False,
+        "require_ponytail": False,
+        "enforce_final_state": False,
+    }
+    kwargs.update(overrides)
+    return verify.gate_receipt_errors(tmp_path, **kwargs)  # type: ignore[arg-type]
+
+
+def _gate_errors_with_findings(
+    tmp_path: Path,
+    report: dict[str, object],
+    changed_paths: list[str],
+    **overrides: object,
+) -> list[str]:
+    """Run the gate over a closeout receipt whose findings artifact exists and
+    whose machine-produced ``changed_paths`` are the given paths."""
+    findings = tmp_path / ".claude/quality_reports/findings-phase-one.json"
+    findings.parent.mkdir(parents=True, exist_ok=True)
+    findings.write_text(json.dumps(report), encoding="utf-8")
+    receipt = _closeout_receipt()
+    receipt["metadata"]["changed_paths"] = changed_paths  # type: ignore[index]
+    receipt["artifacts"]["findings"] = {  # type: ignore[index]
+        "path": ".claude/quality_reports/findings-phase-one.json",
+        "sha256": hashlib.sha256(findings.read_bytes()).hexdigest(),
+    }
+    return _run_gate(tmp_path, receipt, **overrides)
+
+
+_CLEAN_V2 = {"schema_version": 2, "gate_result": "PASS", "open_requests": []}
+
+
+def _five_profile_report(**updates: object) -> dict[str, object]:
+    """A clean schema-2 report that ran all five high-risk review profiles."""
+    return _findings_report(
+        **{
+            **_CLEAN_V2,
+            "profiles_reviewed": sorted(_ALL_FIVE_PROFILES),
+            "ponytail_reviewed": True,
+            "ponytail_findings": 0,
+            **updates,
+        }
+    )
+
+
+def test_gate_blocks_a_test_file_diff_whose_report_lacks_the_tests_profile(
+    tmp_path: Path,
+) -> None:
+    """GR-002: a test-file diff needs `tests` in the reviewed profiles."""
+    errors = _gate_errors_with_findings(
+        tmp_path, _findings_report(**_CLEAN_V2), ["tests/test_x.py"]
+    )
+    assert any("missing required review profiles: tests" in e for e in errors)
+
+    reviewed = _findings_report(**_CLEAN_V2, profiles_reviewed=["code", "tests"])
+    accepted = _gate_errors_with_findings(tmp_path, reviewed, ["tests/test_x.py"])
+    assert not any("required review profiles" in e for e in accepted)
+
+
+def test_gate_requires_all_five_profiles_for_a_scripts_diff(tmp_path: Path) -> None:
+    """GR-002: a generator path needs the five high-risk profiles; the full
+    five-profile report passes the profile rule."""
+    errors = _gate_errors_with_findings(
+        tmp_path, _findings_report(**_CLEAN_V2), ["scripts/x.py"]
+    )
+    assert any(
+        "missing required review profiles: architecture, ponytail, security, tests" in e
+        for e in errors
+    )
+
+    accepted = _gate_errors_with_findings(
+        tmp_path, _five_profile_report(), ["scripts/x.py"]
+    )
+    assert not any("required review profiles" in e for e in accepted)
+
+
+def test_gate_requires_no_extra_profile_for_a_documentation_only_diff(
+    tmp_path: Path,
+) -> None:
+    """GR-002 negative control: a documentation-only first phase needs nothing."""
+    errors = _gate_errors_with_findings(
+        tmp_path, _findings_report(**_CLEAN_V2), ["docs/guide.md"]
+    )
+    assert not any("required review profiles" in e for e in errors)
+
+
+def test_gate_reports_profile_and_ponytail_requirements_in_one_error(
+    tmp_path: Path,
+) -> None:
+    """GR-002: the path rule joins the multi-file Ponytail rule, and every
+    missing profile is named in a single error."""
+    errors = _gate_errors_with_findings(
+        tmp_path,
+        _findings_report(**_CLEAN_V2),
+        ["tests/test_x.py"],
+        require_ponytail=True,
+    )
+    profile_errors = [e for e in errors if "required review profiles" in e]
+    assert len(profile_errors) == 1
+    assert "ponytail, tests" in profile_errors[0]
+    assert "requires a fresh Ponytail review" in profile_errors[0]
+
+
+@pytest.mark.parametrize("head_relation", ("ancestor", "certified"))
+def test_push_gates_apply_required_profiles_only_to_schema_2_reports(
+    tmp_path: Path, head_relation: str
+) -> None:
+    """GR-002: a pre-upgrade (schema 1) report is not re-judged at push; the
+    same profiles on a schema-2 report are."""
+    legacy = _findings_report()
+    legacy_errors = _gate_errors_with_findings(
+        tmp_path, legacy, ["scripts/x.py"], head_relation=head_relation
+    )
+    assert not any("required review profiles" in e for e in legacy_errors)
+
+    current = _findings_report(**_CLEAN_V2)
+    current_errors = _gate_errors_with_findings(
+        tmp_path, current, ["scripts/x.py"], head_relation=head_relation
+    )
+    assert any("required review profiles" in e for e in current_errors)
+
+
+def test_staged_documentation_change_after_closeout_makes_final_state_stale(
+    tmp_path: Path,
+) -> None:
+    """GR-004: ``tree_sha`` (git write-tree) binds the index, so a docs-only
+    change staged after the closeout receipt blocks the commit gate."""
+    _init_repo(tmp_path)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    head = _commit_all(tmp_path, "base")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "work.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(["add", "work.py"], tmp_path)
+    receipt = _closeout_receipt()
+    receipt["metadata"].update(  # type: ignore[attr-defined]
+        {"head_sha": head, "tree_sha": _git(["write-tree"], tmp_path)}
+    )
+    stale = "closeout receipt final tracked state is stale"
+
+    assert stale not in _run_gate(
+        tmp_path, receipt, head=head, enforce_final_state=True
+    )
+
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("late edit\n", encoding="utf-8")
+    _git(["add", "docs/guide.md"], tmp_path)
+
+    assert stale in _run_gate(tmp_path, receipt, head=head, enforce_final_state=True)
+
+
+def test_gate_g1_flags_a_receipt_with_no_verification_items(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any("G1 verification-results-missing" in error for error in errors)
+
+
+def test_gate_g2_flags_a_plan_item_added_after_the_receipt(tmp_path: Path) -> None:
+    _write_gate_phase_plan(
+        tmp_path, verification_block="```bash\ntrue\nuv run pytest tests/ -q\n```\n"
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any(
+        "G2 verification-item-unrun" in error and "uv run pytest tests/ -q" in error
+        for error in errors
+    )
+
+
+def test_gate_g3_flags_a_non_passing_result(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path, verification_block="```bash\ntrue\n```\n")
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "FAIL",
+                "exit_code": 1,
+                "duration_seconds": 0.1,
+                "output_tail": "boom",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any("G3 verification-item-failed" in error for error in errors)
+
+
+def test_gate_g4_flags_an_unaccounted_optional_item(tmp_path: Path) -> None:
+    _write_gate_phase_plan(
+        tmp_path,
+        verification_block="```bash\ntrue\n```\n",
+        optional_block="- run a manual smoke check\n",
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any("G4 optional-verification-unaccounted" in error for error in errors)
+
+
+def test_gate_g4_accepts_a_not_run_optional_item_with_a_reason(tmp_path: Path) -> None:
+    _write_gate_phase_plan(
+        tmp_path,
+        verification_block="```bash\ntrue\n```\n",
+        optional_block="- run a manual smoke check\n",
+        log_verification_section=(
+            "- optional 1: NOT RUN — no compatible host available\n"
+        ),
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert not any("G4" in error for error in errors)
+
+
+def test_gate_g4_rejects_a_not_run_optional_item_without_a_reason(
+    tmp_path: Path,
+) -> None:
+    _write_gate_phase_plan(
+        tmp_path,
+        verification_block="```bash\ntrue\n```\n",
+        optional_block="- run a manual smoke check\n",
+        log_verification_section="- optional 1: NOT RUN\n",
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any("G4 optional-verification-unaccounted" in error for error in errors)
+
+
+def test_gate_ancestor_relation_never_runs_verification_items_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """G1-G4 must never fire for an ``ancestor`` relation, even with a
+    receipt that has no ``extensions`` at all."""
+    _write_gate_phase_plan(tmp_path)
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any(f"G{n}" in error for error in errors for n in range(1, 5))
+
+
+def test_receipt_without_extensions_still_loads(tmp_path: Path) -> None:
+    """A pre-F2 closeout receipt (no ``extensions`` field) still loads and
+    validates, since ``validate_receipt`` already treats it as optional."""
+    receipt = _closeout_receipt()
+    assert "extensions" not in receipt
+    path = tmp_path / "receipt.json"
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    loaded = verify.load_receipt(path)
+
+    assert loaded["status"] == "PASS"

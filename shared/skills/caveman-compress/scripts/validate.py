@@ -13,7 +13,9 @@ FRONTMATTER_REGEX = re.compile(r"\A---\n.*?\n---\n?", re.DOTALL)
 HEADING_REGEX = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
 INLINE_CODE_REGEX = re.compile(r"`[^`\n]+`")
 URL_REGEX = re.compile(r"https?://[^\s)]+")
-PATH_REGEX = re.compile(r"(?:\./|\.\./|/|[A-Za-z]:\\)[\w\-/\\\.]+|[\w\-.]+[/\\][\w\-/\\\.]+")
+PATH_REGEX = re.compile(
+    r"(?:\./|\.\./|/|[A-Za-z]:\\)[\w\-/\\\.]+|[\w\-.]+[/\\][\w\-/\\\.]+"
+)
 BULLET_REGEX = re.compile(r"^\s*[-*+]\s+", re.MULTILINE)
 
 
@@ -68,7 +70,9 @@ def _extract_paths(text: str) -> set[str]:
 
 def _is_table_line(line: str) -> bool:
     stripped = line.strip()
-    return stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2
+    return (
+        stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2
+    )
 
 
 def _table_signature(block: list[str]) -> tuple[int, ...]:
@@ -112,7 +116,9 @@ def validate_text(original: str, compressed: str) -> ValidationResult:
         result.add_error("YAML frontmatter changed; preserve it exactly.")
 
     if _extract_headings(original) != _extract_headings(compressed):
-        result.add_error("Markdown headings changed; preserve heading text and order exactly.")
+        result.add_error(
+            "Markdown headings changed; preserve heading text and order exactly."
+        )
 
     if _extract_code_blocks(original) != _extract_code_blocks(compressed):
         result.add_error("Code blocks changed; preserve them exactly.")
@@ -123,7 +129,9 @@ def validate_text(original: str, compressed: str) -> ValidationResult:
     original_urls = _extract_urls(original)
     compressed_urls = _extract_urls(compressed)
     if original_urls != compressed_urls:
-        result.add_error(f"URLs changed: lost={sorted(original_urls - compressed_urls)}, added={sorted(compressed_urls - original_urls)}")
+        result.add_error(
+            f"URLs changed: lost={sorted(original_urls - compressed_urls)}, added={sorted(compressed_urls - original_urls)}"
+        )
 
     if _extract_table_signatures(original) != _extract_table_signatures(compressed):
         result.add_error("Markdown table structure changed.")
@@ -140,7 +148,9 @@ def validate_text(original: str, compressed: str) -> ValidationResult:
     if original_bullets:
         diff_ratio = abs(original_bullets - compressed_bullets) / original_bullets
         if diff_ratio > 0.15:
-            result.add_warning(f"Bullet count changed significantly: {original_bullets} -> {compressed_bullets}")
+            result.add_warning(
+                f"Bullet count changed significantly: {original_bullets} -> {compressed_bullets}"
+            )
 
     return result
 

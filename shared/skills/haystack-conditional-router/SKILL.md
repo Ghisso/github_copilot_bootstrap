@@ -8,10 +8,20 @@ description: |
 user-invocable: false
 ---
 
-## Rule 1: Output Names Must Exactly Match Downstream Input Names
+`ConditionalRouter` socket-naming and lazy-execution behavior below has not
+been re-verified against every `haystack-ai` release in this repository's
+environment (haystack is not installed here). Check the installed
+`haystack-ai` version's `ConditionalRouter` API/docs if behavior differs.
 
-A typo in `output_name` causes the route to silently fire with no data reaching
-the downstream component — no error, no output.
+## Rule 1: Output Names Must Exactly Match Their `pipeline.connect()` Socket Reference
+
+`output_name` names the router's own output socket
+(`<router_component_name>.<output_name>`); it does not need to match the name
+given to `add_component()` for the downstream component — those are
+independent identifiers. What must match exactly is the `output_name` string
+here and the socket reference used in `pipeline.connect()`. A typo in either
+one causes the route to silently fire with no data reaching the downstream
+component — no error, no output.
 
 ```python
 from haystack.components.routers import ConditionalRouter
@@ -20,19 +30,21 @@ routes = [
     {
         "condition": "{{ route == 'semantic' }}",
         "output": "{{ query }}",
-        "output_name": "semantic_query",      # MUST match add_component() name
+        "output_name": "semantic_query",      # names this router's output socket
         "output_type": str,
     },
     {
         "condition": "{{ route == 'sql' }}",
         "output": "{{ query }}",
-        "output_name": "sql_query",           # MUST match add_component() name
+        "output_name": "sql_query",           # names this router's output socket
         "output_type": str,
     },
 ]
 pipeline.add_component("query_router", ConditionalRouter(routes=routes))
-pipeline.connect("query_router.semantic_query", "embedder.text")   # exact match
-pipeline.connect("query_router.sql_query", "text_to_sql.query")    # exact match
+# Downstream component names ("embedder", "text_to_sql") are independent of
+# output_name; only "query_router.<output_name>" must match exactly below.
+pipeline.connect("query_router.semantic_query", "embedder.text")
+pipeline.connect("query_router.sql_query", "text_to_sql.query")
 ```
 
 ---

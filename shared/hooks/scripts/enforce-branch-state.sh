@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=_lib-frontmatter.sh
+. "$SCRIPT_DIR/_lib-frontmatter.sh"
+
+TARGET_ID="${1:-unknown-target}"
+REPO_ROOT="$(repo_root_from_script)"
+INPUT="$(cat)"
+
+if ! payload_parseable "$INPUT"; then
+  fail_closed "unparseable tool payload"
+fi
+
+if ! is_bash_tool_payload "$INPUT"; then
+  exit 0
+fi
+
+COMMAND="$(hook_command "$INPUT")"
+BRANCH="$(parse_branch_create_command "$COMMAND")"
+if [[ -z "$BRANCH" ]]; then
+  exit 0
+fi
+
+if ! command -v git >/dev/null 2>&1; then
+  deny_pretool "git is required to enforce branch lifecycle for $TARGET_ID"
+  exit 0
+fi
+
+# A branch created in some other repository entirely (git checkout -b/switch
+# -c with an explicit -C, --git-dir or --work-tree redirect) is judged
+# against that repository's own naming, not <plan_name>_implementation.
+# branch_create_targets_other_repository checks each branch-creating
+# invocation individually and fails closed on anything undeterminable, so a
+# compound command mixing a foreign branch creation with one targeting this
+# repository still gates in full.
+if branch_create_targets_other_repository "$COMMAND"; then
+  exit 0
+fi
+
+if ! is_implementation_branch "$BRANCH"; then
+  deny_pretool "implementation branch must be named <plan_name>_implementation using only letters, numbers, dot, underscore, and dash"
+  exit 0
+fi
+
+if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
+  deny_pretool "invalid git branch name: $BRANCH"
+  exit 0
+fi
+
+CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+if [[ "$CURRENT_BRANCH" != "dev" ]]; then
+  deny_pretool "implementation branches must be created from dev; current branch is ${CURRENT_BRANCH:-unknown}"
+  exit 0
+fi
+
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null || true)" ]]; then
+  deny_pretool "working tree must be clean before creating an implementation branch"
+  exit 0
+fi
+
+SLUG="${BRANCH%_implementation}"
+BIG_PLAN="$REPO_ROOT/.claude/plans/$SLUG.md"
+if [[ ! -f "$BIG_PLAN" ]]; then
+  deny_pretool "missing big-plan file for branch $BRANCH: .claude/plans/$SLUG.md"
+  exit 0
+fi
+
+PLAN_TYPE="$(fm_read "$BIG_PLAN" "type" || true)"
+STATUS="$(fm_read_unique_status "$BIG_PLAN" || true)"
+if [[ "$PLAN_TYPE" != "big-plan" ]]; then
+  deny_pretool "$BIG_PLAN must have type: big-plan frontmatter"
+  exit 0
+fi
+
+if [[ "$STATUS" == "$DUPLICATE_STATUS_VALUE" ]]; then
+  deny_pretool "$BIG_PLAN must contain exactly one status field before branch creation"
+  exit 0
+fi
+
+if [[ "$STATUS" != "planning" && "$STATUS" != "in-progress" ]]; then
+  deny_pretool "$BIG_PLAN status must be planning or in-progress before branch creation; cancelled is terminal and cannot start an implementation branch"
+  exit 0
+fi
+
+# Run the plan checks (frontmatter, status, and the L1-L4 verification rules)
+# on this plan and the phase files it lists, as explicit paths. An unrelated
+# draft elsewhere in .claude/plans/ must not block the branch. A phase file
+# that does not exist yet is skipped here; the commit gate requires the
+# current phase's file.
+PLAN_PATHS=(".claude/plans/$SLUG.md")
+while IFS= read -r PHASE; do
+  [[ -n "$PHASE" ]] || continue
+  if ! is_plan_slug "$PHASE"; then
+    deny_pretool "$BIG_PLAN lists a phase that is not a safe plan name: $PHASE"
+    exit 0
+  fi
+  if [[ -f "$REPO_ROOT/.claude/plans/$PHASE.md" ]]; then
+    PLAN_PATHS+=(".claude/plans/$PHASE.md")
+  fi
+done < <(fm_read_list "$BIG_PLAN" "phases")
+
+failures=()
+assert_plan_frontmatter "$REPO_ROOT" ${PLAN_PATHS[@]+"${PLAN_PATHS[@]}"}
+if [[ "${#failures[@]}" -gt 0 ]]; then
+  # Only runs with at least one failure, so the slice is never of an empty
+  # array (a Bash 3.2 hazard under set -u).
+  REASON="$(printf '%s; ' "${failures[@]:0:3}")"
+  if ((${#failures[@]} > 3)); then
+    REASON="$REASON(and $((${#failures[@]} - 3)) more); "
+  fi
+  deny_pretool "plan checks must pass before branch creation: $REASON"
+  exit 0
+fi
+
+exit 0

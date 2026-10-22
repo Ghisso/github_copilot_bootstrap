@@ -38,37 +38,16 @@ Input .md file
            Output .pdf file
 ```
 
-## Supported Features
-
-| Feature | Rendering Engine | Notes |
-|---|---|---|
-| Mermaid diagrams | mmdc (mermaid-cli) via Puppeteer | flowchart, sequence, class, state, ER, gantt, pie, git, mindmap |
-| LaTeX math (inline) | KaTeX server-side | `$E=mc^2$` syntax |
-| LaTeX math (display) | KaTeX server-side | `$$\int f(x) dx$$` syntax |
-| Tables | pandoc + CSS | Full GFM pipe-table support with professional styling |
-| Code blocks | pandoc + CSS | Syntax highlighting via pandoc, monospace styling |
-| Images | pandoc + Playwright | Local `file://` and remote `https://` images |
-| Links | pandoc | Rendered as styled text |
-| Lists / blockquotes | pandoc | Ordered, unordered, nested, blockquotes |
-| YAML frontmatter | pandoc | `title` used as PDF title metadata |
-| Footnotes | pandoc + CSS | `[^1]` syntax, rendered at page bottom |
-| Strikethrough | pandoc | `~~deleted~~` syntax |
-| Horizontal rules | pandoc + CSS | `---` rendered as styled separators |
-
 ## Prerequisites
-
-| Dependency | Purpose | Install |
-|---|---|---|
-| `pandoc` | Markdown → HTML | `apt install pandoc` or `brew install pandoc` |
-| `mmdc` (@mermaid-js/mermaid-cli) | Mermaid → SVG | `npm install -g @mermaid-js/mermaid-cli` |
-| `katex` (npm) | LaTeX → HTML | `npm install -g katex` |
-| `playwright` (Python) | HTML → PDF | `pip install playwright && playwright install chromium` |
 
 Verify all dependencies are available before starting:
 
 ```bash
 command -v pandoc && command -v mmdc && command -v katex && uv run python -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
 ```
+
+See `references/features-and-options.md` for the install command for each
+dependency and the full feature-to-rendering-engine matrix.
 
 ## Pipeline Steps
 
@@ -189,57 +168,11 @@ def html_to_pdf(html_path, pdf_path, format="A4", landscape=False, margin="0.75i
         browser.close()
 ```
 
-## Conversion Options
+## Options, Customization, and Troubleshooting
 
-| Parameter | Default | Description |
-|---|---|---|
-| `format` | `A4` | Page size: `A4`, `Letter`, `Legal`, `A3` |
-| `margin` | `0.75in` | Margins — single value (uniform) or `top,right,bottom,left` |
-| `landscape` | `false` | Landscape orientation |
-| `header_footer` | `false` | Show page numbers in footer (page / total) |
-| `custom_css` | none | Path to additional CSS file to layer on top |
-| `no_mermaid` | `false` | Skip Mermaid rendering (keeps raw code blocks) |
-| `no_math` | `false` | Skip KaTeX math rendering |
-
-## Mermaid Theming
-
-Set a `.mermaidrc` JSON config file:
-
-```json
-{
-  "theme": "neutral",
-  "themeVariables": {
-    "primaryColor": "#e1f5fe",
-    "lineColor": "#333"
-  }
-}
-```
-
-Pass to mmdc: `mmdc -i input.mmd -o output.svg -c .mermaidrc`
-
-## Custom CSS
-
-Layer custom CSS on top of the default styles. Custom rules take precedence.
-
-Example dark theme:
-
-```css
-body { background: #1a1a2e; color: #e0e0e0; }
-h1, h2, h3 { color: #e0e0e0; border-color: #444; }
-table th { background: #2a2a4a; }
-pre { background: #0d0d1a; border-color: #333; }
-```
-
-## Error Handling
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| "mmdc FAILED" in Mermaid step | Invalid Mermaid syntax | Check diagram syntax; mmdc stderr has the parse error |
-| Raw LaTeX visible in PDF | KaTeX couldn't parse expression | Check LaTeX syntax; KaTeX falls back gracefully |
-| "No Chrome binary found" | Playwright Chromium missing | Run `playwright install chromium` |
-| Blank/missing diagrams | SVG too large or complex | Try `--no-mermaid` and render diagrams separately |
-| Images not loading | Relative paths broken | Use absolute paths or `file://` URIs |
-| Page breaks in wrong places | No explicit break markers | Add `<div style="page-break-before: always"></div>` in markdown |
+- Conversion parameters (`format`, `margin`, `landscape`, `header_footer`, `custom_css`, `no_mermaid`, `no_math`): see `references/features-and-options.md`.
+- Mermaid theming and layered custom CSS: see `references/customization-and-troubleshooting.md`.
+- Common failure symptoms and fixes: see `references/customization-and-troubleshooting.md`.
 
 ## Limitations
 
@@ -248,3 +181,8 @@ pre { background: #0d0d1a; border-color: #333; }
 - **Page breaks** require explicit CSS markers (`page-break-before: always`) or manual `<div>` in the source. Pandoc does not infer page breaks from heading structure.
 - **KaTeX coverage** is broad but not complete — obscure LaTeX macros or packages not in KaTeX's supported set will fail and fall back to raw LaTeX.
 - **Custom CSS** may render differently across PDF viewers — layout is determined by Chromium at render time.
+
+## References in This Skill
+
+- `references/features-and-options.md` — supported feature matrix, dependency install commands, and conversion parameter reference
+- `references/customization-and-troubleshooting.md` — Mermaid theming, custom CSS, and the error-handling table
