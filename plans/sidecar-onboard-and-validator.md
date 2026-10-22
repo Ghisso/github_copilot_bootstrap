@@ -40,7 +40,7 @@ The 2026-10-22 planning check generated the unchanged source to `/tmp/sidecar-on
 ## Phases
 
 - [x] `2026-10-22_phase-A-validator-pytest-error` — give the validator an actionable missing-dependency failure and test both environments.
-- [ ] `2026-10-22_phase-B-sidecar-onboard` — add the safe skill, validation, upgrade test, and sidecar docs.
+- [x] `2026-10-22_phase-B-sidecar-onboard` — add the safe skill, validation, upgrade test, and sidecar docs.
 - [ ] `2026-10-22_phase-C-knowledge-refresh` — refresh OpenWiki and audit live documentation and memory for stale claims.
 
 ## Verification
