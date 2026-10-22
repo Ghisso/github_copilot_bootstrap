@@ -22,10 +22,10 @@ sources:
     resource: repo://tests/test_install_bootstrap.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-10-22T18:10:39.614Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
@@ -33,6 +33,8 @@ verified:
 Source, tests, and the policies under `shared/policies/` outrank this page.
 
 The installer has two modes. A full install copies the generated target into a consumer and refreshes it later without touching what the consumer owns; what it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share. A sidecar install adds a small personal overlay to a team-owned repository, in one of two profiles (`skills` or `workflow`), and never changes a tracked file; [Sidecar overlay](sidecar-overlay.md) covers it in full.
+
+For an existing workflow sidecar, the current source adds `onboard` at `.claude/skills/` and `.agents/skills/` without replacing previously installed units or tracked team files. The workflow scenario test builds an old-source install, upgrades it, and checks those two additions and an unchanged Git status. The `skills` profile still omits `onboard`.
 
 ## Install modes and mode detection
 

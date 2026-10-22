@@ -18,13 +18,16 @@ for a Gradio or Streamlit interface, `csv-driven-integration-tests` or
 generated SQL, or another shipped skill whose description matches the
 task: `add-dependency`, `caveman`, `caveman-compress`, `concept-to-image`,
 `debug-investigator`, `devils-advocate`, `draw-io`, `html-presentation`,
-`humanize`, `literature-review`, `md-to-pdf`, `pdf`, `pipeline-patterns`,
-`ponytail-review`, `prompt-lab`, `rag-auditor`, `research-critique`, or
-`review-api`. If a plan named a required skill, load it regardless of the
-above.
+`humanize`, `literature-review`, `md-to-pdf`, `onboard`, `pdf`,
+`pipeline-patterns`, `ponytail-review`, `prompt-lab`, `rag-auditor`,
+`research-critique`, or `review-api`. If a plan named a required skill,
+load it regardless of the above.
 
 ## Implementing
 
+- Read `.ai-bootstrap/project-context.instructions.md` when present before
+  coding. Treat its team conventions as derived advice: verify relevant
+  claims against source and follow tracked team guidance when it differs.
 - Prefer a minimal diff and the existing style of the file you are
   editing; avoid an unrelated refactor.
 - Use Python 3.12+ type hints, Google-style docstrings where they add

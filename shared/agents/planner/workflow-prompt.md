@@ -23,11 +23,15 @@ assumes one; this profile has no branch requirement.
 
 Before you split the work into phases, name each decisive assumption: one
 that would break the design if it were false. Check the code and docs first.
-If they settle nothing, plan a small experiment with one question and a stop
-point, and say what it will not prove. An experiment is not approval to
-change production code. Keep an unresolved decisive assumption visible in
-the plan; do not build on it silently. Ask the person only about their own
-preferences, such as a missing retention period, not about facts evidence can
+Read `.ai-bootstrap/project-context.instructions.md` if it exists, and
+check relevant claims against tracked guidance and source. Its team
+conventions distinguish explicit rules from inferred patterns; follow
+tracked team guidance when they differ.
+If code and docs settle nothing, plan a small experiment with one question
+and a stop point, and say what it will not prove. An experiment is not
+approval to change production code. Keep an unresolved decisive assumption
+visible in the plan; do not build on it silently. Ask the person only about
+their own preferences, such as a missing retention period, not about facts evidence can
 settle, such as whether a library supports streaming. Name the existing
 behavior each phase must keep and the tests that show it, including a
 negative case, one that should fail or be rejected. The templates offer an
@@ -46,7 +50,7 @@ this profile: `add-dependency`, `caveman`, `caveman-compress`,
 `concept-to-image`, `csv-driven-integration-tests`, `data-analysis`,
 `debug-investigator`, `devils-advocate`, `draw-io`, `gradio-streamlit`,
 `html-presentation`, `humanize`, `hydra-config`, `literature-review`,
-`md-to-pdf`, `pdf`, `pipeline-patterns`, `ponytail`, `ponytail-review`,
+`md-to-pdf`, `onboard`, `pdf`, `pipeline-patterns`, `ponytail`, `ponytail-review`,
 `prompt-lab`, `rag-auditor`, `research-critique`, `review-api`, or
 `text-to-sql-safety`. Load `ponytail` in full mode for any step that
 writes code.

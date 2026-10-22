@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:e19b4ddca67278732e4abcd8efdd9aea72cbd3b83b3538d6d7b0194c0429b2dc",
+  "pageVersion": "sha256:bf4b788e586f69bd5524c4b40d641392d2c67895834af965ecf8936bbe49957d",
   "claims": [
     {
       "id": "claim_b0158374af164219ad80eee5f9baed11",
@@ -29,7 +29,7 @@
           "version": "repo-lines-v1:sha256:6d97ae16a2748935d3155cb69248c8f0f62b51e9988c66d3a7e6434ae100f83d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0M2QwOGY2ZTE1NmNkOWNhMmE0ODcxNDEwMzQwOWMzYzI1ZTY5MDVjOWJkNDhmYzZhYzk2OTBhZWQ0OGM4ZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg3OWMzMDBmOTFkNWI5OTM1OGI2MjNhNDcyZjMzM2NjZmQ4ZTIwZjcxOTZkOGEyOTFhMWI2MzJlZTliYTc1YjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkNDg3MDA1MmUyMjU2ODE1ODE3MGZmNGY4OGM1ZTBmMDdmYTIwM2VjOWQwNmJhYzM1YWY3MmY3MGMyMTMzY2EifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L467-L484",
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L561-L578",
           "version": "repo-lines-v1:sha256:4ead5c28d7ad1e05c2185ffaeb61457d439d98a44c20213e6c88f3ed107a3ac0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiZGRlYjE0NDc3YzljNjI3NTNmY2VkOTQxODM3NjVkM2E3ZjE1NTE3ZDhkYWE3ZjIyZGE3YjZkZDZlNzZmYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhMWRkOGVmMDI3NDg0Mzg5ZWFkNGJmNTJlNGI4MTMwYTUwOTkwZjU5OTY1OTA3YjJlOTIxMmM0NTM4ZjYxNzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlYmE2ZWNkNzQ2YjE2MTA0YWZmYmJjZDQ3MmMwOTAxMDNmYTg5NmM3ZjBjZjE5YjIwZWM4NTEyYmUxYTgzNDUifQ"
         }
       ]
@@ -90,7 +90,7 @@
         },
         {
           "resource": "repo://tests/test_sidecar_workflow_scenario.py",
-          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+          "version": "repo-file-v1:sha256:e27eb48a30aacbed74a5579e910ec1dc8a16da4aeed537083ac3b431c4edc117"
         }
       ]
     },
@@ -212,7 +212,7 @@
         },
         {
           "resource": "repo://tests/test_sidecar_workflow_scenario.py",
-          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+          "version": "repo-file-v1:sha256:e27eb48a30aacbed74a5579e910ec1dc8a16da4aeed537083ac3b431c4edc117"
         }
       ]
     },
@@ -221,7 +221,7 @@
       "statement": "Sidecar mode supports only the main worktree; the main worktree's info/exclude lines also hide sidecar paths in linked worktrees, background-session worktrees get no sidecar files unless listed in git.worktreeIncludeFiles or .worktreeinclude, and info/exclude is not a security boundary.",
       "evidence": [
         {
-          "resource": "repo://README.md#L897-L916",
+          "resource": "repo://README.md#L927-L946",
           "version": "repo-lines-v1:sha256:e1a01674b4fb99a67a16feb0fa27a7fc836b53fff4e8df1bb4671769651b9d8f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxMWE1OWQyNGM5YjFlZWZjZTgzNjA0MGUzYmFiNzM3NWE1MzQxOGRiNDM1ODliYTRjYjg0YThjN2MzYzc2YmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTZkNDcwZDE2ZTdkOGMwNTc1MDdiMTMyZGRkOTkzZTQzODExMDk0MmNiMTA5NzAwNTVhMGU4YjYzMmMwMWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNmMxZjkxMmI3MmRlYzk5MzdjYmFhMmY2MTFjNTVlMDA5MmYyZTJkN2EzMjEwNDgxNjYyYzljZDQyN2Y2MGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlNmI2OWUxZDA5ODJlZGU1YzRiMGUxMjc2YWFmNGEwMzE4MDk4ZTI1MDBlYzcyNWJjMTVlN2FjODI5ZjI2ODUifQ"
         },
         {
@@ -298,7 +298,7 @@
         },
         {
           "resource": "repo://tests/test_sidecar_workflow_scenario.py",
-          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+          "version": "repo-file-v1:sha256:e27eb48a30aacbed74a5579e910ec1dc8a16da4aeed537083ac3b431c4edc117"
         }
       ]
     },
@@ -598,19 +598,15 @@
     },
     {
       "id": "claim_363e7bc1583748f0a2c6f6dd1098e60c",
-      "statement": "The manifest is schema_version 1 or 2: version 2 carries the profile the sidecar was installed for and parse_manifest rejects an unknown or missing profile there, while a version-1 manifest must carry no profile key and reads as skills; the next real run rewrites it as version 2 with no unit change.",
+      "statement": "The sidecar manifest accepts schema versions 1 and 2; version 2 records and validates its profile, while version 1 has no profile and is read as skills before an ordinary rerun upgrades it without changing units.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L296-L311",
-          "version": "repo-lines-v1:sha256:0488d756041ff4e74e6d31c0a320e6808e480d09d6879282e09111df75d374d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlYjA4NjI1Zjk3YzBlMzk3MWYwYjM3MTBkNDQ3N2ZmNGQ5NWM1YzM2ZmM1NTFiOGQ1OWMxMDBjMTE3ZTdlMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk5Y2UyZGVhYTA2ZmMyNmQ5YTMwMjMzOWI5NzM4YTcxYWEyNDI4NDE5OGY3OTI5NzhlZWJjNzJkMGE0YmRjYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkMzU2MzI5ZDcyMTExYzM5YTUzOTg5OWQ4N2Q4OGI3MzAzNjM2YmYwNDBiMjFjZDdkNmI5MjhjODM0Njg3MTQifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L296-L484",
+          "version": "repo-lines-v1:sha256:00185c884ca106ce07276bc5605af591a547baff875e767c1c78c3ecaf91f9f8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTg5LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJhZWIwODYyNWY5N2MwZTM5NzFmMGIzNzEwZDQ0NzdmZjRkOTVjNWMzNmZjNTUxYjhkNTljMTAwYzExN2U3ZTIxIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJjNjBlMzVmMjU3YTU1ZjRjNWJmMWZiODY4N2QzOTRmMWViYmQ3MDY1OGJkODM5Y2NmYWJhM2ZmNTIzZDY3ZGI5IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI3MGNlM2YyNGFiNDdjMmY1YTlkMzM3ZjM3N2VkODU3M2ZhNTY1ODQwNzY0MDJmMWFmMDU0YTNkZWQ2MTk0NjJmIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI4Y2M0YTdkMWNjNzk2YWJhM2U0NjcyMzMyN2Y1MTdlOWY4MTE5ODJkMjUwZjA3MDI5ODZlNGI1NzY0YWQ5NTg5In0"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L416-L484",
-          "version": "repo-lines-v1:sha256:78cd42b680f4ce62f4a40d165595c7f628833cda18565ea1b0cb41d661c3dbe4:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4ZThiNzEwZTA3MTg0Y2U4ZWM5ZDU4ZTVkMWFkYjJkZjk4ZTZmYTczYjhlOGQ0NjM5MGEzNDIzYzc3ZDk2MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2MGUzNWYyNTdhNTVmNGM1YmYxZmI4Njg3ZDM5NGYxZWJiZDcwNjU4YmQ4MzljY2ZhYmEzZmY1MjNkNjdkYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyNzIzZWY5ZjA2YjFlMzk1OTA2YmRjNTBmNGU5NjBlM2MyNzBjYmE3NDZhYzhjNWEwMmE1NDc5ODM1OGU4NWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkifQ"
-        },
-        {
-          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L308-L348",
-          "version": "repo-lines-v1:sha256:7dc16d9fba9c2fb021560f67bf170c288a0d73f497545f647f079499c23d661d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkMWMzOWI0ZDVkYWNiMzRlOGU1YzVlZDdjZmRiMTAzNGI2M2Y3ZjE5MDEyYTdkY2FmYTQwMjYwZWViNjRiZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ3MGIxNzI0YzBmYmZmZWZmZDM2YWIzZTc3MzNiZmNlYzczMGNhYTFjOGYzMzczYTI2MTZkYjE2Y2E2YmUyNzYifQ"
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L415-L443",
+          "version": "repo-lines-v1:sha256:86fd6270323be65fad5ea06bf669f8f8bd853d0765956e38e609b30e7850d3fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJlMzEyMWZmMTlmYzIzNjI4ZWJiMGEyNWFiYmJjMDc2M2IyZGNmMjhiZDNkOGEzZjg3OGJlOWVhZjJkYWI3NDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyYjA5ZGU2YzliM2IxODRkODMyMDdhMzBmNzg3YjhlZjAzYTBjY2RmNWQ4ODFkYjAwNmRlNDZmZDBkMzMxYjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0MDEwYzI3YmIzNDBjZmQxNWMxZTg2ZmIxZTNiZDE1MjRjMGM2MWZkNzgyZmRjNjU3YzI1ZjRhMzRhZmI1ZDIifQ"
         }
       ]
     },
@@ -642,17 +638,21 @@
         },
         {
           "resource": "repo://tests/test_sidecar_workflow_scenario.py",
-          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+          "version": "repo-file-v1:sha256:e27eb48a30aacbed74a5579e910ec1dc8a16da4aeed537083ac3b431c4edc117"
         }
       ]
     },
     {
       "id": "claim_85e08cf52b7f4079b0e5b273a81be9ce",
-      "statement": "load_desired_units(source, profile) reads the profile's skills at both write roots, its single-file units, and, when the profile has a state root, the seed files as one state unit from dist/sidecar/<profile>/; the two profiles are skills (four skills, two bridges) and workflow (24 eligible skills, five agents, three rules, one Copilot instructions file, review profiles, four templates, and the .ai-bootstrap state folder at the repository root), defined in scripts/runtime_ownership.py.",
+      "statement": "load_desired_units reads each profile's skills at both roots and its file units from dist/sidecar; the skills profile has four skills and two bridges, while workflow has 25 skills including its own onboard, five agents, three rules, a Copilot instructions file, review profiles, templates, and an .ai-bootstrap state folder.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L139-L232",
-          "version": "repo-lines-v1:sha256:3cacca1fc155ee8e69820b870d1c27b846d6cec6e998c0be6bfc03031b366f44:eyJzZWxlY3RlZExpbmVDb3VudCI6OTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MTFmYTJhZDBiMDdhNzY0NTRlZmJhY2Y2M2I1NWMzZTYxMTE1YzYwMDZjYjNkNjBiYjkwMDZlM2ExMWRhMGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwNmQ1ODUyY2ViMWRmYzFmNzg1MWYwYjg1YmE3NzhjMmE2MzI4Yjk5ZTdjMWFhNTZlZTJiNDU1OTAxM2NkYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1Zjc1NjE0MDg0ZTQ5YTBkODllOTFjMTVmYmI0MjdkMDk3M2U0MjU4OTNiYjA3Zjk4ZjI3ZGFlMjQ4NDNkY2YifQ"
+          "resource": "repo://scripts/runtime_ownership.py#L101-L116",
+          "version": "repo-lines-v1:sha256:893666155dd43055ea040917b44512f0233b160d585c7da28099d21712d0d371:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1ZDBmMWY2NzFkNjllY2NlZGFmZTUwYmIyYzc3YzcwMzYwMDgzYTU1ZWEzOGFlMzZiYzAyODc0OThmMGFlZGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjOWNkY2E3ZjVhOWY3MjVhMDRlYzAxZTE2MTI5NTAwNmQzYWQyYzIzMDI3YzMzZmExYTkyMzUwZjg5MTE3NTIifQ"
+        },
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L139-L233",
+          "version": "repo-lines-v1:sha256:2cf3fc18c5e04f20236a6dc2fb629f26dc9e837fc893c238f349620d4c1ec342:eyJzZWxlY3RlZExpbmVDb3VudCI6OTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MTFmYTJhZDBiMDdhNzY0NTRlZmJhY2Y2M2I1NWMzZTYxMTE1YzYwMDZjYjNkNjBiYjkwMDZlM2ExMWRhMGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwNmQ1ODUyY2ViMWRmYzFmNzg1MWYwYjg1YmE3NzhjMmE2MzI4Yjk5ZTdjMWFhNTZlZTJiNDU1OTAxM2NkYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1Zjc1NjE0MDg0ZTQ5YTBkODllOTFjMTVmYmI0MjdkMDk3M2U0MjU4OTNiYjA3Zjk4ZjI3ZGFlMjQ4NDNkY2YifQ"
         },
         {
           "resource": "repo://scripts/sidecar_overlay.py#L540-L719",
@@ -665,7 +665,7 @@
       "statement": "Switching profiles is an ordinary update: --profile skills on a workflow install removes the workflow-only units through the remove-and-preserve rules and keeps the state folder hidden in place, --profile workflow on a skills install adds the missing units and seeds the state folder (migrating a retained, owned legacy .claude/ai-bootstrap first), a rerun without --profile keeps the manifest's profile, and the end-of-install empty-folder cleanup leaves no empty .claude/templates or similar root behind.",
       "evidence": [
         {
-          "resource": "repo://README.md#L661-L686",
+          "resource": "repo://README.md#L691-L716",
           "version": "repo-lines-v1:sha256:fa9e65457651843b1d10b804f49bab5e21c7399e0f9871eeda101d83150ee161:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NDZlOWQyMDQ4OTM4OTZkN2YwODZlM2QzZGM3MmFmOWMyYmY1M2U5NDRkZWQ0ZTRmYjU3NjkyNzg4YTcwZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY3YWE2YjRiMDFiMTIwODNiYjJjNzU0NWU4MWFlMDZhYTNlYWQyMzFjMWNmYmYxZDBiNjgwN2UyZjc4NWM5MTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNjQ5YmFhMmU2Y2QyMDMwYmI0MDcwOGI5NmM2ZjlmOTY5MWQ0ZWZhYzg5MThlZmRmZTVmNjFjODAyM2VkYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliZGM0YTc3NTBiZjI3MmY2MWY3MzI4NGU4MDViMGZhZTc0MTBhMDZiMzUyN2YwM2FkZjMzYzE5NDNmMmY4NTMifQ"
         },
         {
@@ -674,7 +674,7 @@
         },
         {
           "resource": "repo://tests/test_sidecar_workflow_scenario.py",
-          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+          "version": "repo-file-v1:sha256:e27eb48a30aacbed74a5579e910ec1dc8a16da4aeed537083ac3b431c4edc117"
         }
       ]
     },
@@ -683,7 +683,7 @@
       "statement": "A workflow install or update migrates a legacy .claude/ai-bootstrap state folder to .ai-bootstrap only when the sidecar's own exclude block lists the legacy root and .ai-bootstrap is absent: under the install lock it adds and proves the new exclude line (restoring info/exclude on failure), refuses a cross-filesystem move before any backup, makes a full backup, rechecks the destination, renames without merging, and then reconciles normally; it refuses before any write when both roots exist or the legacy folder is not listed.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L207-L221",
+          "resource": "repo://scripts/runtime_ownership.py#L208-L222",
           "version": "repo-lines-v1:sha256:c3e4f4ba5fd18143c1d6f1d0a766ac6ba117bf563bc6bad7d92f731229bf010a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyYzlhMjQ5NzJiMjEwMjExN2FlYzE4ZGM3NmIyZDZmNTIzOTc5N2ZmNmI2OGEwMGU0ZjllNWU5YTE3N2ZhN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4YjU5NmE5OGRhNjlkNTIxY2QyMjZkNWFkOGFmNjg5ZGZjNWMxMDJjOTdhOGIzZWFhYTQwMjhhNTY3MzIwNTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NzA2YjExNTExZTMxYWMwZTg5ZmNjMjY1NWI5MzJjMzZmOGMwMWMwMDFlM2E2MTgyNmQxNDlmZWY2ZmFlNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiMmFmOGExOGVlMGIyNTFhYWJmYTVlYTE2YmZiMjJhMmE1MTQyNTU1MzU0NGE1ZjJjMzY1NzYxMmMxNGViYmIifQ"
         },
         {
@@ -692,13 +692,27 @@
         },
         {
           "resource": "repo://tests/test_sidecar_workflow_scenario.py",
-          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
+          "version": "repo-file-v1:sha256:e27eb48a30aacbed74a5579e910ec1dc8a16da4aeed537083ac3b431c4edc117"
+        }
+      ]
+    },
+    {
+      "id": "claim_c1c53dbe2a1c495d8fd4cc8a2a5ad506",
+      "statement": "The workflow-only onboard skill checks private destinations before writing project context and a memory pointer; its team conventions distinguish explicit rules from patterns inferred from repeated repository examples.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1929-L1942",
+          "version": "repo-lines-v1:sha256:b91e918bb2643539a2466d5f1f909a4bb90d53403ea566c8a468bfd3cf73a9a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMWNmZmFiZTBhNzBjZTdkYmNiNmM4ZmQ2M2EyODdkYjI3ZDdjZTU2MzBjN2FmY2JhNTRkYjNlMmE1MGI5ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhOTk1MmZlZDlkOTJiNDFmYWMyMTZmNjZhNTg0ZjdjNmQwMjJhZTYyMTRkNWM5MjUzNzJiNDUzNGZmNmYzMjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkZTUzNzlhNzEzYjAyOWVmYzVlNjA0YzM2ZDc3NWFmNzljZDlhNTViOTExZGI0MWQwODU1NDkzMDVmODg3NzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdhNDA1YWIzMTg1MWE1OTIzZjIxOTk2OGVmYmE5ZTZjMDY5NjEyNzI2OGU0ZWMxMGZkNzllNjFlODllMTE3ZmEifQ"
+        },
+        {
+          "resource": "repo://shared/sidecar/workflow/skills/onboard/SKILL.md#L21-L74",
+          "version": "repo-lines-v1:sha256:f7902be5b339994b2fa658fefd6b11791e03bfe1338defc771cb907c00e65939:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkYmRhM2E1Yzc4NjJmMGNkNGRjM2U5ODdlZDc3ZDc5ODlhZjI0YWRjOWU4NTdjODQ2ZmZjYzc4YjkxNjY4Y2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1MmJiOTdlNDgyYTJjMGQ4NjczODQ2Y2E2Yzk3MjZiMjFiYzQ3ZjQyY2U1OTJjZDJkNDkwNTcwODYyYjYzZDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImViNmFjYWUyNjA2NmNiN2NjNGY2MmMxNzVjNjY1YjRmNDFkZTkxNzJjODAwMzFmNWI1YmU1NmRiOTZjN2I3N2YifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-21T02:32:20.957Z"
+    "at": "2026-10-22T18:10:39.614Z"
   }
 }

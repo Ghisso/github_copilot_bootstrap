@@ -6,6 +6,10 @@ tags: [verification, verify.py, receipts, provenance, findings, gates, closeout]
 sources:
   - id: openwiki-source-37cd5f3d3aa49832caf1a222
     resource: repo://docs/runtime-checks.md
+  - id: openwiki-source-df8f0c6d7ed23c271434d0c4
+    resource: repo://docs/smoke-tests.md
+  - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
+    resource: repo://scripts/validate_targets.py
   - id: openwiki-source-f11e4ce184d9addc83c16d26
     resource: repo://shared/hooks/scripts/_lib-frontmatter.sh
   - id: openwiki-source-9fa38289fd921baabf765923
@@ -14,12 +18,14 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
+  - id: openwiki-source-d2aea9dc34db53f2030dc7a0
+    resource: repo://tests/test_validate_targets.py
   - id: openwiki-source-7c9c9eb3a89efa00dd8df426
     resource: repo://tests/test_verify.py
-generated: { by: "claude-code", at: "2026-10-21T23:14:28.484Z" }
+generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T23:14:28.484Z
+    at: 2026-10-22T17:57:02.699Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -101,6 +107,8 @@ A small plan's `## Verification` section holds fenced `bash` or `sh` blocks. Eve
 Closeout needs three files to exist first: the phase receipt, the findings report, and the closeout session log the small plan names in `closeout_session_log`. When one is missing, `verify.py closeout` prints one line such as `closeout evidence is missing: .claude/quality_reports/findings-<phase>.json; run record_findings.py to create it`, exits 2, and persists no receipt. A symlinked or non-regular artifact is still refused, with a message that says which.
 
 Closeout also requires the closeout session log to carry LEARN evidence: `[LEARN:category] ...` entries or the exact marker `[LEARN] none - no new lessons this session`, outside fenced code blocks. `MEMORY.md`'s modification time is never a substitute. When the phase is the big plan's last declared phase, the log must also contain `## Stale-claims surfaces checked`. A closeout whose diff touches no documentation needs `--documentation-na "<reason>"`.
+
+The required `scripts/validate_targets.py` command also runs the hook-gate regression test module. If its interpreter lacks `pytest`, the validator reports an actionable failure naming the devcontainer and `uv run --with pytest python scripts/validate_targets.py`; it does not skip the gate. `docs/smoke-tests.md` uses that explicit dependency form for isolated environments.
 
 ## The OpenWiki backstop inside `VFY-GEN-001`
 

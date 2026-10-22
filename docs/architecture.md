@@ -73,6 +73,13 @@ Overlay](target-mapping.md#sidecar-overlay) for what each profile installs
 and how it updates, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
 for the per-client evidence behind it.
 
+The workflow profile installs `onboard` at both `.claude/skills/onboard/`
+and `.agents/skills/onboard/`. It checks tracked team guidance and source,
+then writes private findings to `.ai-bootstrap/project-context.instructions.md`
+and a pointer in `.ai-bootstrap/MEMORY.md`. Its `## Team conventions`
+section separates explicit team rules from patterns inferred from repeated
+examples; tracked guidance takes precedence over those derived notes.
+
 A `dist/sidecar/<profile>/` tree is not merely internally consistent — it
 must be exact. `scripts/runtime_ownership.py`'s
 `sidecar_source_exact_allowlist(profile)` names the only paths a valid
