@@ -20,7 +20,7 @@ jobs:
         run: uv run python scripts/generate_targets.py --all
 
       - name: Validate targets
-        run: uv run python scripts/validate_targets.py
+        run: uv run --with pytest python scripts/validate_targets.py
 
   python_39_hooks:
     runs-on: ubuntu-latest

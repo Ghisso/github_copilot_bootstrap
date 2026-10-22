@@ -183,6 +183,15 @@ profile's skills and state folder only, never its agents. No bridge or
 instructions file ships for Codex (skill-only by design) or for Google
 Antigravity (unverified).
 
+The workflow profile includes `onboard` at both skill write roots. After
+checking tracked guidance, code, and tests, it writes
+`.ai-bootstrap/project-context.instructions.md` and one pointer in
+`.ai-bootstrap/MEMORY.md`. The context file's `## Team conventions` section
+labels explicit rules separately from patterns inferred from repeated
+examples, with evidence and limits. These private notes yield to tracked
+team guidance. The `skills` profile does not include `onboard` or this
+state folder.
+
 The manifest, staging folder, preserved-copy folder, pending
 ownership record, and run lock that track sidecar ownership live inside the
 Git directory (`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`,

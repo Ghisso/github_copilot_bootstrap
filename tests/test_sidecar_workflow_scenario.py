@@ -15,6 +15,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -241,6 +242,8 @@ def test_workflow_profile_life_cycle(
     capsys.readouterr()
     assert _status(team_repo) == status_with_state
     assert _sidecar_files(team_repo, ".claude/agents") == {".claude/agents/reviewer.md"}
+    assert not (team_repo / ".agents" / "skills" / "onboard").exists()
+    assert not (team_repo / ".claude" / "skills" / "onboard").exists()
     assert not (team_repo / ".claude" / "templates").exists()
     assert plan.is_file()
     assert _exclude_block(team_repo).count(f"/{SIDECAR_STATE_ROOT}\n") == 1
@@ -316,6 +319,97 @@ def test_workflow_profile_life_cycle(
     assert "personal note" not in (team_repo / STATE / "MEMORY.md").read_text(
         encoding="utf-8"
     )
+
+
+def test_existing_workflow_install_adds_only_onboard(
+    team_repo: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An older workflow manifest gains only the new ignored skill units."""
+    team_files = {
+        "CLAUDE.md": b"# Team instructions\nUse clear names.\n",
+        ".claude/skills/task-taker/SKILL.md": b"---\nname: task-taker\n---\nTeam task instructions.\n",
+    }
+    for relative, content in team_files.items():
+        path = team_repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    _commit(team_repo, "team onboarding guidance", *team_files)
+
+    old_source = tmp_path / "old-workflow"
+    shutil.copytree(WORKFLOW_SOURCE, old_source)
+    old_skills = tuple(skill for skill in SIDECAR_WORKFLOW_SKILLS if skill != "onboard")
+    assert len(old_skills) + 1 == len(SIDECAR_WORKFLOW_SKILLS)
+    for root in (".agents", ".claude"):
+        shutil.rmtree(old_source / root / "skills" / "onboard")
+    with monkeypatch.context() as old_profile:
+        old_profile.setitem(
+            sidecar_overlay_module.SIDECAR_PROFILE_SKILLS, "workflow", old_skills
+        )
+        assert install_sidecar(team_repo, old_source, profile="workflow") == 0
+    capsys.readouterr()
+
+    before_manifest = _read_manifest(team_repo)
+    before_exclude = _exclude_block(team_repo)
+    assert not any("onboard" in unit for unit in before_manifest["units"])
+    assert "onboard" not in before_exclude
+    assert _status(team_repo) == ""
+
+    expected = {
+        ".agents/skills/onboard",
+        ".claude/skills/onboard",
+    }
+    assert (
+        install_sidecar(team_repo, WORKFLOW_SOURCE, dry_run=True, profile="workflow")
+        == 0
+    )
+    dry_run = capsys.readouterr().out
+    installs = {
+        line.removeprefix("sidecar-install: would install ")
+        for line in dry_run.splitlines()
+        if line.startswith("sidecar-install: would install ")
+    }
+    assert installs == expected
+    assert "sidecar-install: would update " not in dry_run
+    assert "sidecar-install: would remove " not in dry_run
+    assert _read_manifest(team_repo) == before_manifest
+    assert _exclude_block(team_repo) == before_exclude
+
+    upgrade = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(team_repo),
+            "--mode",
+            "sidecar",
+            "--profile",
+            "workflow",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert upgrade.returncode == 0, upgrade.stdout + upgrade.stderr
+    assert "installed 2, updated 0, removed 0" in upgrade.stdout
+    after_manifest = _read_manifest(team_repo)
+    assert set(after_manifest["units"]) - set(before_manifest["units"]) == expected
+    for unit, details in before_manifest["units"].items():
+        assert after_manifest["units"][unit] == details
+    assert set(_exclude_block(team_repo).splitlines()) - set(
+        before_exclude.splitlines()
+    ) == {f"/{unit}" for unit in expected}
+    for relative, content in team_files.items():
+        assert (team_repo / relative).read_bytes() == content
+    for relative in (*expected, SIDECAR_STATE_ROOT):
+        ignored = subprocess.run(
+            ["git", "-C", str(team_repo), "check-ignore", "-q", relative],
+            check=False,
+        )
+        assert ignored.returncode == 0, relative
+    assert _status(team_repo) == ""
 
 
 def test_version_1_manifest_reads_as_skills_and_upgrades_in_place(

@@ -8,20 +8,24 @@ sources:
     resource: repo://docs/sidecar-provider-contract.md
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
+  - id: openwiki-source-aedfa38e00652688559a19c4
+    resource: repo://scripts/generate_targets.py
   - id: openwiki-source-cae9260f89e696dbf3ed5310
     resource: repo://scripts/runtime_ownership.py
   - id: openwiki-source-472dd9a20a81e8f5a312971f
     resource: repo://scripts/sidecar_overlay.py
+  - id: openwiki-source-1c38db574c5e411bfd8c36ea
+    resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-2d0d5ea9c4029722239233b8
     resource: repo://tests/test_sidecar_install.py
   - id: openwiki-source-0b6f8c38a312ee46c4820997
     resource: repo://tests/test_sidecar_uninstall.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-10-22T18:10:39.614Z
 ---
 
 
@@ -46,7 +50,7 @@ A unit is one skill directory at one write root, one single-file unit (a bridge,
 
 | Unit | Profile | Paths |
 | --- | --- | --- |
-| Skills | both | `skills`: `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`; `workflow`: every public skill not listed in `shared/sidecar/workflow/skills.txt` (24 today); each under both `.claude/skills/` and `.agents/skills/`, copied whole |
+| Skills | both | `skills`: `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`; `workflow`: 25 eligible skills including its own `onboard`; each under both `.claude/skills/` and `.agents/skills/`, copied whole |
 | Ponytail license | both | `LICENSE` (MIT) inside `ponytail/` and `ponytail-review/` at both roots |
 | Claude Code bridge | `skills` | `.claude/rules/ai-bootstrap-sidecar.md`, no frontmatter |
 | Copilot in VS Code bridge | `skills` | `.github/instructions/ai-bootstrap-sidecar.instructions.md`, with `applyTo: "**"` |
@@ -58,6 +62,8 @@ A unit is one skill directory at one write root, one single-file unit (a bridge,
 | State folder | `workflow` | `.ai-bootstrap/` at the repository root with `MEMORY.md` and the `plans/`, `session_logs/`, `explorations/`, `quality_reports/` READMEs as seeds; hidden by the one line `/.ai-bootstrap` |
 
 Both bridges carry the same short body from `shared/sidecar/bridge.md`: tracked repository guidance wins over the sidecar, and `ponytail` applies to coding tasks in `full` mode. The workflow rules describe a relaxed loop (read memory, plan when a task spans several files, implement, run the project's own checks, review a non-trivial diff, log the session) that nothing enforces. No `.github/agents` or `.codex/agents` file ships in either profile, because neither Copilot nor Codex has a config-free way to discover a custom agent from an ignored file; `docs/sidecar-provider-contract.md` records the native runs behind that.
+
+The workflow-only `onboard` skill comes from `shared/sidecar/workflow/skills/onboard/`, rather than the full-install skill. It reads tracked team guidance, representative code and tests, and a bounded set of commit subjects. After checking that the private state paths are ignored, untracked, and free of symlinks, it writes `.ai-bootstrap/project-context.instructions.md` and one pointer in `.ai-bootstrap/MEMORY.md`. Its `## Team conventions` section distinguishes written rules from patterns inferred from repeated examples, cites paths or commits, and calls out thin evidence. The resulting context is derived advice beneath tracked team guidance. The `skills` profile has no `onboard` or state folder.
 
 The sidecar also keeps six things in the Git directory, where they can never be tracked:
 
@@ -331,6 +337,7 @@ Every run ends by printing `preserved copies are in <folder>; the sidecar never 
 - `tests/test_sidecar_update.py` covers upgrades and mixed full and sidecar batches.
 - `tests/test_sidecar_uninstall.py` covers uninstall, dropped skills and retired units, preserve conflicts with the gate, team rules that never block, crash convergence, and refusals.
 - `tests/test_sidecar_workflow_scenario.py` runs the workflow profile end to end against a real team repository with a tracked `.claude/settings.json`, a team skill, agent, and rule: dry run, install, rerun with personal edits, both profile switches, backup (including a dry run), uninstall that keeps the state, purge, and reseed; a version-1 manifest upgrading in place; a team rule and team agents in each client's own file shape taking the sidecar's units; tracked and foreign review profiles and templates winning by name; the legacy-state migration, its refusals, its fault-point reruns, and its dry run; backup lock contention and failure injection; a tracked path under the state root aborting; `git clean -fdx` losing the state while the backup survives; and a mixed `skills` and `workflow` batch through the updater. `git status --porcelain --untracked-files=all` is asserted unchanged at every step.
+- The same workflow scenario suite upgrades an old-source install and requires only the two new `onboard` skill units, with prior unit bytes and tracked Git status unchanged.
 
 ## Related pages
 
