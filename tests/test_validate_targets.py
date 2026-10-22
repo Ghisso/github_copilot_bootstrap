@@ -2347,6 +2347,84 @@ def test_validate_targets() -> None:
     assert "PASS generated target is structurally valid" in result.stdout
 
 
+def test_hook_gate_regression_tests_explains_missing_pytest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing pytest reports one installation route without running the smoke test."""
+    calls: list[object] = []
+
+    def record_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess([], 0)
+
+    monkeypatch.setattr(target_validator.importlib.util, "find_spec", lambda _: None)
+    monkeypatch.setattr(target_validator.subprocess, "run", record_run)
+    errors: list[str] = []
+
+    target_validator.validate_hook_gate_regression_tests(errors)
+
+    assert errors == [
+        "tests/test_hook_gates.py requires pytest; run in the repository "
+        "devcontainer or use `uv run --with pytest python "
+        "scripts/validate_targets.py`."
+    ]
+    assert "Traceback" not in errors[0]
+    assert calls == []
+
+
+def test_hook_gate_regression_tests_runs_when_pytest_is_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Available pytest keeps the mandatory hook-gate smoke test enabled."""
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def record_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        target_validator.importlib.util, "find_spec", lambda _: object()
+    )
+    monkeypatch.setattr(target_validator.subprocess, "run", record_run)
+    errors: list[str] = []
+
+    target_validator.validate_hook_gate_regression_tests(errors)
+
+    assert errors == []
+    assert calls == [
+        (
+            ([sys.executable, str(REPO_ROOT / "tests" / "test_hook_gates.py")],),
+            {
+                "cwd": REPO_ROOT,
+                "text": True,
+                "capture_output": True,
+                "check": False,
+            },
+        )
+    ]
+
+
+def test_hook_gate_regression_tests_reports_a_failing_smoke_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A nonzero hook-gate smoke test remains a validation error."""
+    monkeypatch.setattr(
+        target_validator.importlib.util, "find_spec", lambda _: object()
+    )
+    monkeypatch.setattr(
+        target_validator.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [], 1, stdout="one hook test failed\n", stderr=""
+        ),
+    )
+    errors: list[str] = []
+
+    target_validator.validate_hook_gate_regression_tests(errors)
+
+    assert errors == ["tests/test_hook_gates.py failed:\none hook test failed\n"]
+
+
 def test_mcp_server_parity_errors_fail_independently() -> None:
     """A single drifted/missing server must fail on its own, never bundled
     with, or masked by, an unrelated server's result."""

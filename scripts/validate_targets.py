@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import filecmp
 import hashlib
+import importlib.util
 import json
 import os
 import py_compile
@@ -12142,12 +12143,15 @@ def validate_runtime_drift_cases(errors: list[str]) -> None:
 
 
 def validate_hook_gate_regression_tests(errors: list[str]) -> None:
-    """CI (.github/workflows/validate.yml) only runs this file, not `pytest` —
-    pytest isn't even installed by this repo's own dependency set. Without
-    this, tests/test_hook_gates.py (unit coverage for git_targets_nested_claude's
-    per-invocation scoping and protect-files.sh's secret-basename check) would
-    only ever run when someone remembers to invoke it by hand, silently
-    losing its regression value the moment that's forgotten."""
+    """Run the five required hook-gate smoke tests when `pytest` is available."""
+    if importlib.util.find_spec("pytest") is None:
+        errors.append(
+            "tests/test_hook_gates.py requires pytest; run in the repository "
+            "devcontainer or use `uv run --with pytest python "
+            "scripts/validate_targets.py`."
+        )
+        return
+
     result = subprocess.run(
         [sys.executable, str(REPO_ROOT / "tests" / "test_hook_gates.py")],
         cwd=REPO_ROOT,
