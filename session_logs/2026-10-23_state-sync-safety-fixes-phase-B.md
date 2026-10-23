@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-23
 **Plan:** `.claude/plans/2026-10-23_phase-B-sync-lock-and-exit-trap.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -25,6 +25,17 @@ Let only one mutating state-sync run work on a checkout at a time (a `flock` loc
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       12.3s  uv run pytest tests/test_state_sync.py -q --tb=short -k "sync_lock or exit_trap or network_limit"
+PASS       75.7s  uv run pytest tests/test_state_sync.py tests/test_install_bootstrap.py -q --tb=short
+PASS       49.6s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      321.3s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-10-23_phase-B-sync-lock-and-exit-trap.json` (0 findings after round 2, gate PASS, six profiles).
 - optional 1: NOT RUN — host and devcontainer lock sharing needs a running devcontainer on this checkout, which this session does not have; behavior without shared exclusion is the same as before this phase.
 - optional 2: NOT RUN — no macOS host without `flock` is available; `test_sync_lock_runs_unlocked_without_flock` covers the same path by removing `flock` from `PATH`.
 
