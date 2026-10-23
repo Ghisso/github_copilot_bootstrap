@@ -15,7 +15,8 @@ Audit live guidance for claims that this plan or earlier work made stale, then r
 - Documenter audit of every live-advice surface: no stale claim outside `openwiki/**`, so no file changed (per-surface results below).
 - OpenWiki refresh through its own MCP tools: `openwiki_begin` (`mode: "update"`, run `74fb4fbe-50f2-45b8-970f-c676b77e44d1`) returned a planning run with eight claim issues on three pages; I submitted a three-page plan (`git-backed-ai-state-sync.md`, `hooks-and-guardrails.md`, `quickstart.md`), wrote each page, reconciled every flagged claim (revised with current evidence), added eleven new claims on the state-sync page, and `openwiki_finish` returned `complete`. On the hooks page I also corrected prose that said only Codex runs `state-sync.sh push` on `UserPromptSubmit` (`scripts/generate_targets.py` wires it for Claude Code too, with Claude `SessionEnd` push and `StopFailure` checkpoint). Afterwards root `AGENTS.md` and `CLAUDE.md` were unchanged and no `openwiki/.run.json` remained.
 - Regenerated targets and refreshed the overlay; required checks on that tree: `validate_targets.py` and plan lint exit 0, `verify.py phase` PASS (4988 passed, 1 skipped).
-- Review round 1 (seven profiles): gate WARN with one open request (the check results above) and three MINORs, all in the state-sync page's prose: "SessionStart on every host" (Antigravity wires no lifecycle hooks), "a stalled connection cannot hold the lock" (a connection still being opened has no stall limit), and "only `SIGKILL` can leave the copy" (a signal during the restore, other signals, and the restore's own keep rules also can). All three were fixed through a second OpenWiki update run (`3180def5-0833-4597-aca6-e1e92d68ec52`, one page job, `openwiki_finish` `complete`); the Stop bullet also gained GitHub Copilot's `state-sync.sh push`. Two claims were revised and one added; root adapters stayed unchanged and no `.run.json` remained. Re-review and the check rerun are in progress.
+- Review round 1 (seven profiles): gate WARN with one open request (the check results above) and three MINORs, all in the state-sync page's prose: "SessionStart on every host" (Antigravity wires no lifecycle hooks), "a stalled connection cannot hold the lock" (a connection still being opened has no stall limit), and "only `SIGKILL` can leave the copy" (a signal during the restore, other signals, and the restore's own keep rules also can). All three were fixed through a second OpenWiki update run (`3180def5-0833-4597-aca6-e1e92d68ec52`, one page job, `openwiki_finish` `complete`); the Stop bullet also gained GitHub Copilot's `state-sync.sh push`. Two claims were revised and one added; root adapters stayed unchanged and no `.run.json` remained.
+- Review round 2: gate PASS, no findings, no open requests. Check rerun on the fixed tree: `validate_targets.py` and plan lint exit 0, `verify.py phase` PASS (4988 passed, 1 skipped).
 
 ## [LEARN] Entries
 
@@ -43,6 +44,8 @@ Audit live guidance for claims that this plan or earlier work made stale, then r
 - `docs/2026-08-09-state-sync-rebase-recovery.md`: dated record, left unchanged by policy; current behavior lives in `docs/runtime-checks.md` and the corrected memory entries.
 
 ## Verification
+
+- optional 1: PASS — the refreshed `openwiki/operations/git-backed-ai-state-sync.md` was read against `shared/hooks/scripts/state-sync.sh` (and the restorer, devcontainer, generator, validator, and tests) in two review rounds; round 1 found three prose statements that did not match the code, a second OpenWiki run corrected them, and round 2 found none.
 
 ## Open Questions / Next Steps
 

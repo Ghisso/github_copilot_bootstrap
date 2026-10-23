@@ -3,8 +3,8 @@ name: 2026-10-23_phase-D-knowledge-refresh
 type: small-plan
 parent_plan: state-sync-safety-fixes
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-23_state-sync-safety-fixes-phase-D.md
 ---
 
 # Small Plan: Knowledge Refresh and Stale-Claims Audit
@@ -15,7 +15,7 @@ Refresh the enabled OpenWiki layer after phases A to C have settled, and audit l
 
 ## Steps
 
-- [ ] **1. Audit live advice for stale claims.**
+- [x] **1. Audit live advice for stale claims.**
   - Owner: `documenter` for `README.md`, `docs/`, and `shared/` text; orchestrator for `.claude/MEMORY.md`.
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - Surfaces: root guidance, `README.md`, `docs/` (at least `runtime-checks.md`, `smoke-tests.md`, `architecture.md`, `target-mapping.md`), `shared/policies/`, `shared/skills/` (at least `commit`, `safe-consumer-bootstrap-refresh`, `knowledge-refresh`), `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, state READMEs, and `.claude/MEMORY.md`.
@@ -23,17 +23,17 @@ Refresh the enabled OpenWiki layer after phases A to C have settled, and audit l
   - Correct or supersede each live claim. Leave dated records unchanged: `docs/2026-08-09-state-sync-rebase-recovery.md`, `plans/plan-git-state-sync.md`, `plans/adr-002-git-backed-state-sync.md`, archived plans, and closed session logs, unless an entry would actively mislead a reader and no receipt binds its log.
   - Record each audited surface and its outcome under the exact heading `## Stale-claims surfaces checked` in this phase's closeout session log.
 
-- [ ] **2. Refresh OpenWiki through its own tools.**
+- [x] **2. Refresh OpenWiki through its own tools.**
   - Owner: orchestrator (the OpenWiki MCP tools and their guard hook run in the main session).
   - Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
   - Call `openwiki_begin` with `mode: "update"`, complete the page-job lifecycle, and require `openwiki_finish` to return `complete`. Follow the skill's restore check after `openwiki_begin`.
   - Inspect the generated diff, especially `openwiki/operations/git-backed-ai-state-sync.md` and any page that describes the devcontainer mounts or the root-adapter restorer. Never hand-edit a generated page, a `.claims` file, or the root snippet. A provider or authentication failure blocks this phase until it is fixed and retried; never skip the refresh.
 
-- [ ] **3. Finish the normal control-plane closeout.**
+- [x] **3. Finish the normal control-plane closeout.**
   - Owner: orchestrator.
   - Before CLOSEOUT step 2, run `uv run python scripts/generate_targets.py --all` and then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. Record lessons in `.claude/MEMORY.md` only when they are reusable.
 
-- [ ] **4. Review.**
+- [x] **4. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation`. The findings report binds the whole branch diff against `dev`, so it keeps every earlier phase's profiles.
   - Focus: the refreshed pages and edited docs match the code; no stale claim from the list above survives on a live surface.
 
@@ -56,11 +56,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
