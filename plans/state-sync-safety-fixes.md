@@ -137,7 +137,7 @@ An exit trap covers a run that ends early through `INT`, `TERM`, or `HUP`: it pu
 
 ## Phases
 
-- [ ] `2026-10-23_phase-A-unfinished-git-operations` — never commit over an unfinished rebase or merge; leave what cannot be aborted for the operator.
+- [x] `2026-10-23_phase-A-unfinished-git-operations` — never commit over an unfinished rebase or merge; leave what cannot be aborted for the operator.
 - [ ] `2026-10-23_phase-B-sync-lock-and-exit-trap` — one sync at a time, a stall limit on network calls, and an exit trap for the settings copy.
 - [ ] `2026-10-23_phase-C-restorer-and-devcontainer-hardening` — refuse symlinked restore roots; create the devcontainer's bind-mount folders.
 - [ ] `2026-10-23_phase-D-knowledge-refresh` — refresh OpenWiki and audit live guidance for stale claims.

@@ -17,6 +17,10 @@ Stop state sync from committing conflict markers: refuse to commit while a rebas
 - Documenter updated `README.md`, `docs/runtime-checks.md`, and `docs/smoke-tests.md`; I re-wrapped one README line.
 - Regenerated targets and refreshed this repository's installed overlay (`install_bootstrap.py . --allow-self --local-only`, nested commit `dd9af16`).
 - Required checks before review: state-sync tests 92 passed; validator and installer tests 387 passed; `validate_targets.py`, `check_runtime.py`, and `validate_plan_frontmatter.py` exit 0; `verify.py phase` PASS (4966 passed, 1 skipped). My first check runner fed commands on stdin and lost the last three to a child's stdin drain; rerunning with `</dev/null` fixed it.
+- Review round 1 (`code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`): gate PASS with three MINORs, all fixed rather than accepted: (1) a failed `merge --abort` was reported as "merge left in place" even when `git merge` had failed before creating `MERGE_HEAD`; the coder added `clear_current_merge_state`, guarded the branch with `nested_merge_in_progress`, and added `test_failed_unrelated_merge_without_merge_state_restores_settings` (it failed on the pre-fix script with `['merge -q', 'merge --abort'] == ['merge -q']`); (2) the new `docs/runtime-checks.md` paragraph split "`settings.local.json` is handled the same way" from the paragraph it refers to, so I moved it below the settings paragraphs; (3) that paragraph said every rebase in progress is left alone, so I named the orphaned-autostash exception.
+- Review round 2 on the changed hunks: gate PASS, no findings, no open requests.
+- Regenerated, refreshed the overlay again, and reran every required check: state-sync tests 93 passed; validator and installer tests 387 passed; `validate_targets.py`, `check_runtime.py`, plan lint exit 0; `verify.py phase` PASS (4967 passed, 1 skipped).
+- Reran the three consumer-report probes against the new script: the manual merge keeps `MERGE_HEAD` with no merge commit; the failed-abort pull leaves the rebase in place, the next checkpoint commits nothing, `ai-state` does not move, and the remote keeps `from-A`; the failed setup merge stays at the init commit with `MERGE_HEAD` on disk. No commit holds conflict markers.
 
 ## [LEARN] Entries
 
@@ -27,6 +31,8 @@ Stop state sync from committing conflict markers: refuse to commit while a rebas
 
 ## Verification
 
+- optional 1: PASS — reran the three consumer-report scenarios (`probe_state_sync.py` in the session scratchpad) against the regenerated script; each ended with no new commit, and no commit holds conflict markers.
+
 ## Open Questions / Next Steps
 
-- Implement steps 1-5 (coder), then documentation (documenter), then review.
+- Phase B next: the sync lock, the network stall limit, and the exit trap.

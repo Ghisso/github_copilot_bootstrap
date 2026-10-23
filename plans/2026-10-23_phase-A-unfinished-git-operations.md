@@ -3,8 +3,8 @@ name: 2026-10-23_phase-A-unfinished-git-operations
 type: small-plan
 parent_plan: state-sync-safety-fixes
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-23_state-sync-safety-fixes-phase-A.md
 ---
 
 # Small Plan: Never Commit Over an Unfinished Rebase or Merge
@@ -28,7 +28,7 @@ flowchart TD
 
 ## Steps
 
-- [ ] **1. Detect unfinished operations and refuse to commit over them.**
+- [x] **1. Detect unfinished operations and refuse to commit over them.**
   - Owner: `coder`. File: `shared/hooks/scripts/state-sync.sh` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Add `nested_merge_in_progress` (true while `$CLAUDE_DIR/.git/MERGE_HEAD` is a regular file) and `nested_operation_in_progress` (an unfinished rebase or merge). Reuse `nested_rebase_in_progress`.
@@ -40,7 +40,7 @@ flowchart TD
   - `cmd_status` (lines 655-690): print `merge: none` or `merge: in-progress` on a new line right after the `rebase:` line, in both the uninitialized and the initialized report. Existing lines keep their text and order.
   - Acceptance: during a user's conflicted merge, every mutating mode exits 0, runs no Git command, changes no file or ref, and adds exactly one error-log line.
 
-- [ ] **2. Leave an operation it cannot abort for the operator.**
+- [x] **2. Leave an operation it cannot abort for the operator.**
   - Owner: `coder`. File: `shared/hooks/scripts/state-sync.sh`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - `clear_current_pull_rebase_state` (lines 357-374): run `git -C "$CLAUDE_DIR" rebase --abort` only, append its output to the error log, and return its status. Delete the `rebase --quit` fallback.
@@ -50,7 +50,7 @@ flowchart TD
   - Run the re-check (`preflight_unfinished_operation`) and the `commit_local_state` call (now at lines 523-535) for both paths, not only the rebase path. Order: first record whether `HEAD` and `origin/$BRANCH` share history (the existing `merge-base` call at line 496), then run the re-check and the commit, then take the merge path or the rebase path. A commit on top of `HEAD` does not change whether the two histories are related. Keep the `merge-base` call ahead of the re-check: `test_pre_rebase_checkpoint_rechecks_active_rebase` starts an operator rebase at that call and expects the re-check to catch it. The unrelated-history merge now also starts from a committed tree, so `merge --abort` never has uncommitted local changes to lose. Keep both messages.
   - Acceptance: the only `rebase --quit` left in the script is the orphan auto-clear, and no path writes the settings copy back while an operation is unfinished.
 
-- [ ] **3. Make `setup` stop, and remove two duplications.**
+- [x] **3. Make `setup` stop, and remove two duplications.**
   - Owner: `coder`. Files: `shared/hooks/scripts/state-sync.sh`; `tests/test_install_bootstrap.py` (only the two comments at lines 649 and 723 that name `untrack_error_log`).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - `cmd_setup` (lines 431-453) and `setup_local_state` (lines 418-427) both carry the same existing-repository branch. Keep it only in `setup_local_state`. `cmd_setup` records whether `.claude/.git` was missing, calls `setup_local_state` once, and returns its status at once for an existing repository. This keeps the local-only contract that `test_setup_existing_nested_repo_does_not_checkpoint_pending_state` guards.
@@ -59,7 +59,7 @@ flowchart TD
   - Replace `untrack_nested_cache`, `untrack_error_log`, and `untrack_local_settings` (lines 124-144) with one function, `untrack_local_only_paths`, whose only command is exactly `git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache session_logs/hooks-errors.log settings.local.json`. One comment explains all three paths. `commit_local_state` calls it once.
   - Acceptance: the existing untrack and setup tests pass unchanged.
 
-- [ ] **4. Move the validator contract in this phase.**
+- [x] **4. Move the validator contract in this phase.**
   - Owner: `coder`. Files: `scripts/validate_targets.py`, `tests/test_validate_targets.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Extract the state-sync text checks in `validate_mcp_and_hooks` (lines 3292-3327) into `state_sync_text_errors(text: str) -> list[str]`, and call it on the generated hooks copy. The byte-identity check of the two installed copies stays inline. Unchanged checks keep their messages.
@@ -68,7 +68,7 @@ flowchart TD
   - Add a check that `merge --abort 2>/dev/null || true` does not appear, mirroring the existing rebase check.
   - Tests: `state_sync_text_errors` returns `[]` for `shared/hooks/scripts/state-sync.sh`. Each of these mutations returns exactly one error that names its rule: a second `rebase --quit` invocation appended; the orphan invocation removed; the silent merge abort inserted; the untrack command removed.
 
-- [ ] **5. Regression tests for the three reproduced failures and the new behavior.**
+- [x] **5. Regression tests for the three reproduced failures and the new behavior.**
   - Owner: `coder`. File: `tests/test_state_sync.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - MEMORY lessons: each new test fails against today's script; recovery and control-flow tests record real Git calls through a fake `git` that logs each call and then runs the real one, and assert the exact calls; fixtures commit inside pytest subprocesses, as the suite already does.
@@ -86,7 +86,7 @@ flowchart TD
     - `test_status_reports_rebase_state`: also assert `merge: none` in both reports.
   - These must pass unchanged: `test_pull_clears_half_initialized_rebase_state` (the orphan auto-clear), the settings tests (`test_conflicted_pull_keeps_the_local_settings_it_aborts_around`, `test_conflicted_merge_keeps_the_local_settings_it_aborts_around`, `test_fresh_clone_keeps_its_local_settings_when_origin_still_tracks_them`, `test_reconciliation_is_skipped_when_local_settings_cannot_be_preserved`, `test_pull_keeps_a_settings_write_made_while_it_ran`, `test_merge_keeps_a_settings_write_made_while_it_ran`, `test_pull_that_leaves_the_settings_file_alone_removes_its_byte_copy`), the untrack tests, the setup tests, `test_failed_pull_without_rebase_does_not_attempt_recovery`, and the push and migrate guard tests.
 
-- [ ] **6. Update documentation.**
+- [x] **6. Update documentation.**
   - Owner: `documenter` (CLOSEOUT step 1). Files: `docs/runtime-checks.md`, `README.md`, `docs/smoke-tests.md`.
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `docs/runtime-checks.md`, state-sync section (about lines 480-505): state sync never commits while a rebase or merge is unfinished; it leaves one it finds in place alone, with a logged warning that advises `--continue` or `--abort`; when its own abort fails, it leaves the operation in place and keeps and names the settings copy; `status` reports a `merge:` line.
@@ -94,12 +94,12 @@ flowchart TD
   - `docs/smoke-tests.md`, lines 335 and 342: the same two facts, and that `setup` does not restore adapters after leaving a merge unfinished.
   - Leave `docs/2026-08-09-state-sync-rebase-recovery.md` unchanged; it is a dated record.
 
-- [ ] **7. Orchestrator closeout items.**
+- [x] **7. Orchestrator closeout items.**
   - Owner: orchestrator.
   - Before CLOSEOUT step 2, run `uv run python scripts/generate_targets.py --all` and then refresh this repository's own installed overlay with `uv run python scripts/install_bootstrap.py . --allow-self --local-only`, so `check_runtime.py` and the receipts see current runtime copies (MEMORY). From then on, this repository's own hooks run the new script.
   - In `.claude/MEMORY.md`, supersede the `[LEARN:domain]` entry at lines 120-129: `cmd_setup` no longer ignores a reconciliation failure that leaves a rebase or merge unfinished; it stops before restoring adapters or committing.
 
-- [ ] **8. Review.**
+- [x] **8. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus: no path commits or writes the settings copy back while an operation is unfinished; the orphan auto-clear is the only `rebase --quit`; the setup contracts hold; each new test fails against the old script.
 
@@ -125,11 +125,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
