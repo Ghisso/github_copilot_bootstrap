@@ -3,8 +3,8 @@ name: 2026-10-23_phase-B-sync-lock-and-exit-trap
 type: small-plan
 parent_plan: state-sync-safety-fixes
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-23_state-sync-safety-fixes-phase-B.md
 ---
 
 # Small Plan: One State Sync at a Time, and an Exit Trap for the Settings Copy
@@ -34,7 +34,7 @@ Decisions settled from this evidence:
 
 ## Steps
 
-- [ ] **1. Add the lock.**
+- [x] **1. Add the lock.**
   - Owner: `coder`. File: `shared/hooks/scripts/state-sync.sh`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/integration-gate-spike/SKILL.md`.
   - Add `acquire_sync_lock` and make it the first line of `dispatch_mutating`: `acquire_sync_lock || return 0`. `status` stays unlocked. Behavior, in order:
@@ -46,14 +46,14 @@ Decisions settled from this evidence:
   - `cmd_status` prints `lock: free`, `lock: held`, or `lock: unavailable` (no `flock`, or `flock` fails) on a new line right after `merge:`, in both the uninitialized and the initialized report. It opens `$REPO_ROOT` on descriptor 8, runs `flock -n 8`, and closes descriptor 8 at once, so it never waits and never keeps the lock. A `lock: held` that stays while no sync is running is the visible sign of a stuck process.
   - Acceptance: a busy run of any mutating mode exits 0 and runs no Git command; `setup` and `migrate-from-hf` do so only after waiting.
 
-- [ ] **2. Bound network Git calls.**
+- [x] **2. Bound network Git calls.**
   - Owner: `coder`. File: `shared/hooks/scripts/state-sync.sh`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/integration-gate-spike/SKILL.md`.
   - Near the top, after the stdin drain, add `export GIT_TERMINAL_PROMPT=0`, `export GIT_HTTP_LOW_SPEED_LIMIT="${GIT_HTTP_LOW_SPEED_LIMIT:-1000}"`, and `export GIT_HTTP_LOW_SPEED_TIME="${GIT_HTTP_LOW_SPEED_TIME:-60}"`, with one comment: these keep a stalled HTTPS transfer or a password prompt from holding the lock; SSH remotes are not covered.
   - Change no Git invocation: the validator checks the exact `pull --rebase` line.
   - Acceptance: a run against a server that never answers ends within the stall limit through the existing `fetch from origin/$BRANCH failed` path, and the next run retries.
 
-- [ ] **3. Add the exit trap.**
+- [x] **3. Add the exit trap.**
   - Owner: `coder`. File: `shared/hooks/scripts/state-sync.sh`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Add `settle_local_settings_on_exit`. Install it at top level, just before the `case "$MODE"` dispatch, with `trap settle_local_settings_on_exit EXIT`, `trap 'exit 129' HUP`, `trap 'exit 130' INT`, and `trap 'exit 143' TERM`. The signal traps must call `exit` so the script stops.
@@ -61,7 +61,7 @@ Decisions settled from this evidence:
   - Keep copy-don't-move: `preserve_local_settings` still copies and never deletes the live file.
   - Acceptance: a signal during a pull leaves no settings copy behind, except while a rebase or merge is unfinished; then the copy is kept and named.
 
-- [ ] **4. Tests.**
+- [x] **4. Tests.**
   - Owner: `coder`. File: `tests/test_state_sync.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`, `.claude/skills/integration-gate-spike/SKILL.md`.
   - Put `sync_lock` in the name of every lock test and `exit_trap` in the name of every trap test, so the real-invocation command in `## Verification` selects them. Lock tests that need a real `flock` carry `pytest.mark.skipif(shutil.which("flock") is None, reason=...)`.
@@ -81,7 +81,7 @@ Decisions settled from this evidence:
     12. `test_sync_lock_setup_warns_when_the_wait_ends`. A fake `flock` exits 1 for `-w`. `setup` exits 0, writes `another state sync held the lock for 60 seconds` to the error log, and leaves `.gitignore` unchanged.
   - All existing tests pass unchanged; each uses its own root, so none of them contends for a lock.
 
-- [ ] **5. Update documentation.**
+- [x] **5. Update documentation.**
   - Owner: `documenter` (CLOSEOUT step 1). Files: `docs/runtime-checks.md` (the paragraph at line 502 and the hook paragraph at about lines 506-516), `shared/policies/workflow.instructions.md` (the session-start AI-state bullet at line 539), `README.md` (the "Both are safe to (re-)run anytime" paragraph near line 470), `docs/smoke-tests.md` (lines 279 and 335).
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - State: one state sync runs at a time per checkout; a busy run skips and the next one catches up; `status` never waits.
@@ -91,11 +91,11 @@ Decisions settled from this evidence:
   - State: `setup` and `migrate-from-hf` wait up to 60 seconds for a busy lock, then warn and skip; run them again later.
   - State: state sync cancels an HTTPS transfer that stays below 1,000 bytes per second for 60 seconds and never waits for a typed password; stored credentials and credential helpers keep working. SSH remotes are not covered. `GIT_HTTP_LOW_SPEED_LIMIT` and `GIT_HTTP_LOW_SPEED_TIME` set by the caller win.
 
-- [ ] **6. Orchestrator closeout items.**
+- [x] **6. Orchestrator closeout items.**
   - Owner: orchestrator.
   - Before CLOSEOUT step 2, run `uv run python scripts/generate_targets.py --all` and then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. From then on, this repository's own hooks take the lock.
 
-- [ ] **7. Review.**
+- [x] **7. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus: the stall-limit variables change no Git invocation; a busy run never touches Git; no lock file or stale-lock path exists; the trap cannot write the copy back during an unfinished operation; the Bash 3.2 rules hold.
 
@@ -122,11 +122,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
