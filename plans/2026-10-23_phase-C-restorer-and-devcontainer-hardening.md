@@ -3,7 +3,7 @@ name: 2026-10-23_phase-C-restorer-and-devcontainer-hardening
 type: small-plan
 parent_plan: state-sync-safety-fixes
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
