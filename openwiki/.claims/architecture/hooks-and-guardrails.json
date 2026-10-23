@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:957b1a9a857a941596ae77a9fd3552f263675835c5d12e1bc9b4bdd6ef9d3cf5",
+  "pageVersion": "sha256:07604269dba0106016bd55e63a227ed30d4045bb74881c947f37b97f2f5809a8",
   "claims": [
     {
       "id": "claim_577abfccd7214b578dafc049c57d3ba8",
@@ -42,15 +42,15 @@
     },
     {
       "id": "claim_9ef8ef66bf964990b0cda7d52ba5552c",
-      "statement": "Claude Code wires openwiki-guard.sh post to PostToolUseFailure as well as PostToolUse, while Codex fires nothing on an MCP error and instead runs a payload-free openwiki-guard.sh post at Stop; Codex also runs state-sync.sh push and reporting-reminder.sh prompt on UserPromptSubmit and state-sync.sh checkpoint on SessionEnd.",
+      "statement": "Claude Code wires openwiki-guard.sh post to PostToolUseFailure as well as PostToolUse, while Codex fires nothing on an MCP error and instead runs a payload-free openwiki-guard.sh post at Stop; both hosts run state-sync.sh push and reporting-reminder.sh prompt on UserPromptSubmit, and at session end Codex runs a local state-sync.sh checkpoint on SessionEnd while Claude Code runs state-sync.sh push on SessionEnd and state-sync.sh checkpoint on StopFailure.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1150-L1162",
-          "version": "repo-lines-v1:sha256:22afe3ccc41dc7299f5ab735b2f2810f150e05559c3aa798f3ca6f99e42ca2bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxY2E3YWJiNzg3Mzc2NTY1ODQxNzRlNjcyMGIwYjk1MGU3NmU0ZDlkNjJlMjdhODJiYWNkY2I4NGViNTZkYTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhM2VjMmRiMGQ3ODFjMGFlMTk3NjhiOTBlOTBlZTYxNWU1NmU1YzMyODJkNWMwMTk5OGY5Yjc0NzE0YzhkNzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwOGM1MmY0NGFjYzlhNDVlY2YyYzk1OTQ0ZTVmYTAzNTEyMDFkZGFkMWIwNTgyMTE5MjQ2Mjk3NjlmMTRhODAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4ODJhZmFjMDQ5MTA5MWRhYjA4MzY0NTIwZDJiMzMzNWI4YTIxNDAzMDIyZTA5ODg4ZGJmODU4YWZhYTZmOWYifQ"
+          "resource": "repo://scripts/generate_targets.py#L1152-L1186",
+          "version": "repo-lines-v1:sha256:bfea353adbec4b30609919c6fbfa207007af367ed943bc29c23d41811121aaf7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjNWE3ZDQ3MjllYzk2ZDE4ODljOTY1YjBjOTA4ZDI5NWZlMGIwZmM0NjczZGRjOWM5ZTc1ODMwMmIwNmNlNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkYzM1YjRkY2ZjMTVkZTRmM2Y0N2Y3ZjNkMmZmMzFjYTA1Y2QyNWNjZDA5NzJjMTIwM2E4ZGRiZjFjZDAxZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1267-L1290",
-          "version": "repo-lines-v1:sha256:a68bb58a99e36547ed18b146db3545f03c324e17e844b3801cf5c323d1a5721c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmM2IzMzg2NzhiYjY1ZTA0NGJjMzQyYjEwM2Q1MTRiNTQ1NjhiM2RjZTY0ZjQxYjIzNjY5ZDdhZDE2NTgxZjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIxNzdiYmYwMzVjMzg2MGM2YzRiZDQ1ZmQzMGM2MjgwNmZiMDA4MTM4ODcwZTQ4YjI3NTkwMGVjZjdkZGUyYjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
+          "resource": "repo://scripts/generate_targets.py#L1270-L1290",
+          "version": "repo-lines-v1:sha256:be65230b886fa1b2486643a9f92626186309a7981a2cc6940da316fc3fe6414f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTcxYjViMWRkZDQxNDI4MDkwZDQ5YTA4MTUwZDZhYzBiNTYyYjZmMGYwY2U2MzZkZjcxNWVmMzJlNDZjZmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVlZDM1ODI4Yzg3YjI2YTRhYzdmMjZjM2U3NmZlYzFmNDg2MTQ4OTM2N2UzYmM5MDM4YmI2MWM2ZmE4NjA0OWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
         }
       ]
     },
@@ -215,8 +215,8 @@
           "version": "repo-lines-v1:sha256:2e107162c03c9c97f4ca2ad7c7c41fef10428b722d780f151c9db41db3a35904:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyY2RiODAyOThmNTFhM2E2OWQxZWJlZDM5MmQ4NzA3YWNkNDIxZGY4N2Q0YTU0NDY4NDZlYzg5MGNlNjk4ODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjYTcyYzViNDM2MTVkYTU4YWQyNzBjOWFhNWRkNTY3NzA0NWM3OTc0NmM1M2I5YzZiOWYyNzMzYzg1MzI5MjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyZjQwOTVhODViNjYwODY3NTZiN2M1Y2UzNzgyNzBkMjIyZDU5NTk0YjY2MTdhOGQ2Njk3ZTM4N2RlZjYwODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhMzlkYWE4MmViZjRjY2RhZWUxYzNmN2E3YjExNzg5N2ZiYWE3ZjlmNGQyYjVjNmExYjI4MmYxYjIyYjE0MGYifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L116-L136",
-          "version": "repo-lines-v1:sha256:ec524aec1c2d1a9444350a6e0719832e0cccc7230f860134d3b567bedf3519bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzOWI3YWRkMTRjODUwYzNjZDdlYjhmY2UxMzE4NmE2MWVhYzI4MTBkOGZiOGViYzg3ZjRiNzY0ZjcwZDBhMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0ZGQ2MjYxMGZiNzNkZTUyNjllNjJmNDdlYTk4ZGQ2YTk2OWU0ODlhNDkxOTAxMTI0NjYyNjMyZDkxOWZjYjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhNGMxZGJlM2Y1ZTJjMzBjYmU3MTQ5YzVhNjlmYzAwODAwOTM0NGIwZWVmZTY4NzFlNGVlNjE4ODUxNzU2MmEifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L125-L137",
+          "version": "repo-lines-v1:sha256:771447839ff6695886882c26677ca8faf635ac621a75236f8ec5cfeadddd9da9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzZGFjODljZDQxYTFlNDk3ZTNkNTdiNTJmZDdiMmZmOTA3NjY0NTI4MDA0NTA2YzU1YzRlMjc4YTRiYWE3NjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhMWUyY2YyZTExYjE0NWQ0NTljNmUyMzcxZmJiN2ZjM2EyMTJiYTdlMmY0MmVkNjhjYzMzMjJlODE5YzA5MGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViZDJmMmE3ZmY3MjdjYjg5NGVjNTc3NTRjM2ExNjc2ZTg4ZjkwOGE3Y2Y0ZTNiMjk0ODNlOGJkN2Y3NDJlZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZlMGZiODRkZTc4NmU2NTdiODc4OWU5YmNlMWJhOTM0NGVmYTVhNWNjOTM2MjIxN2JkZGQ1ZjVkZDY2M2UzMTAifQ"
         }
       ]
     },
@@ -371,6 +371,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-21T23:41:10.813Z"
+    "at": "2026-10-23T06:45:08.272Z"
   }
 }

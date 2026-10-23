@@ -54,10 +54,10 @@ sources:
     resource: repo://tests/test_openwiki_cli_smoke.py
   - id: openwiki-source-ac71b7b5ed0ae12dcdfb1f63
     resource: repo://tests/test_openwiki_guard.py
-generated: { by: "claude-code", at: "2026-10-21T23:41:10.813Z" }
+generated: { by: "claude-code", at: "2026-10-23T06:45:08.272Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T23:41:10.813Z
+    at: 2026-10-23T06:45:08.272Z
 ---
 
 # Hook dispatcher and guardrail scripts
@@ -89,10 +89,11 @@ Claude Code and Codex share this shape:
 - **PostToolUse** on `Bash`: `record-branch-state.sh`, `context-mode-dispatch.sh`, `reporting-reminder.sh late-report`. On `openwiki_begin`: `openwiki-guard.sh post`.
 - **Stop**: one ordered wrapper, `claude-stop.sh` or `codex-stop.sh`, runs session logging, the log freshness check, `state-sync.sh checkpoint`, then `state-sync.sh publish`. A failing child is logged and skipped, never fatal.
 
-Two per-host differences matter:
+Both hosts also run `state-sync.sh push` and `reporting-reminder.sh prompt` on `UserPromptSubmit`. Three per-host differences matter:
 
 - Claude Code fires `PostToolUseFailure` when an MCP tool returns an error, so `openwiki-guard.sh post` is wired there too.
-- Codex fires nothing on an MCP tool error, so its Stop also runs a payload-free `openwiki-guard.sh post`. Codex additionally runs `state-sync.sh push` and `reporting-reminder.sh prompt` on `UserPromptSubmit`, and `state-sync.sh checkpoint` on `SessionEnd`.
+- Codex fires nothing on an MCP tool error, so its Stop also runs a payload-free `openwiki-guard.sh post`.
+- At session end, Codex runs only a local `state-sync.sh checkpoint` on `SessionEnd`. Claude Code runs `state-sync.sh push` on `SessionEnd` and a local `state-sync.sh checkpoint` on `StopFailure`.
 
 GitHub Copilot's configuration has no matchers, so it lists the five Bash guards individually under `PreToolUse`, and each guard runs on every Copilot tool call. Antigravity wires only a `*` PreToolUse bridge and, on purpose, no lifecycle hooks.
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:012a58ce9d1677d3ce8d81130aa21f0e267f89d37d12f9b63b7e6cdc4b3e8986",
+  "pageVersion": "sha256:6fded3e2656befb8d2e19ec3081eb88554d99fc8660ed9616086c4ad8f97bbe0",
   "claims": [
     {
       "id": "claim_170b66d0359a4df39a8029164feadafe",
@@ -21,20 +21,24 @@
       "statement": "Repository verification uses generated-target generation and validation, runtime checks, and verify.py fast or phase mode; an isolated validator interpreter without pytest must use the devcontainer or uv run --with pytest, while verify.py selects the repository's lint, type, and test scope.",
       "evidence": [
         {
-          "resource": "repo://README.md",
-          "version": "repo-file-v1:sha256:0f34889c87f378239d801bbedaae1a7d12ffed60b77cf63d24f9ed174423d291"
+          "resource": "repo://README.md#L1386-L1394",
+          "version": "repo-lines-v1:sha256:f9656ff320b9a39bc8524ed7457977c5b7b0bff543c2a472ec1078ffbd925236:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGIwMWExZmEyNjMyMzE3OTEyOTIwNDZiNDUzNmJkMzc2MzQwOGZlMzMzMWExMWM5MDdlZDdhYWY4ZmFhYTVlZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQxMjZlZTA0OTRkYTk3NjJhNWQ5YzgwZGQwOGJhMDI0N2U3Yzc3YTc4YTBkZmQwODY1NTZiMGEwODZjZTIxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDc4MTRjNmI3NDc5ZDJhOGIwYTU4ZGQwMjM4NzFjNjMxZjRhNTJmNDMxZDAzY2UzZmM3MWU3MjEyMTAzMTQ4NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQ5MzZkYTA4NzA1ZmM0YzI5ZTMwMmRkMDczNDlmYTM5MWQzNTc0MmU1YWE5NzhiZjkyNTliNzEwMGUxZjA0ZiJ9"
+        },
+        {
+          "resource": "repo://README.md#L1459-L1463",
+          "version": "repo-lines-v1:sha256:e3b4ee1b2bdcb34158507c830f61df49d2fcc6405ce2a2137fe19aa0b916301c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzZkNWQwZWU0NGM2YzdmYjljYjE3ODlmZmFiZjU0MjBkZGVhMzMxZDgxZmNhY2RhY2JhYzYwODFmZDQyYWZiNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDdjMDZjNTYxZDVjMzI3MzQzNjg1MjY4YTQ2YjMzOTFmMzk5OGVlZTg5MGQyYmU1MWYwZDIxY2M0YTUzYWU2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWViM2QzZTg4MzJkMjRkZTM5MjU3YzJiZTA4ZDM5NjhiYzY5M2JjMjA4YmQ4MmEyY2IzODFhNjc4NjdlMTIyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTBjM2NjYmVhNTMxY2Y4NThmY2YyNTE4YjZkNGJmNjc0YTI3Y2RjN2RlN2U5M2M0Y2U3YzQwNmEyNmZmOGM1NyJ9"
         },
         {
           "resource": "repo://docs/smoke-tests.md#L5-L12",
           "version": "repo-lines-v1:sha256:6b4b98a65590656451012251e9af7f8e19be4f50b352d55970e61a526519b0d5:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWRlMmY1MzI4ZWU2ZTgwNTBlOGFhZmQ4ZGM4NjlhMDY5Y2Q5NTg0ZWRhYWY1NGZlNTg5ZDczYzNiN2RjZDc5OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDBmMDMzNWNlZWQ2OGQ2MjcxMzNmN2VkMDBjYWYxYTNkYzUyMWIwMTZmZWIwMzk1M2RiODNjYjc4ZThlMDZjZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWY5Nzc1MTAzOTAxM2FlNzY5N2RjNjdmNDI3ODg1NjI5Y2Y1NzE4ZDVmNzc5MzQzZWFmYmYyYzQ1NDI0M2Q0MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGM4MzEzODlmMzgzMDRhZDA0MGQ2NDgzNWI2Mzk4ZWY3ZjY0OTRlODExMjc4ZjkwN2JkOTc3ZTk0NWRkNjkwOCJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L12197-L12220",
-          "version": "repo-lines-v1:sha256:625af550be76619d9911981c098b98dfe51f38a56d0c99964a6b4ca7ddd99095:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZTI1NDliMzRmYWQ3MTkzZDk4NTdkNjg4MmYxNmI0ZDM1OGUwNWMyZTY4YjhjNWQ0NjI2MGU2YzA4MTNhZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMTIwZGYxYTMyOTgyMzVkZDQ4Yzk4MWFlYzdjY2Y2NjY2OTc4YjAwYzhkY2I0MzFjMzgxNmMyYjYzMDBjZjYifQ"
+          "resource": "repo://scripts/validate_targets.py#L12221-L12243",
+          "version": "repo-lines-v1:sha256:91727b661d2fa8ab11ac7be7d6b52c6e1418d5fe02deec933e87d56104c95089:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZTI1NDliMzRmYWQ3MTkzZDk4NTdkNjg4MmYxNmI0ZDM1OGUwNWMyZTY4YjhjNWQ0NjI2MGU2YzA4MTNhZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI3YmZhMGZjNzEyMTIwMzQ5YjVlODBiNjVlNzgyNWE1ODgwZGRiMjU1MDZlYjI5YmNiNDg0ZmI5NzBlMzBkNDQifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py",
-          "version": "repo-file-v1:sha256:23cb02c7cb0bb63bca0e0df7be47126447997b5e9533af3a944851129f529574"
+          "resource": "repo://shared/scripts/verify.py#L3403-L3432",
+          "version": "repo-lines-v1:sha256:cc03a9162e35d4b5519cb678dfa097e42be52f22d36e06188c302026dce183e8:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2NTcwOWNkMTU4NDAzMmJiY2I5ODFjM2Q2Y2YwMjNhYjNhNTM1N2ZlZWJmMjcyZTdmOGRjNjMxNTkzMDc5NzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkNmZiZmVkZWYxODk3YTZhYTA2ZDg2MDA4MjRhZThjMDAwMmU3NTViY2YxNzgyZmVmMzIwYzVkZmZiMTBjZDYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM4OWIxYTU3YjljYmQzNDM0NjgzMDIzOTM4MjAyYjEzNDU2ZWM0Yzk0ODlmZjBhZDNhOTcyNGY4MjBlZTk0MzIifQ"
         }
       ]
     },
@@ -93,6 +97,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-22T17:57:02.699Z"
+    "at": "2026-10-23T06:45:08.272Z"
   }
 }

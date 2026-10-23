@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:d1eee783062ea3564b132ec06c85cdb8da0dd8a43ae5c67451fc23e00a9ca37e",
+  "pageVersion": "sha256:7d584098452d18750ce88215d7f25c165d746461f5453af977c2cf84191c23fb",
   "claims": [
     {
       "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
@@ -25,7 +25,7 @@
           "version": "repo-lines-v1:sha256:83211c3f76971cf6421568f954564b4a23e988bfd84c66ff635b6def3164013e:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZDEwYTIzYTI0ZDMyMGM5YTZkOWE2OWNiYmRjNTFiMWYyZDkwMTc2OWYyZjk1MTg0MWUwOTkxZjNmYmM4OWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljMmQzOTE3MDU3MzUwNzFiNzJmZDA2ZDk0MTVmNzZmZDUxZTgyM2JhYWE3ZmUwMTNlNTIwMDlkYzQwYWMzMjcifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L78-L89",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L84-L95",
           "version": "repo-lines-v1:sha256:11125df4e0acda4fef369976373e1e90b1f6b1a747ba6ff5aa5e80d7aa070c8d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ODBlYmRjMDU5MWUyMTJkZDJmZDlmMGIyYWZmNjExNmZlYTEyZGM2NzI3Zjg5MmJlNzFiMWYwN2U1NThlOGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMyZDk5YTM1MTUyYzI1MjU0ZmNhYjU4ZmU2YjViYWU1MDRiMTMwODVmZTJlOWMzMzdhZTliMjYzZDEzOGVhNGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImExMGJlMDYyNjY3NDFmNDc0ZmVmMjFkMTRiNmQ4OTVkNDBmZWIwZDMwMTEzMWVkMzdjNmM3MjczMmRiYzAyZWIifQ"
         }
       ]
@@ -39,7 +39,7 @@
           "version": "repo-lines-v1:sha256:33cd07e2ab96c21b9eac00b95fca76520a8b331cb2ce0cefead0f36ae9bd7a07:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiZDU3ZDYwNGZiYWRiMzJiY2I2N2IzODcwYzdjZTEyYmQ3MzRmMmJhZjFiYjEyZmM5MzliNGQ3OTBiMDdjYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkYTI4NzAxMWYwOWZiZmJlN2Y1ZmIwNTI3NWM1NzM2MTZiYTMxYjdlYjMyYzZjMTExYzlkYzZjOTM2OWE5NzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0Y2YyN2MxNWMwMGFlNzBiMGI5OGU5MDIwNTYyMzMwNzU0ZGJiZWU4ZDY1ZGM3ODM2MmNkOTk1NGYyYmQxY2UifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L736-L748",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L855-L867",
           "version": "repo-lines-v1:sha256:46261184269467f510da2b16cfaf0f5ab462e4ca106be4f156779a4c51512db3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzNDNiZmYyMTUzYTc2ODk4NTYxZTk4NjU2Y2Y3OGIyNjRmMmZjNjViMDhiYTlmYWNlZWM1OWViZTUyNjJjNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         }
       ]
@@ -49,11 +49,11 @@
       "statement": "checkpoint initializes the nested repository if needed (restoring root adapters on that path) and commits local AI state with no remote operation; push is checkpoint followed by publish and skips publication when the checkpoint fails.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L465-L472",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L562-L569",
           "version": "repo-lines-v1:sha256:4f095bf5225db0d3bf0d48cdeb8892a8deade950e59ca030a98b32c73f226f9a:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2QwMjY5NzYyYmRlZThiNjk2NmI3M2Y4ZjkwODljOWVkNWU5MGM2NDVhMjA4N2Y5NTFhZTBkYzQ5NzZkOGY2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzUxNmVlZGU5ZTQ1ZjU1ZGUzMDAxNGU0MjMyNTE5MGJhMzZlM2FjMmQ3MGJhYWM2NDVhNmFkZmU0YWIzOGI5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjNmZTY5ZTM3YzViMmI3NzA5YjRmNGU2MjVhN2ViOGM2YzE4MGM0MDRhODU1MzNkNTY5ZjhlM2Q3ZWVkZGU4YiJ9"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L647-L653",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L754-L760",
           "version": "repo-lines-v1:sha256:514a990f170f0bb77107c645d0f16de67ab2ddac015316ea0d30f21866f1f731:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTU1NTc0ZDVkMmJkNWUwNGFlNzAwMTM4NjQzMjBiYWQxZjRkNTJiZmU1ZjdhZDY1OTQzZWI1NjJiOTJjNDkzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmVjZGRiNzNmZjdhZjJlMzIxZjA3NDZmMTcwMDM5MWRiYTYzMTBhZjAzMjI4YTEwYzY2ZWYyZDZlNGViOTllYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTRiNDA2ZDFmMjQ4ZThkNTM2NGRjYzI4M2JiNzk4YmIwZjA0NTEyNmI3ODc0ZjE3YmJiYjliMTdmZWFjMjkyNCJ9"
         }
       ]
@@ -63,7 +63,7 @@
       "statement": "pull records local nested state first, reconciles committed state with origin/ai-state when a remote is configured and not in local-only mode, and only after a successful reconcile restores root adapters and checkpoints.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L611-L646",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L718-L753",
           "version": "repo-lines-v1:sha256:abe30fb2601e1e4cfe3cd9a1b3ec431cfc80d136a64531637ebc128a498af732:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0NjdmMGQ5NzAyN2U4YTYzMWU5NWQ1NjIzMGRhZDViYjQ3NTdhYjdmMTYzNmZhYjNiMWJkZWY2Y2NmNmZhYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc5ODYzOTAwOTQ4MDU1MDFkZGEyOTRiMjM2MTEwMWMyZmEyY2YzMGI0ODdiZjdiNTE3MmQ4NzU5Yjc4NTVmY2YifQ"
         }
       ]
@@ -73,12 +73,12 @@
       "statement": "publish sends only already committed state: a dirty nested worktree makes it warn and preserve the uncheckpointed state, a clean one reconciles then pushes, and repeated clean publication is a no-op.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L569-L610",
-          "version": "repo-lines-v1:sha256:7b385629cc0bd86be520aeac4b1a5f72ee78a052c6237eec6cac027f4eac47aa:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiOTNjYjM0YjdjNDVlM2YyYmE3MjUwZmJiNWUwZWI3ODEwOWZlOTAxNzUyZDYwM2E3ZGJiOWRkMzllYTg5MDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3MzQ2YmI0Mzc0ZjhjNDFjMjMyNTk1NzgzNTAwNDc5OGVlYTZlNzVlZTMxYmM0M2ZhZDk1NTMzYWQzMDhhOTMifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L676-L716",
+          "version": "repo-lines-v1:sha256:54f3bbc0a5d05992f26fa1b6d0e5449d2e0f31af3f9a7455b0e8feb94e8b2457:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiOTNjYjM0YjdjNDVlM2YyYmE3MjUwZmJiNWUwZWI3ODEwOWZlOTAxNzUyZDYwM2E3ZGJiOWRkMzllYTg5MDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwOTI4MGFlYzhlYzIyNjBmZWRjYjM2ZTJjZDM2NDI2MGQzZmFiZjllZDU0YTc4ZDU3NDc2MmMzNzM2Y2JjZjQifQ"
         },
         {
           "resource": "repo://tests/test_state_sync.py",
-          "version": "repo-file-v1:sha256:443f2772b4c8ac69aae72fecabadff5b588fbb01d65b3d2487e5a5119c7be1f4"
+          "version": "repo-file-v1:sha256:487bbb1e0038e3eaf49635f75932cf22418f24a51bf7ecbbd6abefc7ce6955b6"
         }
       ]
     },
@@ -87,36 +87,48 @@
       "statement": "reconcile_committed_state returns immediately in local-only mode or without a configured remote, otherwise re-pins the origin refspecs to the ai-state branch before any fetch and treats a refspec failure as a reason to skip remote reconciliation while keeping local commits.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L283-L291",
-          "version": "repo-lines-v1:sha256:f78953dd7574a56bd415b53cbff582d3e123fe025fafc65c04b6002bda9aa0d0:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWVlMDFmOGQ2MTk0MDE1NWY1YTFhNjVkNTgzZjkwMjQ1YzQ0MjI5OGE5ODYyY2M5ZTljODU4NThhZjhlYWYyZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzJmODZmN2RlMWVlZjdjNGY1NThjMTg3NTYwOWUzZjQ2NjViZDZlMzUxZWY2MTc1ZjRjZmU3OTYxZTBjNmI1YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWY3MDZiOGI0N2Y3YjM5ZTU2MTNlMDMwMjg5OTllYTlmODFjMjM4OTJmMWNjNjgzODhjNDc5NWU5ODI2ODYyMiJ9"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L301-L308",
+          "version": "repo-lines-v1:sha256:75d4c8ece31f6e7035b6ea20b2fd65b746b5891a66edbbb3dcc10cfc6f7d5260:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWVlMDFmOGQ2MTk0MDE1NWY1YTFhNjVkNTgzZjkwMjQ1YzQ0MjI5OGE5ODYyY2M5ZTljODU4NThhZjhlYWYyZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzJmODZmN2RlMWVlZjdjNGY1NThjMTg3NTYwOWUzZjQ2NjViZDZlMzUxZWY2MTc1ZjRjZmU3OTYxZTBjNmI1YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzNmODk1YjIxNDdkZjNmNGZmNzllYWI4YTkwZTUwMDU4MDNkZTVhNGJmMTcwZmM4YmQwYTc1MGI0NzhmNGI5NiJ9"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L473-L492",
-          "version": "repo-lines-v1:sha256:895b20fe7cccc24c97244624b16fb462a1b6714b65310ae629571966522f0b6f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NjcyMjA3ZjA5MmMxNjYwMDhhN2IyN2Q4OTkyYmFlZWRiODkzN2I4Yjc5MzAxN2EwYWJhY2FhMDdiYTM3ZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllYzA4YzQxNTI2MDdjYjVkMmNkZjQwN2M3ODgxZTc5MTY1NDFkMzk4NDhjMDFkYzE5ZGU5Yzg2ZWU1ZWE1ODAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1OGIxZjJmNmI4ZjJhODhmMDhmZjgwYTMzMmNmMDk2ZTVlMzYxN2EyY2M4MmJiNWFkYmZhMzUxNWQyM2JkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzNjdkOTFhYzc1Mzk5MDljZWM3ZmM1NzQ0NjdjYTZiZTI5NTZmMzE5ZjNlMTkzNGU5OWFjNGEzMmRjZTJhYzMifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L570-L594",
+          "version": "repo-lines-v1:sha256:a8e6f62a50278b1ded80b7625ecec63948855e67ccea1b5fa1df3f47a5b3a465:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NjcyMjA3ZjA5MmMxNjYwMDhhN2IyN2Q4OTkyYmFlZWRiODkzN2I4Yjc5MzAxN2EwYWJhY2FhMDdiYTM3ZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5OTFmNWViZDRkMWI4ODI4NDI4YzRkYTI2MTQzYzg2NDgyN2VlZjZkMWY4M2U4ZTczOGY2ODVjMTU0YjFhNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1OGIxZjJmNmI4ZjJhODhmMDhmZjgwYTMzMmNmMDk2ZTVlMzYxN2EyY2M4MmJiNWFkYmZhMzUxNWQyM2JkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg3ZDg5Yzc3YzBlMThjMGM3YTc1M2Y1ZDYyM2FjMmM3OTRjNGVhOWIzNTQ3YjNjNzNkYzRmYzAyY2VlNzZkZTIifQ"
         }
       ]
     },
     {
       "id": "claim_f1c50b80e9c746cf88de1f03764d96a3",
-      "statement": "Mutating commands run through dispatch_mutating, which preflights rebase state inside the nested repository and preserves a valid pre-existing rebase rather than clobbering it, returning a distinct protected-rebase status.",
+      "statement": "Mutating commands run through dispatch_mutating, which takes the sync lock and then runs preflight_unfinished_operation: an unfinished merge, or a rebase other than the exact orphaned autostash leftover, is found by file, left untouched with one logged warning advising --continue or --abort, and returned as a protected-operation status that the dispatcher turns into exit 0, while the orphaned autostash leftover alone is cleared with rebase --quit.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L298-L375",
-          "version": "repo-lines-v1:sha256:c78f1b896bca0119d224b6652a6acbe135e88cbd87bebc029217a0ccd3168a8a:eyJzZWxlY3RlZExpbmVDb3VudCI6NzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NjMzZmMyNjhiMGI5NTFiNWUwZDI3YjRhOWVlODFiYTZlMjJkYTg0YTgxNDk5NGE5NWVmNDdmNWEwMmMwNTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMTgyY2Y5MzNkODMzYzk1YmEzMzJkYWUxMjI3MTk3MDFiZDZlOTM1Y2UxOTY4YWU5YjY0ZjU4MzE4Y2IwMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0NGM1ZWU1ZTc4Mjg4ZTI3MzYxMjQ1MTJjZTJlZjQ0YWYyMjUyNzRmMmRlY2QzNjkyNWZlMjkzZmI0MGYwNTMifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L316-L364",
+          "version": "repo-lines-v1:sha256:173014250a30c4dc1edb53758cff885ad4a49053770d024817a8c53815f6bab9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NjMzZmMyNjhiMGI5NTFiNWUwZDI3YjRhOWVlODFiYTZlMjJkYTg0YTgxNDk5NGE5NWVmNDdmNWEwMmMwNTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMTgyY2Y5MzNkODMzYzk1YmEzMzJkYWUxMjI3MTk3MDFiZDZlOTM1Y2UxOTY4YWU5YjY0ZjU4MzE4Y2IwMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhZDNmOWM0NTE3Mzk0MjdlZDhkMTA5NTYwMGY2MGU4Y2E0YTA2MDc5OTRhMzMyMjVjNzNjOWJmOTM0NzBmMWQifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L427-L450",
+          "version": "repo-lines-v1:sha256:6453a9d76ccb576e0fca5eea0702595ddabe94c9917a96f375fa0199874a1813:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmNDVmM2NjZWRkODRlZTE1MzZhN2IyMDRlNjkxNzA1M2RjMjVkMjBjZjg1ZjE4M2I5YWViYmU2YThjNTQ4YTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiNzc5YzYxMjYwZmExZTg4OTVlNGQxYjNiNjI5ZThiYTVhOGIwZDkwZjRmM2IwNTQwNGVlYTdiOWZhZmQ2ZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBjMmRkMzYxMzAwNzc1Zjc3Y2RlNGU0NzViNGM1MzJhNWIzOGMyNTY1NjAxZDViMWE0Y2U2OTQ4YzA0ODYwYTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEwOGEwODBjYmU5YWIxYzY4YWZkZjZkMzdiMTI0YTViMWM4ZWQwMTQzNzkyNjFiZjVmOWEzODM3M2Y0YjQ2Y2IifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2091-L2130",
+          "version": "repo-lines-v1:sha256:a9ba02575873e9d73658282a4ccb3468193e5dfaca740356f44f957fb1908e5b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0MWFiYzA2NGNiYzY2YTUzNmNiNzkxYjM3YzM5NjMwODY4YTQxYmQ5NzgzMDJiNTc2OTU5ZTUyMDY2ZDI2ZTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI4ODhhYjdmZmI0YTMzOWI2ZjQ4YzU2NjFiYjljOThiN2E1NjJkYzU2MzI4YjYyNjA1NWQxOWVkZTM5ZDk1YjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMzNDY2OTc1NmQ1Mzg2NDI0OThhMGY1OTFmNzY2NjlkZDBkMzM5YmExNGJiNmYxZTdiMWZkMTdmZTU1YzhiNWMifQ"
         }
       ]
     },
     {
       "id": "claim_53f56b1c64b74d459b42026b0d71f835",
-      "statement": "The nested repository's .gitignore excludes .cache/, session_logs/hooks-errors.log, and settings.local.json, all untracked without deletion by checkpoint (and the first two after every successful reconcile), while session_logs/hooks-bypass.log stays tracked; a .gitattributes gives session_logs/*.log the merge=union driver.",
+      "statement": "The nested repository's .gitignore excludes .cache/, session_logs/hooks-errors.log, and settings.local.json, and untrack_local_only_paths removes all three from the index without deleting them whenever commit_local_state runs, while session_logs/hooks-bypass.log stays tracked; a .gitattributes gives session_logs/*.log the merge=union driver.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L202-L211",
-          "version": "repo-lines-v1:sha256:8eef558dc5f5e476c46c9c30c0524da895deee3e90524d8f89278d2468f63e29:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Mzc2YTUzYmU2ZTVmZDY4OWI1YzcwZDFiMDNhZmNlMGUyNWVmNGYwYThmYzk2YTcwMjI4NWJhZjU2OWE4NWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmM5MGZmOGE0NDE0YzU0NDFkMGY2NzdjNWNiZmRhMzhiNDc0ZTUxYmZkNTU5YTU1NTlkZTBmODc3MDU1MjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJhOTgxNThhZmRlMjA1OWY3ZWE5NWQzNzNlZDI1N2I5YWE5YWI3MGViMmVjNDBjMzhjNjgyODAyNDFlZDJjZDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0OTcwODlkMmU2YTQzOWEzNTQ1YTQyYmQ0Yjg2ZDY1M2NjMTc5YTMwMjUyNTYyYTFmMDBlMDY0MDEwM2FjYTEifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L219-L229",
+          "version": "repo-lines-v1:sha256:72e986116c60536ff810dcae8e2e1c5e9afd3e3ffc4dff9928ac72ddd9312389:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Mzc2YTUzYmU2ZTVmZDY4OWI1YzcwZDFiMDNhZmNlMGUyNWVmNGYwYThmYzk2YTcwMjI4NWJhZjU2OWE4NWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJhOTgxNThhZmRlMjA1OWY3ZWE5NWQzNzNlZDI1N2I5YWE5YWI3MGViMmVjNDBjMzhjNjgyODAyNDFlZDJjZDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQzMzhiMDVjMTJjODBiNGNhN2UwNzFjZjgzNjgwY2ZkYTc5ZWI4MGFlYjM5NzBhNmM2N2VkYjJhMDRlNThhMzMifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L90-L125",
-          "version": "repo-lines-v1:sha256:efe44616acf18417630e8cdee3e0e737351bbe1ca0ea7f10cd305713599b20ed:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyZmQ4YzcyNjU0MWUyYzc5MWMzZTM5MGEzNTgxMWVmYjBhY2FiZWEzMTAwOWQ0MzA3MzI4NWMyMTI4YzY0ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5OTZlN2ZmYTU4OGUwZTMwMTVmZjc2NzNlZTk0ZmRhY2U1Y2UyMzYwZWU5M2I2NTRmYTY3ZDc0ZWJlMGUwMzIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTQwZjJiZjhjMzZmOGY4Y2Q0MzczZTdhNzFiMzVjODJiZGZhYTIxYmY1M2JhYmM2ZDU5MmU5NWZjMTgxOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEwMTAyNmUxMDc0ZWQ5YzZlMzE4OGI0MDEyZjI5NmIzYTEwOTgyMzc5MGM4MzlkZTdkYjhmMjY5NDA3ODJmMTQifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L265-L299",
+          "version": "repo-lines-v1:sha256:4e216782ba5fc6bb1ba5350020783a0c516815add7221f2cadaab7b845fad7c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1NGRhMDE2NTk0YTY4ZDQ2YjEzZTJiMzM5ZjJhYzA0MWQxYzQ1MzE0YWUwNzM5NjcwNjk0NzQzZmMzOTAwYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3OGE0M2RjMWM2ZDM1MGRhNGYwMWIwYzM0ODY4NGY5ZTEzMDM1OWFmZDA4YWU4NmQ3ZmVkNWQ3MGM2YjhhM2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyMWVjYTg0NTFiM2QyMGIwZDI5MTc1YzZmOWU4MjEwZDdjNGU5NWE3NmVjNDZiYzA4ZmFkOTczNDlmNzE4NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZmY4ZDM4ZDY0MDc5MmI0OTA2ZjRmNjYyOGYzYmYzYzQ2YTQ5NjBjNjEwODUzMThhM2M1ZjZiODk0ZDI0ZDYifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L96-L138",
+          "version": "repo-lines-v1:sha256:f871cb0cbcc7de28728588a83eb400fef618686fa56236d22d35a61793a70dc7:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyZmQ4YzcyNjU0MWUyYzc5MWMzZTM5MGEzNTgxMWVmYjBhY2FiZWEzMTAwOWQ0MzA3MzI4NWMyMTI4YzY0ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTQwZjJiZjhjMzZmOGY4Y2Q0MzczZTdhNzFiMzVjODJiZGZhYTIxYmY1M2JhYmM2ZDU5MmU5NWZjMTgxOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI4MWY4MjJjMjI1ZTIzODgyYjY2NzFlNTlkNTRiMGFhMmVkYjgwNTc3MTMyNzFhNDgzMjA3NjA1YTI1NDI3MjIifQ"
         }
       ]
     },
@@ -135,7 +147,7 @@
       "statement": "configure_outer_hooks_path sets the outer repository's core.hooksPath to the fixed literal .claude/hooks/git-hooks once that directory exists, leaves a matching value alone, overwrites a different value with a warning naming the old one, and only warns on failure; it is the one write state-sync.sh makes outside .claude/.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L376-L417",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L468-L509",
           "version": "repo-lines-v1:sha256:ad8d824b5dc53ada0a60af9c8344712581201bc61103ad3ce7fdf4c14830c087:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ODhjYzM0NWFhMmRjODUzZjYxZTU2MDFiYjE0NzA4MDc5NDM1Y2RmY2ZmY2U0YTZiMjI3OWYwYWVmZWQ3YjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkNDJjMjU0Zjc2NzdhYmI3NjUxODBiOGU2OGM3ZDRhNzQ4MzY1MDljOGYyZTg2NWY4ZGZmNTVjOWE1ZTU2YzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2MDdiZjUyNDZiMzI3ZDNhMjBkOGRlZDk1MjhmZWIxMzFjYjMzMzNhMjM0OGNmMTlkNTM4YThiNWVhYzhiOGIifQ"
         }
       ]
@@ -159,7 +171,7 @@
           "version": "repo-lines-v1:sha256:768667452951010d73ac2a5a5fa569ed71a435fe1429857019c1f91127ee98b8:eyJzZWxlY3RlZExpbmVDb3VudCI6NzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmNTJjZjNmMzExOTRhYWUxM2RmMTJkYzU1MzVjZmI1M2RlNjhiOTI3NGEzNzE5MTAxMDkyNjNkZTkzODM2ZjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmYjliNjhkZThjNjQ4MzFkMGFlMmVkOTRlMzAwODRhZjQ1ZmFlODc3NTNhODUzOTE1NzZkMmViODljODNmMTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE4M2E1MTY1MTc2YjI4MjI1YWQ2ODVjNDNkYzA3MGIzMjczNjIxYzczMGNlMjg4YjRiMmZmNzBkNGFjMmM0YWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2M2EwNzk3OGVhMWY4NjNiZGJiNzZhM2I5YWU3MDE0MmE0Y2MzZmI3NmJhNzM0ZjIwMDVjZjdjNzIxYTE0MzcifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L213-L247",
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L230-L264",
           "version": "repo-lines-v1:sha256:065543534ff706f97baac96906aa3779bfadb82c004927a73c89c4d7c60808d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkNjkzZDQ1YTEzMjkzYjI1YmJkNDBmZWUwM2UwMDY1YmJhNDQ2YTU5NjQxN2JkYjY3ZDI0ZjQyODZjZTVmMzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5YjJmNzcwODljMTdkOGYxMjcwYzEzYjhhMGE3YTJiYjk4OGQ3ODkwNjA0YmUyNmZmOGI3M2JlMmYwMThiZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhjOTUyNjMyZmQyODQ0ODA1NThlYWQ4OTViNjNmNGZiNmE0YmY1MWU4MDJmZWYwZmE0ZjJmMzZjNThkZGUwZGUifQ"
         }
       ]
@@ -179,16 +191,16 @@
       "statement": "state-sync keeps a byte copy of settings.local.json around every pull and unrelated-history merge and afterwards restores it only when the file is missing or equals the origin/<branch> version git wrote; any other content is kept as a newer write together with the copy and a warning, and a failure to make the copy skips the pull or merge.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L155-L200",
-          "version": "repo-lines-v1:sha256:e2ca953cc17c879c2a4640fa2729b0e47a970fc8f6a9cd08517371f50692b3be:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3YjgyMTQ0MDFiYTYwODk1NDcwMjY2YmExODA0YmU3MzE4YTY1NmYwODQ1Nzc2NTc4NjZkZWJlNDRlYzJmODYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1Mjc0M2IwNDNmN2U4OGFjODE2MjE3MDEwZGUwN2QyOTk3ZmI0Yzc2ZjA0ZWYzOWY0MjEwNDQwMWZiYTQ0ZTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExMmNkNTI2NGE1MDA1Y2IzMjAwNDFiMmZlMzcwMTEwZjA3YjA1NDM2MzI1ZjAwMTdlNWY0MWMwZmY0MWUzMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY1OWU1MGE5ZWRhOGJhMWRkNDcyOTMyMWYwYmE5Y2FlZThiYmNkY2FmMzk1NDhiOTM1ZTJlMWQxNWJmMDJlNWIifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L147-L184",
+          "version": "repo-lines-v1:sha256:8c7d3fe9a26fac183d50d9714860723da718bf4d3af2f41ee2d072b73fcd5089:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4MmIzM2ZlY2VkNjY4NDBlNDQ0Mjg2ZjE3ZTA4NDY2ZmU2YmYzZTBmNTE4MDRlNjUzZTI3NmMwYmJlYTFjODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA0NTFmOThiOGRkNTAzOGYzZDkwY2VlYjlhNmExNDBhZTdkZTllNDQxZjMzZWRkNTJkYWIzNTEyNzUzMTU4MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2ZTMyY2EwZjQ5OTcyODZlZjY5ZjhjNzM1MDkyM2MwZTMwYzBkYTJkYjFiNzA3MmFmMTRlMmNmMDhjNWYyYTgifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L473-L560",
-          "version": "repo-lines-v1:sha256:233769c7b86dfe9bcc6bfcdf9e054328fd5da0205a17d31f31bce96e98bcaa5b:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NjcyMjA3ZjA5MmMxNjYwMDhhN2IyN2Q4OTkyYmFlZWRiODkzN2I4Yjc5MzAxN2EwYWJhY2FhMDdiYTM3ZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkNTFiOTZiMTNlMjlkNGZlMGJkYTU1NzQ3NDIxYmE4YjE4YzI4M2UxZTdhZTJjYjZjODlmZmQwYTMwMmYwM2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1OGIxZjJmNmI4ZjJhODhmMDhmZjgwYTMzMmNmMDk2ZTVlMzYxN2EyY2M4MmJiNWFkYmZhMzUxNWQyM2JkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYyMTFiMDE0N2NiYjQ5NzlmOWZkZTkxYThiZmNhZWUxNmI0NjFkMjZkYWYxMGFiYTQ2MjQ2NmRkYTNmNDc1ZWIifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L613-L674",
+          "version": "repo-lines-v1:sha256:1a2e6cb1272f6a9fdbd7bae3e78374ab79f509f400ed34f1bb0290f133cd11af:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwNmFiZGIzYTBhZjhjMTIxYjA5N2ZkNWE2Y2UyYjIxZTBhMGYxYjQ1MDdhNWE3ZDUxYTM2Y2EzZGE3YjFmNGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzNjdkOTFhYzc1Mzk5MDljZWM3ZmM1NzQ0NjdjYTZiZTI5NTZmMzE5ZjNlMTkzNGU5OWFjNGEzMmRjZTJhYzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2MGRlODRhNDVmY2YyZjkzMTlkMjU5OGJmZGIyOThiMGUyYzUwMGM3ZGVlMzk4NDY4ZGNmMTM4NzNmNTEwNTEifQ"
         },
         {
           "resource": "repo://tests/test_state_sync.py",
-          "version": "repo-file-v1:sha256:443f2772b4c8ac69aae72fecabadff5b588fbb01d65b3d2487e5a5119c7be1f4"
+          "version": "repo-file-v1:sha256:487bbb1e0038e3eaf49635f75932cf22418f24a51bf7ecbbd6abefc7ce6955b6"
         }
       ]
     },
@@ -197,30 +209,242 @@
       "statement": "write_nested_gitignore and write_nested_gitattributes write their template only when the file is missing and otherwise append only absent lines, adding the settings.local.json line only when git check-ignore --no-index exits exactly 1; they run on setup of an existing nested repository and on every checkpoint, so a consumer's own lines survive and an older repository gains the union-merge rule.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L202-L211",
-          "version": "repo-lines-v1:sha256:8eef558dc5f5e476c46c9c30c0524da895deee3e90524d8f89278d2468f63e29:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Mzc2YTUzYmU2ZTVmZDY4OWI1YzcwZDFiMDNhZmNlMGUyNWVmNGYwYThmYzk2YTcwMjI4NWJhZjU2OWE4NWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmM5MGZmOGE0NDE0YzU0NDFkMGY2NzdjNWNiZmRhMzhiNDc0ZTUxYmZkNTU5YTU1NTlkZTBmODc3MDU1MjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJhOTgxNThhZmRlMjA1OWY3ZWE5NWQzNzNlZDI1N2I5YWE5YWI3MGViMmVjNDBjMzhjNjgyODAyNDFlZDJjZDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0OTcwODlkMmU2YTQzOWEzNTQ1YTQyYmQ0Yjg2ZDY1M2NjMTc5YTMwMjUyNTYyYTFmMDBlMDY0MDEwM2FjYTEifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L219-L229",
+          "version": "repo-lines-v1:sha256:72e986116c60536ff810dcae8e2e1c5e9afd3e3ffc4dff9928ac72ddd9312389:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3Mzc2YTUzYmU2ZTVmZDY4OWI1YzcwZDFiMDNhZmNlMGUyNWVmNGYwYThmYzk2YTcwMjI4NWJhZjU2OWE4NWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJhOTgxNThhZmRlMjA1OWY3ZWE5NWQzNzNlZDI1N2I5YWE5YWI3MGViMmVjNDBjMzhjNjgyODAyNDFlZDJjZDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQzMzhiMDVjMTJjODBiNGNhN2UwNzFjZjgzNjgwY2ZkYTc5ZWI4MGFlYjM5NzBhNmM2N2VkYjJhMDRlNThhMzMifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L248-L262",
-          "version": "repo-lines-v1:sha256:e2c1806a3d791d9fbaaf68a0f00b524235a6675e8a0aef2b05c367de4d2a7361:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1NGRhMDE2NTk0YTY4ZDQ2YjEzZTJiMzM5ZjJhYzA0MWQxYzQ1MzE0YWUwNzM5NjcwNjk0NzQzZmMzOTAwYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNlYTM5OGRkMWU3NzM2MDJjZThjYmI4Mjc4MTYwZGVhN2FjYzU4NDJkMTIyMjA5NDA1NGI0NTI0OGM2Nzc5MDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyMWVjYTg0NTFiM2QyMGIwZDI5MTc1YzZmOWU4MjEwZDdjNGU5NWE3NmVjNDZiYzA4ZmFkOTczNDlmNzE4NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRhNjc3MmUwODViYmJjZDU2ODRiMTdlYTgwYTAyY2Y2YzA1NGQ3ZGNmMGEzODI3YjAyMDQ5MWY2NzZlODFlZTYifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L265-L299",
+          "version": "repo-lines-v1:sha256:4e216782ba5fc6bb1ba5350020783a0c516815add7221f2cadaab7b845fad7c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1NGRhMDE2NTk0YTY4ZDQ2YjEzZTJiMzM5ZjJhYzA0MWQxYzQ1MzE0YWUwNzM5NjcwNjk0NzQzZmMzOTAwYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3OGE0M2RjMWM2ZDM1MGRhNGYwMWIwYzM0ODY4NGY5ZTEzMDM1OWFmZDA4YWU4NmQ3ZmVkNWQ3MGM2YjhhM2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyMWVjYTg0NTFiM2QyMGIwZDI5MTc1YzZmOWU4MjEwZDdjNGU5NWE3NmVjNDZiYzA4ZmFkOTczNDlmNzE4NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZmY4ZDM4ZDY0MDc5MmI0OTA2ZjRmNjYyOGYzYmYzYzQ2YTQ5NjBjNjEwODUzMThhM2M1ZjZiODk0ZDI0ZDYifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L418-L436",
-          "version": "repo-lines-v1:sha256:12562fb7efe832f7a60f8f6f592500c9756fca171842d7a15ea8d71d93bf687b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MmQyNjA3ZWEwZWNhZjFkMDU1MTliZTA2ZDg2ZmUzNmIyOTYxOTQwNGQ4MmZkMjM5ZGZjZTg0MTNlNzU5NGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1MDVjMDUxMDFjZWRmOWJkNTUwNmNiODE0YzI0ZTJiM2UzMTIyODRkN2IyM2JmYTI5OGYyZjcwNmM1OWE2MzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk5M2I1YWRiZmExNDk4MmFlNDZkMjU2NzY2M2FhMzUwYzVlMzUzNjI0MjM2OWYxYTRiZmMzYzYzNmFkZTM5MjkifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L510-L521",
+          "version": "repo-lines-v1:sha256:5efcdc3a1322f5d0ab2194b784025f7392f15f349ca2e57b9832138dfbe8713a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MmQyNjA3ZWEwZWNhZjFkMDU1MTliZTA2ZDg2ZmUzNmIyOTYxOTQwNGQ4MmZkMjM5ZGZjZTg0MTNlNzU5NGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiMzUzNmI4NzYxMzQyMjQzNmZkMTM1N2VkODU0YjQ0MjhhZmQ2NDkyN2YxOGRiNWI4MTEwNDVlOWEzMjc1M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM3ZmNhOWZiYjVjZTM3MDYyYzI0Y2ExZDUyN2I1OGJkMzViZmVlNTM1M2IzOWU0YTMwNTI5YmMyZjA3OWU3OTgifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/state-sync.sh#L90-L118",
-          "version": "repo-lines-v1:sha256:f4fc0ab2fde1d47440656c75f24d7284dd8d2785bf79ddb15c8efce688c90c95:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyZmQ4YzcyNjU0MWUyYzc5MWMzZTM5MGEzNTgxMWVmYjBhY2FiZWEzMTAwOWQ0MzA3MzI4NWMyMTI4YzY0ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmM5MGZmOGE0NDE0YzU0NDFkMGY2NzdjNWNiZmRhMzhiNDc0ZTUxYmZkNTU5YTU1NTlkZTBmODc3MDU1MjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTQwZjJiZjhjMzZmOGY4Y2Q0MzczZTdhNzFiMzVjODJiZGZhYTIxYmY1M2JhYmM2ZDU5MmU5NWZjMTgxOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM3ZTU1NDIwNzM2NDNlNDViZjU0MjU4MTg2NThiZTg1NmVjMTljMTUxOGRjNzEzNGI5ZDc2ZjE0ZDQ3MDk1NDAifQ"
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L96-L128",
+          "version": "repo-lines-v1:sha256:cba4a5992d415a47c67240fec350b0bf267d5bfaa5e8fd99869baa8abc670d5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyZmQ4YzcyNjU0MWUyYzc5MWMzZTM5MGEzNTgxMWVmYjBhY2FiZWEzMTAwOWQ0MzA3MzI4NWMyMTI4YzY0ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTQwZjJiZjhjMzZmOGY4Y2Q0MzczZTdhNzFiMzVjODJiZGZhYTIxYmY1M2JhYmM2ZDU5MmU5NWZjMTgxOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNmEwNjkyYjkzNzUwN2E3NTM2M2JlMzVjYjAzMGRkYTg5ODYzZjY1YTYwYjRhYTZkYTNlY2Y4ZDJjMzE5ODkifQ"
         },
         {
-          "resource": "repo://tests/test_state_sync.py#L669-L760",
-          "version": "repo-lines-v1:sha256:76586d20cadca860006eb67f39b48987860b8ace2b3a282fa2b29da712fbee80:eyJzZWxlY3RlZExpbmVDb3VudCI6OTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyMjAyNDQ3M2M4MzQyNWZjMTllZjMyZWIzNjBiMjEwYjg3ZDE0Y2JiMmViODc3ZDc1YTY5NGJhMjQ5ZmVjY2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxODJhZWNhOThlY2Q0OTgyMDQyZmFmNDU1NDM4ZjI0OGM3NDRjZWZlNTlmZDY3NzRjYTdlZWNmNmZkZDIxM2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjOTMwZDdlYjExOGYxYWNiNmJjZTIxYmY5NTgzMjEwNjhmOWY5ODFjNTkzOThhNWM1MTExMDY2YTU0NTgzOTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk1MjAwZTdhYjA3NTdjMzA0MjAxMjFjMjI2MTkzMjQxMTJjMjY4NWY5MjA4MzU4ZThiMTdjNjBhNWRlOGM5ZmEifQ"
+          "resource": "repo://tests/test_state_sync.py#L897-L1030",
+          "version": "repo-lines-v1:sha256:5829f748dcefa5e0b715bb383a04a9c104ee928a5bd4dcd71a95b493b0bab40b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTM0LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI5ODMwZDUzN2YwNWFiNzA3YjBiN2U4MjIyZTE2ODRhZmYxNmZhOWE3MTE2ODRhYzFjNGM5MjIyYWE0ODY3NGY2IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIxOTQyOTU1MjVjYzNjMWE0ZWU1NzRjMmNhYzliZjM1MWI0OTU4YzQ3OTNjM2ZlNDI0NWJiZDJkZTAyOWYyYTg0IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxMjJkNTA4NGRiMDVjNjhiMzNkMDQzNDg5MDNiNGIwMDlhNmFmZTU2NDczM2YzZmI3YmUzNTg0ZmEwYTcyZjY5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIwMjNkMDEzZjdkMTU5ZjljYzdmYjk0YTI1OGM4MmYzNjY4YjRiMTI4MWE4ZjIwYmQ4MTgyOGU5YjdjZjMzZjFiIn0"
+        }
+      ]
+    },
+    {
+      "id": "claim_b6c57b6e44a84d19969f21e15e7459a0",
+      "statement": "commit_local_state refuses before any staging while a rebase or merge is unfinished in the nested repository or git ls-files -u lists unmerged paths, so no state-sync commit can conclude an operation or record conflict markers.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L265-L274",
+          "version": "repo-lines-v1:sha256:4a6ea2b9b216aa855f3413553a29e5e82bde68ca65da9bfc3388a55e3d4eb24d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1NGRhMDE2NTk0YTY4ZDQ2YjEzZTJiMzM5ZjJhYzA0MWQxYzQ1MzE0YWUwNzM5NjcwNjk0NzQzZmMzOTAwYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU0NDRmYmE4ZDIxNjQyOWY3ZTQ4ODRkMGEwOTljOTI2OGQ3YjhhMDA0ODAzNDdlNDVlNDc1NWZlZGUzYTczNjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyMWVjYTg0NTFiM2QyMGIwZDI5MTc1YzZmOWU4MjEwZDdjNGU5NWE3NmVjNDZiYzA4ZmFkOTczNDlmNzE4NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMwZjU5MjM2ZjgzNDY0NjgyOGZiYzhlZmU5MWM5MzU2NmIyNThiNzZmYzQyZDA3OGVjZDlmMDliMzY5ZDQ1NjQifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L316-L326",
+          "version": "repo-lines-v1:sha256:df1065c6bc3150f85779a00cfd9ece134c1fedfabec3e63456450f08662b209f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NjMzZmMyNjhiMGI5NTFiNWUwZDI3YjRhOWVlODFiYTZlMjJkYTg0YTgxNDk5NGE5NWVmNDdmNWEwMmMwNTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMTgyY2Y5MzNkODMzYzk1YmEzMzJkYWUxMjI3MTk3MDFiZDZlOTM1Y2UxOTY4YWU5YjY0ZjU4MzE4Y2IwMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgxNDY3N2ZhZmRkYWJiM2RkY2Y2NGEzMDRkMjdmMDk3NjcxYjI1MTRhMWFlOWJhMTlkMTA2MmQ3YTdkYWI1YjQifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2367-L2430",
+          "version": "repo-lines-v1:sha256:d90f20b1dac7a6a2dd5896b266a0e348445ece98cdf1c8484e37dceace112c28:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliZDE3ZWI1OGVmZjU0YjVjMzcxMWQ1ZDlhYzdlMzkxNWUwYjljNDk1MmQ0NTQ1ZWVmZmY3YTgzZjYwMzFlNWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkYzc4YWI1YzFlMTA5ZmMyYmQ0NGQwZGI1N2ExNmVmYmI4NTQ5MTE3YmEzYWM0ZTY5YjBjODg1ODI1ODY3YmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAzMmE3ODQzMDZmNGEwOTFmZjEwZDBmYjBlYTRjZDQ1YjVjNTQyYjBhNTczMzc5NmNkODZmOGI2ZGQ1YWRhMjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkZjQyYTczMWEwOGIyMWE0YWI3MzZlZTljYjRmOThiM2E2ZTQ5Y2FkYjE5ODE2ZmY3MGQzNmFiYjNmY2FlYTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_68b6b77d119e499bb03c32e5b80ea451",
+      "statement": "When the current pull's rebase --abort fails, or an unrelated-history merge that created MERGE_HEAD cannot be aborted, state sync leaves the operation in place, keeps and names the settings.local.json copy instead of restoring it, and setup returns before restoring root adapters or committing.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L186-L192",
+          "version": "repo-lines-v1:sha256:43551c128125b37cef4a3824e8f18a51cbed302dd41a9cc64318e424c3fe52be:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWVjNDViYTlhYWZjYzU3MTI0ZTEzZWUxZDM4MzQxYTZlZWQ1NDhmZTVkZTVjZTA4NzA3NDQ4NmQyYWI5OWMxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmUzMjA3NGQ2MzEzNWRkNTY4ZjY5YThhMDk3YTY0ODgzNTQ3MzgyMTIzNmVjYmFmMjJlMmVhNGU3MjE4NjczOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWNiZjI5NGYzODg0ZWE0YjM4YTkwMWViYTVkNzkzY2IxMzY3MTA3YjllZjM0MDE2MGQ3MDkzYWE3ZGY5ZWQyYSJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L452-L466",
+          "version": "repo-lines-v1:sha256:06d913f0303b8164bbe889f9de01cce954570828065b03c72dfee13f8749f217:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxMmRlYzlhZjJiZDk5ZWI0MWI4N2MxOWY1MTc0YTE3YzUyYjYwNGYyZmRiOTI5ZDk2MmJiMGU4NGY5ZWZhZTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY3YjJjYWJhYzQ3OGMwNzdmOWM0YTc3NWNhZDFiOTY1MGVmYWNmMmY4N2YxYjE3Mzk4ZDg0N2NhOGI1NDQ1NTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYwY2Y4Yjg3MWQzZjExNjA2ODIxYmUxOWY1MzcyZmMzYzc1MWNlYjk1YzEyZDllYTNkN2Q0Yzc0ODViOTJkMTUifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L523-L550",
+          "version": "repo-lines-v1:sha256:da95dcf81f3611a241216e43085b6de4302f9c46d90ffad5acdb58e8df76c9c7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzYWJjZjQ5ZmE4YzlkNzUyMWJiOTNjOTRiY2M4NmExMzJkYTg4NzM0NWE5ZTRlODQ3YjRlODAwNjZlMWZmMGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzYzllMmM2NDczMjQ1NTUwZTRkOWM5MjE4ODBiZmQ3NTc0MTNmYWQ1MTc3YTliMTNmN2JjOTlmYjY3MjIzNWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVlMDIyODExZGYwNTQ0YzVkMDNmZTNkMjE4ZjY3NTliM2Y2OTY3NDIyMGJlYzRhYjdmYWJkYmVjNWRhYzQyOTYifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L613-L666",
+          "version": "repo-lines-v1:sha256:9539bc1c7cad2bde99391016c69275174a8f15d9790a040539d31f49e70fe4d7:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwNmFiZGIzYTBhZjhjMTIxYjA5N2ZkNWE2Y2UyYjIxZTBhMGYxYjQ1MDdhNWE3ZDUxYTM2Y2EzZGE3YjFmNGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmM5MGZmOGE0NDE0YzU0NDFkMGY2NzdjNWNiZmRhMzhiNDc0ZTUxYmZkNTU5YTU1NTlkZTBmODc3MDU1MjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzNjdkOTFhYzc1Mzk5MDljZWM3ZmM1NzQ0NjdjYTZiZTI5NTZmMzE5ZjNlMTkzNGU5OWFjNGEzMmRjZTJhYzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEzYmE0ODk1MzQwNzI4YWI3ODU1ZDFkNDBkOGY3MTVhNWFhNzc3MzZjODAxYjI1OWUzNzZkMDdhNDQ2NjYxMjQifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2131-L2331",
+          "version": "repo-lines-v1:sha256:5d5d4db35bc46a4bd269807e21545a212251642111341ab1ae5474e346b84f7f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAxLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI5NzBiNWU1MTgxZWFmYjFiN2JmN2I4YzVjYjFiZmZjNjg0OWNjZDRjMDIyYTVkZGMyZmE0MzcxNjgyMGIwY2JmIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI3MWIxMWVjMjc1YTQ1ZjhjZTkyZTRlODc4M2E5YjcwMDkxNjg4OTI0ZWZhZDliMzI1Mzc0YjdiNTQwMzY4MjUwIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJjYTliMzJlYWU3ODU1NGNlMTMzYTUwOTdjZWQ5OWM5YmE2MjU5MzczOTJhNzdlNGQzMjY4M2FjM2M0MjE3ZjMyIn0"
+        }
+      ]
+    },
+    {
+      "id": "claim_9e1e48973f8a4353b90af39209824d5d",
+      "statement": "Before the unrelated-history merge or the pull rebase, reconcile_committed_state records whether HEAD and origin/<branch> share history, re-checks for an unfinished operation, and commits local changes, so an abort never has uncommitted local work to lose.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L596-L611",
+          "version": "repo-lines-v1:sha256:e8008df21e407f9bba53b81f43a434e5be6b7a746459bace1f28f43f34d1d4ec:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM0NTdjYmZhMWQ4M2QzOTM5ZWJmZTNjYmY3YWViYjcyNmVhMmI4YzdhZDhiYTMyYjJhZWJkZGE4OTdlN2VmMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmM5MGZmOGE0NDE0YzU0NDFkMGY2NzdjNWNiZmRhMzhiNDc0ZTUxYmZkNTU5YTU1NTlkZTBmODc3MDU1MjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyNzdiYzUxZjIwZGNmZDM3OTYzMzhiYzkxYjIwYzUwYTFlYzczYTMwYjQ0ZTNmYjRmNTlmOWI5MGQzYzNmMmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkYTY5NTI1ODM4YWUzYTJiYjEwNzZjZDE4NDQ3NWJkMDU2NjQ1ZDk3MGM2M2ZmODNhYWUwZjA2NGY0MDBiMDcifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2332-L2366",
+          "version": "repo-lines-v1:sha256:3f4dab0a4bd1533361326e52d317d6a17160ae627a9d6c7384cb1b419209de0b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliNzg2YTMyZmJjZmRiYzc5OTYyZDQ0NGMxMGZlMDk5YmExYzIxNGVjZDNkNWZjMWZiOGIxOWFhN2Q0Y2RmZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzNzEwM2FiNjYxZWIxMWEwNDY1ZjE2OTVhNDJlMTUwNTQwNTljMDdmMDgxYTJiY2IzNDZmOTk5NDAxZmQ4NTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgxMWRiYjM1NjQyMDZmYWQ1Zjk4YjBhZTU4NjYwNjM2ZWRjNzg2NWZjYmNkM2JlNTdlOWIyZGJjZDVlODFhNTkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f35f5a16a34e472195238a2427f2e16d",
+      "statement": "acquire_sync_lock takes an exclusive flock on the repository root folder through descriptor 9 with no lock file; a busy run prints a stderr notice and skips, setup and migrate-from-hf wait up to 60 seconds and then log a warning and skip, and a missing or failing flock leaves sync running unlocked.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L366-L410",
+          "version": "repo-lines-v1:sha256:28c1ad388690fe13a4d17fd7ca02d588bb965999d386c49695f739351a7ac1db:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUyOWI3ODczYzZmZTJlYjBhZmI3YmJkZDE2MWMwNDU5N2JmZDczMDI2ZTc5OGQ5M2ZlZDM0ZDRiYzM5ODFkNWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwYjYzNDZjYTI0ZjhlYzAwNmJiODRiMTJjZWY5MWNlMTQ1Yzk3N2QxOWViNzYzMmZjZDExNjQ2ODA4YTM3MDkifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2974-L3043",
+          "version": "repo-lines-v1:sha256:9a4803cb0e1151563222b2adfacc1435c2147a9294ab75a7a7c3165077823e12:eyJzZWxlY3RlZExpbmVDb3VudCI6NzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkNzU2NDgyZGQwZjI3MDQyNTRjMDg4YWJkMGZmYmFiYzg4Y2ViZDYyYjA4ZDk3ZGZmNTU0YTUyN2MyNWQ0NjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmNzgwOGJjOTU4ZDdlZGRjMWIwMDAyYjdjZjQyNjljYjkyMzhkZDY5ZDQxZjhjNTk0NTg5MmQxZDM4ZWYyOTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE3NDk2ZDk3MjQyNzg0ZGZlYzE1ZThmNzgzNTc2YmZjMTU5OWFiOWY1ZTIyMzllZjJmNzQ0MTQ0NDY1ODcyZTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQxNTY5MmU2N2Q0NGU1NmMwZjM5YzRlOGIzMThlNjBkMmI0YjU4NGFiZjg1ZTcxNzgwYzU4YzkzOTI5YjczMjUifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L3325-L3380",
+          "version": "repo-lines-v1:sha256:b31be258afae6127d002e3e29479a1a2566aa496f23302781157b5d7e42dc94e:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkM2I5NzlmYWUzZjBlNjMzMjE4NzE1N2FjZTc1MWQyNjRkZGM0OWU0NDBkMTE2YmIyOGUxYWI5YjAzYjQwNTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2ZmM5MGFiZmExMzFkNzM4ZGYzYjgyZmFiNTUxMWY0ZWE4YjkxMzk2YTIyMWRmY2I5YmFjMDk0MjNkMDcyOTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2NGUwYTFlYTJmMDAwOWFhOTA0OWJmZDY4YjVmMjM5ZTM0YmQwZmM3NmI1ZTg0NzdjMmMzZTg0ZDk4MzU0MzQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d3fc8277de644776ac5bbec536166af5",
+      "statement": "status reports rebase, merge, and lock state; sync_lock_state probes the lock on descriptor 8 with flock -n and closes it at once, so status never waits for or keeps the lock.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L412-L425",
+          "version": "repo-lines-v1:sha256:fa2a577e98a9b3e2cf9982ce56920f96be548892d5cea5222018955a457e62f6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMTAyMDI5MGVjOWJkNDE5YWZlNDYxYTFlOWIzNjhhNzlmMjBjN2Q4NWYxZGNjZjhjM2U5NTc5YzYwYTBjNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM2YjdlYzYyMDAwMGI2MzZhYWVhODRjZDY3MDg0YjhiYTA4Mzc0ZjdlNDUwNDBiYzY1NGZiNGE2MWFkMWQ2ZjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2MWNhYmEzNTJlYTA1YWUwMDIwYTJmMjY3NWY0MzgxYWEzMTZlOGFlOWY4ODVkOGNhMzgxNDU5ZjJhZDllODcifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L762-L803",
+          "version": "repo-lines-v1:sha256:280f0d8ddaaf4d8ef78154480f49cc84d2024d9a6d1a26415b3fceac285937f3:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViYmFjMTQxMjVhOGUwNWRiMjFhODkxN2IwZTFlMGZlMzRhNzMwZTVmOGQ1NzNmZTk5MzE2MmNmZjliNTNiZjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1ZGM3NDVlYjhmMzE3ZjA1MmMwNzQ2ZGQzNjU3YTUzM2ExMGZjNTgyOTVkZTk0OTliNjE1NDJlNGFmYWEwZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJhZDhmYTNhNzZjNGMyNjg3ZDQxZmY0ZTM0MjU4NDgyZTM3YmIwYjk4MTZhZmE5NWRlOGFkOTQ4NDUxNWRiZjQifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2240-L2256",
+          "version": "repo-lines-v1:sha256:0a428897a4353f4e557a4e9a49daf11153f5c7e8da228df30c73d50eb0230eac:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYzBkNWM1NGQyMTJmY2FiYTBmMDEyYjA3MmE2ZjYzM2QxZjQxMjUxYzNjMmQ2OTY2Y2ZmNjIyMTFkZTAwMzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMyYjFlMmZhNzM1ZDFjZmVkNzY2ZTcxM2I1ZjZhZTk3MDQxNzY2MGU3NGRlNGJkZTJjMTkzMTkxOGM3M2ZiYzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4ODA1N2I5NDM1ZWI5YmVmMzUzMWM1OWNiMGFjN2UzYmYxM2E1YjZkZTE2YTU0ZTI0ZDNjNzExMWZlYmYyMmYifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L3044-L3100",
+          "version": "repo-lines-v1:sha256:f35673b5143e907fb36acf74adaf1244a536a2d21e1c97adb5be5f04cd627c4b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZhZTE1YjNmMzBhZTU5MmJlODkyZDlhYzUxOWViOTUzOGVlZDhhNWUwNWIyMWNkZjdmYTY3YzllY2JjNzMwNGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwZGU0NjBlMWFiNWI0YmE4NWQyYzFiMjFhOGNiNjBlYzgyOWU1OTM2ODZmNTM3ZGE1MjFjZTUxMTkzZDVlMjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2ZmM5MGFiZmExMzFkNzM4ZGYzYjgyZmFiNTUxMWY0ZWE4YjkxMzk2YTIyMWRmY2I5YmFjMDk0MjNkMDcyOTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFkOWIxOTc2Mjc3OTI2MDdmNDhjOGNiZWU3NWI1Mzc3OGY3YmY0MDRjNzIzMThmMGUyNWExNTk3ZGYzNWE3NmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4a30f876a9644d069eb8bb72f1126756",
+      "statement": "state-sync.sh exports GIT_TERMINAL_PROMPT=0 and defaults GIT_HTTP_LOW_SPEED_LIMIT to 1000 and GIT_HTTP_LOW_SPEED_TIME to 60 while keeping caller-set values, so a stalled HTTPS transfer is cancelled and Git never waits for a typed password, without changing any Git command line; an HTTPS connection still being opened and SSH remotes have no stall limit.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L366-L379",
+          "version": "repo-lines-v1:sha256:d747bd64328ae99ed1b2ccbb79dbca939cbbdb716870db15850faa7290c810e7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUyOWI3ODczYzZmZTJlYjBhZmI3YmJkZDE2MWMwNDU5N2JmZDczMDI2ZTc5OGQ5M2ZlZDM0ZDRiYzM5ODFkNWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyMzQ1Yzc3NWRmNGVkOTk0N2E2ZWVlM2IyYjQ5ZTc2MDc0MGM0MTE3MGY4YmJlYWYxZDliNmQ3NjllMjE0NDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2MDk3MWI0MzVhYTg4MjUwOWI0MzQ1Y2RhOGY5MzI3MzVmZjlkZjA4OGQzMDUwYzczZjc5OGE3OWEwZWViYmUifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L70-L76",
+          "version": "repo-lines-v1:sha256:078b87dc517810db37924098c95da96a7455106e4046907540e887359690c074:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjlhZWRmMjE5YWE4MWIzMzM2MTY0Njg4ZjQzZWRlZjM0ZjJlYmIyNGRiNDliMTliZGE0NGFjNDMxYTU1MTgxZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM5ZWRlNTZmYmEyNmY1ZDg4YTc0MGU2YzJmYTIwMzgxZmZlMjNjMzNiNDU1OTMxYTFmNmFmZTJhZDJmNTQ4NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjRjMTg4M2U1MmZiOWI1Y2ZmYzUwOTBiOTI0NDc3ZGQ5ZTc4YTFkNjUzZjBlMzIxMGE3MTk1ZjY3MGJkZDI5NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODBkMjBlZTJiNzA0YjQwZWY5NTVjZmI3OWQyZTc2ZTcxNjBjYzlmN2U0ZjQwY2QxOGQwNDE3MzE4OTg1MDRmMCJ9"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L3253-L3324",
+          "version": "repo-lines-v1:sha256:5f6e4583ec4f4af5018238f4aee5000ae679e0fd366509275c50a889dd6e563b:eyJzZWxlY3RlZExpbmVDb3VudCI6NzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliZDFhMTQxZDRiOWJlNWE5NGQ1YjdlM2IzNjdiYmFmMjRhMTQzNmVlYTRiYTNiMmJmOWEyMWYyZWM1OTczYTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmNzgwOGJjOTU4ZDdlZGRjMWIwMDAyYjdjZjQyNjljYjkyMzhkZDY5ZDQxZjhjNTk0NTg5MmQxZDM4ZWYyOTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2ZmM5MGFiZmExMzFkNzM4ZGYzYjgyZmFiNTUxMWY0ZWE4YjkxMzk2YTIyMWRmY2I5YmFjMDk0MjNkMDcyOTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFhN2FjNzRmNzkyY2UwYTljMjE4M2YwMjk5MmU1YWViNGY2M2MwYjYxNTJiNTI0MjRmMjEzNTk0ZmFkZWEyMjIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f895c7d482c3477b8db60633310bd0c0",
+      "statement": "An EXIT trap, reached through INT, TERM, and HUP traps that call exit, hands a held settings.local.json copy to restore_local_settings after an early stop, or keeps and names the copy while a rebase or merge is unfinished.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L194-L213",
+          "version": "repo-lines-v1:sha256:3f8a55a0e82357a6cf611c31af15d0afdc73445dd4174eb964e2499d6435933e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxMzM1ZjkwZjc4MzYyNmJlYmI1ZWU0ZWFhNjY1NWRiNDQ5N2VlNmUxNjY0NDUwNDJmYWQwMWViNGUxYmMwMDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjOTE5YjZiZWMyMmE0N2QxYTBlMTRhMjM5YjAyOGExZDJkMDNmYWIwYThkODgzOTY3ZjBkOGVmYWIzMDYyNjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRiOTEyMGM3YmY1Nzk5NWZkNTNhNGViZDI0NTdmZTViZjk3YjhiZjc3YTNlNjRhMGFiMzk3YTMyOTdhYzgwM2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY3OGI0NTVkOGQ4MWRmZmE0MGQ1YjZiMGI4YWMwYjIyZGVkNzUwZjA0NWRlZDc4OTVlZDA4MmM0NTIxMTM5YjUifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L851-L854",
+          "version": "repo-lines-v1:sha256:1a0838d91e58a9f69ce334664b4a04b03dc7e5b7ee9e5c694feb1f572d876ab1:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzMxOTVhOTIzOTdlOTE2MTZkZGFmZWM0MzM5OWJmNzM3NTkwZjkzMTYzZGJlNmZhY2NiZDBhYmFlNDk2ZjhhOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODNjNDYwMTNjNGJkZTdjYjQwN2VlMGUyMmNiNzA3ODY0ZjdmMzZiOGEzYjg4YjY1ZTdmMDVjMTlhY2EyMzY5MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjc1YjkwZjFhMzZmZGE5NDQ1ZjVlMTZmZWVhYTA5NjU3M2RlMTM5MDhkMzc1NTY4N2Y4OWIzYzczYzY2NTMyNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzZiMmU4NDk5Mjc4MGRkNmM3MjlmMGFmNTNmZTI1YmE1NzA3NzFjZDM0YWM4ZmEwNWQwNGI3M2IwNDliMTAzMCJ9"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L3147-L3252",
+          "version": "repo-lines-v1:sha256:b7ed3389b3ef04e78091ad08c3ae05597fc107c2dc78068b77dfc0f94b344139:eyJzZWxlY3RlZExpbmVDb3VudCI6MTA2LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI5NjQ0Y2YyYzc4MTM1NzBiNDkzZGM4NmFlNWMzNWFhZmI5NDJmNDNhMmM2ZWE1YWE3ZTJhNjE4MTQ2ZjkwN2RkIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3Zjc4MDhiYzk1OGQ3ZWRkYzFiMDAwMmI3Y2Y0MjY5Y2I5MjM4ZGQ2OWQ0MWY4YzU5NDU4OTJkMWQzOGVmMjk3IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI5NzJkZGVmYTJlYWNjOTEyZDU3MzQzYThlYzQ2YTAzNWZmY2NiNGFkOGMyNTVlNzY4MTY4OTc2OWFhNTcxNDk4IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIzNGMyYWZmOTc2MzBkMWZhYTQ2M2ZkMjVkZmE0YWQ3ZWVhY2IyYjBkZmQzNzY4MWMzNmEwNWJiN2IwZWUzY2RjIn0"
+        }
+      ]
+    },
+    {
+      "id": "claim_8e7f38797ebc4e42b906bd83d4ba3090",
+      "statement": "restore-root-adapters.sh refuses a symlinked .claude or .claude/bootstrap-root with exit 1 before resolving any path, after its silent exit 0 for a missing mirror or manifest, so it never copies adapter files from outside the repository.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/restore-root-adapters.sh#L30-L46",
+          "version": "repo-lines-v1:sha256:c1cdc55cfeb2b267d5f2f102c2fe0b73e03f0901aa9f4c0acdc2aea500ff0684:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0NTdkNjE2OThmZjE2YTMwZWVkOTg4NjVmYWJhZDI3NzJjYmMyMzJlYzE4YTUwZjBhYzQ3MmZkNjc3Y2I2ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNjdiZTk3MjViNjkyZTdiNzY2MzNjYmY5YzdlZWRmMWM1ZTQ1YTkzM2UwN2YwZTJkZjgwNDUzN2Q5Zjc5N2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI4MzIyNjY5OTBiMWVkMWNlNDVhYzk5ODQxM2VkYmE3YjY2NDQ0NDg5ZTczMGY0ODViYzU3YmUzYjQ5ZjgyNTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQyZTVhN2VhZDg2ZGFmMDkxOWRmNWQ1N2Q5ZDQ2MzYwNzA0NjliM2RkZjRiYmFkMTc0MTUyMWMyOTc2YTdlMjEifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py#L2670-L2740",
+          "version": "repo-lines-v1:sha256:04942e5f81e480306aa8dada9f5c106cbb0ef30e09a7fc72fe97fe19103b623c:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiYThkZmZhYzJjZDZjNDFhMzRmZGUyNDFjOTYzNjk1ZTUyZWQ0YWZjZWJjY2M2ODI5Y2M1MGE5ODViNTQ1MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAyYWJmMDc1NmIzMmVjM2M1NzVmODViNzcxMmFhZjIyNDdhNTViZTExMjcwNmFhMDgwYjU4NzVhY2I5ZGI1YjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUyNjA5N2JlMmI4ZWY5MjY4YjM4MGEwYWNlZjlmMGQyNjczNzkyM2VhODNmMzBlYWVjNTViMzdmYTdjOTc2NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNjYzUyMTE0NTI5NGNjZGI5NDk1ZTAzYTBhYWRjMzRiOWMzYTg3ZDIzNmMyMDY1YWI4NTcxNTUwZjBlMjIwZjQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_09315436d266457c853d0c5c6a601b3d",
+      "statement": "The generated devcontainer.json runs a list-form initializeCommand that creates ${localEnv:HOME}/.openwiki and ${localEnv:HOME}/.cache/huggingface on the host before its bind mounts are created, and validate_targets.py requires that exact command.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L9552-L9562",
+          "version": "repo-lines-v1:sha256:e1980fea8131de2605d84168ae35683eb07728931331af38fe56ef94cab173ae:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhMGI1NWIxN2U3NGRjMjE1NjA3Mjg4MjI0ZjRjOGJkY2E5ZmZhYzJkNzc4NGUxYmRhNDVjMDBmNTU5NzVhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiYTNiMzgxNWMwNTRlY2M2Yjg4MTc1NDQ3Njc5YWY0OTU5MDQ3ZmRmYTI5NDYwZTg0YWNjNDAwZjJmMjBhZGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4OTFiZGM2NWYyYzI3YjBmNDUxMDQ5M2NjNjliZWE4NTM4ZWE4MzM2ODM2ZDY5MzM2NTU2NWRlODhiNmM2YjAifQ"
+        },
+        {
+          "resource": "repo://shared/devcontainer/devcontainer.json#L14-L18",
+          "version": "repo-lines-v1:sha256:309fd6e846d2e7b433dd95a0290b8f8492414dd0fcd8916d9ed29859032ee39c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGVlMzc5ZjVmNmUzZTljZmViNTY5OGFmMjNhZTg4YWVkOTM2NzlhZGZlYmM5NzZhMTM5MWMyMGUyODQyMDdlMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTY0ZDhjMDczNDI5ODkzMTAxNTc2ZDg4ZDk5MTI3ZTg5ZDY4OTFkM2IxN2U4OWRmMDJlYzlhZTcwNzA1ZDhiZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTlmOGRjYzgwOTQyODY0OTUzOWU5ZjQ0MzNkY2RlNzMxODk3NmQyNWRkYTUyMmE3YThjNDFiMTcwNWY0YzE0NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzJhYjI4NDg5NTQ2NWYxMTgxYzUzMjA0ZGQxMzk2NWZjYmRiNDZjYmYyN2E3ZTAyOWJkNGQ0MzkwMjgyOTYzMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c6a52ca3b3314dd1b360f42dec66b024",
+      "statement": "validate_targets.py requires the generated state-sync.sh to invoke git rebase --quit exactly once, for the orphaned autostash auto-clear, and never to silence a failed rebase or merge abort with || true.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L1443-L1487",
+          "version": "repo-lines-v1:sha256:dd29434d4adc1ed426c9eba4b35f47590a4b3cbb8a384a289579af3021c297eb:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkYTgyMjQ3YzFiYjIzNDJkZjQwNmY3N2ExNmZjYWIxNGM0NTFmNTljNDkzNTQxZGQ2NmNjMDU4MmU4MWNhZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmYjcwNWI4NjMxOTYxYjhkNTAyOWY3NWYzNTRmYjMwODI2MzQ1OWMxNjMyODk1MjcxM2U4ODg5OTllYjljNDUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e2ca03bdfcca4628bee14118cbc992d6",
+      "statement": "Both Claude Code and Codex run state-sync.sh push on UserPromptSubmit; Codex runs a local state-sync.sh checkpoint on SessionEnd, while Claude Code runs state-sync.sh push on SessionEnd and state-sync.sh checkpoint on StopFailure.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1176-L1186",
+          "version": "repo-lines-v1:sha256:ad2480a50dfc46e5e47fea11d66479a05d218737d12bb3e6591d381f143efe6c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiMzBkZjY0ZjA4NzA2NWEyYTJkYWM2ODg2MjhlYjRmYWU2NTYzMmFkZjk0MGUxNDEwZmJkYWZmZTk4M2I2YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjMjU3NzQ3N2MwNWZjZjNjNWI4YTkxZDMwOTc2Y2VmZTFiNDU3Y2U2ZmE3MGI0NDFiNDY3ZTk1MzYwOTVkM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1281-L1290",
+          "version": "repo-lines-v1:sha256:8738489f8197a90b8eab0408afbd38ef128e1561b66b3d46ee7fb085c51d4be6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiMzBkZjY0ZjA4NzA2NWEyYTJkYWM2ODg2MjhlYjRmYWU2NTYzMmFkZjk0MGUxNDEwZmJkYWZmZTk4M2I2YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjMjU3NzQ3N2MwNWZjZjNjNWI4YTkxZDMwOTc2Y2VmZTFiNDU3Y2U2ZmE3MGI0NDFiNDY3ZTk1MzYwOTVkM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_26eabe3a099244c99f0980ef3c92c841",
+      "statement": "Claude Code, Codex, and GitHub Copilot run state-sync.sh pull at SessionStart, while Antigravity wires only a PreToolUse bridge and no lifecycle hooks; GitHub Copilot's Stop runs state-sync.sh push instead of a Stop wrapper.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1106-L1112",
+          "version": "repo-lines-v1:sha256:dae4e2a9785f2a1315918e999d465ee18de403645ca80e63e6a527d60071f6a9:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzA2Y2I4MDY2MWY2NDczOTk2OWMxY2M2ODU0ZGIwYzgwODEwZTVjMWU1ZDZiYzBkMTAwMWYzMjdjMjk4YmVkNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmNmY2VkY2NkMDgxOTE1ODM3NjU3OGU5ZGUwYjkwMTUzMmY4NDBhZGE5ZjJhZGI5MTBjODU3NTJkOWE5ODlhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2MyNTc3NDc3YzA1ZmNmM2M1YjhhOTFkMzA5NzZjZWZlMWI0NTdjZTZmYTcwYjQ0MWI0NjdlOTUzNjA5NWQzZCJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1211-L1217",
+          "version": "repo-lines-v1:sha256:56808fe4f3e35e2668b9fcec49584988ad4f9919ead559b5c2d9528077ece3d4:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQ0YWM0ZWU4YTVmYWI5ZWUwYWIyM2FjYTE5ZmJkNDM4MTFmZGEyNzA0MWFlYTgyNDVhZWE2YWNmNGFjNDlhOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWYxOTdhMjE3ZjA4YTgxODRmOTA0YjA3OGFjYmE3Y2JjMDhkN2I0MGIzMzU3NDBkYmE3MmEwYTdkMDJiYjZhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzAwNzEyN2UxMmJiZDQwZjAzZGQwZTE3MThlM2Y3NGIwNGJjNzM3ZTQ0ZjBlMzRkYWZhNDZlNTY2YTQyYjNhNCJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1304-L1328",
+          "version": "repo-lines-v1:sha256:fc58f1acb22b8073d663e9872e9e1adebdef8c0b45172bec7df596dbebd26170:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2YTdhOWJlYjg4OGFiNDI1N2I0MGVhNjBhMjQ2N2Y4MzI5Y2VkOTg2MzkyZDlkNDZjMDYzZWIzNmVhMTY1ZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM3NDliNDU4NzYwMjQ0MTJhYzZkNGNkYjNhNDkxYTk5ZTA5MjcyMjFhMjQ2ZmZkZjY4NmI2Mjg1OThhNzRjNzEifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/hooks.json#L129-L155",
+          "version": "repo-lines-v1:sha256:484f71eeab18172a30f7c60ec5b94a054bb126e53b220cc5cae37a9d707323f2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViMjQ3ZmI4Yjg3YWM0OWM2ODllMDRmODRmOTExMWU2N2Y2ZWUwZjg0NTY5MDc0NzY2OTdjYzNhYTNkM2NhNzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5Y2VjZDI0MzZiMDE3OGEyOTdmMzUyYWFhOThiNGEyN2NhZjU1ZDAyZGFkY2U5N2MxYjc2YjUxZTIyYjYwMTgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlYTkwN2EzMjcwMGMzMjk1YzA0NGJlN2UyZGYzZDBkOTU2YjkwNDEyMmY4ZTRkZWIxNzg1YTBiZDlmOTI0YWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAxMmI0MmY1ZmVhNTMxYWFmZDcyY2NmZjU3ZDBjMTZiYWQzZWY3NzgzMDZiNTdhOGZjMGUxZTlmNWU4ZTBkNjcifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/hooks.json#L4-L12",
+          "version": "repo-lines-v1:sha256:7949229f4b2fd0509e2ecf21bf340ebed842ff1f1637b3a15c25760fe2bc807d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJhOTM4ZTA4OWFlNGE3ZjNjMDIyYTc3MWYwZjg4YTkwMzhmNTg1ZWJjZmFhZDhkZTM2NTViN2VhNTdlNzU3YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTY3MDc1MzM0MTAxOGE3M2JiN2RhM2Y3MmMwZWIwMWIwMGQ1MjFhZGUzNmRlMmZhMDQxZTkxMGY2MGE1YzBlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjVlNTk2ZWQwZGE4NGZmOGFhMzM5YzcyNTFkNjEwM2Y2MDc0OWY1YmQxYTFhNDlmOWFmNTVlMDkzMjE1OWVmZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI5ZmVhM2FkNWY4ZDRlZGQwODY1NjM0OTFlYWZkMThlMzEzZjQzMDZlMTA2ZTUyODAyNjRjMjk5ZmZiYzdkNiJ9"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-21T02:32:20.957Z"
+    "at": "2026-10-23T07:02:22.284Z"
   }
 }
