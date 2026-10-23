@@ -3,8 +3,8 @@ name: 2026-10-23_phase-C-restorer-and-devcontainer-hardening
 type: small-plan
 parent_plan: state-sync-safety-fixes
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-23_state-sync-safety-fixes-phase-C.md
 ---
 
 # Small Plan: Restorer Symlink Checks and Devcontainer Mount Folders
@@ -19,7 +19,7 @@ Second, the devcontainer bind-mounts `~/.openwiki` and `~/.cache/huggingface` fr
 
 ## Steps
 
-- [ ] **1. Refuse symlinked roots in the restorer.**
+- [x] **1. Refuse symlinked roots in the restorer.**
   - Owner: `coder`. File: `shared/hooks/scripts/restore-root-adapters.sh`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Keep the early `exit 0` at lines 33-35, so a repository with nothing to restore still exits quietly. That includes one whose `.claude` is a symlink with no restore content.
@@ -27,7 +27,7 @@ Second, the devcontainer bind-mounts `~/.openwiki` and `~/.cache/huggingface` fr
   - Do not edit the line `for relative in "${paths[@]}"; do`: `scripts/check_runtime.py` (line 473) allowlists it by exact text. Add no unguarded array expansion.
   - `state-sync.sh` already turns a restorer failure into the logged warning `restoring root adapters failed; continuing.`; it needs no change.
 
-- [ ] **2. Create the bind-mount folders before the container starts.**
+- [x] **2. Create the bind-mount folders before the container starts.**
   - Owner: `coder`. Files: `shared/devcontainer/devcontainer.json`, `scripts/validate_targets.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Add, just before `"mounts"`: `"initializeCommand": ["mkdir", "-p", "${localEnv:HOME}/.openwiki", "${localEnv:HOME}/.cache/huggingface"]`. The list form runs `mkdir` with no shell, so a home path with spaces or shell characters stays one argument.
@@ -35,7 +35,7 @@ Second, the devcontainer bind-mounts `~/.openwiki` and `~/.cache/huggingface` fr
   - `scripts/install_bootstrap.py::update_devcontainer_state_remote` (lines 1005-1025) rewrites the file through `json.loads` and `json.dumps`, which keeps unknown keys, so it needs no change.
   - Tests: `uv run python scripts/validate_targets.py` checks the generated tree, so reverting the `devcontainer.json` change fails it. No separate unit tests, matching the neighbouring inline checks.
 
-- [ ] **3. Restorer regression tests.**
+- [x] **3. Restorer regression tests.**
   - Owner: `coder`. File: `tests/test_state_sync.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - New tests:
@@ -45,18 +45,18 @@ Second, the devcontainer bind-mounts `~/.openwiki` and `~/.cache/huggingface` fr
   - Both rejection tests fail against today's script, which copies the outside file.
   - `test_restore_root_adapters_rejects_allowed_source_symlink_escape` and the other restorer tests pass unchanged.
 
-- [ ] **4. Update documentation.**
+- [x] **4. Update documentation.**
   - Owner: `documenter` (CLOSEOUT step 1). Files: `README.md`, `docs/runtime-checks.md`, `docs/smoke-tests.md`.
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `README.md` line 1151: drop the request to create `~/.openwiki` by hand; the devcontainer's `initializeCommand` now creates both mount folders as the host user.
   - `docs/runtime-checks.md`, the post-start paragraph near line 848: the restorer refuses a symlinked `.claude` or `.claude/bootstrap-root`.
   - `docs/smoke-tests.md`, the devcontainer bullets (line 92 and nearby): the generated `devcontainer.json` creates its bind-mount folders before the container starts.
 
-- [ ] **5. Orchestrator closeout items.**
+- [x] **5. Orchestrator closeout items.**
   - Owner: orchestrator.
   - Before CLOSEOUT step 2, run `uv run python scripts/generate_targets.py --all` and then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
 
-- [ ] **6. Review.**
+- [x] **6. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation`. `config` is added because `devcontainer.json` changes (routing table in `.claude/instructions/workspace.instructions.md`).
   - Focus: the restorer still exits 0 with nothing to restore; no new code path follows a symlinked root; the devcontainer change runs no shell.
 
@@ -81,11 +81,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
