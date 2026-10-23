@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-23
 **Plan:** `.claude/plans/2026-10-23_phase-D-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -45,6 +45,14 @@ Audit live guidance for claims that this plan or earlier work made stale, then r
 
 ## Verification
 
+```text
+PASS        0.4s  uv run python scripts/generate_targets.py --all
+PASS       55.4s  uv run python scripts/validate_targets.py
+PASS        0.2s  uv run python scripts/validate_plan_frontmatter.py
+PASS      367.0s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-10-23_phase-D-knowledge-refresh.json` (0 findings after round 2, gate PASS, seven profiles).
 - optional 1: PASS — the refreshed `openwiki/operations/git-backed-ai-state-sync.md` was read against `shared/hooks/scripts/state-sync.sh` (and the restorer, devcontainer, generator, validator, and tests) in two review rounds; round 1 found three prose statements that did not match the code, a second OpenWiki run corrected them, and round 2 found none.
 
 ## Open Questions / Next Steps
