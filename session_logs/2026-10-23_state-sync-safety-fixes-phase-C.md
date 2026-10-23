@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-23
 **Plan:** `.claude/plans/2026-10-23_phase-C-restorer-and-devcontainer-hardening.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -23,6 +23,16 @@ Make `restore-root-adapters.sh` refuse a symlinked `.claude` or `.claude/bootstr
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS      111.8s  uv run pytest tests/test_state_sync.py tests/test_validate_targets.py tests/test_check_runtime.py -q --tb=short
+PASS       50.6s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      322.9s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-10-23_phase-C-restorer-and-devcontainer-hardening.json` (0 findings after round 2, gate PASS, seven profiles including `config`).
 - optional 1: PASS — with `HOME` pointed at an empty folder, `@devcontainers/cli up` on an `alpine:3.20` devcontainer carrying the generated `initializeCommand` and `mounts` (not the full CUDA image) created both folders owned by the host user and started the container with both bind mounts; the same config without `initializeCommand` failed with `bind source path does not exist`.
 
 ## Open Questions / Next Steps
