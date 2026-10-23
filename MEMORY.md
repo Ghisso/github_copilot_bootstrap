@@ -172,8 +172,9 @@
 - [LEARN:security] Automated recovery must distinguish state that existed at
   entry from state the current operation created. Auto-clean only an exact,
   observed orphan shape; leave valid or unknown pre-existing state untouched,
-  and reserve broader abort/fallback cleanup for state the operation can
-  prove it owns.
+  and reserve `--abort` for state the operation can prove it owns. When that
+  abort fails, leave the operation for a person; never force it out with
+  `--quit` (see the 2026-10-23 `[LEARN:security]` entry above).
 - [LEARN:testing] A regression test must FAIL if the fix is reverted. When
   buggy code was "harmless" only because a lower layer already blocked the bad
   outcome (e.g. git rejecting a non-fast-forward push either way), assert a
@@ -480,7 +481,9 @@
 - [LEARN:recovery] A recovery that swallows its own failure converts a
   transient fault into a permanent one. `git rebase --abort 2>/dev/null ||
   true` cannot clear a half-initialized rebase; `--quit` can because it clears
-  state without moving `HEAD`.
+  state without moving `HEAD`. Use `--quit` only for that exact orphaned
+  autostash shape: on a real rebase it leaves a detached HEAD with an
+  unmerged index, which the next `git add -A` commits.
 - [LEARN:recovery] `--autostash` isn't free insurance. It can write the
   autostash commit and rebase directory before discovering new dirty state, so
   a self-writing repository can manufacture the latch it meant to avoid.
