@@ -1,16 +1,16 @@
 ---
 name: state-sync-safety-fixes
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: state-sync-safety-fixes_implementation
-started_at:
+started_at: 2026-10-23T04:06:37Z
 phases:
   - 2026-10-23_phase-A-unfinished-git-operations
   - 2026-10-23_phase-B-sync-lock-and-exit-trap
   - 2026-10-23_phase-C-restorer-and-devcontainer-hardening
   - 2026-10-23_phase-D-knowledge-refresh
-current_phase:
+current_phase: 2026-10-23_phase-A-unfinished-git-operations
 ---
 
 # Big Plan: State-Sync Safety Fixes
