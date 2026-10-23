@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-10-23T07:10:42Z",
+  "branch": "state-sync-safety-fixes_implementation",
+  "head_sha": "ebc3bdd349104d761199f549369e7bddcad01730",
+  "base_ref": "dev",
+  "merge_base_sha": "a0c600375638be7f05b27b70f7916ebcb4cd2269",
+  "phase": "2026-10-23_phase-D-knowledge-refresh",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "6d71d29d5b0481f6157b61d6b2a8208b20d3dd75",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "openwiki/.claims/architecture/hooks-and-guardrails.json",
+    "openwiki/.claims/operations/git-backed-ai-state-sync.json",
+    "openwiki/.claims/quickstart.json",
+    "openwiki/.last-update.json",
+    "openwiki/.page-manifest.json",
+    "openwiki/architecture/hooks-and-guardrails.md",
+    "openwiki/operations/git-backed-ai-state-sync.md",
+    "openwiki/operations/index.md",
+    "openwiki/quickstart.md",
+    "scripts/validate_targets.py",
+    "shared/devcontainer/devcontainer.json",
+    "shared/hooks/scripts/restore-root-adapters.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/workflow.instructions.md",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
