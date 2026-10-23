@@ -124,9 +124,28 @@
   `cmd_publish` (which `cmd_push` runs after `cmd_checkpoint`) and
   `cmd_migrate` skip the push on a non-zero result, and `cmd_pull` returns
   it. Top-level dispatch still converts the non-zero return into a warning +
-  `exit 0` so hooks never block Codex shutdown. `cmd_setup` ignores that
-  result, except the protected-rebase status it passes back, since it never
-  pushes.
+  `exit 0` so hooks never block Codex shutdown. `cmd_setup` never pushes:
+  it ignores an ordinary reconcile failure and still restores adapters and
+  commits, passes the protected-operation status back, and returns 1 before
+  restoring adapters or committing while a rebase or merge is left
+  unfinished (its abort failed).
+- [LEARN:security] A recovery fallback that forces a Git operation out
+  (`rebase --quit` after a failed `--abort`) turns a visible, protected state
+  into a silent corrupt one: a detached HEAD with an unmerged index, which the
+  next `git add -A` commits as conflict markers while the branch stops moving.
+  Leave an operation that cannot be aborted for a person, and guard every
+  automatic commit with the operation markers (`rebase-merge`, `rebase-apply`,
+  `MERGE_HEAD`) and `git ls-files -u`.
+- [LEARN:review] A consumer's bug report can describe its own hand-patched
+  copy. Two items of the 2026-10-23 consumer report (settings file "deleted
+  during every pull", a false restore warning) came from the consumer
+  agent's reference patch, which added `rm -f` of the live file. Diff the
+  consumer's installed bytes against the shipped version before planning
+  around a claim.
+- [LEARN:tooling] A check runner that feeds commands to a `while read` loop on
+  stdin must run each command with `</dev/null`. A child that reads stdin
+  (`state-sync.sh`'s `timeout 2 cat` drain, run inside `validate_targets.py`)
+  swallows the remaining lines, and the later checks silently never run.
 - [LEARN:security] Automated recovery must distinguish state that existed at
   entry from state the current operation created. Auto-clean only an exact,
   observed orphan shape; leave valid or unknown pre-existing state untouched,

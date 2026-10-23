@@ -20,6 +20,11 @@ Stop state sync from committing conflict markers: refuse to commit while a rebas
 
 ## [LEARN] Entries
 
+- [LEARN:security] Forcing a Git operation out (`rebase --quit` after a failed `--abort`) turns a protected state into a silent corrupt one: a detached HEAD with an unmerged index that the next `git add -A` commits. Leave it for a person and guard automatic commits with the operation markers plus `git ls-files -u`.
+- [LEARN:review] A consumer's bug report can describe its own hand-patched copy; two items of this report came from the consumer agent's own `rm -f` patch. Diff installed bytes against the shipped version first.
+- [LEARN:tooling] A check runner that feeds commands on stdin must run each with `</dev/null`, or a child's stdin drain swallows the remaining commands.
+- [LEARN:domain] Updated the `cmd_setup` entry in `.claude/MEMORY.md`: it now returns 1 before restoring adapters or committing while a rebase or merge is left unfinished.
+
 ## Verification
 
 ## Open Questions / Next Steps
