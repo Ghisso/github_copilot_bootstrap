@@ -46,7 +46,7 @@ fi
 CLAUDE_DIR="$REPO_ROOT/.claude"
 BRANCH="${AI_STATE_BRANCH:-ai-state}"
 ERROR_LOG="$REPO_ROOT/.claude/session_logs/hooks-errors.log"
-PROTECTED_REBASE_STATE=2
+PROTECTED_OPERATION_STATE=2
 
 prepare_error_log() {
   mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
@@ -121,26 +121,14 @@ EOF
   fi
 }
 
-untrack_nested_cache() {
-  # Upgraded nested repositories may already contain committed cache files.
-  # Remove only their index entries; -f is safe with --cached and preserves
-  # every working-tree byte for the local Context Mode installation.
-  git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache
-}
-
-untrack_error_log() {
-  # Upgraded nested repositories may already track the local-only error log
-  # (see write_nested_gitignore). Remove only its index entry; the local file
-  # on disk is untouched, and session_logs/hooks-bypass.log stays tracked.
-  git -C "$CLAUDE_DIR" rm -f -q --cached --ignore-unmatch -- session_logs/hooks-errors.log
-}
-
-untrack_local_settings() {
-  # `settings.local.json` is machine-local: Claude Code writes permission
-  # approvals there, and it can add or turn off hooks, so it must never sync
-  # (see write_nested_gitignore). Upgraded nested repositories may already
-  # track it. Remove only its index entry; the local file on disk is untouched.
-  git -C "$CLAUDE_DIR" rm -f -q --cached --ignore-unmatch -- settings.local.json
+# Upgraded nested repositories may already track local-only paths: the derived
+# context cache, the hook error log (see write_nested_gitignore), and
+# settings.local.json, which Claude Code writes permission approvals to and can
+# use to add or turn off hooks, so it must never sync. Remove only their index
+# entries; -f is safe with --cached and every working-tree byte stays, and
+# session_logs/hooks-bypass.log stays tracked.
+untrack_local_only_paths() {
+  git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache session_logs/hooks-errors.log settings.local.json
 }
 
 # Git may delete or overwrite the ignored, untracked settings.local.json while
@@ -187,6 +175,14 @@ restore_local_settings() {
   fi
   warn "restored local settings.local.json, which git replaced during reconciliation."
   rm -f "$backup"
+}
+
+# For a rebase or merge left unfinished ($1), the copy stays where it is: git
+# still owns the tree, so writing it back could be overwritten or lost again.
+# `$(...)` runs this in a subshell, so the caller clears LOCAL_SETTINGS_BACKUP.
+kept_local_settings_note() {
+  [[ -n "$LOCAL_SETTINGS_BACKUP" ]] || return 0
+  printf ' settings.local.json was not restored; its copy is kept at %s. Copy it back to %s/settings.local.json once the %s is resolved.' "$LOCAL_SETTINGS_BACKUP" "$CLAUDE_DIR" "$1"
 }
 
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
@@ -247,19 +243,20 @@ init_nested_repo() {
 # so the working tree is clean when the rebase starts.
 commit_local_state() {
   local message="${1:-}"
+  # `git add -A` would stage conflict markers and commit them. The unmerged-path
+  # test also catches what no rebase folder or MERGE_HEAD marks: a conflicted
+  # cherry-pick, revert, or stash pop, or a detached HEAD left by rebase --quit.
+  if nested_operation_in_progress || [[ -n "$(git -C "$CLAUDE_DIR" ls-files -u)" ]]; then
+    warn "an unfinished rebase or merge, or unmerged paths, in $CLAUDE_DIR; not committing over it. Inspect with: git -C $CLAUDE_DIR status."
+    return 1
+  fi
   if ! write_nested_gitignore; then
     return 1
   fi
   if ! write_nested_gitattributes; then
     return 1
   fi
-  if ! untrack_nested_cache; then
-    return 1
-  fi
-  if ! untrack_error_log; then
-    return 1
-  fi
-  if ! untrack_local_settings; then
+  if ! untrack_local_only_paths; then
     return 1
   fi
   if ! git -C "$CLAUDE_DIR" add -A; then
@@ -299,6 +296,14 @@ nested_rebase_in_progress() {
   [[ -d "$CLAUDE_DIR/.git/rebase-merge" || -d "$CLAUDE_DIR/.git/rebase-apply" ]]
 }
 
+nested_merge_in_progress() {
+  [[ -f "$CLAUDE_DIR/.git/MERGE_HEAD" ]]
+}
+
+nested_operation_in_progress() {
+  nested_rebase_in_progress || nested_merge_in_progress
+}
+
 orphaned_preexisting_autostash() {
   local rebase_dir="$CLAUDE_DIR/.git/rebase-merge" entry entries=0
   [[ -d "$rebase_dir" && ! -d "$CLAUDE_DIR/.git/rebase-apply" ]] || return 1
@@ -310,13 +315,18 @@ orphaned_preexisting_autostash() {
   [[ $entries -eq 1 ]]
 }
 
-preflight_mutating_rebase_state() {
+# Runs no Git command for a protected state: both operations are found by file.
+preflight_unfinished_operation() {
+  if nested_merge_in_progress; then
+    warn "an unfinished merge is in progress; state sync will not alter it. Inspect with: git -C $CLAUDE_DIR status. Resolve with: git -C $CLAUDE_DIR merge --continue after fixing conflicts, or git -C $CLAUDE_DIR merge --abort."
+    return "$PROTECTED_OPERATION_STATE"
+  fi
   if ! nested_rebase_in_progress; then
     return 0
   fi
   if ! orphaned_preexisting_autostash; then
-    printf 'WARN state-sync: pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C %s status. Resolve with: git -C %s rebase --continue, or quit with: git -C %s rebase --quit\n' "$CLAUDE_DIR" "$CLAUDE_DIR" "$CLAUDE_DIR" >&2
-    return "$PROTECTED_REBASE_STATE"
+    warn "pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C $CLAUDE_DIR status. Resolve with: git -C $CLAUDE_DIR rebase --continue after fixing conflicts, or git -C $CLAUDE_DIR rebase --abort."
+    return "$PROTECTED_OPERATION_STATE"
   fi
 
   local quit_output quit_status
@@ -335,10 +345,10 @@ preflight_mutating_rebase_state() {
 dispatch_mutating() {
   local preflight_status command_status
   set +e
-  preflight_mutating_rebase_state
+  preflight_unfinished_operation
   preflight_status=$?
   set -e
-  if [[ $preflight_status -eq $PROTECTED_REBASE_STATE ]]; then
+  if [[ $preflight_status -eq $PROTECTED_OPERATION_STATE ]]; then
     return 0
   fi
   if [[ $preflight_status -ne 0 ]]; then
@@ -348,29 +358,19 @@ dispatch_mutating() {
   "$@"
   command_status=$?
   set -e
-  if [[ $command_status -eq $PROTECTED_REBASE_STATE ]]; then
+  if [[ $command_status -eq $PROTECTED_OPERATION_STATE ]]; then
     return 0
   fi
   return "$command_status"
 }
 
+# Only abort: a rebase that --abort cannot clear is left for the operator, since
+# forcing it out would leave a detached HEAD with an unmerged index.
 clear_current_pull_rebase_state() {
-  local abort_output abort_status quit_output quit_status
-  set +e
-  abort_output="$(git -C "$CLAUDE_DIR" rebase --abort 2>&1)"
-  abort_status=$?
-  if [[ $abort_status -eq 0 ]]; then
-    set -e
-    append_error_output "$abort_output"
-    return 0
-  fi
-
-  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
-  quit_status=$?
-  set -e
+  local abort_output abort_status=0
+  abort_output="$(git -C "$CLAUDE_DIR" rebase --abort 2>&1)" || abort_status=$?
   append_error_output "$abort_output"
-  append_error_output "$quit_output"
-  return "$quit_status"
+  return "$abort_status"
 }
 
 restore_root_adapters() {
@@ -429,20 +429,25 @@ setup_local_state() {
 # Existing nested repositories retain setup's local-only contract; a fresh
 # setup reconciles once, while `pull` uses the local step once before its sync.
 cmd_setup() {
-  if [[ -d "$CLAUDE_DIR/.git" ]]; then
-    write_nested_gitignore && write_nested_gitattributes
-    return $?
+  local fresh_repo=0 setup_status=0 reconcile_status
+  if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
+    fresh_repo=1
   fi
-  if ! setup_local_state; then
-    return 1
+  setup_local_state || setup_status=$?
+  if [[ $fresh_repo -eq 0 || $setup_status -ne 0 ]]; then
+    return "$setup_status"
   fi
-  local reconcile_status
   set +e
   reconcile_committed_state
   reconcile_status=$?
   set -e
-  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+  if [[ $reconcile_status -eq $PROTECTED_OPERATION_STATE ]]; then
     return "$reconcile_status"
+  fi
+  # A rebase or merge left unfinished owns the tree: neither restoring adapters
+  # nor committing may touch it, and the settings copy is still waiting.
+  if nested_operation_in_progress; then
+    return 1
   fi
 
   # D5 / F1 (§9): a standalone `setup` (no devcontainer post-start.sh) must
@@ -481,6 +486,7 @@ reconcile_committed_state() {
   fi
 
   local remote_ref_status output status conflicts preflight_status
+  local abort_output abort_status histories_related=1
   set +e
   git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
   remote_ref_status=$?
@@ -493,7 +499,26 @@ reconcile_committed_state() {
     return 1
   fi
 
-  if ! git -C "$CLAUDE_DIR" merge-base HEAD "origin/$BRANCH" >/dev/null 2>&1; then
+  # Recorded before the commit below, which cannot change whether the two
+  # histories are related.
+  git -C "$CLAUDE_DIR" merge-base HEAD "origin/$BRANCH" >/dev/null 2>&1 || histories_related=0
+
+  # Re-check immediately before staging: an operator rebase can begin after
+  # the entrypoint guard, while hook logging can dirty the tree before pull.
+  # Both paths start from a committed tree, so an abort never loses local work.
+  set +e
+  preflight_unfinished_operation
+  preflight_status=$?
+  set -e
+  if [[ $preflight_status -ne 0 ]]; then
+    return "$preflight_status"
+  fi
+  if ! commit_local_state; then
+    warn "local state checkpoint failed; reconciliation will retry on the next sync."
+    return 1
+  fi
+
+  if [[ $histories_related -eq 0 ]]; then
     if ! preserve_local_settings; then
       warn "could not keep a copy of local settings.local.json; merge with origin/$BRANCH skipped and will retry on the next sync."
       return 1
@@ -504,9 +529,16 @@ reconcile_committed_state() {
     set -e
     if [[ $status -ne 0 ]]; then
       conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
-      git -C "$CLAUDE_DIR" merge --abort 2>/dev/null || true
-      restore_local_settings || true
       append_error_output "$output"
+      abort_status=0
+      abort_output="$(git -C "$CLAUDE_DIR" merge --abort 2>&1)" || abort_status=$?
+      append_error_output "$abort_output"
+      if [[ $abort_status -ne 0 ]]; then
+        warn "merge with origin/$BRANCH conflicted and merge --abort did not finish; the merge was left in place. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Inspect with: git -C $CLAUDE_DIR status. Resolve with: git -C $CLAUDE_DIR merge --continue after fixing conflicts, or git -C $CLAUDE_DIR merge --abort.$(kept_local_settings_note merge)"
+        LOCAL_SETTINGS_BACKUP=""
+        return 1
+      fi
+      restore_local_settings || true
       warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
       return 1
     fi
@@ -518,20 +550,6 @@ reconcile_committed_state() {
       return 1
     fi
     return 0
-  fi
-
-  # Re-check immediately before staging: an operator rebase can begin after
-  # the entrypoint guard, while hook logging can dirty the tree before pull.
-  set +e
-  preflight_mutating_rebase_state
-  preflight_status=$?
-  set -e
-  if [[ $preflight_status -ne 0 ]]; then
-    return "$preflight_status"
-  fi
-  if ! commit_local_state; then
-    warn "local state checkpoint failed; reconciliation will retry on the next sync."
-    return 1
   fi
 
   if ! preserve_local_settings; then
@@ -547,13 +565,13 @@ reconcile_committed_state() {
   if [[ $status -ne 0 ]]; then
     conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
     append_error_output "$output"
-    if nested_rebase_in_progress; then
-      if ! clear_current_pull_rebase_state; then
-        warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
-      fi
+    if nested_rebase_in_progress && ! clear_current_pull_rebase_state; then
+      warn "reconciliation with origin/$BRANCH failed and rebase --abort did not finish; the rebase was left in place. Inspect with: git -C $CLAUDE_DIR status. Resolve with: git -C $CLAUDE_DIR rebase --continue after fixing conflicts, or git -C $CLAUDE_DIR rebase --abort.$(kept_local_settings_note rebase)"
+      LOCAL_SETTINGS_BACKUP=""
+    else
+      restore_local_settings || true
+      warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     fi
-    restore_local_settings || true
-    warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
     return 1
   fi
@@ -588,7 +606,7 @@ cmd_publish() {
   reconcile_committed_state
   reconcile_status=$?
   set -e
-  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+  if [[ $reconcile_status -eq $PROTECTED_OPERATION_STATE ]]; then
     return "$reconcile_status"
   fi
   if [[ $reconcile_status -ne 0 ]]; then
@@ -654,9 +672,9 @@ cmd_push() {
 
 cmd_status() {
   if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
-    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\n'
+    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\nmerge: none\n'
   else
-    local worktree remote tracking ahead behind rebase
+    local worktree remote tracking ahead behind rebase merge
     if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
       worktree="dirty"
     else
@@ -677,7 +695,11 @@ cmd_status() {
     if nested_rebase_in_progress; then
       rebase="in-progress"
     fi
-    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\n' "$worktree" "$remote" "$tracking" "$rebase"
+    merge="none"
+    if nested_merge_in_progress; then
+      merge="in-progress"
+    fi
+    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\nmerge: %s\n' "$worktree" "$remote" "$tracking" "$rebase" "$merge"
   fi
   printf 'error-log: %s\n' "$ERROR_LOG"
   if [[ -f "$ERROR_LOG" ]]; then
@@ -711,7 +733,7 @@ cmd_migrate() {
   reconcile_committed_state
   reconcile_status=$?
   set -e
-  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+  if [[ $reconcile_status -eq $PROTECTED_OPERATION_STATE ]]; then
     return "$reconcile_status"
   fi
   if [[ $reconcile_status -ne 0 ]]; then
