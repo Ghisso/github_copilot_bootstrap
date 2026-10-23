@@ -562,7 +562,7 @@ without claiming that it changed hooks. If sync is not progressing after you
 approve updated hooks, run `state-sync.sh status` and inspect
 `.claude/session_logs/hooks-errors.log`.
 
-Findings reports must be written as `.claude/quality_reports/findings-<phase>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records the exact phase-receipt and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; every bound report must be `dirty: false` (no unstaged changes) and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
+Findings reports must be written as `.claude/quality_reports/findings-<phase>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records the exact phase-receipt and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. A plan's leading phases whose slug and closeout log are both dated before 2026-08-29 may have no closeout receipt, because receipts did not exist yet; see the historical receipt-chain paragraphs below. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; every bound report must be `dirty: false` (no unstaged changes) and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
 
 Phase and closeout receipts also bind the governing nested control plane. Their
 `control_plane_provenance` records the nested `.claude` HEAD, relevant nested
@@ -845,6 +845,21 @@ list first. It then re-verifies every
 artifact hash against the current file bytes. Only the terminal completed
 phase receives current-tree/current-runtime freshness checks; every earlier
 phase gets this ancestor/tree/artifact-hash chain instead.
+
+Closeout receipts exist only since commit `b3c6bec` (2026-08-29), so a plan
+that began earlier would otherwise never be able to commit again. The walk
+therefore skips a plan's leading run of earlier phases, and only that run. A
+phase is in the run when it is cancelled, or when all of these hold: it is
+complete, its slug is dated before 2026-08-29 (`RECEIPT_CHAIN_SINCE` in
+`verify.py`), its `closeout_session_log` file name is dated before 2026-08-29,
+and nothing exists at its closeout receipt path. The run ends at the first
+phase that does not qualify. Every phase after that point is checked in full,
+so deleting a receipt cannot exempt a phase listed after it. A receipt file on
+disk is always validated, so a malformed or tampered one still fails, and an
+undated or later-dated phase is always checked. The closeout log's date is
+required because slug dates are planning dates, not completion dates. The user
+approved this on 2026-10-23 as a narrow reversal of the 2026-09-02 rule
+(commit `8ed2c9e`) that a phase predating receipts gets no implicit pass.
 
 The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested.
 
