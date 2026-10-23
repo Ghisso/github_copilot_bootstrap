@@ -162,6 +162,13 @@
   grandchild (`git maintenance`, a credential daemon) or a hung network call
   keeps the lock; report the lock state somewhere visible (`status` prints
   `lock: held`).
+- [LEARN:tooling] Devcontainer `mounts` use Docker's `--mount`, which refuses a
+  missing bind source (`bind source path does not exist`), so a fresh host
+  fails container creation. A list-form `initializeCommand` (`mkdir -p` with
+  `${localEnv:HOME}`) creates the sources on the host as the host user first.
+  Prove devcontainer config cheaply: copy the exact keys onto an `alpine`
+  image and run `npx @devcontainers/cli up` with `HOME` pointed at an empty
+  folder, instead of rebuilding the full image.
 - [LEARN:security] Automated recovery must distinguish state that existed at
   entry from state the current operation created. Auto-clean only an exact,
   observed orphan shape; leave valid or unknown pre-existing state untouched,

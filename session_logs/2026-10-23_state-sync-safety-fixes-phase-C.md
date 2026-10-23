@@ -19,8 +19,12 @@ Make `restore-root-adapters.sh` refuse a symlinked `.claude` or `.claude/bootstr
 
 ## [LEARN] Entries
 
+- [LEARN:tooling] Devcontainer `mounts` use Docker's `--mount`, which refuses a missing bind source; a list-form `initializeCommand` creates the sources on the host first. Prove such config with the exact keys on an `alpine` image and `@devcontainers/cli up` under an empty `HOME`, not a full image rebuild.
+
 ## Verification
+
+- optional 1: PASS — with `HOME` pointed at an empty folder, `@devcontainers/cli up` on an `alpine:3.20` devcontainer carrying the generated `initializeCommand` and `mounts` (not the full CUDA image) created both folders owned by the host user and started the container with both bind mounts; the same config without `initializeCommand` failed with `bind source path does not exist`.
 
 ## Open Questions / Next Steps
 
-- Implement steps 1-3 (coder), then documentation (documenter), then review.
+- Phase D next: the OpenWiki refresh and the stale-claims audit across live guidance.
