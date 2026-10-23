@@ -24,17 +24,16 @@ Second, the devcontainer bind-mounts `~/.openwiki` and `~/.cache/huggingface` fr
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Keep the early `exit 0` at lines 33-35, so a repository with nothing to restore still exits quietly. That includes one whose `.claude` is a symlink with no restore content.
   - Right after `fail()` is defined, set `CLAUDE_ROOT="$REPO_ROOT/.claude"` and refuse a symlink at either level: `fail ".claude is a symlink; root adapters were not restored"` and `fail ".claude/bootstrap-root is a symlink; root adapters were not restored"`.
-  - After `REPO_ROOT` is resolved (line 88), resolve `CLAUDE_ROOT` with `canonical_path` and require it inside `REPO_ROOT` (`fail ".claude resolves outside the repository root"`). After `SOURCE_ROOT` is resolved, require it inside `CLAUDE_ROOT` (`fail "bootstrap root resolves outside .claude"`). A comment says these two checks are defense in depth: after the symlink checks pass, they can only fail if the tree changes during the run.
   - Do not edit the line `for relative in "${paths[@]}"; do`: `scripts/check_runtime.py` (line 473) allowlists it by exact text. Add no unguarded array expansion.
   - `state-sync.sh` already turns a restorer failure into the logged warning `restoring root adapters failed; continuing.`; it needs no change.
 
 - [ ] **2. Create the bind-mount folders before the container starts.**
-  - Owner: `coder`. Files: `shared/devcontainer/devcontainer.json`, `scripts/validate_targets.py`, `tests/test_validate_targets.py`.
+  - Owner: `coder`. Files: `shared/devcontainer/devcontainer.json`, `scripts/validate_targets.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Add, just before `"mounts"`: `"initializeCommand": ["mkdir", "-p", "${localEnv:HOME}/.openwiki", "${localEnv:HOME}/.cache/huggingface"]`. The list form runs `mkdir` with no shell, so a home path with spaces or shell characters stays one argument.
-  - Add `devcontainer_bind_source_errors(data: dict[str, Any]) -> list[str]` to `scripts/validate_targets.py` and call it from `validate_devcontainer_and_installer`. It requires `initializeCommand` to be a list that starts with `"mkdir", "-p"` and contains the `source=` value of every `type=bind` entry in `mounts`.
+  - In `scripts/validate_targets.py`, next to the existing `openwiki_mount` check (about line 9530), add one inline literal check in the same style as its neighbours: `check(data.get("initializeCommand") == ["mkdir", "-p", "${localEnv:HOME}/.openwiki", "${localEnv:HOME}/.cache/huggingface"], "devcontainer must create its bind-mount source folders on the host", errors)`. No new helper.
   - `scripts/install_bootstrap.py::update_devcontainer_state_remote` (lines 1005-1025) rewrites the file through `json.loads` and `json.dumps`, which keeps unknown keys, so it needs no change.
-  - Tests: the shared `devcontainer.json` returns `[]`; with the Hugging Face path dropped from `initializeCommand`, one error names `${localEnv:HOME}/.cache/huggingface`; the string form returns one error; a missing `initializeCommand` returns one error.
+  - Tests: `uv run python scripts/validate_targets.py` checks the generated tree, so reverting the `devcontainer.json` change fails it. No separate unit tests, matching the neighbouring inline checks.
 
 - [ ] **3. Restorer regression tests.**
   - Owner: `coder`. File: `tests/test_state_sync.py`.
