@@ -1681,3 +1681,12 @@
   pass. In backlog-followups Phase I, two scoping tests were edited from
   `x=$(...)` to `y=$(...)`, which hid a refusal of `PORT=${PORT:-8080}`;
   if an existing expectation is wrong, show Bash's reading instead.
+- [LEARN:verification] A check that reads history must say how it treats
+  records made before the check existed. `historical_chain_errors` required a
+  closeout receipt for every earlier completed phase, but receipts only exist
+  since `b3c6bec` (2026-08-29), so a consumer plan with July phases could
+  never commit again. The fix skips only a plan's leading run of complete
+  phases whose slug and closeout log are both dated before that day, with no
+  receipt file at all; a malformed receipt, a later date, or an undated slug
+  still fails. Slug dates are planning dates, so pair them with a date that
+  marks completion, and test with a fixture shaped like the real consumer.
