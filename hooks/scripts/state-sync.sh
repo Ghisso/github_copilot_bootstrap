@@ -373,6 +373,15 @@ clear_current_pull_rebase_state() {
   return "$abort_status"
 }
 
+# The same rule for the unrelated-history merge. Callers run it only while a
+# merge exists: a merge that failed before creating MERGE_HEAD has nothing to abort.
+clear_current_merge_state() {
+  local abort_output abort_status=0
+  abort_output="$(git -C "$CLAUDE_DIR" merge --abort 2>&1)" || abort_status=$?
+  append_error_output "$abort_output"
+  return "$abort_status"
+}
+
 restore_root_adapters() {
   local restore="$SCRIPT_DIR/restore-root-adapters.sh"
   if [[ -f "$restore" ]]; then
@@ -486,7 +495,7 @@ reconcile_committed_state() {
   fi
 
   local remote_ref_status output status conflicts preflight_status
-  local abort_output abort_status histories_related=1
+  local histories_related=1
   set +e
   git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
   remote_ref_status=$?
@@ -530,10 +539,7 @@ reconcile_committed_state() {
     if [[ $status -ne 0 ]]; then
       conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
       append_error_output "$output"
-      abort_status=0
-      abort_output="$(git -C "$CLAUDE_DIR" merge --abort 2>&1)" || abort_status=$?
-      append_error_output "$abort_output"
-      if [[ $abort_status -ne 0 ]]; then
+      if nested_merge_in_progress && ! clear_current_merge_state; then
         warn "merge with origin/$BRANCH conflicted and merge --abort did not finish; the merge was left in place. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Inspect with: git -C $CLAUDE_DIR status. Resolve with: git -C $CLAUDE_DIR merge --continue after fixing conflicts, or git -C $CLAUDE_DIR merge --abort.$(kept_local_settings_note merge)"
         LOCAL_SETTINGS_BACKUP=""
         return 1
