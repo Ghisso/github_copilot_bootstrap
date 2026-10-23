@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-10-23T06:21:02Z",
+  "branch": "state-sync-safety-fixes_implementation",
+  "head_sha": "cedb3b03c28c30603058edb48785f2466523464a",
+  "base_ref": "dev",
+  "merge_base_sha": "a0c600375638be7f05b27b70f7916ebcb4cd2269",
+  "phase": "2026-10-23_phase-C-restorer-and-devcontainer-hardening",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "6fb0175bcdded71d6f1c5dccc382d02b1accc15b",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/validate_targets.py",
+    "shared/devcontainer/devcontainer.json",
+    "shared/hooks/scripts/restore-root-adapters.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/workflow.instructions.md",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
