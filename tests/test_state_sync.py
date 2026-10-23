@@ -8,11 +8,18 @@ git operation is local, so the suite needs no network.
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import shutil
+import signal
+import socket
 import subprocess
 import sys
+import threading
+import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -36,16 +43,13 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _sync(
-    script: Path,
+def _sync_env(
     root: Path,
     remote: Path | None,
-    mode: str,
-    *args: str,
     trace_path: Path | None = None,
     extra_env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Invoke the copied ``state-sync.sh`` for one writer against ``remote``."""
+) -> dict[str, str]:
+    """Return the environment for one writer's ``state-sync.sh`` run."""
     env = {
         **os.environ,
         "AI_STATE_REPO_ROOT": str(root),
@@ -66,6 +70,20 @@ def _sync(
         env["GIT_TRACE2_EVENT"] = str(trace_path)
     if extra_env is not None:
         env.update(extra_env)
+    return env
+
+
+def _sync(
+    script: Path,
+    root: Path,
+    remote: Path | None,
+    mode: str,
+    *args: str,
+    trace_path: Path | None = None,
+    extra_env: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Invoke the copied ``state-sync.sh`` for one writer against ``remote``."""
     return subprocess.run(
         ["bash", str(script), mode, *args],
         text=True,
@@ -73,7 +91,8 @@ def _sync(
         check=False,
         # stdin closed so the script's 2s stdin-drain returns immediately.
         stdin=subprocess.DEVNULL,
-        env=env,
+        env=_sync_env(root, remote, trace_path, extra_env),
+        timeout=timeout,
     )
 
 
@@ -334,6 +353,126 @@ def _logged_calls(invocations: Path, subcommand: str) -> list[str]:
         for line in invocations.read_text().splitlines()
         if line.startswith(f"{subcommand} ")
     ]
+
+
+needs_flock = pytest.mark.skipif(
+    shutil.which("flock") is None, reason="flock(1) is not installed"
+)
+
+
+@contextlib.contextmanager
+def _sync_lock_held(root: Path) -> Iterator[Callable[[], None]]:
+    """Hold the sync lock the way ``flock(1)`` takes it: ``flock(2)`` on a
+    read-only descriptor of the repository root. Yields a function that
+    releases it early; leaving the block releases it too."""
+    fd = os.open(root, os.O_RDONLY)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    released = False
+
+    def release() -> None:
+        nonlocal released
+        if not released:
+            released = True
+            os.close(fd)
+
+    try:
+        yield release
+    finally:
+        release()
+
+
+def _default_signal_handling() -> None:
+    """Run in the child before exec: undo signals the launcher ignored (``nohup``,
+    a backgrounded non-interactive shell). Bash cannot trap a signal that was
+    ignored on entry, and an ignored disposition survives ``exec``."""
+    for signum in (signal.SIGINT, signal.SIGHUP, signal.SIGTERM):
+        signal.signal(signum, signal.SIG_DFL)
+
+
+@contextlib.contextmanager
+def _sync_process(
+    script: Path,
+    root: Path,
+    remote: Path | None,
+    mode: str,
+    *args: str,
+    extra_env: dict[str, str] | None = None,
+) -> Iterator[subprocess.Popen[str]]:
+    """Start one run in its own process group, as a hook runner would. Leaving
+    the block kills the whole group if it is still running."""
+    proc = subprocess.Popen(
+        ["bash", str(script), mode, *args],
+        text=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_sync_env(root, remote, None, extra_env),
+        start_new_session=True,
+        preexec_fn=_default_signal_handling,
+    )
+    try:
+        yield proc
+    finally:
+        if proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        for stream in (proc.stdout, proc.stderr):
+            if stream is not None:
+                stream.close()
+
+
+def _wait_for_file(
+    path: Path, proc: subprocess.Popen[str], limit: float = 30.0
+) -> None:
+    """Wait for ``path``, failing instead of hanging when the run ends first or
+    ``limit`` seconds pass."""
+    deadline = time.monotonic() + limit
+    while not path.exists():
+        assert proc.poll() is None, f"the run ended before {path.name} appeared"
+        assert time.monotonic() < deadline, f"{path.name} not seen in {limit} s"
+        time.sleep(0.05)
+
+
+def _fake_git(tmp_path: Path, body: str) -> dict[str, str]:
+    """Return the environment for a fake ``git`` that runs the bash ``body`` on
+    every call and then real git (``$REAL_GIT``), unless ``body`` exits."""
+    real_git = shutil.which("git")
+    assert real_git is not None
+    fake_bin = tmp_path / "fake-git-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(f'#!/usr/bin/env bash\n{body}\nexec "$REAL_GIT" "$@"\n')
+    fake_git.chmod(0o755)
+    return {"PATH": f"{fake_bin}:{os.environ['PATH']}", "REAL_GIT": real_git}
+
+
+def _fake_flock(tmp_path: Path, body: str) -> dict[str, str]:
+    """Return the environment for a fake ``flock`` that runs the bash ``body``."""
+    fake_bin = tmp_path / "fake-flock-bin"
+    fake_bin.mkdir()
+    fake_flock = fake_bin / "flock"
+    fake_flock.write_text(f"#!/usr/bin/env bash\n{body}\n")
+    fake_flock.chmod(0o755)
+    return {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
+
+
+@pytest.fixture(scope="module")
+def path_without_flock(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
+    """Return a ``PATH`` of symlinks to every program on the current ``PATH``
+    except ``flock`` (built once: it links thousands of programs)."""
+    bin_dir = tmp_path_factory.mktemp("no-flock-bin")
+    for directory in os.environ["PATH"].split(os.pathsep):
+        if not os.path.isdir(directory):
+            continue
+        for entry in os.scandir(directory):
+            if (
+                entry.name != "flock"
+                and not entry.is_dir()
+                and os.access(entry.path, os.X_OK)
+                and not (bin_dir / entry.name).exists()
+            ):
+                (bin_dir / entry.name).symlink_to(entry.path)
+    return {"PATH": str(bin_dir)}
 
 
 def _valid_preexisting_rebase(
@@ -2735,3 +2874,463 @@ def test_migrate_without_conflict_reconciles_and_pushes(
     assert result.returncode == 0
     assert _remote_show(remote, "plans/n.md") == "from-migrate\n"
     assert _remote_show(remote, "plans/x.md") == "from-remote\n"
+
+
+# --- One sync at a time, the exit trap, and the network stall limit ---------
+
+# Pauses a fake ``git`` at its first ``add``: writes READY_FILE, then waits up to
+# 30 seconds for RELEASE_FILE so a broken run fails instead of hanging.
+PAUSE_AT_ADD = r"""
+if [[ "${3:-}" == "add" && ! -e "$READY_FILE" ]]; then
+  : > "$READY_FILE"
+  waited=0
+  while [[ ! -e "$RELEASE_FILE" && $waited -lt 300 ]]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+fi
+"""
+
+# At ``pull``: optionally runs real git first (which may stop on a conflict),
+# then deletes the live settings file, writes READY_FILE, and sleeps until a
+# signal ends it (30 seconds at most).
+STALL_AT_PULL = r"""
+if [[ "${3:-}" == "pull" ]]; then
+  if [[ -n "${REAL_PULL:-}" ]]; then
+    "$REAL_GIT" "$@" || true
+  fi
+  rm -f "$SETTINGS"
+  : > "$READY_FILE"
+  sleep 30
+  exit 1
+fi
+"""
+
+
+@needs_flock
+@pytest.mark.parametrize("mode", ("pull", "checkpoint", "publish", "push"))
+def test_sync_lock_busy_run_skips_without_running_git(
+    script: Path, tmp_path: Path, mode: str
+) -> None:
+    """A run that finds the lock held skips at once and touches nothing: no Git
+    command, HEAD, remote ref, or dirty file changes. The next checkpoint, with
+    the lock free, commits the file. (``setup`` and ``migrate-from-hf`` wait
+    instead; see the ``setup`` lock tests.)"""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, mode)
+    _write(writer, "plans/seed.md", "seed\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    _write(writer, "plans/dirty.md", "waits for the next run\n")
+    nested = writer / ".claude"
+    before_head = _local_head(writer)
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+    env, invocations = _recording_git(tmp_path)
+
+    with _sync_lock_held(writer):
+        result = _sync(script, writer, remote, mode, extra_env=env)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "another state sync is running" in result.stderr
+    assert not invocations.exists()
+    assert _local_head(writer) == before_head
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
+    assert _git(nested, "status", "--porcelain").stdout == "?? plans/dirty.md\n"
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    assert _local_show(writer, "plans/dirty.md") == "waits for the next run\n"
+
+
+@needs_flock
+def test_sync_lock_is_shared_by_devcontainer_and_hooks_copies(tmp_path: Path) -> None:
+    """Both installed copies resolve the same root from their own location (no
+    ``AI_STATE_REPO_ROOT``), so a run of one excludes a run of the other."""
+    root = tmp_path / "shared-root"
+    hooks_copy = root / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    devcontainer_copy = root / ".devcontainer" / "state-sync.sh"
+    for copy in (hooks_copy, devcontainer_copy):
+        copy.parent.mkdir(parents=True)
+        shutil.copy(SCRIPT_SRC, copy)
+    own_root = {"AI_STATE_REPO_ROOT": ""}
+    assert (
+        _sync(hooks_copy, root, None, "checkpoint", extra_env=own_root).returncode == 0
+    )
+    _write(root, "plans/dirty.md", "committed by run A\n")
+    before_head = _local_head(root)
+    ready, release = tmp_path / "ready", tmp_path / "release"
+    env = {
+        **own_root,
+        **_fake_git(tmp_path, PAUSE_AT_ADD),
+        "READY_FILE": str(ready),
+        "RELEASE_FILE": str(release),
+    }
+
+    with _sync_process(hooks_copy, root, None, "checkpoint", extra_env=env) as run_a:
+        _wait_for_file(ready, run_a)
+        run_b = _sync(devcontainer_copy, root, None, "checkpoint", extra_env=own_root)
+        head_while_a_waits = _local_head(root)
+        release.touch()
+        run_a.communicate(timeout=30)
+
+    assert run_b.returncode == 0
+    assert "another state sync is running" in run_b.stderr
+    assert head_while_a_waits == before_head
+    assert run_a.returncode == 0
+    assert _local_show(root, "plans/dirty.md") == "committed by run A\n"
+
+
+@needs_flock
+def test_sync_lock_status_runs_while_lock_is_held(
+    script: Path, tmp_path: Path, path_without_flock: dict[str, str]
+) -> None:
+    """``status`` never waits for the lock (it would hit the time limit here) and
+    reports ``held``, ``free``, or ``unavailable`` (no ``flock``), in both the
+    initialized and the uninitialized report."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "status-lock")
+    uninitialized = tmp_path / "uninitialized"
+    (uninitialized / ".claude").mkdir(parents=True)
+
+    with _sync_lock_held(writer):
+        held = _sync(script, writer, remote, "status", timeout=20)
+    free = _sync(script, writer, remote, "status")
+    unavailable = _sync(script, writer, remote, "status", extra_env=path_without_flock)
+    with _sync_lock_held(uninitialized):
+        fresh_held = _sync(script, uninitialized, None, "status", timeout=20)
+    fresh_free = _sync(script, uninitialized, None, "status")
+
+    assert held.returncode == 0
+    assert "repository: initialized" in held.stdout
+    assert "merge: none\nlock: held\n" in held.stdout
+    assert "another state sync is running" not in held.stderr
+    assert "merge: none\nlock: free\n" in free.stdout
+    assert "merge: none\nlock: unavailable\n" in unavailable.stdout
+    assert "repository: uninitialized" in fresh_held.stdout
+    assert "merge: none\nlock: held\n" in fresh_held.stdout
+    assert "merge: none\nlock: free\n" in fresh_free.stdout
+
+
+def test_sync_lock_fresh_clone_leaves_no_lock_file(tmp_path: Path) -> None:
+    """Contract guard that already passes without the lock: the lock is the root
+    folder itself, so a fresh clone gains no lock file and no dirty nested tree."""
+    root = tmp_path / "fresh-clone"
+    root.mkdir()
+    assert subprocess.run(["git", "init", "-q", str(root)], check=False).returncode == 0
+    copy = root / ".devcontainer" / "state-sync.sh"
+    copy.parent.mkdir()
+    shutil.copy(SCRIPT_SRC, copy)
+
+    result = _sync(copy, root, None, "setup", extra_env={"AI_STATE_REPO_ROOT": ""})
+
+    assert result.returncode == 0, result.stderr
+    assert {entry.name for entry in root.iterdir()} == {
+        ".git",
+        ".claude",
+        ".devcontainer",
+    }
+    assert _git(root / ".claude", "status", "--porcelain").stdout == ""
+
+
+def test_sync_lock_runs_unlocked_without_flock(
+    script: Path, tmp_path: Path, path_without_flock: dict[str, str]
+) -> None:
+    """Contract guard that already passes without the lock: with no ``flock`` on
+    ``PATH`` (stock macOS) a run goes on unlocked and silent, even while the
+    lock is held."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "no-flock")
+    _write(writer, "plans/unlocked.md", "committed anyway\n")
+
+    with _sync_lock_held(writer):
+        result = _sync(
+            script, writer, remote, "checkpoint", extra_env=path_without_flock
+        )
+
+    assert result.returncode == 0
+    assert "another state sync is running" not in result.stderr
+    assert _local_show(writer, "plans/unlocked.md") == "committed anyway\n"
+
+
+def test_sync_lock_failure_runs_unlocked_with_notice(
+    script: Path, tmp_path: Path
+) -> None:
+    """A ``flock`` that fails for any reason but a busy lock (exit 65 here) does
+    not stop sync: the run commits, tells stderr, and logs nothing."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "flock-fails")
+    _write(writer, "plans/unlocked.md", "committed anyway\n")
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "checkpoint",
+        extra_env=_fake_flock(tmp_path, "exit 65"),
+    )
+
+    assert result.returncode == 0
+    assert "could not lock" in result.stderr
+    assert "flock exit 65" in result.stderr
+    assert not any("could not lock" in line for line in _error_log_lines(writer))
+    assert _local_show(writer, "plans/unlocked.md") == "committed anyway\n"
+
+
+@pytest.mark.parametrize(
+    ("signum", "exit_code"),
+    (
+        pytest.param(signal.SIGTERM, 143, id="SIGTERM"),
+        pytest.param(signal.SIGINT, 130, id="SIGINT"),
+        pytest.param(signal.SIGHUP, 129, id="SIGHUP"),
+    ),
+)
+def test_exit_trap_restores_settings_copy_after_signal(
+    script: Path, tmp_path: Path, signum: signal.Signals, exit_code: int
+) -> None:
+    """A run stopped by a signal while Git has removed the live settings file puts
+    its copy back and leaves none behind; the exit code is 128 plus the signal."""
+    remote = _bare_remote(tmp_path)
+    first = _new_writer(script, tmp_path, remote, "first")
+    assert _sync(script, first, remote, "push").returncode == 0
+    second = _new_writer(script, tmp_path, remote, "second")
+    nested = second / ".claude"
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"second-local\r\n")
+    ready = tmp_path / "ready"
+    env = {
+        **_fake_git(tmp_path, STALL_AT_PULL),
+        "SETTINGS": str(settings),
+        "READY_FILE": str(ready),
+    }
+
+    with _sync_process(script, second, remote, "pull", extra_env=env) as run:
+        _wait_for_file(ready, run)
+        assert not settings.exists()
+        os.killpg(run.pid, signum)
+        run.communicate(timeout=30)
+
+    assert run.returncode == exit_code
+    assert settings.read_bytes() == b"second-local\r\n"
+    assert list((nested / ".git").glob("settings.local.json.*")) == []
+
+
+def test_exit_trap_keeps_and_names_copy_during_unfinished_rebase(
+    script: Path, tmp_path: Path
+) -> None:
+    """A run stopped while its pull's conflicted rebase is still in place keeps the
+    settings copy and names it; writing it back would hand Git's tree a file Git
+    may overwrite again."""
+    remote = _bare_remote(tmp_path)
+    first = _new_writer(script, tmp_path, remote, "first")
+    _write(first, "plans/x.md", "base\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    second = _new_writer(script, tmp_path, remote, "second")
+    nested = second / ".claude"
+    _write(second, "plans/x.md", "from-second\n")
+    assert _sync(script, second, remote, "checkpoint").returncode == 0
+    _write(first, "plans/x.md", "from-first\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"second-local\r\n")
+    ready = tmp_path / "ready"
+    env = {
+        **_fake_git(tmp_path, STALL_AT_PULL),
+        "REAL_PULL": "1",
+        "SETTINGS": str(settings),
+        "READY_FILE": str(ready),
+    }
+
+    with _sync_process(script, second, remote, "pull", extra_env=env) as run:
+        _wait_for_file(ready, run)
+        os.killpg(run.pid, signal.SIGTERM)
+        _, stderr = run.communicate(timeout=30)
+
+    copies = list((nested / ".git").glob("settings.local.json.*"))
+    assert run.returncode == 143
+    assert (nested / ".git" / "rebase-merge").is_dir()
+    assert not settings.exists()
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == b"second-local\r\n"
+    marker = "state sync stopped while a rebase or merge was unfinished"
+    assert marker in stderr
+    assert str(copies[0]) in stderr.split(marker, 1)[1]
+
+
+@contextlib.contextmanager
+def _silent_http_server() -> Iterator[int]:
+    """Serve a local port that accepts connections, reads each request, and never
+    answers. Yields the port."""
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+    connections: list[socket.socket] = []
+
+    def accept_forever() -> None:
+        while True:
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            connections.append(connection)
+            connection.settimeout(5)
+            with contextlib.suppress(OSError):
+                connection.recv(65536)
+
+    thread = threading.Thread(target=accept_forever, daemon=True)
+    thread.start()
+    try:
+        yield server.getsockname()[1]
+    finally:
+        with contextlib.suppress(OSError):
+            server.shutdown(socket.SHUT_RDWR)
+        server.close()
+        for connection in connections:
+            connection.close()
+        thread.join(timeout=10)
+
+
+@needs_flock
+def test_network_limit_ends_a_stalled_fetch(script: Path, tmp_path: Path) -> None:
+    """A server that accepts the request and never answers cannot hold a run for
+    good: Git gives up at the stall limit (the caller's 2 seconds here win over
+    the 60-second default), the run takes its fetch-failure path, and the lock is
+    free afterwards. Without a default limit Git waits forever."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "stalled")
+    env = {
+        "GIT_HTTP_LOW_SPEED_TIME": "2",
+        "NO_PROXY": "127.0.0.1",
+        "no_proxy": "127.0.0.1",
+    }
+
+    with _silent_http_server() as port:
+        url = f"http://127.0.0.1:{port}/x.git"
+        assert (
+            _git(writer / ".claude", "remote", "set-url", "origin", url).returncode == 0
+        )
+        started = time.monotonic()
+        with _sync_process(script, writer, remote, "pull", extra_env=env) as run:
+            _, stderr = run.communicate(timeout=20)
+        elapsed = time.monotonic() - started
+
+    assert run.returncode == 0
+    assert elapsed < 20
+    assert "fetch from origin/ai-state failed" in stderr
+    assert "lock: free" in _sync(script, writer, remote, "status").stdout
+
+
+def test_network_limit_sets_no_prompt_and_stall_defaults(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every ``fetch`` and ``push`` runs with the password prompt off and the stall
+    limit set: 1000 bytes per second for 60 seconds unless the caller chose its
+    own values, and the prompt stays off even when the caller turned it on."""
+    for name in (
+        "GIT_TERMINAL_PROMPT",
+        "GIT_HTTP_LOW_SPEED_LIMIT",
+        "GIT_HTTP_LOW_SPEED_TIME",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "limits")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    record = r"""
+if [[ "${3:-}" == "fetch" || "${3:-}" == "push" ]]; then
+  printf '%s %s %s %s\n' "$3" "${GIT_TERMINAL_PROMPT-unset}" \
+    "${GIT_HTTP_LOW_SPEED_LIMIT-unset}" "${GIT_HTTP_LOW_SPEED_TIME-unset}" >> "$ENV_LOG"
+fi
+"""
+    fake = _fake_git(tmp_path, record)
+    scenarios: tuple[tuple[dict[str, str], str], ...] = (
+        ({}, "0 1000 60"),
+        ({"GIT_HTTP_LOW_SPEED_TIME": "5"}, "0 1000 5"),
+        ({"GIT_TERMINAL_PROMPT": "1"}, "0 1000 60"),
+    )
+
+    for index, (caller, expected) in enumerate(scenarios):
+        log = tmp_path / f"env-{index}.log"
+        _write(writer, f"plans/limits-{index}.md", "changed\n")
+        result = _sync(
+            script,
+            writer,
+            remote,
+            "push",
+            extra_env={**fake, **caller, "ENV_LOG": str(log)},
+        )
+        assert result.returncode == 0, result.stderr
+        assert log.read_text().splitlines() == [f"fetch {expected}", f"push {expected}"]
+
+
+@needs_flock
+def test_sync_lock_setup_waits_for_a_busy_lock(script: Path, tmp_path: Path) -> None:
+    """``setup`` waits for a busy lock instead of skipping, because the installer
+    relies on it to keep ``settings.local.json`` ignored; a ``checkpoint`` under
+    the same lock skips at once."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "waiting-setup")
+    gitignore = writer / ".claude" / ".gitignore"
+    gitignore.write_text("user-sentinel/\n")
+
+    with _sync_lock_held(writer) as release:
+        started = time.monotonic()
+        skipped = _sync(script, writer, remote, "checkpoint")
+        skipped_after = time.monotonic() - started
+        with _sync_process(script, writer, remote, "setup") as run:
+            time.sleep(2)
+            still_waiting = run.poll() is None
+            untouched = gitignore.read_text()
+            release()
+            _, stderr = run.communicate(timeout=30)
+
+    assert "another state sync is running" in skipped.stderr
+    assert skipped_after < 10
+    assert still_waiting
+    assert untouched == "user-sentinel/\n"
+    assert run.returncode == 0
+    assert "another state sync is running" not in stderr
+    assert "settings.local.json" in gitignore.read_text().splitlines()
+
+
+@pytest.mark.parametrize("mode", ("setup", "migrate-from-hf"))
+def test_sync_lock_setup_warns_when_the_wait_ends(
+    script: Path, tmp_path: Path, mode: str
+) -> None:
+    """The two patient modes call exactly ``flock -w 60 9``. When that wait ends
+    with the lock still busy (a fake ``flock`` exits 1 for ``-w``) they log a
+    warning and skip, changing nothing and making no commit. A ``checkpoint``
+    under the same fake calls ``flock -n 9``."""
+    remote = _bare_remote(tmp_path)
+    if mode == "setup":
+        root = _new_writer(script, tmp_path, remote, mode)
+        (root / ".claude" / ".gitignore").write_text("user-sentinel/\n")
+    else:
+        root = tmp_path / mode
+        _write(root, "plans/pre-git.md", "state from before git\n")
+    nested = root / ".claude"
+    had_repository = (nested / ".git").exists()
+    before_head = _local_head(root) if had_repository else None
+    before_worktree = _worktree_snapshot(root)
+    flock_log = tmp_path / "flock-arguments.log"
+    env = {
+        **_fake_flock(
+            tmp_path,
+            'printf "%s\\n" "$*" >> "$FLOCK_LOG"\nif [[ "$1" == "-w" ]]; then exit 1; fi',
+        ),
+        "FLOCK_LOG": str(flock_log),
+    }
+
+    result = _sync(script, root, remote, mode, extra_env=env)
+
+    assert result.returncode == 0
+    assert flock_log.read_text().splitlines() == ["-w 60 9"]
+    assert any(
+        f"another state sync held the lock for 60 seconds; {mode} skipped" in line
+        for line in _error_log_lines(root)
+    )
+    assert (nested / ".git").exists() == had_repository
+    if had_repository:
+        assert _local_head(root) == before_head
+    assert _worktree_snapshot(root) == before_worktree
+
+    checkpoint = _sync(script, root, remote, "checkpoint", extra_env=env)
+
+    assert checkpoint.returncode == 0
+    assert flock_log.read_text().splitlines() == ["-w 60 9", "-n 9"]

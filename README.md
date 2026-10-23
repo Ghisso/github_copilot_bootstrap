@@ -478,6 +478,9 @@ is exactly why `.devcontainer/` carries its own copy of the same script.
 (and `pull`/`checkpoint` keep it active on every later sync), so there is no
 separate step to remember. A session that starts with the hooks checked out
 but not yet active is told to re-run `setup`.
+Only one state-sync run works on a checkout at a time. If another run holds the
+lock, `setup` waits up to 60 seconds, then warns and skips; run it again later.
+`state-sync.sh status` shows the `lock:` line.
 
 #### GitHub Copilot surface ownership
 

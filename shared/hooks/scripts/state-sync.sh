@@ -69,6 +69,12 @@ info() {
 # hook or VS Code task invocation never closes stdin, so this must not block.
 timeout 2 cat >/dev/null 2>/dev/null || true
 
+# These keep a stalled HTTPS transfer or a typed password prompt from holding
+# the sync lock; SSH remotes are not covered. A caller's own stall values win.
+export GIT_TERMINAL_PROMPT=0
+export GIT_HTTP_LOW_SPEED_LIMIT="${GIT_HTTP_LOW_SPEED_LIMIT:-1000}"
+export GIT_HTTP_LOW_SPEED_TIME="${GIT_HTTP_LOW_SPEED_TIME:-60}"
+
 MODE="${1:-push}"
 LOCAL_ONLY="${AI_STATE_LOCAL_ONLY:-0}"
 if [[ "${2:-}" == "--local-only" ]]; then
@@ -183,6 +189,21 @@ restore_local_settings() {
 kept_local_settings_note() {
   [[ -n "$LOCAL_SETTINGS_BACKUP" ]] || return 0
   printf ' settings.local.json was not restored; its copy is kept at %s. Copy it back to %s/settings.local.json once the %s is resolved.' "$LOCAL_SETTINGS_BACKUP" "$CLAUDE_DIR" "$1"
+}
+
+# EXIT trap, also reached through the signal traps below: a run that stops early
+# puts the settings copy back, or keeps and names it while a rebase or merge is
+# unfinished. set +e first, so a failing command here can neither end the trap
+# early nor change the script's exit status.
+settle_local_settings_on_exit() {
+  set +e
+  [[ -n "$LOCAL_SETTINGS_BACKUP" ]] || return 0
+  if nested_operation_in_progress; then
+    warn "state sync stopped while a rebase or merge was unfinished;$(kept_local_settings_note "rebase or merge")"
+    LOCAL_SETTINGS_BACKUP=""
+    return 0
+  fi
+  restore_local_settings || true
 }
 
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
@@ -342,7 +363,69 @@ preflight_unfinished_operation() {
   fi
 }
 
+# One mutating run per checkout: an exclusive flock on the repository root
+# folder itself, held on descriptor 9 until the script exits. No lock file, so
+# `git add -A` cannot commit one and nothing goes stale; it also works before
+# .claude/ exists. A busy run skips and the next sync catches up; setup and
+# migrate-from-hf, which no hook calls, wait up to 60 seconds because the
+# installer relies on setup to keep settings.local.json ignored.
+# ponytail: no exclusion without flock (stock macOS) or on a filesystem that
+# refuses it; a detached child that inherits descriptor 9 (for example
+# `git maintenance` started by a commit) keeps the lock until it ends; host and
+# container exclude each other only on one shared kernel; an SSH remote, or an
+# HTTPS connection still being opened, has no stall limit and keeps the lock
+# until Git returns, and a TERM sent to Bash alone waits for that child.
+# Upgrade path: a portable lock with owner recovery, after a measured collision.
+# Returns 0 to go on and 1 to skip the run.
+acquire_sync_lock() {
+  command -v flock >/dev/null 2>&1 || return 0
+  # No `2>/dev/null` on this bare exec: it would silence stderr for the run.
+  if ! exec 9<"$REPO_ROOT"; then
+    info "could not open $REPO_ROOT to lock state sync; continuing without the lock."
+    return 0
+  fi
+  local lock_status=0 patient=0
+  case "$MODE" in
+    setup | migrate-from-hf) patient=1 ;;
+  esac
+  if [[ $patient -eq 1 ]]; then
+    flock -w 60 9 || lock_status=$?
+  else
+    flock -n 9 || lock_status=$?
+  fi
+  if [[ $lock_status -eq 0 ]]; then
+    return 0
+  fi
+  if [[ $lock_status -eq 1 && $patient -eq 1 ]]; then
+    warn "another state sync held the lock for 60 seconds; $MODE skipped. Run it again when no sync is running."
+    return 1
+  fi
+  if [[ $lock_status -eq 1 ]]; then
+    info "another state sync is running for $REPO_ROOT; $MODE skipped. The next sync will include these changes."
+    return 1
+  fi
+  info "could not lock $REPO_ROOT for state sync (flock exit $lock_status); continuing without the lock."
+  exec 9<&-
+}
+
+# Reports the lock without waiting or keeping it: descriptor 8, closed at once.
+sync_lock_state() {
+  local lock_status=0
+  if ! command -v flock >/dev/null 2>&1 || ! exec 8<"$REPO_ROOT"; then
+    printf 'unavailable'
+    return 0
+  fi
+  flock -n 8 || lock_status=$?
+  exec 8<&-
+  case "$lock_status" in
+    0) printf 'free' ;;
+    1) printf 'held' ;;
+    *) printf 'unavailable' ;;
+  esac
+}
+
 dispatch_mutating() {
+  acquire_sync_lock || return 0
   local preflight_status command_status
   set +e
   preflight_unfinished_operation
@@ -677,8 +760,10 @@ cmd_push() {
 }
 
 cmd_status() {
+  local lock
+  lock="$(sync_lock_state)"
   if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
-    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\nmerge: none\n'
+    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\nmerge: none\nlock: %s\n' "$lock"
   else
     local worktree remote tracking ahead behind rebase merge
     if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
@@ -705,7 +790,7 @@ cmd_status() {
     if nested_merge_in_progress; then
       merge="in-progress"
     fi
-    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\nmerge: %s\n' "$worktree" "$remote" "$tracking" "$rebase" "$merge"
+    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\nmerge: %s\nlock: %s\n' "$worktree" "$remote" "$tracking" "$rebase" "$merge" "$lock"
   fi
   printf 'error-log: %s\n' "$ERROR_LOG"
   if [[ -f "$ERROR_LOG" ]]; then
@@ -761,6 +846,12 @@ cmd_migrate() {
     info "NOTICE: Hugging Face state sync is retired. .devcontainer/devcontainer.json still references HF_AI_SYNC_* settings; the bucket's contents are now historical only, and AI state lives on the ai-state branch from here on."
   fi
 }
+
+# A signal must end the script (exit), which runs the EXIT trap.
+trap settle_local_settings_on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 case "$MODE" in
   setup) dispatch_mutating cmd_setup || warn "setup failed; continuing." ;;
