@@ -163,8 +163,9 @@ network failures produce warnings and leave the commit local; publish it later
 with `state-sync.sh push` or the manual VS Code task. Normal Stop-hook runs do
 not originate installer updates, but their `git add -A` commits any uncommitted
 nested changes — including locally modified bootstrap-controlled files — as
-session state. Clean installer/updater commits and the normal pull/rebase flow
-are the intended protection.
+session state. It commits nothing while a rebase or merge is unfinished in
+`.claude`, or while unmerged paths remain. Clean installer/updater commits and
+the normal pull/rebase flow are the intended protection.
 
 To refresh a consumer completely while working offline or before an explicit
 review, use `--local-only`:
@@ -477,6 +478,9 @@ is exactly why `.devcontainer/` carries its own copy of the same script.
 (and `pull`/`checkpoint` keep it active on every later sync), so there is no
 separate step to remember. A session that starts with the hooks checked out
 but not yet active is told to re-run `setup`.
+Only one state-sync run works on a checkout at a time. If another run holds the
+lock, `setup` waits up to 60 seconds, then warns and skips; run it again later.
+`state-sync.sh status` shows the `lock:` line.
 
 #### GitHub Copilot surface ownership
 
@@ -1148,7 +1152,7 @@ Interpretation:
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
-- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/). Create the host `~/.openwiki` directory before the first container build, or Docker can create it as `root` and prevent the `vscode` user from writing to it. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
+- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/). Its `initializeCommand` creates the host `~/.openwiki` and `~/.cache/huggingface` folders as your user before the container starts, so a first build neither fails on a missing mount source nor gets a `root`-owned folder the `vscode` user cannot write to. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
 - Templates, prompts, memory, plans, session logs, quality reports, and deterministic verification receipts rendered into the shared `.claude/` basis
 

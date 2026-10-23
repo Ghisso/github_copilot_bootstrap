@@ -8,11 +8,18 @@ git operation is local, so the suite needs no network.
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import shutil
+import signal
+import socket
 import subprocess
 import sys
+import threading
+import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -36,16 +43,13 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _sync(
-    script: Path,
+def _sync_env(
     root: Path,
     remote: Path | None,
-    mode: str,
-    *args: str,
     trace_path: Path | None = None,
     extra_env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Invoke the copied ``state-sync.sh`` for one writer against ``remote``."""
+) -> dict[str, str]:
+    """Return the environment for one writer's ``state-sync.sh`` run."""
     env = {
         **os.environ,
         "AI_STATE_REPO_ROOT": str(root),
@@ -66,6 +70,20 @@ def _sync(
         env["GIT_TRACE2_EVENT"] = str(trace_path)
     if extra_env is not None:
         env.update(extra_env)
+    return env
+
+
+def _sync(
+    script: Path,
+    root: Path,
+    remote: Path | None,
+    mode: str,
+    *args: str,
+    trace_path: Path | None = None,
+    extra_env: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Invoke the copied ``state-sync.sh`` for one writer against ``remote``."""
     return subprocess.run(
         ["bash", str(script), mode, *args],
         text=True,
@@ -73,7 +91,8 @@ def _sync(
         check=False,
         # stdin closed so the script's 2s stdin-drain returns immediately.
         stdin=subprocess.DEVNULL,
-        env=env,
+        env=_sync_env(root, remote, trace_path, extra_env),
+        timeout=timeout,
     )
 
 
@@ -118,9 +137,12 @@ def _write(root: Path, relpath: str, content: str) -> None:
     path.write_text(content)
 
 
-def _restore(root: Path) -> subprocess.CompletedProcess[str]:
-    """Run the real root-adapter restorer from its installed location."""
-    script = root / ".claude" / "hooks" / "scripts" / "restore-root-adapters.sh"
+def _restore(
+    root: Path, script_dir: str = ".claude/hooks/scripts"
+) -> subprocess.CompletedProcess[str]:
+    """Run the real root-adapter restorer from an installed location: the hooks
+    copy by default, or ``.devcontainer`` for the post-start entry point."""
+    script = root / script_dir / "restore-root-adapters.sh"
     script.parent.mkdir(parents=True, exist_ok=True)
     script.write_text(render_restore_script(RESTORE_SRC.read_text(encoding="utf-8")))
     return subprocess.run(
@@ -250,14 +272,210 @@ def _rebase_metadata(root: Path) -> dict[str, bytes]:
     return snapshot
 
 
+ERROR_LOG_RELPATH = "session_logs/hooks-errors.log"
+
+
 def _worktree_snapshot(root: Path) -> dict[str, bytes]:
-    """Return every non-Git worktree file as a byte snapshot."""
+    """Return every non-Git worktree file as a byte snapshot.
+
+    The local error log is left out: a protected run appends one warning to it.
+    """
     worktree = root / ".claude"
     return {
         path.relative_to(worktree).as_posix(): path.read_bytes()
         for path in sorted(worktree.rglob("*"))
-        if path.is_file() and ".git" not in path.relative_to(worktree).parts
+        if path.is_file()
+        and ".git" not in path.relative_to(worktree).parts
+        and path.relative_to(worktree).as_posix() != ERROR_LOG_RELPATH
     }
+
+
+def _error_log_lines(root: Path) -> list[str]:
+    """Return the local error log's lines (empty when it does not exist)."""
+    log = root / ".claude" / ERROR_LOG_RELPATH
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def _appended_error_lines(root: Path, before: list[str]) -> list[str]:
+    """Return the lines a run appended to the error log, never rewriting old ones."""
+    after = _error_log_lines(root)
+    assert after[: len(before)] == before
+    return after[len(before) :]
+
+
+def _recording_git(
+    tmp_path: Path,
+    *,
+    fail: tuple[str, str] | None = None,
+    delete_after_pull: Path | None = None,
+) -> tuple[dict[str, str], Path]:
+    """Return the environment for a fake ``git`` that logs each call, then runs real git.
+
+    The log holds ``<subcommand> <first argument>`` per call and does not exist
+    until a call is made. ``fail`` makes only that subcommand and first argument
+    fail. ``delete_after_pull`` is removed right after a real ``git pull``, as Git
+    removes the ignored local settings file while it replays commits around it.
+    """
+    real_git = shutil.which("git")
+    assert real_git is not None
+    fake_bin = tmp_path / "recording-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        r"""#!/usr/bin/env bash
+printf "%s %s\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"
+if [[ "${3:-}" == "$FAIL_SUBCOMMAND" && "${4:-}" == "$FAIL_ARGUMENT" ]]; then
+  printf 'forced %s %s failure\n' "$3" "$4" >&2
+  exit 1
+fi
+"$REAL_GIT" "$@"
+status=$?
+if [[ "${3:-}" == "pull" && -n "$DELETE_AFTER_PULL" ]]; then
+  rm -f "$DELETE_AFTER_PULL"
+fi
+exit "$status"
+"""
+    )
+    fake_git.chmod(0o755)
+    invocations = tmp_path / "recording-invocations.log"
+    fail_subcommand, fail_argument = fail or ("-", "-")
+    return {
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "REAL_GIT": real_git,
+        "GIT_INVOCATIONS": str(invocations),
+        "FAIL_SUBCOMMAND": fail_subcommand,
+        "FAIL_ARGUMENT": fail_argument,
+        "DELETE_AFTER_PULL": str(delete_after_pull or ""),
+    }, invocations
+
+
+def _logged_calls(invocations: Path, subcommand: str) -> list[str]:
+    """Return the logged calls of one Git subcommand, in order."""
+    return [
+        line
+        for line in invocations.read_text().splitlines()
+        if line.startswith(f"{subcommand} ")
+    ]
+
+
+needs_flock = pytest.mark.skipif(
+    shutil.which("flock") is None, reason="flock(1) is not installed"
+)
+
+
+@contextlib.contextmanager
+def _sync_lock_held(root: Path) -> Iterator[Callable[[], None]]:
+    """Hold the sync lock the way ``flock(1)`` takes it: ``flock(2)`` on a
+    read-only descriptor of the repository root. Yields a function that
+    releases it early; leaving the block releases it too."""
+    fd = os.open(root, os.O_RDONLY)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    released = False
+
+    def release() -> None:
+        nonlocal released
+        if not released:
+            released = True
+            os.close(fd)
+
+    try:
+        yield release
+    finally:
+        release()
+
+
+def _default_signal_handling() -> None:
+    """Run in the child before exec: undo signals the launcher ignored (``nohup``,
+    a backgrounded non-interactive shell). Bash cannot trap a signal that was
+    ignored on entry, and an ignored disposition survives ``exec``."""
+    for signum in (signal.SIGINT, signal.SIGHUP, signal.SIGTERM):
+        signal.signal(signum, signal.SIG_DFL)
+
+
+@contextlib.contextmanager
+def _sync_process(
+    script: Path,
+    root: Path,
+    remote: Path | None,
+    mode: str,
+    *args: str,
+    extra_env: dict[str, str] | None = None,
+) -> Iterator[subprocess.Popen[str]]:
+    """Start one run in its own process group, as a hook runner would. Leaving
+    the block kills the whole group if it is still running."""
+    proc = subprocess.Popen(
+        ["bash", str(script), mode, *args],
+        text=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_sync_env(root, remote, None, extra_env),
+        start_new_session=True,
+        preexec_fn=_default_signal_handling,
+    )
+    try:
+        yield proc
+    finally:
+        if proc.poll() is None:
+            os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        for stream in (proc.stdout, proc.stderr):
+            if stream is not None:
+                stream.close()
+
+
+def _wait_for_file(
+    path: Path, proc: subprocess.Popen[str], limit: float = 30.0
+) -> None:
+    """Wait for ``path``, failing instead of hanging when the run ends first or
+    ``limit`` seconds pass."""
+    deadline = time.monotonic() + limit
+    while not path.exists():
+        assert proc.poll() is None, f"the run ended before {path.name} appeared"
+        assert time.monotonic() < deadline, f"{path.name} not seen in {limit} s"
+        time.sleep(0.05)
+
+
+def _fake_git(tmp_path: Path, body: str) -> dict[str, str]:
+    """Return the environment for a fake ``git`` that runs the bash ``body`` on
+    every call and then real git (``$REAL_GIT``), unless ``body`` exits."""
+    real_git = shutil.which("git")
+    assert real_git is not None
+    fake_bin = tmp_path / "fake-git-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(f'#!/usr/bin/env bash\n{body}\nexec "$REAL_GIT" "$@"\n')
+    fake_git.chmod(0o755)
+    return {"PATH": f"{fake_bin}:{os.environ['PATH']}", "REAL_GIT": real_git}
+
+
+def _fake_flock(tmp_path: Path, body: str) -> dict[str, str]:
+    """Return the environment for a fake ``flock`` that runs the bash ``body``."""
+    fake_bin = tmp_path / "fake-flock-bin"
+    fake_bin.mkdir()
+    fake_flock = fake_bin / "flock"
+    fake_flock.write_text(f"#!/usr/bin/env bash\n{body}\n")
+    fake_flock.chmod(0o755)
+    return {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
+
+
+@pytest.fixture(scope="module")
+def path_without_flock(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
+    """Return a ``PATH`` of symlinks to every program on the current ``PATH``
+    except ``flock`` (built once: it links thousands of programs)."""
+    bin_dir = tmp_path_factory.mktemp("no-flock-bin")
+    for directory in os.environ["PATH"].split(os.pathsep):
+        if not os.path.isdir(directory):
+            continue
+        for entry in os.scandir(directory):
+            if (
+                entry.name != "flock"
+                and not entry.is_dir()
+                and os.access(entry.path, os.X_OK)
+                and not (bin_dir / entry.name).exists()
+            ):
+                (bin_dir / entry.name).symlink_to(entry.path)
+    return {"PATH": str(bin_dir)}
 
 
 def _valid_preexisting_rebase(
@@ -284,6 +502,44 @@ def _valid_preexisting_rebase(
     assert _git(writer / ".claude", "checkout", "-q", "operator-work").returncode == 0
     assert _git(writer / ".claude", "rebase", "ai-state").returncode != 0
     return writer, rebase_file
+
+
+def _diverged_branches(
+    script: Path, tmp_path: Path, remote: Path, name: str
+) -> tuple[Path, str]:
+    """Create a writer whose ``ai-state`` and ``operator-work`` branches edit one
+    file differently, with ``ai-state`` checked out and a clean tree."""
+    writer = _new_writer(script, tmp_path, remote, name)
+    nested = writer / ".claude"
+    relpath = "plans/operator-merge.md"
+    assert _git(nested, "config", "user.name", "Test").returncode == 0
+    assert _git(nested, "config", "user.email", "test@example.com").returncode == 0
+    _write(writer, relpath, "base\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    assert _git(nested, "checkout", "-qb", "operator-work").returncode == 0
+    _write(writer, relpath, "operator\n")
+    assert _git(nested, "add", "-A").returncode == 0
+    assert _git(nested, "commit", "-qm", "operator").returncode == 0
+    assert _git(nested, "checkout", "-q", "ai-state").returncode == 0
+    _write(writer, relpath, "sync\n")
+    assert _git(nested, "add", "-A").returncode == 0
+    assert _git(nested, "commit", "-qm", "sync").returncode == 0
+    return writer, relpath
+
+
+def _valid_preexisting_merge(
+    script: Path, tmp_path: Path, remote: Path, name: str
+) -> tuple[Path, str]:
+    """Create a real conflicted merge that represents active operator work."""
+    writer, relpath = _diverged_branches(script, tmp_path, remote, name)
+    nested = writer / ".claude"
+    assert _git(nested, "merge", "operator-work").returncode != 0
+    assert (nested / ".git" / "MERGE_HEAD").is_file()
+    stages = {
+        line.split()[2] for line in _git(nested, "ls-files", "-u").stdout.splitlines()
+    }
+    assert stages == {"1", "2", "3"}
+    return writer, relpath
 
 
 def test_checkpoint_commits_locally_without_remote_io(
@@ -1627,8 +1883,7 @@ def test_pre_rebase_checkpoint_rechecks_active_rebase(
     assert _git(nested, "commit", "-qm", "late sync").returncode == 0
     assert _git(nested, "checkout", "-q", "late-operator-work").returncode == 0
     before_remote = _git(remote, "rev-parse", "ai-state").stdout
-    error_log = nested / "session_logs" / "hooks-errors.log"
-    before_error_log = error_log.read_bytes() if error_log.exists() else None
+    before_error_log = _error_log_lines(writer)
     actual_git = shutil.which("git")
     assert actual_git is not None
     fake_bin = tmp_path / "late-rebase-bin"
@@ -1676,6 +1931,7 @@ def test_pre_rebase_checkpoint_rechecks_active_rebase(
     assert result.returncode == 0
     assert result.stdout == ""
     assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert "rebase --quit" not in result.stderr
     assert not any(
         line.split(maxsplit=1)[0] in {"add", "commit", "pull", "push"}
         for line in invocation_lines[rebase_start + 1 :]
@@ -1693,10 +1949,9 @@ def test_pre_rebase_checkpoint_rechecks_active_rebase(
                 actual_rebase / path.relative_to(protected_rebase)
             ).read_bytes() == (path.read_bytes())
     assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
-    if before_error_log is None:
-        assert not error_log.exists()
-    else:
-        assert error_log.read_bytes() == before_error_log
+    (logged,) = _appended_error_lines(writer, before_error_log)
+    assert "pre-existing rebase state is ambiguous" in logged
+    assert "rebase --abort" in logged
 
 
 def test_rebase_abort_alone_cannot_clear_half_initialized_state(
@@ -1784,8 +2039,7 @@ def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
     before_worktree = _worktree_snapshot(writer)
     before_metadata = _rebase_metadata(writer)
     before_remote = _git(remote, "rev-parse", "ai-state").stdout
-    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
-    before_error_log = error_log.read_bytes() if error_log.exists() else None
+    before_error_log = _error_log_lines(writer)
     actual_git = shutil.which("git")
     assert actual_git is not None
     fake_bin = tmp_path / "fake-bin"
@@ -1813,6 +2067,7 @@ def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
     assert result.returncode == 0
     assert result.stdout == ""
     assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert "rebase --quit" not in result.stderr
     assert not invocations.exists()
     assert _local_head(writer) == before_head
     assert _git(writer / ".claude", "ls-files", "--stage").stdout == before_index
@@ -1824,77 +2079,107 @@ def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
     assert _worktree_snapshot(writer) == before_worktree
     assert _rebase_metadata(writer) == before_metadata
     assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
-    if before_error_log is None:
-        assert not error_log.exists()
-    else:
-        assert error_log.read_bytes() == before_error_log
+    (logged,) = _appended_error_lines(writer, before_error_log)
+    assert "pre-existing rebase state is ambiguous" in logged
+    assert "rebase --abort" in logged
 
 
-def test_current_pull_recovery_reports_distinct_abort_and_quit_failures(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(
+    "mode",
+    ("setup", "pull", "checkpoint", "publish", "push", "migrate-from-hf"),
+)
+def test_mutating_entrypoints_preserve_valid_preexisting_merge(
+    script: Path, tmp_path: Path, mode: str
 ) -> None:
-    """Current-pull recovery preserves both abort and quit diagnostics."""
+    """Every mutating entry point leaves an operator's conflicted merge untouched,
+    runs no Git command, and logs one warning that advises ``--continue`` or ``--abort``."""
     remote = _bare_remote(tmp_path)
-    writer = _new_writer(script, tmp_path, remote, "recovery-failure")
-    _write(writer, "plans/published.md", "published\n")
-    assert _sync(script, writer, remote, "push").returncode == 0
-    assert not (writer / ".claude" / ".git" / "rebase-merge").exists()
-    assert not (writer / ".claude" / ".git" / "rebase-apply").exists()
-    actual_git = shutil.which("git")
-    assert actual_git is not None
-    fake_bin = tmp_path / "fake-bin"
-    fake_bin.mkdir()
-    fake_git = fake_bin / "git"
-    invocations = tmp_path / "git-invocations.log"
-    fake_git.write_text(
-        "#!/usr/bin/env bash\n"
-        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
-        'if [[ "$3" == "pull" ]]; then\n'
-        '  mkdir -p "$2/.git/rebase-merge"\n'
-        '  printf "current-pull\\n" > "$2/.git/rebase-merge/head-name"\n'
-        "  printf 'forced current pull failure\\n' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        'if [[ "$3" == "rebase" && "$4" == "--abort" ]]; then\n'
-        "  printf 'forced abort recovery failure\\n' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        'if [[ "$3" == "rebase" && "$4" == "--quit" ]]; then\n'
-        "  printf 'forced quit recovery failure\\n' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        f'exec "{actual_git}" "$@"\n'
-    )
-    fake_git.chmod(0o755)
+    writer, _ = _valid_preexisting_merge(script, tmp_path, remote, mode)
+    nested = writer / ".claude"
+    before_head = _local_head(writer)
+    before_index = _git(nested, "ls-files", "--stage").stdout
+    before_merge_head = (nested / ".git" / "MERGE_HEAD").read_bytes()
+    before_status = _git(nested, "status", "--porcelain=v1", "-z").stdout
+    before_worktree = _worktree_snapshot(writer)
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+    before_error_log = _error_log_lines(writer)
+    env, invocations = _recording_git(tmp_path)
 
-    result = _sync(
-        script,
-        writer,
-        remote,
-        "pull",
-        extra_env={
-            "GIT_INVOCATIONS": str(invocations),
-            "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        },
-    )
-    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+    result = _sync(script, writer, remote, mode, extra_env=env)
 
     assert result.returncode == 0
+    assert result.stdout == ""
     assert (
-        "leftover rebase state from a failed reconciliation could not be cleared"
+        "an unfinished merge is in progress; state sync will not alter it"
         in result.stderr
     )
-    assert f"git -C {writer / '.claude'} rebase --quit" in result.stderr
-    assert "pull: up to date" not in result.stderr
-    assert error_log.exists()
-    assert "forced abort recovery failure" in error_log.read_text()
-    assert "forced quit recovery failure" in error_log.read_text()
-    rebase_invocations = [
-        line
-        for line in invocations.read_text().splitlines()
-        if line.startswith("rebase ")
-    ]
-    assert rebase_invocations == ["rebase --abort", "rebase --quit"]
+    assert "merge --continue" in result.stderr
+    assert "merge --abort" in result.stderr
+    assert not invocations.exists()
+    assert _local_head(writer) == before_head
+    assert _git(nested, "ls-files", "--stage").stdout == before_index
+    assert (nested / ".git" / "MERGE_HEAD").read_bytes() == before_merge_head
+    assert _git(nested, "status", "--porcelain=v1", "-z").stdout == before_status
+    assert _worktree_snapshot(writer) == before_worktree
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
+    assert _git(nested, "rev-list", "--merges", "HEAD").stdout == ""
+    (logged,) = _appended_error_lines(writer, before_error_log)
+    assert "an unfinished merge is in progress" in logged
+    assert "merge --abort" in logged
+
+
+def test_failed_pull_abort_leaves_rebase_and_keeps_settings_copy(
+    script: Path, tmp_path: Path
+) -> None:
+    """A pull conflict whose ``rebase --abort`` fails is left for the operator: no
+    ``rebase --quit`` fallback, no later commit over it, and the settings copy
+    is kept and named instead of being written back into a tree Git still owns."""
+    remote = _bare_remote(tmp_path)
+    first = _new_writer(script, tmp_path, remote, "first")
+    _write(first, "plans/x.md", "base\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    second = _new_writer(script, tmp_path, remote, "second")
+    nested = second / ".claude"
+    _write(second, "plans/x.md", "from-second\n")
+    assert _sync(script, second, remote, "checkpoint").returncode == 0
+    branch_before = _git(nested, "rev-parse", "ai-state").stdout.strip()
+    _write(first, "plans/x.md", "from-first\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"second-local\r\n")
+    env, invocations = _recording_git(
+        tmp_path, fail=("rebase", "--abort"), delete_after_pull=settings
+    )
+
+    result = _sync(script, second, remote, "pull", extra_env=env)
+
+    assert result.returncode == 0
+    assert _logged_calls(invocations, "rebase") == ["rebase --abort"]
+    assert (nested / ".git" / "rebase-merge").is_dir()
+    assert _git(nested, "rev-parse", "ai-state").stdout.strip() == branch_before
+    copies = list((nested / ".git").glob("settings.local.json.*"))
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == b"second-local\r\n"
+    assert str(copies[0]) in result.stderr
+    assert not settings.exists()
+    assert "rebase --continue" in result.stderr
+    assert "rebase --abort" in result.stderr
+    assert "rebase --quit" not in result.stderr
+    assert "forced rebase --abort failure" in "\n".join(_error_log_lines(second))
+    before_head = _local_head(second)
+    before_count = _git(nested, "rev-list", "--all", "--count").stdout
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+
+    checkpoint = _sync(script, second, remote, "checkpoint")
+    push = _sync(script, second, remote, "push")
+
+    assert checkpoint.returncode == 0
+    assert "pre-existing rebase state is ambiguous" in checkpoint.stderr
+    assert _local_head(second) == before_head
+    assert _git(nested, "rev-list", "--all", "--count").stdout == before_count
+    assert _git(nested, "ls-files", "-u").stdout != ""
+    assert push.returncode == 0
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
 
 
 def test_failed_pull_without_rebase_does_not_attempt_recovery(
@@ -1948,6 +2233,187 @@ def test_status_reports_rebase_state(script: Path, tmp_path: Path) -> None:
 
     assert "rebase: in-progress" in in_progress.stdout
     assert "rebase: none" in clear.stdout
+    assert "merge: none" in in_progress.stdout
+    assert "merge: none" in clear.stdout
+
+
+def test_status_reports_merge_state(script: Path, tmp_path: Path) -> None:
+    """Status exposes an unfinished merge on the line after ``rebase:``."""
+    remote = _bare_remote(tmp_path)
+    uninitialized = tmp_path / "uninitialized"
+    uninitialized.mkdir()
+    writer, _ = _valid_preexisting_merge(script, tmp_path, remote, "status-merge")
+
+    fresh = _sync(script, uninitialized, None, "status")
+    in_progress = _sync(script, writer, remote, "status")
+    assert _git(writer / ".claude", "merge", "--abort").returncode == 0
+    clear = _sync(script, writer, remote, "status")
+
+    assert "rebase: none\nmerge: none\n" in fresh.stdout
+    assert "rebase: none\nmerge: in-progress\n" in in_progress.stdout
+    assert "rebase: none\nmerge: none\n" in clear.stdout
+
+
+def test_fresh_setup_with_unabortable_merge_neither_commits_nor_restores(
+    script: Path, tmp_path: Path
+) -> None:
+    """A fresh setup whose unrelated-history merge conflicts and cannot be aborted
+    leaves the merge for the operator: no commit over the markers, no adapter
+    restore, and the settings copy kept and named."""
+    remote = _bare_remote(tmp_path)
+    publisher = _new_writer(script, tmp_path, remote, "publisher")
+    _write(publisher, "plans/x.md", "from-publisher\n")
+    assert _sync(script, publisher, remote, "push").returncode == 0
+    root = tmp_path / "fresh"
+    consumer_script = _install_pull_runtime(root)
+    adapter_source = _write_github_adapter_source(root)
+    _write(root, "plans/x.md", "from-fresh\n")
+    nested = root / ".claude"
+    (nested / SETTINGS_LOCAL).write_bytes(b"fresh-local\r\n")
+    env, invocations = _recording_git(tmp_path, fail=("merge", "--abort"))
+
+    result = _sync(consumer_script, root, remote, "setup", extra_env=env)
+
+    assert result.returncode == 0
+    assert adapter_source.is_file()
+    assert _logged_calls(invocations, "merge") == ["merge -q", "merge --abort"]
+    assert (nested / ".git" / "MERGE_HEAD").is_file()
+    assert _local_commit_count(root) == 1
+    assert _git(nested, "log", "-1", "--format=%s").stdout.strip() == (
+        "bootstrap: init ai-state"
+    )
+    assert _git(nested, "rev-list", "--merges", "HEAD").stdout == ""
+    assert not (root / ".github").exists()
+    copies = list((nested / ".git").glob("settings.local.json.*"))
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == b"fresh-local\r\n"
+    assert str(copies[0]) in result.stderr
+    assert "merge --continue" in result.stderr
+    assert "merge --abort" in result.stderr
+    assert "setup failed; continuing." in result.stderr
+    before_head = _local_head(root)
+
+    checkpoint = _sync(consumer_script, root, remote, "checkpoint")
+
+    assert checkpoint.returncode == 0
+    assert "an unfinished merge is in progress" in checkpoint.stderr
+    assert _local_head(root) == before_head
+    assert _local_commit_count(root) == 1
+
+
+def test_failed_unrelated_merge_without_merge_state_restores_settings(
+    script: Path, tmp_path: Path
+) -> None:
+    """A merge that fails before it creates ``MERGE_HEAD`` has nothing to abort:
+    no ``merge --abort`` runs, nothing is reported as left in place, and the
+    settings file keeps its bytes with no copy left under ``.git``."""
+    remote = _bare_remote(tmp_path)
+    publisher = _new_writer(script, tmp_path, remote, "publisher")
+    _write(publisher, "plans/x.md", "from-publisher\n")
+    assert _sync(script, publisher, remote, "push").returncode == 0
+    root = tmp_path / "fresh"
+    _write(root, "plans/x.md", "from-fresh\n")
+    nested = root / ".claude"
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"fresh-local\r\n")
+    env, invocations = _recording_git(tmp_path, fail=("merge", "-q"))
+
+    result = _sync(script, root, remote, "setup", extra_env=env)
+
+    assert result.returncode == 0
+    assert _logged_calls(invocations, "merge") == ["merge -q"]
+    assert "could not be merged automatically" in result.stderr
+    assert "left in place" not in result.stderr
+    assert not (nested / ".git" / "MERGE_HEAD").exists()
+    assert settings.read_bytes() == b"fresh-local\r\n"
+    assert list((nested / ".git").glob("settings.local.json.*")) == []
+
+
+def test_unrelated_history_merge_commits_local_changes_first(
+    script: Path, tmp_path: Path
+) -> None:
+    """The unrelated-history merge starts from a committed tree: an uncommitted
+    local file is in the merge commit's first parent, not added after the merge."""
+    remote = _bare_remote(tmp_path)
+    peer = _new_writer(script, tmp_path, remote, "peer")
+    _write(peer, "plans/remote.md", "from-remote\n")
+    assert _sync(script, peer, remote, "push").returncode == 0
+    writer = tmp_path / "local-first"
+    (writer / ".claude").mkdir(parents=True)
+    _write(writer, "plans/base.md", "base\n")
+    assert _sync(script, writer, None, "checkpoint").returncode == 0
+    nested = writer / ".claude"
+    assert _git(nested, "remote", "add", "origin", str(remote)).returncode == 0
+    _write(writer, "plans/dirty.md", "written, not committed\n")
+
+    result = _sync(script, writer, remote, "pull")
+
+    assert result.returncode == 0, result.stderr
+    _, *parents = _git(
+        nested, "rev-list", "--parents", "-n", "1", "HEAD"
+    ).stdout.split()
+    assert len(parents) == 2, "HEAD must be the merge commit itself"
+    first_parent, second_parent = parents
+    assert (
+        _git(nested, "show", f"{first_parent}:plans/dirty.md").stdout
+        == "written, not committed\n"
+    )
+    assert _git(nested, "show", f"{second_parent}:plans/remote.md").returncode == 0
+    assert _git(nested, "status", "--porcelain").stdout == ""
+    assert (nested / "plans" / "remote.md").read_text() == "from-remote\n"
+    assert (nested / "plans" / "dirty.md").read_text() == "written, not committed\n"
+
+
+def test_commit_refuses_while_a_merge_is_unfinished(
+    script: Path, tmp_path: Path
+) -> None:
+    """The backstop in ``commit_local_state``: a merge that starts after the entry
+    guard ran (here inside the adapter restore before the post-pull checkpoint)
+    is never committed over, and no staging or untrack call touches it."""
+    remote = _bare_remote(tmp_path)
+    writer, _ = _diverged_branches(script, tmp_path, remote, "late-merge")
+    nested = writer / ".claude"
+    script.with_name("restore-root-adapters.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        f'git -C "{nested}" merge operator-work >/dev/null 2>&1 || true\n'
+    )
+    before_head = _local_head(writer)
+    env, invocations = _recording_git(tmp_path)
+
+    result = _sync(script, writer, remote, "pull", "--local-only", extra_env=env)
+
+    calls = invocations.read_text().splitlines()
+    assert result.returncode == 0
+    assert "not committing over it" in result.stderr
+    assert "post-pull checkpoint failed" in result.stderr
+    assert (nested / ".git" / "MERGE_HEAD").is_file()
+    assert _local_head(writer) == before_head
+    assert _git(nested, "rev-list", "--merges", "HEAD").stdout == ""
+    assert calls[-1] == "merge operator-work"
+
+
+def test_checkpoint_refuses_unmerged_index_left_by_rebase_quit(
+    script: Path, tmp_path: Path
+) -> None:
+    """``rebase --quit`` leaves a detached HEAD with an unmerged index and no
+    rebase folder. No marker file shows it, so ``commit_local_state`` finds it
+    through the index and refuses to commit the conflict markers."""
+    remote = _bare_remote(tmp_path)
+    writer, _ = _valid_preexisting_rebase(script, tmp_path, remote, "quit-leftover")
+    nested = writer / ".claude"
+    assert _git(nested, "rebase", "--quit").returncode == 0
+    assert not (nested / ".git" / "rebase-merge").exists()
+    assert _git(nested, "ls-files", "-u").stdout != ""
+    before_head = _local_head(writer)
+    before_count = _git(nested, "rev-list", "--all", "--count").stdout
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0
+    assert "not committing over it" in result.stderr
+    assert _local_head(writer) == before_head
+    assert _git(nested, "rev-list", "--all", "--count").stdout == before_count
+    assert _git(nested, "ls-files", "-u").stdout != ""
 
 
 def test_restore_root_adapters_parses_inert_paths_and_preserves_tracked_files(
@@ -2201,6 +2667,65 @@ def test_restore_root_adapters_rejects_allowed_source_symlink_escape(
     assert not (root / ".codex").exists()
 
 
+def test_restore_root_adapters_rejects_symlinked_claude_dir(tmp_path: Path) -> None:
+    """A symlinked `.claude` is refused, so nothing is copied from outside the repo."""
+    root = tmp_path / "consumer"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    _write_restore_manifest(outside, "CLAUDE.md")
+    escaped = outside / ".claude" / "bootstrap-root" / "CLAUDE.md"
+    escaped.parent.mkdir(parents=True)
+    escaped.write_text("escaped\n")
+    (root / ".claude").symlink_to(outside / ".claude", target_is_directory=True)
+
+    result = _restore(root, ".devcontainer")
+
+    assert result.returncode == 1
+    assert ".claude is a symlink" in result.stderr
+    assert not (root / "CLAUDE.md").exists()
+
+
+def test_restore_root_adapters_rejects_symlinked_bootstrap_root(
+    tmp_path: Path,
+) -> None:
+    """A symlinked `.claude/bootstrap-root` is refused, not followed outside."""
+    root = tmp_path / "consumer"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "CLAUDE.md").write_text("escaped\n")
+    _write_restore_manifest(root, "CLAUDE.md")
+    (root / ".claude" / "bootstrap-root").symlink_to(outside, target_is_directory=True)
+
+    result = _restore(root)
+
+    assert result.returncode == 1
+    assert ".claude/bootstrap-root is a symlink" in result.stderr
+    assert not (root / "CLAUDE.md").exists()
+
+
+def test_restore_root_adapters_ignores_symlinked_claude_without_content(
+    tmp_path: Path,
+) -> None:
+    """A symlinked `.claude` with nothing to restore still exits quietly.
+
+    This passes against the pre-fix script too: it guards the early
+    nothing-to-restore exit, which the symlink checks must not pre-empt.
+    """
+    root = tmp_path / "consumer"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / ".claude").symlink_to(outside, target_is_directory=True)
+    (root / ".devcontainer").mkdir()
+    before = sorted(path.name for path in root.iterdir())
+
+    result = _restore(root, ".devcontainer")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert sorted(path.name for path in root.iterdir()) == before
+
+
 def test_push_after_rebase_conflict_does_not_push(script: Path, tmp_path: Path) -> None:
     """A same-file conflict must abort cleanly and skip the doomed push.
 
@@ -2411,3 +2936,463 @@ def test_migrate_without_conflict_reconciles_and_pushes(
     assert result.returncode == 0
     assert _remote_show(remote, "plans/n.md") == "from-migrate\n"
     assert _remote_show(remote, "plans/x.md") == "from-remote\n"
+
+
+# --- One sync at a time, the exit trap, and the network stall limit ---------
+
+# Pauses a fake ``git`` at its first ``add``: writes READY_FILE, then waits up to
+# 30 seconds for RELEASE_FILE so a broken run fails instead of hanging.
+PAUSE_AT_ADD = r"""
+if [[ "${3:-}" == "add" && ! -e "$READY_FILE" ]]; then
+  : > "$READY_FILE"
+  waited=0
+  while [[ ! -e "$RELEASE_FILE" && $waited -lt 300 ]]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+fi
+"""
+
+# At ``pull``: optionally runs real git first (which may stop on a conflict),
+# then deletes the live settings file, writes READY_FILE, and sleeps until a
+# signal ends it (30 seconds at most).
+STALL_AT_PULL = r"""
+if [[ "${3:-}" == "pull" ]]; then
+  if [[ -n "${REAL_PULL:-}" ]]; then
+    "$REAL_GIT" "$@" || true
+  fi
+  rm -f "$SETTINGS"
+  : > "$READY_FILE"
+  sleep 30
+  exit 1
+fi
+"""
+
+
+@needs_flock
+@pytest.mark.parametrize("mode", ("pull", "checkpoint", "publish", "push"))
+def test_sync_lock_busy_run_skips_without_running_git(
+    script: Path, tmp_path: Path, mode: str
+) -> None:
+    """A run that finds the lock held skips at once and touches nothing: no Git
+    command, HEAD, remote ref, or dirty file changes. The next checkpoint, with
+    the lock free, commits the file. (``setup`` and ``migrate-from-hf`` wait
+    instead; see the ``setup`` lock tests.)"""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, mode)
+    _write(writer, "plans/seed.md", "seed\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    _write(writer, "plans/dirty.md", "waits for the next run\n")
+    nested = writer / ".claude"
+    before_head = _local_head(writer)
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+    env, invocations = _recording_git(tmp_path)
+
+    with _sync_lock_held(writer):
+        result = _sync(script, writer, remote, mode, extra_env=env)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "another state sync is running" in result.stderr
+    assert not invocations.exists()
+    assert _local_head(writer) == before_head
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
+    assert _git(nested, "status", "--porcelain").stdout == "?? plans/dirty.md\n"
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    assert _local_show(writer, "plans/dirty.md") == "waits for the next run\n"
+
+
+@needs_flock
+def test_sync_lock_is_shared_by_devcontainer_and_hooks_copies(tmp_path: Path) -> None:
+    """Both installed copies resolve the same root from their own location (no
+    ``AI_STATE_REPO_ROOT``), so a run of one excludes a run of the other."""
+    root = tmp_path / "shared-root"
+    hooks_copy = root / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    devcontainer_copy = root / ".devcontainer" / "state-sync.sh"
+    for copy in (hooks_copy, devcontainer_copy):
+        copy.parent.mkdir(parents=True)
+        shutil.copy(SCRIPT_SRC, copy)
+    own_root = {"AI_STATE_REPO_ROOT": ""}
+    assert (
+        _sync(hooks_copy, root, None, "checkpoint", extra_env=own_root).returncode == 0
+    )
+    _write(root, "plans/dirty.md", "committed by run A\n")
+    before_head = _local_head(root)
+    ready, release = tmp_path / "ready", tmp_path / "release"
+    env = {
+        **own_root,
+        **_fake_git(tmp_path, PAUSE_AT_ADD),
+        "READY_FILE": str(ready),
+        "RELEASE_FILE": str(release),
+    }
+
+    with _sync_process(hooks_copy, root, None, "checkpoint", extra_env=env) as run_a:
+        _wait_for_file(ready, run_a)
+        run_b = _sync(devcontainer_copy, root, None, "checkpoint", extra_env=own_root)
+        head_while_a_waits = _local_head(root)
+        release.touch()
+        run_a.communicate(timeout=30)
+
+    assert run_b.returncode == 0
+    assert "another state sync is running" in run_b.stderr
+    assert head_while_a_waits == before_head
+    assert run_a.returncode == 0
+    assert _local_show(root, "plans/dirty.md") == "committed by run A\n"
+
+
+@needs_flock
+def test_sync_lock_status_runs_while_lock_is_held(
+    script: Path, tmp_path: Path, path_without_flock: dict[str, str]
+) -> None:
+    """``status`` never waits for the lock (it would hit the time limit here) and
+    reports ``held``, ``free``, or ``unavailable`` (no ``flock``), in both the
+    initialized and the uninitialized report."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "status-lock")
+    uninitialized = tmp_path / "uninitialized"
+    (uninitialized / ".claude").mkdir(parents=True)
+
+    with _sync_lock_held(writer):
+        held = _sync(script, writer, remote, "status", timeout=20)
+    free = _sync(script, writer, remote, "status")
+    unavailable = _sync(script, writer, remote, "status", extra_env=path_without_flock)
+    with _sync_lock_held(uninitialized):
+        fresh_held = _sync(script, uninitialized, None, "status", timeout=20)
+    fresh_free = _sync(script, uninitialized, None, "status")
+
+    assert held.returncode == 0
+    assert "repository: initialized" in held.stdout
+    assert "merge: none\nlock: held\n" in held.stdout
+    assert "another state sync is running" not in held.stderr
+    assert "merge: none\nlock: free\n" in free.stdout
+    assert "merge: none\nlock: unavailable\n" in unavailable.stdout
+    assert "repository: uninitialized" in fresh_held.stdout
+    assert "merge: none\nlock: held\n" in fresh_held.stdout
+    assert "merge: none\nlock: free\n" in fresh_free.stdout
+
+
+def test_sync_lock_fresh_clone_leaves_no_lock_file(tmp_path: Path) -> None:
+    """Contract guard that already passes without the lock: the lock is the root
+    folder itself, so a fresh clone gains no lock file and no dirty nested tree."""
+    root = tmp_path / "fresh-clone"
+    root.mkdir()
+    assert subprocess.run(["git", "init", "-q", str(root)], check=False).returncode == 0
+    copy = root / ".devcontainer" / "state-sync.sh"
+    copy.parent.mkdir()
+    shutil.copy(SCRIPT_SRC, copy)
+
+    result = _sync(copy, root, None, "setup", extra_env={"AI_STATE_REPO_ROOT": ""})
+
+    assert result.returncode == 0, result.stderr
+    assert {entry.name for entry in root.iterdir()} == {
+        ".git",
+        ".claude",
+        ".devcontainer",
+    }
+    assert _git(root / ".claude", "status", "--porcelain").stdout == ""
+
+
+def test_sync_lock_runs_unlocked_without_flock(
+    script: Path, tmp_path: Path, path_without_flock: dict[str, str]
+) -> None:
+    """Contract guard that already passes without the lock: with no ``flock`` on
+    ``PATH`` (stock macOS) a run goes on unlocked and silent, even while the
+    lock is held."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "no-flock")
+    _write(writer, "plans/unlocked.md", "committed anyway\n")
+
+    with _sync_lock_held(writer):
+        result = _sync(
+            script, writer, remote, "checkpoint", extra_env=path_without_flock
+        )
+
+    assert result.returncode == 0
+    assert "another state sync is running" not in result.stderr
+    assert _local_show(writer, "plans/unlocked.md") == "committed anyway\n"
+
+
+def test_sync_lock_failure_runs_unlocked_with_notice(
+    script: Path, tmp_path: Path
+) -> None:
+    """A ``flock`` that fails for any reason but a busy lock (exit 65 here) does
+    not stop sync: the run commits, tells stderr, and logs nothing."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "flock-fails")
+    _write(writer, "plans/unlocked.md", "committed anyway\n")
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "checkpoint",
+        extra_env=_fake_flock(tmp_path, "exit 65"),
+    )
+
+    assert result.returncode == 0
+    assert "could not lock" in result.stderr
+    assert "flock exit 65" in result.stderr
+    assert not any("could not lock" in line for line in _error_log_lines(writer))
+    assert _local_show(writer, "plans/unlocked.md") == "committed anyway\n"
+
+
+@pytest.mark.parametrize(
+    ("signum", "exit_code"),
+    (
+        pytest.param(signal.SIGTERM, 143, id="SIGTERM"),
+        pytest.param(signal.SIGINT, 130, id="SIGINT"),
+        pytest.param(signal.SIGHUP, 129, id="SIGHUP"),
+    ),
+)
+def test_exit_trap_restores_settings_copy_after_signal(
+    script: Path, tmp_path: Path, signum: signal.Signals, exit_code: int
+) -> None:
+    """A run stopped by a signal while Git has removed the live settings file puts
+    its copy back and leaves none behind; the exit code is 128 plus the signal."""
+    remote = _bare_remote(tmp_path)
+    first = _new_writer(script, tmp_path, remote, "first")
+    assert _sync(script, first, remote, "push").returncode == 0
+    second = _new_writer(script, tmp_path, remote, "second")
+    nested = second / ".claude"
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"second-local\r\n")
+    ready = tmp_path / "ready"
+    env = {
+        **_fake_git(tmp_path, STALL_AT_PULL),
+        "SETTINGS": str(settings),
+        "READY_FILE": str(ready),
+    }
+
+    with _sync_process(script, second, remote, "pull", extra_env=env) as run:
+        _wait_for_file(ready, run)
+        assert not settings.exists()
+        os.killpg(run.pid, signum)
+        run.communicate(timeout=30)
+
+    assert run.returncode == exit_code
+    assert settings.read_bytes() == b"second-local\r\n"
+    assert list((nested / ".git").glob("settings.local.json.*")) == []
+
+
+def test_exit_trap_keeps_and_names_copy_during_unfinished_rebase(
+    script: Path, tmp_path: Path
+) -> None:
+    """A run stopped while its pull's conflicted rebase is still in place keeps the
+    settings copy and names it; writing it back would hand Git's tree a file Git
+    may overwrite again."""
+    remote = _bare_remote(tmp_path)
+    first = _new_writer(script, tmp_path, remote, "first")
+    _write(first, "plans/x.md", "base\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    second = _new_writer(script, tmp_path, remote, "second")
+    nested = second / ".claude"
+    _write(second, "plans/x.md", "from-second\n")
+    assert _sync(script, second, remote, "checkpoint").returncode == 0
+    _write(first, "plans/x.md", "from-first\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"second-local\r\n")
+    ready = tmp_path / "ready"
+    env = {
+        **_fake_git(tmp_path, STALL_AT_PULL),
+        "REAL_PULL": "1",
+        "SETTINGS": str(settings),
+        "READY_FILE": str(ready),
+    }
+
+    with _sync_process(script, second, remote, "pull", extra_env=env) as run:
+        _wait_for_file(ready, run)
+        os.killpg(run.pid, signal.SIGTERM)
+        _, stderr = run.communicate(timeout=30)
+
+    copies = list((nested / ".git").glob("settings.local.json.*"))
+    assert run.returncode == 143
+    assert (nested / ".git" / "rebase-merge").is_dir()
+    assert not settings.exists()
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == b"second-local\r\n"
+    marker = "state sync stopped while a rebase or merge was unfinished"
+    assert marker in stderr
+    assert str(copies[0]) in stderr.split(marker, 1)[1]
+
+
+@contextlib.contextmanager
+def _silent_http_server() -> Iterator[int]:
+    """Serve a local port that accepts connections, reads each request, and never
+    answers. Yields the port."""
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+    connections: list[socket.socket] = []
+
+    def accept_forever() -> None:
+        while True:
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            connections.append(connection)
+            connection.settimeout(5)
+            with contextlib.suppress(OSError):
+                connection.recv(65536)
+
+    thread = threading.Thread(target=accept_forever, daemon=True)
+    thread.start()
+    try:
+        yield server.getsockname()[1]
+    finally:
+        with contextlib.suppress(OSError):
+            server.shutdown(socket.SHUT_RDWR)
+        server.close()
+        for connection in connections:
+            connection.close()
+        thread.join(timeout=10)
+
+
+@needs_flock
+def test_network_limit_ends_a_stalled_fetch(script: Path, tmp_path: Path) -> None:
+    """A server that accepts the request and never answers cannot hold a run for
+    good: Git gives up at the stall limit (the caller's 2 seconds here win over
+    the 60-second default), the run takes its fetch-failure path, and the lock is
+    free afterwards. Without a default limit Git waits forever."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "stalled")
+    env = {
+        "GIT_HTTP_LOW_SPEED_TIME": "2",
+        "NO_PROXY": "127.0.0.1",
+        "no_proxy": "127.0.0.1",
+    }
+
+    with _silent_http_server() as port:
+        url = f"http://127.0.0.1:{port}/x.git"
+        assert (
+            _git(writer / ".claude", "remote", "set-url", "origin", url).returncode == 0
+        )
+        started = time.monotonic()
+        with _sync_process(script, writer, remote, "pull", extra_env=env) as run:
+            _, stderr = run.communicate(timeout=20)
+        elapsed = time.monotonic() - started
+
+    assert run.returncode == 0
+    assert elapsed < 20
+    assert "fetch from origin/ai-state failed" in stderr
+    assert "lock: free" in _sync(script, writer, remote, "status").stdout
+
+
+def test_network_limit_sets_no_prompt_and_stall_defaults(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every ``fetch`` and ``push`` runs with the password prompt off and the stall
+    limit set: 1000 bytes per second for 60 seconds unless the caller chose its
+    own values, and the prompt stays off even when the caller turned it on."""
+    for name in (
+        "GIT_TERMINAL_PROMPT",
+        "GIT_HTTP_LOW_SPEED_LIMIT",
+        "GIT_HTTP_LOW_SPEED_TIME",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "limits")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    record = r"""
+if [[ "${3:-}" == "fetch" || "${3:-}" == "push" ]]; then
+  printf '%s %s %s %s\n' "$3" "${GIT_TERMINAL_PROMPT-unset}" \
+    "${GIT_HTTP_LOW_SPEED_LIMIT-unset}" "${GIT_HTTP_LOW_SPEED_TIME-unset}" >> "$ENV_LOG"
+fi
+"""
+    fake = _fake_git(tmp_path, record)
+    scenarios: tuple[tuple[dict[str, str], str], ...] = (
+        ({}, "0 1000 60"),
+        ({"GIT_HTTP_LOW_SPEED_TIME": "5"}, "0 1000 5"),
+        ({"GIT_TERMINAL_PROMPT": "1"}, "0 1000 60"),
+    )
+
+    for index, (caller, expected) in enumerate(scenarios):
+        log = tmp_path / f"env-{index}.log"
+        _write(writer, f"plans/limits-{index}.md", "changed\n")
+        result = _sync(
+            script,
+            writer,
+            remote,
+            "push",
+            extra_env={**fake, **caller, "ENV_LOG": str(log)},
+        )
+        assert result.returncode == 0, result.stderr
+        assert log.read_text().splitlines() == [f"fetch {expected}", f"push {expected}"]
+
+
+@needs_flock
+def test_sync_lock_setup_waits_for_a_busy_lock(script: Path, tmp_path: Path) -> None:
+    """``setup`` waits for a busy lock instead of skipping, because the installer
+    relies on it to keep ``settings.local.json`` ignored; a ``checkpoint`` under
+    the same lock skips at once."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "waiting-setup")
+    gitignore = writer / ".claude" / ".gitignore"
+    gitignore.write_text("user-sentinel/\n")
+
+    with _sync_lock_held(writer) as release:
+        started = time.monotonic()
+        skipped = _sync(script, writer, remote, "checkpoint")
+        skipped_after = time.monotonic() - started
+        with _sync_process(script, writer, remote, "setup") as run:
+            time.sleep(2)
+            still_waiting = run.poll() is None
+            untouched = gitignore.read_text()
+            release()
+            _, stderr = run.communicate(timeout=30)
+
+    assert "another state sync is running" in skipped.stderr
+    assert skipped_after < 10
+    assert still_waiting
+    assert untouched == "user-sentinel/\n"
+    assert run.returncode == 0
+    assert "another state sync is running" not in stderr
+    assert "settings.local.json" in gitignore.read_text().splitlines()
+
+
+@pytest.mark.parametrize("mode", ("setup", "migrate-from-hf"))
+def test_sync_lock_setup_warns_when_the_wait_ends(
+    script: Path, tmp_path: Path, mode: str
+) -> None:
+    """The two patient modes call exactly ``flock -w 60 9``. When that wait ends
+    with the lock still busy (a fake ``flock`` exits 1 for ``-w``) they log a
+    warning and skip, changing nothing and making no commit. A ``checkpoint``
+    under the same fake calls ``flock -n 9``."""
+    remote = _bare_remote(tmp_path)
+    if mode == "setup":
+        root = _new_writer(script, tmp_path, remote, mode)
+        (root / ".claude" / ".gitignore").write_text("user-sentinel/\n")
+    else:
+        root = tmp_path / mode
+        _write(root, "plans/pre-git.md", "state from before git\n")
+    nested = root / ".claude"
+    had_repository = (nested / ".git").exists()
+    before_head = _local_head(root) if had_repository else None
+    before_worktree = _worktree_snapshot(root)
+    flock_log = tmp_path / "flock-arguments.log"
+    env = {
+        **_fake_flock(
+            tmp_path,
+            'printf "%s\\n" "$*" >> "$FLOCK_LOG"\nif [[ "$1" == "-w" ]]; then exit 1; fi',
+        ),
+        "FLOCK_LOG": str(flock_log),
+    }
+
+    result = _sync(script, root, remote, mode, extra_env=env)
+
+    assert result.returncode == 0
+    assert flock_log.read_text().splitlines() == ["-w 60 9"]
+    assert any(
+        f"another state sync held the lock for 60 seconds; {mode} skipped" in line
+        for line in _error_log_lines(root)
+    )
+    assert (nested / ".git").exists() == had_repository
+    if had_repository:
+        assert _local_head(root) == before_head
+    assert _worktree_snapshot(root) == before_worktree
+
+    checkpoint = _sync(script, root, remote, "checkpoint", extra_env=env)
+
+    assert checkpoint.returncode == 0
+    assert flock_log.read_text().splitlines() == ["-w 60 9", "-n 9"]

@@ -499,7 +499,47 @@ separate file and stays tracked and union-merged like every other
 - `could not restore ... its bytes are kept at <path>`: copy the bytes back yourself.
 - `settings.local.json was written while state sync ran; kept the newer file. The copy taken before sync is kept at <path>.`: compare the two files and delete the copy when you no longer need it.
 
-If a sync is killed (for example by the hook timeout), the copy can be left under `.claude/.git/`. Copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
+A run stopped by `INT`, `TERM`, or `HUP` puts the copy back itself. If a rebase or merge is unfinished, it keeps the copy and names it in a warning. A run ended any other way (for example `SIGKILL`, `SIGQUIT`, or a power loss), or by a signal that lands while the copy is being put back, can still leave the copy under `.claude/.git/`. In that case, copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
+
+State sync never commits while a rebase or merge is unfinished in `.claude`, or
+while `git ls-files -u` lists unmerged paths (for example a conflicted
+cherry-pick, revert, or `stash pop`). It warns `... not committing over it.
+Inspect with: git -C <.claude> status.` A rebase or merge already in progress
+when a mutating mode starts is left alone: the mode exits 0, changes nothing,
+and logs one warning to `.claude/session_logs/hooks-errors.log`. The one
+exception is the orphaned autostash leftover (a `rebase-merge` folder that holds
+only an `autostash` file), which state sync clears with `rebase --quit` before
+it continues. The warning advises `rebase --continue` or `rebase --abort`, or
+`merge --continue` after fixing conflicts or `merge --abort`. If state sync's
+own pull conflicts and `rebase --abort` fails, it does not fall back to
+`rebase --quit`. It leaves the rebase in place and does not write
+`settings.local.json` back. The warning names the copy kept under
+`.claude/.git/`; copy it back after you resolve the rebase. The
+unrelated-history merge behaves the same when a started merge cannot be
+aborted, and `setup` then stops before restoring root adapters or committing.
+Before merging an unrelated `origin/ai-state` history, state sync commits local
+changes first. `status` prints `merge: none` or `merge: in-progress` right
+after the `rebase:` line, then `lock: free`, `lock: held`, or
+`lock: unavailable`. A `lock: held` that stays while no sync is running means a
+stuck process holds the lock, for example a Git call over SSH, which has no
+stall limit. Every sync skips until it ends. Find it with `lsof <repository
+root>` and end it.
+
+Only one mutating state-sync run works on a checkout at a time. It takes an
+exclusive `flock` on the repository root folder. There is no lock file, and the
+system releases the lock when the holder ends. A run that finds the lock busy
+prints a notice on stderr and skips; the next sync catches up. `setup` and
+`migrate-from-hf`, which no hook calls, wait up to 60 seconds, then log a
+warning and skip; run them again later. `status` never waits. Where `flock` is
+missing (stock macOS), sync runs unlocked. The lock covers state-sync runs only:
+direct `git -C .claude` commands by people or agents do not take it.
+
+State sync also exports `GIT_TERMINAL_PROMPT=0`, so Git never waits for a typed
+password. Stored credentials and credential helpers still work, including in
+the manual **AI state: push** task. It defaults `GIT_HTTP_LOW_SPEED_LIMIT` to
+`1000` and `GIT_HTTP_LOW_SPEED_TIME` to `60`: an HTTPS transfer slower than
+1,000 bytes per second for 60 seconds is cancelled. Values you already set for
+those two variables win. SSH remotes are not covered.
 
 For generated Codex and Claude hooks, verify one runtime-specific Stop wrapper
 runs sequentially for each turn: session log, session-log check, `checkpoint`,
@@ -511,8 +551,8 @@ local `checkpoint`, while Claude `SessionEnd` invokes `push` with timeout `60`.
 No lifecycle event may split checkpoint and publication into concurrent handlers.
 Timeout or network failure must preserve the local commit for a later retry;
 use `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` to
-inspect recovery state. Post-commit and the manual VS Code **AI state: push**
-task remain the durable checkpoint-and-publish paths.
+inspect recovery state (including the `lock:` line). Post-commit and the manual
+VS Code **AI state: push** task remain the durable checkpoint-and-publish paths.
 
 An install or update can change `.codex/hooks.json`, whose Codex for VS Code
 project trust is content/hash-bound. Verify the installer and batch updater
@@ -843,9 +883,9 @@ Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit
 
 Generated output includes `.devcontainer/`:
 
-- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
+- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container. Its list-form `initializeCommand` (`mkdir -p`, no shell) creates the two bind-mount sources, `~/.openwiki` and `~/.cache/huggingface`, on the host as the host user before the container starts, because Docker's `--mount` refuses a missing source folder.
 - `Dockerfile` installs Python, uv, git, sudo, `context-mode`, `openwiki`, `mermaid`, `jsdom`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
-- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere) and `state-sync.sh pull`. `setup` configures `core.hooksPath` to `.claude/hooks/git-hooks` itself, inside `restore_root_adapters`, immediately after the checkout populates the hook directory, so the commit-msg gate is wired the instant `.claude/hooks/git-hooks/` exists; `post-start.sh` carries no separate `core.hooksPath` step of its own. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere) and `state-sync.sh pull`. `setup` configures `core.hooksPath` to `.claude/hooks/git-hooks` itself, inside `restore_root_adapters`, immediately after the checkout populates the hook directory, so the commit-msg gate is wired the instant `.claude/hooks/git-hooks/` exists; `post-start.sh` carries no separate `core.hooksPath` step of its own. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs. The restorer exits 0 when there is nothing to restore, and refuses (exit 1) a symlinked `.claude` or `.claude/bootstrap-root`, which `state-sync.sh` logs as `restoring root adapters failed; continuing.`
 
 There is **no separate credential to configure** — by default the nested `.claude/`
 repo's remote is the outer repo's own `origin`, so it authenticates the same way the

@@ -96,6 +96,7 @@ from validate_targets import (  # noqa: E402
     sidecar_forbidden_text_tokens,
     sidecar_target_errors,
     sidecar_text_errors,
+    state_sync_text_errors,
     tool_routing_recommendation_errors,
     documenter_humanize_errors,
     execution_defaults_policy_errors,
@@ -4654,3 +4655,55 @@ def test_sidecar_target_errors_rejects_a_leftover_legacy_state_path(
         "still references" in error and SIDECAR_LEGACY_STATE_ROOT in error
         for error in errors
     )
+
+
+STATE_SYNC_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "state-sync.sh"
+STATE_SYNC_QUIT = 'git -C "$CLAUDE_DIR" rebase --quit'
+STATE_SYNC_UNTRACK = (
+    'git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- '
+    ".cache session_logs/hooks-errors.log settings.local.json"
+)
+
+
+def test_state_sync_text_errors_accepts_the_shared_script() -> None:
+    """The shipped state-sync.sh satisfies every literal-invocation rule."""
+    assert state_sync_text_errors(STATE_SYNC_SOURCE.read_text(encoding="utf-8")) == []
+
+
+@pytest.mark.parametrize(
+    ("mutate", "rule"),
+    [
+        pytest.param(
+            lambda text: f"{text}\n{STATE_SYNC_QUIT}\n",
+            "rebase --quit exactly once",
+            id="second-rebase-quit",
+        ),
+        pytest.param(
+            lambda text: text.replace(STATE_SYNC_QUIT, "true"),
+            "rebase --quit exactly once",
+            id="orphan-rebase-quit-removed",
+        ),
+        pytest.param(
+            lambda text: (
+                f'{text}\ngit -C "$CLAUDE_DIR" merge --abort 2>/dev/null || true\n'
+            ),
+            "failed merge aborts",
+            id="silent-merge-abort",
+        ),
+        pytest.param(
+            lambda text: text.replace(STATE_SYNC_UNTRACK, "true"),
+            "untrack the local-only error log",
+            id="untrack-command-removed",
+        ),
+    ],
+)
+def test_state_sync_text_errors_names_each_broken_rule(mutate: Any, rule: str) -> None:
+    """Each mutation of the shipped script breaks exactly one rule, by name."""
+    text = STATE_SYNC_SOURCE.read_text(encoding="utf-8")
+    mutated = mutate(text)
+
+    errors = state_sync_text_errors(mutated)
+
+    assert mutated != text
+    assert len(errors) == 1
+    assert rule in errors[0]
