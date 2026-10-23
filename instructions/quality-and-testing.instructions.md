@@ -132,7 +132,7 @@ normal "review passed clean" report, not an omission, only with
 | Gate | Requires |
 |---|---|
 | Phase-completion commit | `counts.critical == 0` **and** `counts.major == 0` in a fresh, matching findings report, an explicit `disposition` plus non-empty `reason` on every surviving MINOR, and `gate_result == "PASS"` with `open_requests == []` |
-| Push / PR | the same contract, re-checked across every completed phase, except a plan's leading phases whose slug and closeout log are dated before 2026-08-29; the `gate_result` and required-profile rules apply only to reports with `schema_version >= 2`, so phases recorded before the upgrade are not re-judged |
+| Push / PR | the same contract, re-checked across every completed phase, except a plan's leading phases whose slug and closeout log are dated before 2026-08-29 and that have no receipt file; the `gate_result` and required-profile rules apply only to reports with `schema_version >= 2`, so phases recorded before the upgrade are not re-judged |
 
 A commit gate rejects a report with no `gate_result`: re-record the current
 phase's report with `--gate-result` before closeout.
