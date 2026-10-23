@@ -77,7 +77,7 @@ One module constant and one helper in `shared/scripts/verify.py`:
 
 ## Phases
 
-- [ ] `2026-10-23_phase-A-pre-receipt-phase-exemption` — skip only the leading run of pre-receipt phases; tests, docs, and the stale-claims audit.
+- [x] `2026-10-23_phase-A-pre-receipt-phase-exemption` — skip only the leading run of pre-receipt phases; tests, docs, and the stale-claims audit.
 
 ## Verification
 

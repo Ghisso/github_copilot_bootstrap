@@ -20,6 +20,7 @@ Unblock long-running plans whose first phases were completed before closeout rec
 - Documenter: the rule in `docs/runtime-checks.md` (full paragraph), README (upgrade paragraph plus one qualifier), both policies, `docs/smoke-tests.md`, and `docs/architecture.md`; `validate_targets.py` passed after the policy edits.
 - Regenerated and refreshed the overlay; required checks on that tree all exit 0 (`verify.py phase` PASS, 5008 passed, 1 skipped).
 - Review round 1 (six profiles): gate FAIL with two MAJORs and one MINOR, all fixed. (1) `docs/runtime-checks.md` said every phase with a pre-cutoff slug has no receipt, which ignored the closeout-log date; reworded. (2) Two guards had no test: an undated slug with an early-dated log, and a missing plan file in the leading run; the coder added both tests, and each failed under its own mutation. (3) Three short qualifiers dropped the "no receipt file" condition and the README opener keyed on plan start; fixed. The full negative control is now 22 cases: 7 fail on the old code (each `receipt is invalid`) and 15 guards pass; all 22 pass on the new code. `tests/test_verify.py` 377 passed; ruff and mypy clean.
+- Review round 2: gate PASS, no open requests, one MINOR (README "its leading run" had no antecedent) fixed to "a plan's leading run" and recorded with disposition `fixed`. Check rerun on the fixed tree after regeneration and the overlay refresh: all exit 0; `verify.py phase` PASS (5010 passed, 1 skipped).
 
 ## [LEARN] Entries
 
@@ -46,6 +47,9 @@ Unblock long-running plans whose first phases were completed before closeout rec
 
 ## Verification
 
+- optional 1: PASS — read-only probe of the real consumer (`industrial-inspection`, branch `2026-07-21_haystack-3-agent-refactor_implementation`, terminal G0, `receipt_head` `28378951c91c08abdb136f549ab6136e6919b7d6`): the updated `historical_chain_errors` returned `[]` and skipped the six July phases; nothing was written there.
+
 ## Open Questions / Next Steps
 
-- Implement steps 1-2 (coder, tests first), then docs, audit, review, and closeout.
+- The consumer needs a bootstrap refresh, then must re-run G0's closeout (its closeout log was edited after its receipt) before committing G0.
+- The two stale OpenWiki statements wait for the next knowledge-refresh phase.

@@ -3,8 +3,8 @@ name: 2026-10-23_phase-A-pre-receipt-phase-exemption
 type: small-plan
 parent_plan: pre-receipt-phase-exemption
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-23_pre-receipt-phase-exemption-phase-A.md
 ---
 
 # Small Plan: Skip Phases That Predate Closeout Receipts
@@ -21,7 +21,7 @@ Terms:
 
 ## Steps
 
-- [ ] **1. Write the tests first.**
+- [x] **1. Write the tests first.**
   - Owner: `coder`. File: `tests/test_verify.py` (modify), next to the `test_historical_chain_*` tests.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Add one fixture builder next to `_historical_chain_fixture`, reusing `_init_repo`, `_commit_all`, `_write_big_plan`, and `_write_historical_phase`. Suggested contract: `_pre_receipt_chain_fixture(tmp_path: Path, phases: list[tuple[str, str]]) -> dict[str, str]`, returning each built slug's commit SHA. Each `(slug, kind)` entry is one `phases:` item, in order, and `kind` is one of:
@@ -48,7 +48,7 @@ Terms:
   - `test_historical_chain_rejects_missing_receipt_file` keeps its input and assertion. Update only its docstring: an undated phase with no receipt still fails closed; only the leading run of dated pre-receipt phases is skipped.
   - Negative control: before Step 2, run `uv run pytest tests/test_verify.py -q --tb=line -k "pre_receipt or receipt_cutoff or post_cutoff or pre_cutoff"`. Record in the session log that exactly the tests marked "fails today" fail, each with `receipt is invalid`, and every guard passes.
 
-- [ ] **2. Skip the leading pre-receipt run.**
+- [x] **2. Skip the leading pre-receipt run.**
   - Owner: `coder`. File: `shared/scripts/verify.py` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Add the constant next to `CLOSEOUT_RECEIPT`: `RECEIPT_CHAIN_SINCE = "2026-08-29"`, with a short comment that closeout receipts exist only since commit `b3c6bec` and that `historical_chain_errors` skips only a plan's leading run of phases dated before it (user decision 2026-10-23).
@@ -58,7 +58,7 @@ Terms:
   - Also correct the code comment in `shared/hooks/scripts/_lib-frontmatter.sh` (about lines 1540-1544) that says every earlier completed phase requires its own valid receipt: add that a plan's leading run of phases completed before closeout receipts existed is skipped. Comment only, no logic change; user-approved scope addition, 2026-10-23.
   - Run Step 1's command again: every new test passes. Then run `uv run python .claude/scripts/verify.py fast --format text`.
 
-- [ ] **3. Update the documentation.**
+- [x] **3. Update the documentation.**
   - Owner: `documenter` (CLOSEOUT step 1). Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `docs/runtime-checks.md`: in the closeout-receipt paragraph (about line 565), note that phases whose slug is dated before 2026-08-29 have no receipt. After the "Historical receipt-chain validation" paragraph (about line 828), add one paragraph that states the three conditions (including the closeout log's date), names `RECEIPT_CHAIN_SINCE` and commit `b3c6bec`, says a malformed or tampered receipt still fails, says why deleting a receipt cannot exempt a later phase, and records the user's 2026-10-23 approval of this narrow reversal of the 2026-09-02 rule (commit `8ed2c9e`).
   - `README.md`: in "Upgrading a consumer with active work" (about line 284), add a short paragraph: a plan that began before 2026-08-29 needs no backfilled receipts; the commit, push, and PR gates skip its leading run of complete phases whose slug and closeout log are dated before that day and that have no receipt; every later phase still needs one. At about line 1405, qualify "re-checks that same contract across every completed phase" with "except a plan's leading phases that predate closeout receipts".
@@ -67,7 +67,7 @@ Terms:
   - `docs/smoke-tests.md` (about line 293) and `docs/architecture.md` (about line 376): add the same short qualifier to "every completed phase" / "every earlier completed phase".
   - Use plain words and short sentences.
 
-- [ ] **4. Audit live advice for stale claims and record lessons.**
+- [x] **4. Audit live advice for stale claims and record lessons.**
   - Owner: `documenter` for `README.md`, `docs/`, and `shared/` text; orchestrator for `.claude/MEMORY.md` and the session log.
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - This phase is the big plan's last entry, so it runs the standing final-phase documentation, memory, and LEARN audit. Surfaces: root guidance (`CLAUDE.md`, `AGENTS.md`), `README.md`, `docs/`, `shared/policies/`, `shared/skills/` (at least `commit` and `safe-consumer-bootstrap-refresh`), `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, state READMEs, the installed `.claude/` overlay after the self-install, and `.claude/MEMORY.md`.
@@ -81,11 +81,11 @@ Terms:
   - Add this `[LEARN]` entry at the end of the `## Workflow` section of `.claude/MEMORY.md` (and in the session log):
     `- [LEARN:verification] A check that reads history must say how it treats records made before the check existed. historical_chain_errors required a closeout receipt for every earlier completed phase, but receipts only exist since b3c6bec (2026-08-29), so a consumer plan with July phases could never commit again. The fix skips only a plan's leading run of complete phases whose slug and closeout log are both dated before that day, with no receipt file at all; a malformed receipt, a later date, or an undated slug still fails. Slug dates are planning dates, so pair them with a date that marks completion. Test such rules with a fixture shaped like a real long-running consumer plan.`
 
-- [ ] **5. Orchestrator closeout items.**
+- [x] **5. Orchestrator closeout items.**
   - Owner: orchestrator.
   - Before CLOSEOUT step 2, run `uv run python scripts/generate_targets.py --all` and then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. Never hand-copy `dist/` or `.claude/scripts/verify.py`.
 
-- [ ] **6. Review.**
+- [x] **6. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus: the skip covers only the leading run and cannot reach a phase after a receipt-bearing one; an undated slug, a 2026-08-29 slug, an incomplete phase, and any directory entry at the receipt path all stay on today's path; no error message changed; each new pass-test failed against the old code for the intended reason; the docs state exactly what is checked.
 
@@ -110,14 +110,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 
