@@ -1,13 +1,13 @@
 ---
 name: pre-receipt-phase-exemption
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: pre-receipt-phase-exemption_implementation
-started_at:
+started_at: 2026-10-23T09:26:43Z
 phases:
   - 2026-10-23_phase-A-pre-receipt-phase-exemption
-current_phase:
+current_phase: 2026-10-23_phase-A-pre-receipt-phase-exemption
 ---
 
 # Big Plan: Pre-Receipt Phase Exemption
@@ -26,7 +26,7 @@ Planning evidence, 2026-10-23: a read-only run of today's `historical_chain_erro
 
 - The historical walk skips an earlier phase only when all of these hold:
   1. its slug starts with a `YYYY-MM-DD_` date before `2026-08-29`;
-  2. its small plan is complete and no closeout receipt file is on disk at its path;
+  2. its small plan is complete, its small plan's `closeout_session_log` names a file whose name starts with a `YYYY-MM-DD` date before `2026-08-29`, and no closeout receipt file is on disk at its path;
   3. every phase listed before it also meets (1) and (2), or is cancelled.
   In short, only the leading run of the `phases:` list can be skipped.
 - Every other case fails exactly as today: a receipt file that is on disk but malformed or tampered with, an undated slug, a phase dated on or after 2026-08-29, and a dated phase listed after any phase that has a receipt.
@@ -34,6 +34,7 @@ Planning evidence, 2026-10-23: a read-only run of today's `historical_chain_erro
 
 ## Non-Goals and Constraints
 
+- User decision, 2026-10-23, after the devil's-advocate review: condition (2) also checks the closeout log's date. Slug dates are planning dates, and many plans give every phase the plan's start date, so without it a phase planned before the cutoff but finished later could be marked complete without a closeout and still be skipped.
 - User decision, 2026-10-23: this narrowly reverses the rule from commit `8ed2c9e` (2026-09-02) that "a phase predating receipts gets no implicit pass". It stays narrow because only an early, pre-cutoff, receipt-less prefix of the list is skipped. Deleting a receipt cannot exempt a phase dated on or after 2026-08-29, or a phase listed after one that has a receipt. `tests/test_verify.py::test_historical_chain_rejects_missing_receipt_file` uses undated slugs and keeps failing closed, with its input and assertion unchanged.
 - Rejected: a big-plan frontmatter field that names where the chain starts; using the `fixup!`/`squash!` commit bypass.
 - Code changes only `shared/scripts/verify.py`, with the standard library only, plus one corrected comment in `shared/hooks/scripts/_lib-frontmatter.sh` (no logic change). It stays the single source that `scripts/generate_targets.py` copies to `dist/` and the self-install copies to `.claude/scripts/verify.py`; check `VFY-GEN-001` compares them. Never hand-edit a copy.
@@ -46,7 +47,7 @@ Planning evidence, 2026-10-23: a read-only run of today's `historical_chain_erro
 One module constant and one helper in `shared/scripts/verify.py`:
 
 - `RECEIPT_CHAIN_SINCE = "2026-08-29"`, with a comment naming commit `b3c6bec`. It follows the slug-date precedent `VERIFICATION_CONTRACT_SINCE` in `scripts/validate_plan_frontmatter.py`.
-- `leading_pre_receipt_count(root: Path, phases: list[str], parent_plan: str) -> int` counts how many phases at the start of the list are either cancelled (`is_cancelled_small_plan`) or meet conditions (1) and (2). It stops at the first phase that does not. It tests for the receipt with `os.path.lexists`, so any directory entry at the path, even a broken symlink, counts as a receipt and goes through today's validation.
+- `leading_pre_receipt_count(root: Path, phases: list[str], parent_plan: str) -> int` counts how many phases at the start of the list are either cancelled (`is_cancelled_small_plan`) or meet conditions (1) and (2), including the closeout log's date. It stops at the first phase that does not. It tests for the receipt with `os.path.lexists`, so any directory entry at the path, even a broken symlink, counts as a receipt and goes through today's validation.
 - `historical_chain_errors` runs that count over the phases before the terminal phase, then walks back only over the phases after the counted run. Nothing else in the walk changes, and no error message changes.
 
 ### Decisive assumptions and evidence
@@ -54,9 +55,9 @@ One module constant and one helper in `shared/scripts/verify.py`:
 | Assumption | Evidence | Remaining limit |
 | --- | --- | --- |
 | No closeout receipt could exist before 2026-08-29 | `git show -s b3c6bec`: 2026-08-29, "feat: add deterministic verification foundation" | A phase dated 2026-08-29 itself is always checked (strict cutoff, user choice) |
-| Slug dates tell when a phase was planned | Slug convention `YYYY-MM-DD_phase-X-slug` (`plan-decomposition` skill); `validate_plan_frontmatter.py` trusts slug dates the same way | A new plan that back-dates its first slugs and later deletes their receipts would be skipped. The gates guard against agent mistakes, not a hostile editor; the deletion stays visible in nested Git history |
+| Slug dates tell when a phase was planned | Slug convention `YYYY-MM-DD_phase-X-slug` (`plan-decomposition` skill); `validate_plan_frontmatter.py` trusts slug dates the same way | A new plan would have to back-date both its first slugs and their closeout log names, then delete their receipts, to be skipped. The gates guard against agent mistakes, not a hostile editor; the deletion stays visible in nested Git history |
 | A symlinked reports folder cannot fake a missing receipt | `gate_receipt_errors` loads the terminal receipt from the same folder through `confined_path`, which refuses symlinked parents (`test_gate_rejects_symlinked_closeout_receipt`) | None |
-| The change unblocks the consumer's walk | Read-only planning run on the consumer checkout, 2026-10-23: today's code returns the reported phase F error; the patched copy returns `[]` and counts 6 | The consumer must still refresh its runtime and regenerate its G0 receipts (README "Upgrading a consumer with active work"); this plan does not cover the other gate checks there |
+| The change unblocks the consumer's walk | Read-only planning run on the consumer checkout, 2026-10-23: today's code returns the reported phase F error; the patched copy returns `[]` and counts 6 | The consumer must still refresh its runtime and regenerate its G0 receipts (README "Upgrading a consumer with active work"); this plan does not cover the other gate checks there. The devil's-advocate probe found G0's closeout log edited after its receipt (`closeout receipt artifact closeout_log was tampered with`), so the consumer must re-run `verify.py closeout --persist` for G0 after the refresh |
 
 ### Contracts touched
 
