@@ -646,7 +646,7 @@ testpaths = ["tests"]
     assert b"status: complete" in terminal_big_plan
     assert b"current_phase: \n" in terminal_big_plan
     # hooks-errors.log is local-only (gitignored and untracked by
-    # write_nested_gitignore/untrack_error_log in state-sync.sh), so the real
+    # write_nested_gitignore/untrack_local_only_paths in state-sync.sh), so the real
     # post-commit hook chain triggered above never leaves it tracked+dirty.
     assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
     remote = tmp_path / "remote.git"
@@ -720,7 +720,7 @@ testpaths = ["tests"]
         == 0
     )
     # hooks-errors.log is local-only (gitignored and untracked by
-    # write_nested_gitignore/untrack_error_log in state-sync.sh), so the real
+    # write_nested_gitignore/untrack_local_only_paths in state-sync.sh), so the real
     # post-commit hook chain triggered above never leaves it tracked+dirty.
     assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
 

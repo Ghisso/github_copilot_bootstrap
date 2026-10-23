@@ -250,14 +250,90 @@ def _rebase_metadata(root: Path) -> dict[str, bytes]:
     return snapshot
 
 
+ERROR_LOG_RELPATH = "session_logs/hooks-errors.log"
+
+
 def _worktree_snapshot(root: Path) -> dict[str, bytes]:
-    """Return every non-Git worktree file as a byte snapshot."""
+    """Return every non-Git worktree file as a byte snapshot.
+
+    The local error log is left out: a protected run appends one warning to it.
+    """
     worktree = root / ".claude"
     return {
         path.relative_to(worktree).as_posix(): path.read_bytes()
         for path in sorted(worktree.rglob("*"))
-        if path.is_file() and ".git" not in path.relative_to(worktree).parts
+        if path.is_file()
+        and ".git" not in path.relative_to(worktree).parts
+        and path.relative_to(worktree).as_posix() != ERROR_LOG_RELPATH
     }
+
+
+def _error_log_lines(root: Path) -> list[str]:
+    """Return the local error log's lines (empty when it does not exist)."""
+    log = root / ".claude" / ERROR_LOG_RELPATH
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def _appended_error_lines(root: Path, before: list[str]) -> list[str]:
+    """Return the lines a run appended to the error log, never rewriting old ones."""
+    after = _error_log_lines(root)
+    assert after[: len(before)] == before
+    return after[len(before) :]
+
+
+def _recording_git(
+    tmp_path: Path,
+    *,
+    fail: tuple[str, str] | None = None,
+    delete_after_pull: Path | None = None,
+) -> tuple[dict[str, str], Path]:
+    """Return the environment for a fake ``git`` that logs each call, then runs real git.
+
+    The log holds ``<subcommand> <first argument>`` per call and does not exist
+    until a call is made. ``fail`` makes only that subcommand and first argument
+    fail. ``delete_after_pull`` is removed right after a real ``git pull``, as Git
+    removes the ignored local settings file while it replays commits around it.
+    """
+    real_git = shutil.which("git")
+    assert real_git is not None
+    fake_bin = tmp_path / "recording-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        r"""#!/usr/bin/env bash
+printf "%s %s\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"
+if [[ "${3:-}" == "$FAIL_SUBCOMMAND" && "${4:-}" == "$FAIL_ARGUMENT" ]]; then
+  printf 'forced %s %s failure\n' "$3" "$4" >&2
+  exit 1
+fi
+"$REAL_GIT" "$@"
+status=$?
+if [[ "${3:-}" == "pull" && -n "$DELETE_AFTER_PULL" ]]; then
+  rm -f "$DELETE_AFTER_PULL"
+fi
+exit "$status"
+"""
+    )
+    fake_git.chmod(0o755)
+    invocations = tmp_path / "recording-invocations.log"
+    fail_subcommand, fail_argument = fail or ("-", "-")
+    return {
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "REAL_GIT": real_git,
+        "GIT_INVOCATIONS": str(invocations),
+        "FAIL_SUBCOMMAND": fail_subcommand,
+        "FAIL_ARGUMENT": fail_argument,
+        "DELETE_AFTER_PULL": str(delete_after_pull or ""),
+    }, invocations
+
+
+def _logged_calls(invocations: Path, subcommand: str) -> list[str]:
+    """Return the logged calls of one Git subcommand, in order."""
+    return [
+        line
+        for line in invocations.read_text().splitlines()
+        if line.startswith(f"{subcommand} ")
+    ]
 
 
 def _valid_preexisting_rebase(
@@ -284,6 +360,44 @@ def _valid_preexisting_rebase(
     assert _git(writer / ".claude", "checkout", "-q", "operator-work").returncode == 0
     assert _git(writer / ".claude", "rebase", "ai-state").returncode != 0
     return writer, rebase_file
+
+
+def _diverged_branches(
+    script: Path, tmp_path: Path, remote: Path, name: str
+) -> tuple[Path, str]:
+    """Create a writer whose ``ai-state`` and ``operator-work`` branches edit one
+    file differently, with ``ai-state`` checked out and a clean tree."""
+    writer = _new_writer(script, tmp_path, remote, name)
+    nested = writer / ".claude"
+    relpath = "plans/operator-merge.md"
+    assert _git(nested, "config", "user.name", "Test").returncode == 0
+    assert _git(nested, "config", "user.email", "test@example.com").returncode == 0
+    _write(writer, relpath, "base\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    assert _git(nested, "checkout", "-qb", "operator-work").returncode == 0
+    _write(writer, relpath, "operator\n")
+    assert _git(nested, "add", "-A").returncode == 0
+    assert _git(nested, "commit", "-qm", "operator").returncode == 0
+    assert _git(nested, "checkout", "-q", "ai-state").returncode == 0
+    _write(writer, relpath, "sync\n")
+    assert _git(nested, "add", "-A").returncode == 0
+    assert _git(nested, "commit", "-qm", "sync").returncode == 0
+    return writer, relpath
+
+
+def _valid_preexisting_merge(
+    script: Path, tmp_path: Path, remote: Path, name: str
+) -> tuple[Path, str]:
+    """Create a real conflicted merge that represents active operator work."""
+    writer, relpath = _diverged_branches(script, tmp_path, remote, name)
+    nested = writer / ".claude"
+    assert _git(nested, "merge", "operator-work").returncode != 0
+    assert (nested / ".git" / "MERGE_HEAD").is_file()
+    stages = {
+        line.split()[2] for line in _git(nested, "ls-files", "-u").stdout.splitlines()
+    }
+    assert stages == {"1", "2", "3"}
+    return writer, relpath
 
 
 def test_checkpoint_commits_locally_without_remote_io(
@@ -1627,8 +1741,7 @@ def test_pre_rebase_checkpoint_rechecks_active_rebase(
     assert _git(nested, "commit", "-qm", "late sync").returncode == 0
     assert _git(nested, "checkout", "-q", "late-operator-work").returncode == 0
     before_remote = _git(remote, "rev-parse", "ai-state").stdout
-    error_log = nested / "session_logs" / "hooks-errors.log"
-    before_error_log = error_log.read_bytes() if error_log.exists() else None
+    before_error_log = _error_log_lines(writer)
     actual_git = shutil.which("git")
     assert actual_git is not None
     fake_bin = tmp_path / "late-rebase-bin"
@@ -1676,6 +1789,7 @@ def test_pre_rebase_checkpoint_rechecks_active_rebase(
     assert result.returncode == 0
     assert result.stdout == ""
     assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert "rebase --quit" not in result.stderr
     assert not any(
         line.split(maxsplit=1)[0] in {"add", "commit", "pull", "push"}
         for line in invocation_lines[rebase_start + 1 :]
@@ -1693,10 +1807,9 @@ def test_pre_rebase_checkpoint_rechecks_active_rebase(
                 actual_rebase / path.relative_to(protected_rebase)
             ).read_bytes() == (path.read_bytes())
     assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
-    if before_error_log is None:
-        assert not error_log.exists()
-    else:
-        assert error_log.read_bytes() == before_error_log
+    (logged,) = _appended_error_lines(writer, before_error_log)
+    assert "pre-existing rebase state is ambiguous" in logged
+    assert "rebase --abort" in logged
 
 
 def test_rebase_abort_alone_cannot_clear_half_initialized_state(
@@ -1784,8 +1897,7 @@ def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
     before_worktree = _worktree_snapshot(writer)
     before_metadata = _rebase_metadata(writer)
     before_remote = _git(remote, "rev-parse", "ai-state").stdout
-    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
-    before_error_log = error_log.read_bytes() if error_log.exists() else None
+    before_error_log = _error_log_lines(writer)
     actual_git = shutil.which("git")
     assert actual_git is not None
     fake_bin = tmp_path / "fake-bin"
@@ -1813,6 +1925,7 @@ def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
     assert result.returncode == 0
     assert result.stdout == ""
     assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert "rebase --quit" not in result.stderr
     assert not invocations.exists()
     assert _local_head(writer) == before_head
     assert _git(writer / ".claude", "ls-files", "--stage").stdout == before_index
@@ -1824,77 +1937,107 @@ def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
     assert _worktree_snapshot(writer) == before_worktree
     assert _rebase_metadata(writer) == before_metadata
     assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
-    if before_error_log is None:
-        assert not error_log.exists()
-    else:
-        assert error_log.read_bytes() == before_error_log
+    (logged,) = _appended_error_lines(writer, before_error_log)
+    assert "pre-existing rebase state is ambiguous" in logged
+    assert "rebase --abort" in logged
 
 
-def test_current_pull_recovery_reports_distinct_abort_and_quit_failures(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize(
+    "mode",
+    ("setup", "pull", "checkpoint", "publish", "push", "migrate-from-hf"),
+)
+def test_mutating_entrypoints_preserve_valid_preexisting_merge(
+    script: Path, tmp_path: Path, mode: str
 ) -> None:
-    """Current-pull recovery preserves both abort and quit diagnostics."""
+    """Every mutating entry point leaves an operator's conflicted merge untouched,
+    runs no Git command, and logs one warning that advises ``--continue`` or ``--abort``."""
     remote = _bare_remote(tmp_path)
-    writer = _new_writer(script, tmp_path, remote, "recovery-failure")
-    _write(writer, "plans/published.md", "published\n")
-    assert _sync(script, writer, remote, "push").returncode == 0
-    assert not (writer / ".claude" / ".git" / "rebase-merge").exists()
-    assert not (writer / ".claude" / ".git" / "rebase-apply").exists()
-    actual_git = shutil.which("git")
-    assert actual_git is not None
-    fake_bin = tmp_path / "fake-bin"
-    fake_bin.mkdir()
-    fake_git = fake_bin / "git"
-    invocations = tmp_path / "git-invocations.log"
-    fake_git.write_text(
-        "#!/usr/bin/env bash\n"
-        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
-        'if [[ "$3" == "pull" ]]; then\n'
-        '  mkdir -p "$2/.git/rebase-merge"\n'
-        '  printf "current-pull\\n" > "$2/.git/rebase-merge/head-name"\n'
-        "  printf 'forced current pull failure\\n' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        'if [[ "$3" == "rebase" && "$4" == "--abort" ]]; then\n'
-        "  printf 'forced abort recovery failure\\n' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        'if [[ "$3" == "rebase" && "$4" == "--quit" ]]; then\n'
-        "  printf 'forced quit recovery failure\\n' >&2\n"
-        "  exit 1\n"
-        "fi\n"
-        f'exec "{actual_git}" "$@"\n'
-    )
-    fake_git.chmod(0o755)
+    writer, _ = _valid_preexisting_merge(script, tmp_path, remote, mode)
+    nested = writer / ".claude"
+    before_head = _local_head(writer)
+    before_index = _git(nested, "ls-files", "--stage").stdout
+    before_merge_head = (nested / ".git" / "MERGE_HEAD").read_bytes()
+    before_status = _git(nested, "status", "--porcelain=v1", "-z").stdout
+    before_worktree = _worktree_snapshot(writer)
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+    before_error_log = _error_log_lines(writer)
+    env, invocations = _recording_git(tmp_path)
 
-    result = _sync(
-        script,
-        writer,
-        remote,
-        "pull",
-        extra_env={
-            "GIT_INVOCATIONS": str(invocations),
-            "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        },
-    )
-    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+    result = _sync(script, writer, remote, mode, extra_env=env)
 
     assert result.returncode == 0
+    assert result.stdout == ""
     assert (
-        "leftover rebase state from a failed reconciliation could not be cleared"
+        "an unfinished merge is in progress; state sync will not alter it"
         in result.stderr
     )
-    assert f"git -C {writer / '.claude'} rebase --quit" in result.stderr
-    assert "pull: up to date" not in result.stderr
-    assert error_log.exists()
-    assert "forced abort recovery failure" in error_log.read_text()
-    assert "forced quit recovery failure" in error_log.read_text()
-    rebase_invocations = [
-        line
-        for line in invocations.read_text().splitlines()
-        if line.startswith("rebase ")
-    ]
-    assert rebase_invocations == ["rebase --abort", "rebase --quit"]
+    assert "merge --continue" in result.stderr
+    assert "merge --abort" in result.stderr
+    assert not invocations.exists()
+    assert _local_head(writer) == before_head
+    assert _git(nested, "ls-files", "--stage").stdout == before_index
+    assert (nested / ".git" / "MERGE_HEAD").read_bytes() == before_merge_head
+    assert _git(nested, "status", "--porcelain=v1", "-z").stdout == before_status
+    assert _worktree_snapshot(writer) == before_worktree
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
+    assert _git(nested, "rev-list", "--merges", "HEAD").stdout == ""
+    (logged,) = _appended_error_lines(writer, before_error_log)
+    assert "an unfinished merge is in progress" in logged
+    assert "merge --abort" in logged
+
+
+def test_failed_pull_abort_leaves_rebase_and_keeps_settings_copy(
+    script: Path, tmp_path: Path
+) -> None:
+    """A pull conflict whose ``rebase --abort`` fails is left for the operator: no
+    ``rebase --quit`` fallback, no later commit over it, and the settings copy
+    is kept and named instead of being written back into a tree Git still owns."""
+    remote = _bare_remote(tmp_path)
+    first = _new_writer(script, tmp_path, remote, "first")
+    _write(first, "plans/x.md", "base\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    second = _new_writer(script, tmp_path, remote, "second")
+    nested = second / ".claude"
+    _write(second, "plans/x.md", "from-second\n")
+    assert _sync(script, second, remote, "checkpoint").returncode == 0
+    branch_before = _git(nested, "rev-parse", "ai-state").stdout.strip()
+    _write(first, "plans/x.md", "from-first\n")
+    assert _sync(script, first, remote, "push").returncode == 0
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"second-local\r\n")
+    env, invocations = _recording_git(
+        tmp_path, fail=("rebase", "--abort"), delete_after_pull=settings
+    )
+
+    result = _sync(script, second, remote, "pull", extra_env=env)
+
+    assert result.returncode == 0
+    assert _logged_calls(invocations, "rebase") == ["rebase --abort"]
+    assert (nested / ".git" / "rebase-merge").is_dir()
+    assert _git(nested, "rev-parse", "ai-state").stdout.strip() == branch_before
+    copies = list((nested / ".git").glob("settings.local.json.*"))
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == b"second-local\r\n"
+    assert str(copies[0]) in result.stderr
+    assert not settings.exists()
+    assert "rebase --continue" in result.stderr
+    assert "rebase --abort" in result.stderr
+    assert "rebase --quit" not in result.stderr
+    assert "forced rebase --abort failure" in "\n".join(_error_log_lines(second))
+    before_head = _local_head(second)
+    before_count = _git(nested, "rev-list", "--all", "--count").stdout
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+
+    checkpoint = _sync(script, second, remote, "checkpoint")
+    push = _sync(script, second, remote, "push")
+
+    assert checkpoint.returncode == 0
+    assert "pre-existing rebase state is ambiguous" in checkpoint.stderr
+    assert _local_head(second) == before_head
+    assert _git(nested, "rev-list", "--all", "--count").stdout == before_count
+    assert _git(nested, "ls-files", "-u").stdout != ""
+    assert push.returncode == 0
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
 
 
 def test_failed_pull_without_rebase_does_not_attempt_recovery(
@@ -1948,6 +2091,187 @@ def test_status_reports_rebase_state(script: Path, tmp_path: Path) -> None:
 
     assert "rebase: in-progress" in in_progress.stdout
     assert "rebase: none" in clear.stdout
+    assert "merge: none" in in_progress.stdout
+    assert "merge: none" in clear.stdout
+
+
+def test_status_reports_merge_state(script: Path, tmp_path: Path) -> None:
+    """Status exposes an unfinished merge on the line after ``rebase:``."""
+    remote = _bare_remote(tmp_path)
+    uninitialized = tmp_path / "uninitialized"
+    uninitialized.mkdir()
+    writer, _ = _valid_preexisting_merge(script, tmp_path, remote, "status-merge")
+
+    fresh = _sync(script, uninitialized, None, "status")
+    in_progress = _sync(script, writer, remote, "status")
+    assert _git(writer / ".claude", "merge", "--abort").returncode == 0
+    clear = _sync(script, writer, remote, "status")
+
+    assert "rebase: none\nmerge: none\n" in fresh.stdout
+    assert "rebase: none\nmerge: in-progress\n" in in_progress.stdout
+    assert "rebase: none\nmerge: none\n" in clear.stdout
+
+
+def test_fresh_setup_with_unabortable_merge_neither_commits_nor_restores(
+    script: Path, tmp_path: Path
+) -> None:
+    """A fresh setup whose unrelated-history merge conflicts and cannot be aborted
+    leaves the merge for the operator: no commit over the markers, no adapter
+    restore, and the settings copy kept and named."""
+    remote = _bare_remote(tmp_path)
+    publisher = _new_writer(script, tmp_path, remote, "publisher")
+    _write(publisher, "plans/x.md", "from-publisher\n")
+    assert _sync(script, publisher, remote, "push").returncode == 0
+    root = tmp_path / "fresh"
+    consumer_script = _install_pull_runtime(root)
+    adapter_source = _write_github_adapter_source(root)
+    _write(root, "plans/x.md", "from-fresh\n")
+    nested = root / ".claude"
+    (nested / SETTINGS_LOCAL).write_bytes(b"fresh-local\r\n")
+    env, invocations = _recording_git(tmp_path, fail=("merge", "--abort"))
+
+    result = _sync(consumer_script, root, remote, "setup", extra_env=env)
+
+    assert result.returncode == 0
+    assert adapter_source.is_file()
+    assert _logged_calls(invocations, "merge") == ["merge -q", "merge --abort"]
+    assert (nested / ".git" / "MERGE_HEAD").is_file()
+    assert _local_commit_count(root) == 1
+    assert _git(nested, "log", "-1", "--format=%s").stdout.strip() == (
+        "bootstrap: init ai-state"
+    )
+    assert _git(nested, "rev-list", "--merges", "HEAD").stdout == ""
+    assert not (root / ".github").exists()
+    copies = list((nested / ".git").glob("settings.local.json.*"))
+    assert len(copies) == 1
+    assert copies[0].read_bytes() == b"fresh-local\r\n"
+    assert str(copies[0]) in result.stderr
+    assert "merge --continue" in result.stderr
+    assert "merge --abort" in result.stderr
+    assert "setup failed; continuing." in result.stderr
+    before_head = _local_head(root)
+
+    checkpoint = _sync(consumer_script, root, remote, "checkpoint")
+
+    assert checkpoint.returncode == 0
+    assert "an unfinished merge is in progress" in checkpoint.stderr
+    assert _local_head(root) == before_head
+    assert _local_commit_count(root) == 1
+
+
+def test_failed_unrelated_merge_without_merge_state_restores_settings(
+    script: Path, tmp_path: Path
+) -> None:
+    """A merge that fails before it creates ``MERGE_HEAD`` has nothing to abort:
+    no ``merge --abort`` runs, nothing is reported as left in place, and the
+    settings file keeps its bytes with no copy left under ``.git``."""
+    remote = _bare_remote(tmp_path)
+    publisher = _new_writer(script, tmp_path, remote, "publisher")
+    _write(publisher, "plans/x.md", "from-publisher\n")
+    assert _sync(script, publisher, remote, "push").returncode == 0
+    root = tmp_path / "fresh"
+    _write(root, "plans/x.md", "from-fresh\n")
+    nested = root / ".claude"
+    settings = nested / SETTINGS_LOCAL
+    settings.write_bytes(b"fresh-local\r\n")
+    env, invocations = _recording_git(tmp_path, fail=("merge", "-q"))
+
+    result = _sync(script, root, remote, "setup", extra_env=env)
+
+    assert result.returncode == 0
+    assert _logged_calls(invocations, "merge") == ["merge -q"]
+    assert "could not be merged automatically" in result.stderr
+    assert "left in place" not in result.stderr
+    assert not (nested / ".git" / "MERGE_HEAD").exists()
+    assert settings.read_bytes() == b"fresh-local\r\n"
+    assert list((nested / ".git").glob("settings.local.json.*")) == []
+
+
+def test_unrelated_history_merge_commits_local_changes_first(
+    script: Path, tmp_path: Path
+) -> None:
+    """The unrelated-history merge starts from a committed tree: an uncommitted
+    local file is in the merge commit's first parent, not added after the merge."""
+    remote = _bare_remote(tmp_path)
+    peer = _new_writer(script, tmp_path, remote, "peer")
+    _write(peer, "plans/remote.md", "from-remote\n")
+    assert _sync(script, peer, remote, "push").returncode == 0
+    writer = tmp_path / "local-first"
+    (writer / ".claude").mkdir(parents=True)
+    _write(writer, "plans/base.md", "base\n")
+    assert _sync(script, writer, None, "checkpoint").returncode == 0
+    nested = writer / ".claude"
+    assert _git(nested, "remote", "add", "origin", str(remote)).returncode == 0
+    _write(writer, "plans/dirty.md", "written, not committed\n")
+
+    result = _sync(script, writer, remote, "pull")
+
+    assert result.returncode == 0, result.stderr
+    _, *parents = _git(
+        nested, "rev-list", "--parents", "-n", "1", "HEAD"
+    ).stdout.split()
+    assert len(parents) == 2, "HEAD must be the merge commit itself"
+    first_parent, second_parent = parents
+    assert (
+        _git(nested, "show", f"{first_parent}:plans/dirty.md").stdout
+        == "written, not committed\n"
+    )
+    assert _git(nested, "show", f"{second_parent}:plans/remote.md").returncode == 0
+    assert _git(nested, "status", "--porcelain").stdout == ""
+    assert (nested / "plans" / "remote.md").read_text() == "from-remote\n"
+    assert (nested / "plans" / "dirty.md").read_text() == "written, not committed\n"
+
+
+def test_commit_refuses_while_a_merge_is_unfinished(
+    script: Path, tmp_path: Path
+) -> None:
+    """The backstop in ``commit_local_state``: a merge that starts after the entry
+    guard ran (here inside the adapter restore before the post-pull checkpoint)
+    is never committed over, and no staging or untrack call touches it."""
+    remote = _bare_remote(tmp_path)
+    writer, _ = _diverged_branches(script, tmp_path, remote, "late-merge")
+    nested = writer / ".claude"
+    script.with_name("restore-root-adapters.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        f'git -C "{nested}" merge operator-work >/dev/null 2>&1 || true\n'
+    )
+    before_head = _local_head(writer)
+    env, invocations = _recording_git(tmp_path)
+
+    result = _sync(script, writer, remote, "pull", "--local-only", extra_env=env)
+
+    calls = invocations.read_text().splitlines()
+    assert result.returncode == 0
+    assert "not committing over it" in result.stderr
+    assert "post-pull checkpoint failed" in result.stderr
+    assert (nested / ".git" / "MERGE_HEAD").is_file()
+    assert _local_head(writer) == before_head
+    assert _git(nested, "rev-list", "--merges", "HEAD").stdout == ""
+    assert calls[-1] == "merge operator-work"
+
+
+def test_checkpoint_refuses_unmerged_index_left_by_rebase_quit(
+    script: Path, tmp_path: Path
+) -> None:
+    """``rebase --quit`` leaves a detached HEAD with an unmerged index and no
+    rebase folder. No marker file shows it, so ``commit_local_state`` finds it
+    through the index and refuses to commit the conflict markers."""
+    remote = _bare_remote(tmp_path)
+    writer, _ = _valid_preexisting_rebase(script, tmp_path, remote, "quit-leftover")
+    nested = writer / ".claude"
+    assert _git(nested, "rebase", "--quit").returncode == 0
+    assert not (nested / ".git" / "rebase-merge").exists()
+    assert _git(nested, "ls-files", "-u").stdout != ""
+    before_head = _local_head(writer)
+    before_count = _git(nested, "rev-list", "--all", "--count").stdout
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0
+    assert "not committing over it" in result.stderr
+    assert _local_head(writer) == before_head
+    assert _git(nested, "rev-list", "--all", "--count").stdout == before_count
+    assert _git(nested, "ls-files", "-u").stdout != ""
 
 
 def test_restore_root_adapters_parses_inert_paths_and_preserves_tracked_files(

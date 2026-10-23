@@ -501,6 +501,26 @@ separate file and stays tracked and union-merged like every other
 
 If a sync is killed (for example by the hook timeout), the copy can be left under `.claude/.git/`. Copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
 
+State sync never commits while a rebase or merge is unfinished in `.claude`, or
+while `git ls-files -u` lists unmerged paths (for example a conflicted
+cherry-pick, revert, or `stash pop`). It warns `... not committing over it.
+Inspect with: git -C <.claude> status.` A rebase or merge already in progress
+when a mutating mode starts is left alone: the mode exits 0, changes nothing,
+and logs one warning to `.claude/session_logs/hooks-errors.log`. The one
+exception is the orphaned autostash leftover (a `rebase-merge` folder that holds
+only an `autostash` file), which state sync clears with `rebase --quit` before
+it continues. The warning advises `rebase --continue` or `rebase --abort`, or
+`merge --continue` after fixing conflicts or `merge --abort`. If state sync's
+own pull conflicts and `rebase --abort` fails, it does not fall back to
+`rebase --quit`. It leaves the rebase in place and does not write
+`settings.local.json` back. The warning names the copy kept under
+`.claude/.git/`; copy it back after you resolve the rebase. The
+unrelated-history merge behaves the same when a started merge cannot be
+aborted, and `setup` then stops before restoring root adapters or committing.
+Before merging an unrelated `origin/ai-state` history, state sync commits local
+changes first. `status` prints `merge: none` or `merge: in-progress` right
+after the `rebase:` line.
+
 For generated Codex and Claude hooks, verify one runtime-specific Stop wrapper
 runs sequentially for each turn: session log, session-log check, `checkpoint`,
 then best-effort `publish`. Codex stdout must be exactly one valid JSON object;

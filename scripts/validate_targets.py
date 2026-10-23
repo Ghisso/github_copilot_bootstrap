@@ -1440,6 +1440,53 @@ def reporting_reminder_hook_errors(hooks: object, target: str) -> list[str]:
     return errors
 
 
+def state_sync_text_errors(text: str) -> list[str]:
+    """Return literal-invocation failures for the generated state-sync.sh."""
+    errors: list[str] = []
+    check(
+        text.count('git -C "$CLAUDE_DIR" rebase --quit') == 1,
+        "state-sync.sh must invoke rebase --quit exactly once, for the orphan "
+        "autostash auto-clear; the current pull's recovery must use rebase "
+        "--abort only",
+        errors,
+    )
+    check(
+        "rebase --abort 2>/dev/null || true" not in text,
+        "state-sync.sh must not silently discard failed rebase aborts",
+        errors,
+    )
+    check(
+        "merge --abort 2>/dev/null || true" not in text,
+        "state-sync.sh must not silently discard failed merge aborts",
+        errors,
+    )
+    check(
+        "--autostash" not in text,
+        "state-sync.sh must not contain --autostash",
+        errors,
+    )
+    check(
+        'output="$(git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH" 2>&1)"' in text,
+        "state-sync.sh must use the exact rebase pull invocation",
+        errors,
+    )
+    check(
+        "configure_outer_hooks_path" in text
+        and 'git -C "$REPO_ROOT" config core.hooksPath "$hooks_path"' in text,
+        "state-sync.sh must configure the outer repository's core.hooksPath",
+        errors,
+    )
+    check(
+        "session_logs/hooks-errors.log" in text
+        and 'git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- '
+        ".cache session_logs/hooks-errors.log settings.local.json"
+        in text,
+        "state-sync.sh must gitignore and untrack the local-only error log",
+        errors,
+    )
+    return errors
+
+
 def reporting_reminder_script_errors(text: str) -> list[str]:
     """Return errors when the generated reminder script drifts from its contract."""
     errors: list[str] = []
@@ -3290,41 +3337,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
     if state_sync_claude.exists():
-        state_sync_text = read(state_sync_claude)
-        check(
-            'git -C "$CLAUDE_DIR" rebase --quit' in state_sync_text,
-            "state-sync.sh must use the literal rebase --quit recovery invocation",
-            errors,
-        )
-        check(
-            "rebase --abort 2>/dev/null || true" not in state_sync_text,
-            "state-sync.sh must not silently discard failed rebase aborts",
-            errors,
-        )
-        check(
-            "--autostash" not in state_sync_text,
-            "state-sync.sh must not contain --autostash",
-            errors,
-        )
-        check(
-            'output="$(git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH" 2>&1)"'
-            in state_sync_text,
-            "state-sync.sh must use the exact rebase pull invocation",
-            errors,
-        )
-        check(
-            "configure_outer_hooks_path" in state_sync_text
-            and 'git -C "$REPO_ROOT" config core.hooksPath "$hooks_path"'
-            in state_sync_text,
-            "state-sync.sh must configure the outer repository's core.hooksPath",
-            errors,
-        )
-        check(
-            "session_logs/hooks-errors.log" in state_sync_text
-            and "untrack_error_log" in state_sync_text,
-            "state-sync.sh must gitignore and untrack the local-only error log",
-            errors,
-        )
+        errors.extend(state_sync_text_errors(read(state_sync_claude)))
 
     # Run generated Stop wrappers instead of relying on text searches: Codex
     # needs one JSON response, while Claude must leave stdout empty.

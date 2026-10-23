@@ -163,8 +163,9 @@ network failures produce warnings and leave the commit local; publish it later
 with `state-sync.sh push` or the manual VS Code task. Normal Stop-hook runs do
 not originate installer updates, but their `git add -A` commits any uncommitted
 nested changes — including locally modified bootstrap-controlled files — as
-session state. Clean installer/updater commits and the normal pull/rebase flow
-are the intended protection.
+session state. It commits nothing while a rebase or merge is unfinished in
+`.claude`, or while unmerged paths remain. Clean installer/updater commits and
+the normal pull/rebase flow are the intended protection.
 
 To refresh a consumer completely while working offline or before an explicit
 review, use `--local-only`:
