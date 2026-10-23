@@ -24,6 +24,23 @@ Unblock long-running plans whose first phases were completed before closeout rec
 
 ## Stale-claims surfaces checked
 
+- `CLAUDE.md`: clean.
+- `AGENTS.md`: clean.
+- `README.md`: fixed; an upgrade paragraph for plans begun before 2026-08-29, and the "across every completed phase" claim qualified (I re-wrapped one line).
+- `docs/runtime-checks.md`: fixed; the closeout-receipt paragraph notes pre-cutoff phases have none, and a new paragraph after "Historical receipt-chain validation" states the full rule, the reason, and the user's approval. Its line saying the walk covers "every earlier completed phase" stays, with the exception stated right after it.
+- `docs/smoke-tests.md`, `docs/architecture.md`: fixed; short qualifiers.
+- Other undated `docs/` files: clean.
+- `shared/policies/workflow.instructions.md`: fixed (two places); line 435 (log bytes hashed into the chain) is still true.
+- `shared/policies/quality-and-testing.instructions.md`: fixed; the Push / PR row qualified.
+- `shared/skills/` (including `commit` and `safe-consumer-bootstrap-refresh`): clean; `commit` says every phase must be terminal at final closeout, which is still true.
+- `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, state READMEs under `shared/`: clean.
+- `shared/hooks/scripts/_lib-frontmatter.sh` comment: fixed in step 2.
+- `scripts/validate_targets.py` comment about the removed "free pass" (~6685-6694): still accurate; its scenario uses undated slugs.
+- Installed `.claude/` copies of the policies and scripts: refreshed by the self-install before closeout.
+- `.claude/MEMORY.md`: no entry stated the old rule; the new `[LEARN:verification]` entry describes the new one.
+- `openwiki/operations/deterministic-verification.md` (~157, "walks every earlier completed phase") and `openwiki/workflows/lifecycle-and-task-lanes.md` (~115, "across every completed phase"): stale, left for the next knowledge-refresh phase; OpenWiki pages change only through OpenWiki's tools, and a one-phase plan gets no refresh phase.
+- Dated records (archived plans, closed session logs, `docs/2026-*`): left unchanged.
+
 ## Verification
 
 ## Open Questions / Next Steps
