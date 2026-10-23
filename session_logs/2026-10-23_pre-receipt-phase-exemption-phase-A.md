@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-23
 **Plan:** `.claude/plans/2026-10-23_phase-A-pre-receipt-phase-exemption.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -47,6 +47,16 @@ Unblock long-running plans whose first phases were completed before closeout rec
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS        9.2s  uv run pytest tests/test_verify.py -q --tb=short
+PASS       49.2s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      325.6s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-10-23_phase-A-pre-receipt-phase-exemption.json` (one MINOR, disposition `fixed`; gate PASS; six profiles).
 - optional 1: PASS — read-only probe of the real consumer (`industrial-inspection`, branch `2026-07-21_haystack-3-agent-refactor_implementation`, terminal G0, `receipt_head` `28378951c91c08abdb136f549ab6136e6919b7d6`): the updated `historical_chain_errors` returned `[]` and skipped the six July phases; nothing was written there.
 
 ## Open Questions / Next Steps
