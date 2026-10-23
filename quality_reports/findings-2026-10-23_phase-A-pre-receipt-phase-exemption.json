@@ -1,0 +1,51 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "README opener leaves 'its leading run' without an antecedent after the rewording; say 'a plan's leading run'",
+      "file": "README.md",
+      "line": 298,
+      "profile": "documentation",
+      "disposition": "fixed",
+      "reason": "README.md line 298 now reads 'skip a plan's leading run of complete phases', as the reviewer suggested."
+    }
+  ],
+  "generated_at": "2026-10-23T09:55:42Z",
+  "branch": "pre-receipt-phase-exemption_implementation",
+  "head_sha": "d911723dc33bccd04f8d34d563ff341b9aa0beb0",
+  "base_ref": "dev",
+  "merge_base_sha": "d911723dc33bccd04f8d34d563ff341b9aa0beb0",
+  "phase": "2026-10-23_phase-A-pre-receipt-phase-exemption",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "12d1582b82a55eab3fe2baf65c5373460b9e14a2",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/policies/quality-and-testing.instructions.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/scripts/verify.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
