@@ -9549,6 +9549,17 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "devcontainer must bind-mount the host OpenWiki configuration directory",
             errors,
         )
+        check(
+            data.get("initializeCommand")
+            == [
+                "mkdir",
+                "-p",
+                "${localEnv:HOME}/.openwiki",
+                "${localEnv:HOME}/.cache/huggingface",
+            ],
+            "devcontainer must create its bind-mount source folders on the host",
+            errors,
+        )
         unexpected_env_keys = sorted(set(container_env) - ALLOWED_DEVCONTAINER_ENV_KEYS)
         check(
             set(container_env) <= ALLOWED_DEVCONTAINER_ENV_KEYS,

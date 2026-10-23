@@ -90,6 +90,7 @@ Expected:
 - A fresh install seeds `.claude/MEMORY.md`; repeat installs and legacy pre-git migration preserve an existing consumer `MEMORY.md` byte-for-byte.
 - Generated output contains `templates/plan-big.md`, `templates/plan-small.md`, and `templates/session-log.md`.
 - Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, `.devcontainer/state-sync.sh`, and `.devcontainer/restore-root-adapters.sh`.
+- The generated `.devcontainer/devcontainer.json` creates its bind-mount source folders (`~/.openwiki` and `~/.cache/huggingface`) on the host with a list-form `initializeCommand` (`mkdir -p`, no shell) before the container starts.
 
 ## Reporting reminders
 

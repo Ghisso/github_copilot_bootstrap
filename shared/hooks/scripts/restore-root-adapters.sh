@@ -39,6 +39,12 @@ fail() {
   exit 1
 }
 
+# canonical_path() below resolves symlinks, and the containment checks compare
+# against the resolved folder, so a symlinked root would be trusted as-is.
+CLAUDE_ROOT="$REPO_ROOT/.claude"
+[[ ! -L "$CLAUDE_ROOT" ]] || fail ".claude is a symlink; root adapters were not restored"
+[[ ! -L "$CLAUDE_ROOT/bootstrap-root" ]] || fail ".claude/bootstrap-root is a symlink; root adapters were not restored"
+
 canonical_path() {
   local path="$1"
   if [[ -d "$path" ]]; then

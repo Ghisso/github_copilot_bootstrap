@@ -137,9 +137,12 @@ def _write(root: Path, relpath: str, content: str) -> None:
     path.write_text(content)
 
 
-def _restore(root: Path) -> subprocess.CompletedProcess[str]:
-    """Run the real root-adapter restorer from its installed location."""
-    script = root / ".claude" / "hooks" / "scripts" / "restore-root-adapters.sh"
+def _restore(
+    root: Path, script_dir: str = ".claude/hooks/scripts"
+) -> subprocess.CompletedProcess[str]:
+    """Run the real root-adapter restorer from an installed location: the hooks
+    copy by default, or ``.devcontainer`` for the post-start entry point."""
+    script = root / script_dir / "restore-root-adapters.sh"
     script.parent.mkdir(parents=True, exist_ok=True)
     script.write_text(render_restore_script(RESTORE_SRC.read_text(encoding="utf-8")))
     return subprocess.run(
@@ -2662,6 +2665,65 @@ def test_restore_root_adapters_rejects_allowed_source_symlink_escape(
     assert result.returncode == 1
     assert "missing or unsafe source path: .codex" in result.stderr
     assert not (root / ".codex").exists()
+
+
+def test_restore_root_adapters_rejects_symlinked_claude_dir(tmp_path: Path) -> None:
+    """A symlinked `.claude` is refused, so nothing is copied from outside the repo."""
+    root = tmp_path / "consumer"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    _write_restore_manifest(outside, "CLAUDE.md")
+    escaped = outside / ".claude" / "bootstrap-root" / "CLAUDE.md"
+    escaped.parent.mkdir(parents=True)
+    escaped.write_text("escaped\n")
+    (root / ".claude").symlink_to(outside / ".claude", target_is_directory=True)
+
+    result = _restore(root, ".devcontainer")
+
+    assert result.returncode == 1
+    assert ".claude is a symlink" in result.stderr
+    assert not (root / "CLAUDE.md").exists()
+
+
+def test_restore_root_adapters_rejects_symlinked_bootstrap_root(
+    tmp_path: Path,
+) -> None:
+    """A symlinked `.claude/bootstrap-root` is refused, not followed outside."""
+    root = tmp_path / "consumer"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "CLAUDE.md").write_text("escaped\n")
+    _write_restore_manifest(root, "CLAUDE.md")
+    (root / ".claude" / "bootstrap-root").symlink_to(outside, target_is_directory=True)
+
+    result = _restore(root)
+
+    assert result.returncode == 1
+    assert ".claude/bootstrap-root is a symlink" in result.stderr
+    assert not (root / "CLAUDE.md").exists()
+
+
+def test_restore_root_adapters_ignores_symlinked_claude_without_content(
+    tmp_path: Path,
+) -> None:
+    """A symlinked `.claude` with nothing to restore still exits quietly.
+
+    This passes against the pre-fix script too: it guards the early
+    nothing-to-restore exit, which the symlink checks must not pre-empt.
+    """
+    root = tmp_path / "consumer"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / ".claude").symlink_to(outside, target_is_directory=True)
+    (root / ".devcontainer").mkdir()
+    before = sorted(path.name for path in root.iterdir())
+
+    result = _restore(root, ".devcontainer")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert sorted(path.name for path in root.iterdir()) == before
 
 
 def test_push_after_rebase_conflict_does_not_push(script: Path, tmp_path: Path) -> None:
