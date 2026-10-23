@@ -373,7 +373,7 @@ and `record-branch-state.sh` gate and record branch creation;
 `enforce-commit-gate.sh` and `record-commit-closeout.sh` gate the commit
 ceremony and advance the plan's current phase from the native `post-commit`
 hook; `enforce-pr-gate.sh` gates the push and PR contract, including the
-historical receipt-chain check across every completed phase;
+historical receipt-chain check across every completed phase (except a plan's leading phases whose slug and closeout log are dated before 2026-08-29 and that have no receipt file);
 `session-start-state.sh` and `stop-session-log-check.sh` provide reminders
 for stale phase and session-log state. `verify.py closeout --persist`
 refuses to write a receipt the terminal push gate could never accept when

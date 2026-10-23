@@ -294,6 +294,11 @@ than accepting or bypassing them. Recovery needs no manual receipt edit or
 gate bypass — step 1 below regenerates a valid current-schema phase receipt
 at its normal deterministic path.
 
+Phases completed before 2026-08-29 need no backfilled closeout receipts. The
+commit, push, and PR gates skip a plan's leading run of complete phases whose slug
+and closeout log are dated before that day and that have no receipt. Every
+later phase still needs one, and a receipt file that exists is always checked.
+
 After the refresh, verify the consumer's nested `.claude` repository has a
 valid `HEAD` and a clean worktree. Then regenerate evidence with the current
 runtime, in order:
@@ -1404,8 +1409,8 @@ request; `record_findings.py` refuses `PASS` while any `--open-request` is
 set. Changed paths also decide which review profiles must be present (see
 [quality and testing](shared/policies/quality-and-testing.instructions.md));
 PR/push closeout re-checks that same contract across every completed
-phase. See [Deterministic verification: verify.py modes, receipts, and
-findings](openwiki/operations/deterministic-verification.md) for the full
+phase, except a plan's leading phases that predate closeout receipts. See
+[Deterministic verification: verify.py modes, receipts, and findings](openwiki/operations/deterministic-verification.md) for the full
 receipt schema, the Ponytail metadata contract, and what each `verify.py`
 mode measures.
 

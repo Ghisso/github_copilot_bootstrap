@@ -1232,6 +1232,113 @@ def _historical_chain_fixture(tmp_path: Path) -> tuple[str, str]:
     return parent_sha, sha_b
 
 
+_PRE_RECEIPT_KINDS = frozenset({"receipt", "missing", "cancelled", "terminal", "later"})
+# The shape of a real long-running consumer plan: phases A to F were completed
+# before closeout receipts existed, G0 and G1 were completed after, and the
+# documentation phase is listed last although its slug is dated early.
+_EARLY_PHASES = [f"2026-07-21_phase-{letter}-early" for letter in "abcde"]
+_PHASE_F = "2026-07-21_phase-f-eval-benchmark-parity"
+_PHASE_G0 = "2026-09-04_phase-g0-state-sync-runtime-sync"
+_PHASE_G1 = "2026-10-23_phase-g1-compatible-dependency-refresh"
+_PHASE_G_DOC = "2026-07-21_phase-g-documentation"
+
+
+def _pre_receipt_chain_fixture(
+    tmp_path: Path, phases: list[tuple[str, str]]
+) -> dict[str, str]:
+    """Build big plan ``big`` in real Git from ordered ``(slug, kind)`` entries.
+
+    ``kind`` is ``receipt`` (complete, valid closeout receipt), ``missing``
+    (the same, with its closeout receipt file deleted), ``cancelled``,
+    ``terminal`` (exactly one: an empty commit, no files), or ``later`` (listed
+    in the plan, no commit, no files). The first receipt's ``head_sha`` is the
+    base commit; each later one is the previous phase's commit, and its
+    ``tree_sha`` is its own commit's tree, as in ``_historical_chain_fixture``.
+    Every commit is made before the ``.claude`` files are written. Returns
+    each committed slug's commit sha.
+    """
+    kinds = [kind for _, kind in phases]
+    assert set(kinds) <= _PRE_RECEIPT_KINDS and kinds.count("terminal") == 1
+    _init_repo(tmp_path)
+    previous = _commit_all(tmp_path, "base commit")
+    heads: dict[str, str] = {}
+    shas: dict[str, str] = {}
+    for slug, kind in phases:
+        if kind in {"cancelled", "later"}:
+            continue
+        if kind != "terminal":
+            (tmp_path / f"{slug}.txt").write_text(f"{slug}\n", encoding="utf-8")
+        heads[slug] = previous
+        previous = shas[slug] = _commit_all(tmp_path, f"{slug} commit")
+    _write_big_plan(tmp_path, slug="big", phases=[slug for slug, _ in phases])
+    for slug, kind in phases:
+        if kind in {"receipt", "missing"}:
+            _write_historical_phase(
+                tmp_path,
+                branch="big_implementation",
+                phase=slug,
+                parent_plan="big",
+                head_sha=heads[slug],
+                tree_sha=_git(["rev-parse", f"{shas[slug]}^{{tree}}"], tmp_path),
+            )
+        if kind == "missing":
+            _closeout_receipt_file(tmp_path, slug).unlink()
+        if kind == "cancelled":
+            evidence = tmp_path / ".claude/session_logs" / f"{slug}-cancelled.md"
+            evidence.parent.mkdir(parents=True, exist_ok=True)
+            evidence.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+            (tmp_path / ".claude/plans" / f"{slug}.md").write_text(
+                "---\n"
+                f"name: {slug}\n"
+                "type: small-plan\n"
+                "parent_plan: big\n"
+                "phase_index: 1\n"
+                "status: cancelled\n"
+                "cancelled_at: 2026-08-31T00:00:00Z\n"
+                "cancelled_reason: Work is no longer needed\n"
+                f"cancelled_evidence: .claude/session_logs/{slug}-cancelled.md\n"
+                "---\n",
+                encoding="utf-8",
+            )
+    return shas
+
+
+def _closeout_receipt_file(root: Path, slug: str) -> Path:
+    return root / ".claude/quality_reports" / f"verification-closeout-{slug}.json"
+
+
+def _edit_small_plan(root: Path, slug: str, old: str, new: str) -> None:
+    plan = root / ".claude/plans" / f"{slug}.md"
+    text = plan.read_text(encoding="utf-8")
+    assert old in text
+    plan.write_text(text.replace(old, new), encoding="utf-8")
+
+
+def _consumer_shape(terminal: str, f_slug: str = _PHASE_F) -> list[tuple[str, str]]:
+    """Return the consumer plan's phases with ``terminal`` as the last completed."""
+    names = [*_EARLY_PHASES, f_slug, _PHASE_G0, _PHASE_G1, _PHASE_G_DOC]
+    at = names.index(terminal)
+    shape = []
+    for index, name in enumerate(names):
+        if index > at:
+            kind = "later"
+        elif index == at:
+            kind = "terminal"
+        else:
+            kind = "receipt" if name in {_PHASE_G0, _PHASE_G1} else "missing"
+        shape.append((name, kind))
+    return shape
+
+
+def _historical_errors(root: Path, shas: dict[str, str], terminal: str) -> list[str]:
+    return verify.historical_chain_errors(
+        root,
+        branch="big_implementation",
+        phase=terminal,
+        receipt_head=shas[terminal],
+    )
+
+
 def test_historical_chain_accepts_ordered_completed_phase(tmp_path: Path) -> None:
     """A single earlier completed phase, built the way the real lifecycle
     produces it - head_sha is the phase's parent commit, tree_sha is the
@@ -1261,8 +1368,10 @@ def test_historical_chain_rejects_missing_receipt_head(tmp_path: Path) -> None:
 
 def test_historical_chain_rejects_missing_receipt_file(tmp_path: Path) -> None:
     """A completed historical phase with no closeout receipt at all must fail
-    closed. This is the legacy/migration boundary: a phase predating receipts
-    gets no implicit pass from the terminal receipt covering it."""
+    closed: the terminal receipt does not cover it. Its undated slug and its
+    undated log both block the leading-run skip, so this test does not isolate
+    either; ``test_historical_chain_rejects_undated_slug_with_pre_cutoff_log``
+    isolates the undated slug."""
     _, sha_b = _historical_chain_fixture(tmp_path)
     receipt_path = (
         tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
@@ -1539,6 +1648,319 @@ def test_historical_chain_rejects_ancestor_failure(tmp_path: Path) -> None:
         tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
     )
     assert any("is not an ancestor of" in error for error in errors)
+
+
+def test_historical_chain_skips_leading_pre_receipt_phases(tmp_path: Path) -> None:
+    """Completed phases dated before receipts existed, with no receipt file and
+    at the start of the plan, need no receipt. Fails against the old code with
+    ``receipt is invalid``."""
+    shas = _pre_receipt_chain_fixture(
+        tmp_path,
+        [
+            ("2026-07-21_phase-a-early", "missing"),
+            ("2026-07-22_phase-b-early", "missing"),
+            ("2026-09-04_phase-c-receipt", "receipt"),
+            ("2026-09-05_phase-d-terminal", "terminal"),
+        ],
+    )
+    assert _historical_errors(tmp_path, shas, "2026-09-05_phase-d-terminal") == []
+
+
+@pytest.mark.parametrize(
+    "terminal",
+    (_PHASE_G0, _PHASE_G1, _PHASE_G_DOC),
+    ids=("terminal-g0", "terminal-g1", "terminal-g-documentation"),
+)
+def test_historical_chain_accepts_consumer_pre_receipt_shape(
+    tmp_path: Path, terminal: str
+) -> None:
+    """The real consumer plan: phases A to F predate receipts and have none.
+    Every stage of its life passes. Fails against the old code, naming F."""
+    shas = _pre_receipt_chain_fixture(tmp_path, _consumer_shape(terminal))
+    assert _historical_errors(tmp_path, shas, terminal) == []
+
+
+def test_historical_chain_still_validates_receipt_phase_after_pre_receipt_run(
+    tmp_path: Path,
+) -> None:
+    """The skip ends at the first phase that has a receipt: deleting G0's
+    receipt is still an error. Guard: passes against the old code too."""
+    shas = _pre_receipt_chain_fixture(tmp_path, _consumer_shape(_PHASE_G1))
+    _closeout_receipt_file(tmp_path, _PHASE_G0).unlink()
+    errors = _historical_errors(tmp_path, shas, _PHASE_G1)
+    assert errors and errors[0].startswith(
+        f"historical phase {_PHASE_G0} receipt is invalid"
+    )
+
+
+def test_historical_chain_rejects_pre_cutoff_phase_after_receipt_phase(
+    tmp_path: Path,
+) -> None:
+    """A back-dated phase listed after a receipt-bearing one is not in the
+    leading run, so its missing receipt fails. Guard: passes against the old
+    code too."""
+    shas = _pre_receipt_chain_fixture(
+        tmp_path,
+        [
+            ("2026-09-04_phase-a-receipt", "receipt"),
+            ("2026-07-21_phase-b-backdated", "missing"),
+            ("2026-09-05_phase-c-terminal", "terminal"),
+        ],
+    )
+    errors = _historical_errors(tmp_path, shas, "2026-09-05_phase-c-terminal")
+    assert errors and errors[0].startswith(
+        "historical phase 2026-07-21_phase-b-backdated receipt is invalid"
+    )
+
+
+def test_historical_chain_rejects_pre_cutoff_phase_after_pre_cutoff_receipt(
+    tmp_path: Path,
+) -> None:
+    """A receipt on an early phase also ends the run: a pre-cutoff phase
+    listed after it still needs its receipt. Guard: passes against the old
+    code too."""
+    shas = _pre_receipt_chain_fixture(
+        tmp_path,
+        [
+            ("2026-07-20_phase-a-receipt", "receipt"),
+            ("2026-07-21_phase-b-missing", "missing"),
+            ("2026-09-05_phase-c-terminal", "terminal"),
+        ],
+    )
+    errors = _historical_errors(tmp_path, shas, "2026-09-05_phase-c-terminal")
+    assert errors and errors[0].startswith(
+        "historical phase 2026-07-21_phase-b-missing receipt is invalid"
+    )
+
+
+@pytest.mark.parametrize(
+    ("case", "expected"),
+    (
+        ("not-json", "historical phase 2026-07-21_phase-a-early receipt is invalid"),
+        ("tampered-findings", "was tampered with"),
+        (
+            "broken-symlink",
+            "historical phase 2026-07-21_phase-a-early receipt is invalid",
+        ),
+    ),
+    ids=("not-json", "tampered-findings", "broken-symlink"),
+)
+def test_historical_chain_rejects_invalid_pre_cutoff_receipt(
+    tmp_path: Path, case: str, expected: str
+) -> None:
+    """Any directory entry at the receipt path, even a malformed file, a
+    tampered artifact, or a broken symlink, is a receipt: it is validated, not
+    skipped. Guard: passes against the old code too; the symlink case also
+    fails if the receipt test follows links (``Path.exists``)."""
+    early, terminal = "2026-07-21_phase-a-early", "2026-09-04_phase-b-terminal"
+    shas = _pre_receipt_chain_fixture(
+        tmp_path, [(early, "receipt"), (terminal, "terminal")]
+    )
+    receipt = _closeout_receipt_file(tmp_path, early)
+    if case == "not-json":
+        receipt.write_text("not json", encoding="utf-8")
+    elif case == "tampered-findings":
+        (tmp_path / f".claude/quality_reports/findings-{early}.json").write_text(
+            '{"tampered": true}', encoding="utf-8"
+        )
+    else:
+        receipt.unlink()
+        receipt.symlink_to(receipt.parent / "missing-target.json")
+    errors = _historical_errors(tmp_path, shas, terminal)
+    assert errors and expected in errors[0]
+
+
+@pytest.mark.parametrize(
+    ("slug_day", "log_day", "skipped"),
+    (
+        ("2026-08-28", "2026-08-28", True),
+        ("2026-08-29", "2026-08-28", False),
+        ("2026-08-28", "2026-08-29", False),
+    ),
+    ids=("both-before-cutoff", "slug-on-cutoff-day", "log-on-cutoff-day"),
+)
+def test_historical_chain_receipt_cutoff_boundary(
+    tmp_path: Path, slug_day: str, log_day: str, skipped: bool
+) -> None:
+    """The cutoff is strict for the slug date and for the closeout log date
+    alone: 2026-08-28 is skipped, 2026-08-29 (the day receipts began) is
+    checked. The first case fails against the old code with ``receipt is
+    invalid``; the others are guards."""
+    early, terminal = f"{slug_day}_phase-a-early", "2026-09-05_phase-c-terminal"
+    shas = _pre_receipt_chain_fixture(
+        tmp_path,
+        [
+            (early, "missing"),
+            ("2026-09-04_phase-b-receipt", "receipt"),
+            (terminal, "terminal"),
+        ],
+    )
+    _edit_small_plan(
+        tmp_path,
+        early,
+        f"session_logs/{early}-closeout.md",
+        f"session_logs/{log_day}_phase-a-early.md",
+    )
+    errors = _historical_errors(tmp_path, shas, terminal)
+    if skipped:
+        assert errors == []
+    else:
+        assert errors and errors[0].startswith(
+            f"historical phase {early} receipt is invalid"
+        )
+
+
+def test_historical_chain_allows_cancelled_phase_inside_pre_receipt_run(
+    tmp_path: Path,
+) -> None:
+    """A cancelled phase does not end the leading run: the early phase after
+    it is still skipped. Fails against the old code, naming phase C."""
+    shas = _pre_receipt_chain_fixture(
+        tmp_path,
+        [
+            ("2026-07-20_phase-a-early", "missing"),
+            ("2026-07-21_phase-b-cancelled", "cancelled"),
+            ("2026-07-22_phase-c-early", "missing"),
+            ("2026-09-04_phase-d-receipt", "receipt"),
+            ("2026-09-05_phase-e-terminal", "terminal"),
+        ],
+    )
+    assert _historical_errors(tmp_path, shas, "2026-09-05_phase-e-terminal") == []
+
+
+def test_historical_chain_rejects_incomplete_pre_cutoff_phase(tmp_path: Path) -> None:
+    """An early phase that is not complete is never skipped. Guard: passes
+    against the old code too."""
+    early, terminal = "2026-07-21_phase-a-early", "2026-09-04_phase-b-terminal"
+    shas = _pre_receipt_chain_fixture(
+        tmp_path, [(early, "missing"), (terminal, "terminal")]
+    )
+    _edit_small_plan(tmp_path, early, "status: complete", "status: planned")
+    errors = _historical_errors(tmp_path, shas, terminal)
+    assert errors and errors[0].startswith(
+        f"historical phase {early} is neither complete nor cancelled"
+    )
+
+
+def test_historical_chain_rejects_undated_slug_with_pre_cutoff_log(
+    tmp_path: Path,
+) -> None:
+    """An undated slug is never skipped, even when its closeout log is dated
+    before the cutoff and its plan is complete. Isolates the slug-date
+    condition. Guard: passes against the old code too; fails if the new code
+    lets an undated slug qualify."""
+    early, terminal = "phase-a-early", "2026-09-04_phase-b-terminal"
+    shas = _pre_receipt_chain_fixture(
+        tmp_path, [(early, "missing"), (terminal, "terminal")]
+    )
+    _edit_small_plan(
+        tmp_path,
+        early,
+        f"session_logs/{early}-closeout.md",
+        "session_logs/2026-07-21_phase-a-early.md",
+    )
+    errors = _historical_errors(tmp_path, shas, terminal)
+    assert errors and errors[0].startswith(
+        f"historical phase {early} receipt is invalid"
+    )
+
+
+def test_historical_chain_reports_missing_plan_file_in_pre_receipt_run(
+    tmp_path: Path,
+) -> None:
+    """A leading phase whose small plan file is gone is not skipped: the walk
+    reports the missing plan. Guard: passes against the old code too; fails if
+    the count carries on past an unreadable plan."""
+    early, terminal = "2026-07-21_phase-a-early", "2026-09-04_phase-b-terminal"
+    shas = _pre_receipt_chain_fixture(
+        tmp_path, [(early, "missing"), (terminal, "terminal")]
+    )
+    (tmp_path / ".claude/plans" / f"{early}.md").unlink()
+    errors = _historical_errors(tmp_path, shas, terminal)
+    assert errors and errors[0].startswith(
+        f"historical phase {early} is missing its plan file"
+    )
+
+
+@pytest.mark.parametrize(
+    ("log_line", "expected"),
+    (
+        (
+            "closeout_session_log: .claude/session_logs/2026-10-23_phase-a-early.md",
+            "historical phase 2026-07-21_phase-a-early receipt is invalid",
+        ),
+        (
+            "closeout_session_log: .claude/session_logs/phase-a-early.md",
+            "historical phase 2026-07-21_phase-a-early receipt is invalid",
+        ),
+        (
+            "closeout_session_log:",
+            "historical phase 2026-07-21_phase-a-early is neither complete nor cancelled",
+        ),
+    ),
+    ids=("log-dated-after-cutoff", "log-name-undated", "log-empty"),
+)
+def test_historical_chain_rejects_pre_cutoff_phase_with_later_closeout_log(
+    tmp_path: Path, log_line: str, expected: str
+) -> None:
+    """A slug dated before the cutoff is a planning date. The phase is skipped
+    only if its closeout log is dated before the cutoff too: a log dated
+    later, with no date, or with no value is not skipped. Guard: passes
+    against the old code too; the first two fail if the new code ignores the
+    log's date. An empty log value is also not a complete plan."""
+    early, terminal = "2026-07-21_phase-a-early", "2026-09-04_phase-b-terminal"
+    shas = _pre_receipt_chain_fixture(
+        tmp_path, [(early, "missing"), (terminal, "terminal")]
+    )
+    _edit_small_plan(
+        tmp_path,
+        early,
+        f"closeout_session_log: .claude/session_logs/{early}-closeout.md",
+        log_line,
+    )
+    errors = _historical_errors(tmp_path, shas, terminal)
+    assert errors and errors[0].startswith(expected)
+
+
+@pytest.mark.parametrize(
+    ("early_f", "walks_f"),
+    ((_PHASE_F, False), ("2026-08-29_phase-f-eval-benchmark-parity", True)),
+    ids=("f-before-cutoff", "f-on-cutoff-day"),
+)
+def test_gate_receipt_errors_skips_consumer_pre_receipt_run(
+    tmp_path: Path, early_f: str, walks_f: bool
+) -> None:
+    """The public gate, on the consumer's terminal-G0 shape, reaches the walk
+    and skips A to F. With F dated on the cutoff day the walk reports F, which
+    proves the fixture reaches it. Other gate errors from this minimal
+    fixture, such as the missing ``dev`` merge base, are not asserted. The
+    first case fails against the old code; the second is a guard."""
+    shas = _pre_receipt_chain_fixture(tmp_path, _consumer_shape(_PHASE_G0, early_f))
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase=_PHASE_G0,
+        parent_plan="big",
+        head_sha=shas[early_f],
+        tree_sha=_git(["rev-parse", f"{shas[_PHASE_G0]}^{{tree}}"], tmp_path),
+    )
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch="big_implementation",
+        phase=_PHASE_G0,
+        head=shas[_PHASE_G0],
+        head_relation="ancestor",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=False,
+    )
+    historical = [error for error in errors if error.startswith("historical")]
+    if walks_f:
+        assert historical and historical[0].startswith(
+            f"historical phase {early_f} receipt is invalid"
+        )
+    else:
+        assert historical == []
 
 
 @pytest.mark.parametrize(
