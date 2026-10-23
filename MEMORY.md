@@ -169,6 +169,11 @@
   Prove devcontainer config cheaply: copy the exact keys onto an `alpine`
   image and run `npx @devcontainers/cli up` with `HOME` pointed at an empty
   folder, instead of rebuilding the full image.
+- [LEARN:documentation] A wiki page's prose can be wrong while its claims
+  pass. The hooks page said only Codex runs `push` on `UserPromptSubmit`; the
+  matching claim was true but incomplete, so OpenWiki flagged nothing. During
+  a refresh, read each assigned page's prose against the generator, not only
+  the flagged claims.
 - [LEARN:security] Automated recovery must distinguish state that existed at
   entry from state the current operation created. Auto-clean only an exact,
   observed orphan shape; leave valid or unknown pre-existing state untouched,
