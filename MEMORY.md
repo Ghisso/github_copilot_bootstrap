@@ -146,6 +146,22 @@
   stdin must run each command with `</dev/null`. A child that reads stdin
   (`state-sync.sh`'s `timeout 2 cat` drain, run inside `validate_targets.py`)
   swallows the remaining lines, and the later checks silently never run.
+- [LEARN:testing] A test that signals a child process must reset the child's
+  signal dispositions before exec (`preexec_fn` setting SIGINT, SIGHUP, and
+  SIGTERM to `SIG_DFL`). A launcher that ignores SIGINT or SIGHUP (`nohup`, a
+  backgrounded non-interactive shell) passes the ignore on, and Bash cannot
+  trap a signal that was ignored on entry, so the trap test fails only in
+  some environments.
+- [LEARN:testing] An assertion made after the process under test has exited
+  cannot observe what that process held. "status did not keep the lock",
+  checked by re-locking after `status` returned, could never fail. Observe the
+  resource while the process still runs, or drop the claim.
+- [LEARN:tooling] `exec 9<"$dir"; flock -n 9` gives a mutex with no lock file
+  that the kernel releases when the holder exits (`state-sync.sh` locks the
+  repository root this way). Every child inherits descriptor 9, so a detached
+  grandchild (`git maintenance`, a credential daemon) or a hung network call
+  keeps the lock; report the lock state somewhere visible (`status` prints
+  `lock: held`).
 - [LEARN:security] Automated recovery must distinguish state that existed at
   entry from state the current operation created. Auto-clean only an exact,
   observed orphan shape; leave valid or unknown pre-existing state untouched,
