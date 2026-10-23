@@ -10,7 +10,7 @@ phases:
   - 2026-10-23_phase-B-sync-lock-and-exit-trap
   - 2026-10-23_phase-C-restorer-and-devcontainer-hardening
   - 2026-10-23_phase-D-knowledge-refresh
-current_phase: 2026-10-23_phase-C-restorer-and-devcontainer-hardening
+current_phase: 2026-10-23_phase-D-knowledge-refresh
 ---
 
 # Big Plan: State-Sync Safety Fixes

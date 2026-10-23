@@ -3,7 +3,7 @@ name: 2026-10-23_phase-D-knowledge-refresh
 type: small-plan
 parent_plan: state-sync-safety-fixes
 phase_index: 4
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
