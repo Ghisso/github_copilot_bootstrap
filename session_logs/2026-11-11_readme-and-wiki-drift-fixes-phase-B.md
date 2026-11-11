@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-11
 **Plan:** `.claude/plans/2026-11-11_phase-B-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -48,8 +48,18 @@ Refresh the OpenWiki layer through OpenWiki's own MCP tools so it matches PR #52
 ## Verification
 
 ```text
-# filled in from verify closeout --format text at CLOSEOUT step 4
+PASS        0.0s  test "$(grep -c -F '`*` runs only the optional' openwiki/architecture/hooks-and-guardrails.md)" = "0"
+PASS        0.0s  grep -n -F 'mcp__.*)$' openwiki/architecture/hooks-and-guardrails.md
+PASS        0.0s  grep -n -F '2026-08-29' openwiki/workflows/lifecycle-and-task-lanes.md
+PASS        0.0s  grep -n -F '2026-08-29' openwiki/operations/deterministic-verification.md
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  git diff --quiet dev -- AGENTS.md CLAUDE.md
+PASS       47.0s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
 ```
+
+- Phase receipt: `.claude/quality_reports/verification-phase-2026-11-11_phase-B-knowledge-refresh.json` (PASS; Ruff 0 violations, mypy 0 errors, pytest 5014 passed and 1 skipped in 307 s).
+- Findings: `.claude/quality_reports/findings-2026-11-11_phase-B-knowledge-refresh.json` (0 findings after round 2, gate PASS, six profiles, `ponytail_reviewed=true`).
 
 - optional 1: PASS — each refreshed page's prose was read against the code it cites (generator, validator, filter, verifier, workflow policy, runtime docs, tests) by me and by the reviewer in two rounds; round 1 found one claim whose evidence missed its last clause and one over-long list item, a corrective OpenWiki run fixed both, and round 2 found no mismatch.
 
