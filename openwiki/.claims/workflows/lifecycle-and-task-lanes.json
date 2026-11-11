@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:428eb397c14bbfbd29618e14bef796310bf9cb300589823350eb6becca4fba40",
+  "pageVersion": "sha256:0d7ee92ed57891df4b0867ce6ccf56328f4f36ac3c80b3817a3e1ea19defc32a",
   "claims": [
     {
       "id": "claim_f49518af7629414a92868ab695c5bf80",
@@ -66,7 +66,7 @@
     },
     {
       "id": "claim_0d648a6764914bd0a9db91ac0519b4ae",
-      "statement": "A normal completion commit requires a passing verify phase and closeout receipt plus a findings report with counts.critical == 0 and counts.major == 0, a disposition and reason on every surviving MINOR, the reviewer's recorded gate_result PASS with no open request, and every review profile the changed paths require; CRITICAL and MAJOR block the completion commit itself, and the same contract is re-checked across every completed phase at push or PR time.",
+      "statement": "A normal completion commit requires a passing verify phase and closeout receipt plus a findings report with counts.critical == 0 and counts.major == 0, a disposition and reason on every surviving MINOR, the reviewer's recorded gate_result PASS with no open request, and every review profile the changed paths require; CRITICAL and MAJOR block the completion commit itself, and the same contract is re-checked across every completed phase at push or PR time, except a plan's leading run of phases dated before 2026-08-29 that have no receipt file.",
       "evidence": [
         {
           "resource": "repo://shared/agents/reviewer/prompt.md#L84-L92",
@@ -74,7 +74,15 @@
         },
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L171-L181",
-          "version": "repo-lines-v1:sha256:d753e7edc50d24adad83a0fb0fd8eb0b2edbc89a6726ee4191b73d248e2b390d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1ZDk3NGE4Zjg4YTdhMzM0MDY1N2VkOWRmYTdlOTc5NTlkNGNlMDM0OGIyMDI2Y2M5MTJlNzQ1YjhkY2QzODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAyOGMxNmI5MzcxZTZhZDhhZTdiMjM2OGYxMDE3ZTU2OTVlYzgwOTk1NGI2NGZlZDAyNmRlMGYzMGFiYjQxMGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5NjNiYjQxOWZiMjM2ODI4MWVmZmQzMGM0ZmVmYjNhZDgyNjM2ZWNmYmZlMWQ3NWU4MDA5NjA0ODg2YjJlZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+          "version": "repo-lines-v1:sha256:0693e413a5a1e48aa9e01691f56afd803935b6c25328e79ccc8d107b0fb4d131:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1ZDk3NGE4Zjg4YTdhMzM0MDY1N2VkOWRmYTdlOTc5NTlkNGNlMDM0OGIyMDI2Y2M5MTJlNzQ1YjhkY2QzODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhNTcwNDI2ZWZiZmI2NDQ3Y2MwMzRiMGRkZTA5MTUyYTk4YTM4YTI4ZjE0MmFlZTlmNDU4YTJiM2M0YmQxZjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5NjNiYjQxOWZiMjM2ODI4MWVmZmQzMGM0ZmVmYjNhZDgyNjM2ZWNmYmZlMWQ3NWU4MDA5NjA0ODg2YjJlZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L1788-L1820",
+          "version": "repo-lines-v1:sha256:42a0789e367007b941c213405cc7028ac8300283212f0824d55f16bc61151469:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllZGE4ZmQxYzI3MGRiYzg3OGRiZTBkZTE0ZjU0NGRhMGM5OWU1ZWJiMWMwNGYyOWY3MDMxOTU5YThmNTZhNTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjMTE3OTE2NTYyOWQ1ZWFhNDYyMzdkYzgyNjgxNDNhNjYxYWIzMGZmMjc3ZGNjOTA2NWJiNTMyZmNjM2Y0YjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUyYWVmNDIyZTQ1ZTQyOGEzZTczNmEzYjVlZGY1ZmM2NzNhZDUzMGFiZGJkYzliM2Y4Y2JjZGJhOWNiODg0ODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4NjBjMzJkMjRkNTZhNmIyYWQ5M2Y4ODAyZmQ5Mjg3OWU2ZDYzZjVmMWQzMzRkYzQ4ZTdjYzdhYzI2YWM0YmIifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L79-L82",
+          "version": "repo-lines-v1:sha256:f8bed5801278c20eda613ff7700610f98206177e1fd4634dda1e3a3bf490f76a:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2Y4NTc0NzIyY2JlYTQwMmNlMjUxYTU0ZDIzMjNhM2ZmYzBlMGVlZTU4NTcyN2E0ZjUxYjY2ZjczYzRkMGEyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjVlMGMyNjRkZTNjZmUxZTY4YmI0YWVkYjJiMTdjZDI5N2Q5ZDhiNjJlMjI3NjMyMWU3Njk2NjNkODJiOTU2YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWIwZWQ3NTYxYjI1MjJjMzIyOWU3OTA2MDQzOTNmZmU5OTNlZmJmY2RlN2JlNTExZmQ1NjliNjQ0YzVkMWQwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGZjOGRmMGUzM2VkZmU4NmVjOGIwYjlmNDU0OGVlZWQxNTk3NmEyNTE2YWExZjdmOTJlNGRjNzI2ZjgxN2E3ZCJ9"
         }
       ]
     },
@@ -211,6 +219,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-21T02:32:20.957Z"
+    "at": "2026-11-11T14:51:38.121Z"
   }
 }

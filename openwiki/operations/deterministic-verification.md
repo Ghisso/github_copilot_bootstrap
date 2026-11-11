@@ -22,10 +22,10 @@ sources:
     resource: repo://tests/test_validate_targets.py
   - id: openwiki-source-7c9c9eb3a89efa00dd8df426
     resource: repo://tests/test_verify.py
-generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
+generated: { by: "claude-code", at: "2026-11-11T14:51:38.121Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-22T17:57:02.699Z
+    at: 2026-11-11T15:10:30.745Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -154,11 +154,14 @@ With the `exact` relation the gate also enforces the verification-items contract
 - `G3 verification-item-failed:` a recorded non-`PASS`;
 - `G4 optional-verification-unaccounted:` an optional item with no outcome line in the log.
 
-For pushes and pull requests, `historical_chain_errors` additionally walks every earlier completed phase: its receipt's `head_sha` must resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches `tree_sha`, and the recorded receipt, findings, and closeout-log hashes must still match the files. Closed session logs are therefore immutable; corrections go in a sibling `<log-name>.errata.md`.
+For pushes and pull requests, `historical_chain_errors` additionally walks the earlier completed phases: each receipt's `head_sha` must resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches `tree_sha`, and the recorded receipt, findings, and closeout-log hashes must still match the files. Closed session logs are therefore immutable; corrections go in a sibling `<log-name>.errata.md`.
+
+The walk skips only a plan's leading run of phases that predate closeout receipts, which exist only since 2026-08-29 (`RECEIPT_CHAIN_SINCE` in `shared/scripts/verify.py`). `leading_pre_receipt_count` puts a phase in that run when it is cancelled, or when it is complete, its slug and its `closeout_session_log` file name are both dated before 2026-08-29, and nothing exists at its closeout receipt path. The run ends at the first phase that does not qualify, so deleting a receipt cannot exempt a later phase, and a receipt file on disk is always validated.
 
 ## Representative tests
 
 - `tests/test_verify.py` covers receipt schema migration (v2 and v3 receipts are rejected), per-phase receipt immutability, symlink rejection, the explicit documentation-not-applicable requirement, every LEARN-section rule, and the bootstrap-root fingerprint's third-party exemption.
+- `tests/test_verify.py` also covers the pre-receipt skip: a leading pre-2026-08-29 run is skipped, a phase with a receipt after that run is still validated, a pre-cutoff phase after a receipt phase is refused, and a cancelled phase inside the run is allowed.
 - `tests/test_commit_closeout.py` covers the post-commit phase advance: a completed phase advances for every commit-message source, an incomplete or bypass commit does not, and a recorded head cannot advance a second phase.
 
 ## Related pages

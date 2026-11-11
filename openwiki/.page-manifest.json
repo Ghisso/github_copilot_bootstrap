@@ -9,11 +9,11 @@
       "completedRunId": "793f4ed1-d811-4942-aa71-c718fd3296d4"
     },
     "/openwiki/architecture/hooks-and-guardrails.md": {
-      "gitHead": "ebc3bdd349104d761199f549369e7bddcad01730",
-      "sourceFingerprint": "sha256:120e02b6e3efe8598546ad6dec11772ef02bde3c40d0b99a38a69440c16c934c",
-      "pageVersion": "sha256:07604269dba0106016bd55e63a227ed30d4045bb74881c947f37b97f2f5809a8",
+      "pageVersion": "sha256:5caebef069516a8df454d64b052f68f114a64ad15dd40f7a6355ddfdfe560c38",
       "completedBy": "claude-code",
-      "completedRunId": "74fb4fbe-50f2-45b8-970f-c676b77e44d1"
+      "completedRunId": "c5c0c5e7-5f84-4b4d-852c-c0d4ee771f42",
+      "gitHead": "3d55f40294672daf937c9c98433eaf4ccd3ad534",
+      "sourceFingerprint": "sha256:8e249178ab9c6a6cc57fff3d16bab97235eaeefae30ce2fe5b1519bb509023cd"
     },
     "/openwiki/architecture/source-generated-consumer-layout.md": {
       "gitHead": "da0049cb1cca581b71fabf2719664358846de045",
@@ -30,18 +30,18 @@
       "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
     },
     "/openwiki/operations/deterministic-verification.md": {
-      "gitHead": "da0049cb1cca581b71fabf2719664358846de045",
-      "sourceFingerprint": "sha256:aff62e2741f04b327c42f7d80988de258590db7914e155ab40a0d21209461ace",
-      "pageVersion": "sha256:1256baad73529e427396e15f9e536f505e474f136ebbf1d797cf8c4b46870fc2",
-      "completedBy": "codex",
-      "completedRunId": "793f4ed1-d811-4942-aa71-c718fd3296d4"
+      "pageVersion": "sha256:de9bf6c3140703d848ec9b3cab25ca09d34340253be76ebbae2bf5d972516554",
+      "completedBy": "claude-code",
+      "completedRunId": "c5c0c5e7-5f84-4b4d-852c-c0d4ee771f42",
+      "gitHead": "3d55f40294672daf937c9c98433eaf4ccd3ad534",
+      "sourceFingerprint": "sha256:8e249178ab9c6a6cc57fff3d16bab97235eaeefae30ce2fe5b1519bb509023cd"
     },
     "/openwiki/operations/git-backed-ai-state-sync.md": {
+      "gitHead": "ebc3bdd349104d761199f549369e7bddcad01730",
+      "sourceFingerprint": "sha256:120e02b6e3efe8598546ad6dec11772ef02bde3c40d0b99a38a69440c16c934c",
       "pageVersion": "sha256:7d584098452d18750ce88215d7f25c165d746461f5453af977c2cf84191c23fb",
       "completedBy": "claude-code",
-      "completedRunId": "3180def5-0833-4597-aca6-e1e92d68ec52",
-      "gitHead": "ebc3bdd349104d761199f549369e7bddcad01730",
-      "sourceFingerprint": "sha256:120e02b6e3efe8598546ad6dec11772ef02bde3c40d0b99a38a69440c16c934c"
+      "completedRunId": "3180def5-0833-4597-aca6-e1e92d68ec52"
     },
     "/openwiki/operations/install-ownership-and-runtime-checks.md": {
       "gitHead": "da0049cb1cca581b71fabf2719664358846de045",
@@ -58,18 +58,18 @@
       "completedRunId": "d98539f0-c91f-4425-af79-d7e0c671d73f"
     },
     "/openwiki/quickstart.md": {
-      "gitHead": "ebc3bdd349104d761199f549369e7bddcad01730",
-      "sourceFingerprint": "sha256:120e02b6e3efe8598546ad6dec11772ef02bde3c40d0b99a38a69440c16c934c",
-      "pageVersion": "sha256:6fded3e2656befb8d2e19ec3081eb88554d99fc8660ed9616086c4ad8f97bbe0",
+      "gitHead": "3d55f40294672daf937c9c98433eaf4ccd3ad534",
+      "sourceFingerprint": "sha256:8e249178ab9c6a6cc57fff3d16bab97235eaeefae30ce2fe5b1519bb509023cd",
+      "pageVersion": "sha256:ca52c661f24ea77d04e99bcfcda040e9eba246cce81d7981416c24f6b1e6cd9b",
       "completedBy": "claude-code",
-      "completedRunId": "74fb4fbe-50f2-45b8-970f-c676b77e44d1"
+      "completedRunId": "615cda42-d418-440c-8c42-f2dc6e7f3792"
     },
     "/openwiki/workflows/lifecycle-and-task-lanes.md": {
-      "gitHead": "f05c3b3e6894676c9e625171cccaf244ecbfd8a2",
-      "sourceFingerprint": "sha256:e4b061e34b3adc70a5ed1c507660fe2e470a1344e411cbff76243a2ac228fbfb",
-      "pageVersion": "sha256:428eb397c14bbfbd29618e14bef796310bf9cb300589823350eb6becca4fba40",
+      "gitHead": "3d55f40294672daf937c9c98433eaf4ccd3ad534",
+      "sourceFingerprint": "sha256:8e249178ab9c6a6cc57fff3d16bab97235eaeefae30ce2fe5b1519bb509023cd",
+      "pageVersion": "sha256:0d7ee92ed57891df4b0867ce6ccf56328f4f36ac3c80b3817a3e1ea19defc32a",
       "completedBy": "claude-code",
-      "completedRunId": "0aaf238f-257e-4752-baa9-553be66988af"
+      "completedRunId": "615cda42-d418-440c-8c42-f2dc6e7f3792"
     }
   }
 }

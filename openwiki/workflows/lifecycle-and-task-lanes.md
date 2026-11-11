@@ -16,16 +16,18 @@ sources:
     resource: repo://shared/policies/agent-reporting.instructions.md
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
+  - id: openwiki-source-b7cd6d01f37550e855f61bdc
+    resource: repo://shared/scripts/verify.py
   - id: openwiki-source-4a96f2f176ecd3fcc4f95f18
     resource: repo://shared/templates/plan-big.md
   - id: openwiki-source-588c1b68a254d094494d64f9
     resource: repo://shared/templates/plan-small.md
   - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
     resource: repo://tests/test_validate_plan_frontmatter.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "claude-code", at: "2026-11-11T14:51:38.121Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-11-11T14:51:38.121Z
 ---
 
 # Task lanes and the enforced lifecycle
@@ -112,7 +114,7 @@ The commit gate requires, for an ordinary commit on an implementation branch:
 - the closeout session log with LEARN evidence;
 - a small plan whose frontmatter validates.
 
-CRITICAL and MAJOR findings block the completion commit itself, not only the push. The push and PR gates re-check the same contract across every completed phase through the historical receipt chain, and a PR must target `dev`.
+CRITICAL and MAJOR findings block the completion commit itself, not only the push. The push and PR gates re-check the same contract across every completed phase through the historical receipt chain, and a PR must target `dev`. The one exception is a plan's leading run of phases dated before 2026-08-29 that have no receipt file: closeout receipts did not exist then, so `verify.py` skips that run (`RECEIPT_CHAIN_SINCE`), and the skip ends at the first phase that does not qualify.
 
 ## The verification evidence contract
 
