@@ -42,10 +42,10 @@ Known stale statements (recorded by the PR #52 and PR #53 audits and the 2026-11
 ## Verification
 
 ```bash
-! rg -n -F '`*` runs only the optional' openwiki/architecture/hooks-and-guardrails.md
-rg -n -F 'mcp__.*)$' openwiki/architecture/hooks-and-guardrails.md
-rg -n -F '2026-08-29' openwiki/workflows/lifecycle-and-task-lanes.md
-rg -n -F '2026-08-29' openwiki/operations/deterministic-verification.md
+test "$(grep -c -F '`*` runs only the optional' openwiki/architecture/hooks-and-guardrails.md)" = "0"
+grep -n -F 'mcp__.*)$' openwiki/architecture/hooks-and-guardrails.md
+grep -n -F '2026-08-29' openwiki/workflows/lifecycle-and-task-lanes.md
+grep -n -F '2026-08-29' openwiki/operations/deterministic-verification.md
 test ! -e openwiki/.run.json
 git diff --quiet dev -- AGENTS.md CLAUDE.md
 uv run python scripts/validate_targets.py

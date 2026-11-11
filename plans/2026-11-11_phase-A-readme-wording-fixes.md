@@ -32,9 +32,9 @@ Two `README.md` sentences disagree with the code (found by the 2026-11-11 onboar
 ## Verification
 
 ```bash
-! rg -n -F 'All three generated targets' README.md
-rg -n -F 'The fourth generated target, Google Antigravity' README.md
-rg -n -F 'shown for a consumer project with a `src/` layout' README.md
+test "$(grep -c -F 'All three generated targets' README.md)" = "0"
+grep -n -F 'The fourth generated target, Google Antigravity' README.md
+grep -n -F 'shown for a consumer project with a `src/` layout' README.md
 test "$(git diff --numstat dev -- README.md | cut -f1,2 | tr '\t' ' ')" = "2 2"
 uv run python scripts/validate_targets.py
 uv run python scripts/validate_plan_frontmatter.py
