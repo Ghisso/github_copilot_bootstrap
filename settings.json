@@ -56,7 +56,7 @@
         ]
       },
       {
-        "matcher": "*",
+        "matcher": "^(Bash|Read|Grep|WebFetch|mcp__.*)$",
         "hooks": [
           {
             "type": "command",
