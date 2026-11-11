@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-11
 **Plan:** `.claude/plans/2026-11-11_phase-A-context-mode-agent-matcher.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -26,6 +26,7 @@ Generated Claude Code settings run the Context Mode PreToolUse hook only for `^(
 - Review round 1 (six profiles): gate PASS, no CRITICAL or MAJOR, two MINORs, both fixed. (1) `docs/runtime-checks.md`: the pin-bump procedure did not say to recheck the Claude matcher against the new version's routed tools, and the recorded fixtures cover a fixed tool set, so a newly routed tool would be skipped silently; added step 3 (compare `CLAUDE_CONTEXT_MODE_MATCHER` with `routePreToolUse` and extend the test). (2) `tests/test_lifecycle_hooks.py`: the helper comment claimed a full copy of the legacy-name table and the `TaskStop` row was never asserted; the coder reworded the comment (only the rows for Agent, TaskOutput, TaskStop; session aliases not modelled) and added `TaskStop` to the must-not-fire tuple. Reviewer notes also acted on: re-wrapped the orphan line in `docs/architecture.md`, and both `docs/architecture.md` and `docs/runtime-checks.md` now say the filter already drops the Agent rewrite, so leaving Agent out is a second safeguard.
 - After the fixes: regenerated, refreshed the self-install, and re-ran `verify.py phase`: PASS (ruff 0, mypy 0, pytest 5014 passed, 1 skipped; VFY-GEN-001 PASS).
 - Review round 2 (same reviewer, six profiles): gate PASS, no findings, no open requests; both round-1 MINORs confirmed fixed. Its notes: the tooling lesson should say PreToolUse (the relaxed character set is proven only for that event), applied in both places; step 3 of the pin-bump procedure does not mention that the matcher string is also written out in `tests/test_validate_targets.py` and three docs (not acted on: the test literal fails loudly if the constant changes; left as an upkeep note).
+- Closeout: first nested checkpoint `fd46a26`; staged the seven outer files (`git status` showed nothing unstaged); `record_findings.py` recorded 0 findings, gate PASS, `ponytail_reviewed=true`; `verify.py phase --persist` exit 0; `verify.py closeout` dry run PASS on all six required items (lines under `## Verification`).
 
 ## [LEARN] Entries
 
@@ -51,9 +52,15 @@ Generated Claude Code settings run the Context Mode PreToolUse hook only for `^(
 ## Verification
 
 ```text
-# verify closeout --format text summary lines
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       77.3s  uv run pytest tests/test_lifecycle_hooks.py tests/test_validate_targets.py tests/test_openwiki_guard.py tests/test_context_mode_dispatch.py -q --tb=short
+PASS       47.0s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      306.9s  uv run python .claude/scripts/verify.py phase --format text
 ```
 
+- Findings: `.claude/quality_reports/findings-2026-11-11_phase-A-context-mode-agent-matcher.json` (0 findings after review round 2; gate PASS; six profiles; the two round-1 MINORs were fixed before round 2).
 - optional 1: PASS — Claude Code 2.1.226's own matcher function and legacy-name table, extracted from `~/.local/share/claude/versions/2.1.226` into the session scratchpad and run under Node on the generated value `^(Bash|Read|Grep|WebFetch|mcp__.*)$`: fires for Bash, Read, Grep, WebFetch, `mcp__context-mode__ctx_search`, `mcp__semble__search`, and `mcp__plugin_context-mode_context-mode__ctx_execute`; does not fire for Agent, Task, TaskOutput, TaskStop, ReadMcpResourceTool, Edit, Write, Glob, NotebookEdit, WebSearch, or Skill.
 - optional 2: PASS — `CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream`: 1 passed; the real pinned binary's Agent rewrite and `curl` deny still reach nothing.
 
