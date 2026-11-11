@@ -8,7 +8,7 @@ started_at: 2026-11-11T14:29:35Z
 phases:
   - 2026-11-11_phase-A-readme-wording-fixes
   - 2026-11-11_phase-B-knowledge-refresh
-current_phase: 2026-11-11_phase-A-readme-wording-fixes
+current_phase: 2026-11-11_phase-B-knowledge-refresh
 ---
 
 # Big Plan: README and Wiki Drift Fixes

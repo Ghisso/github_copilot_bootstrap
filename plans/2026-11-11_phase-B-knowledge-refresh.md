@@ -3,7 +3,7 @@ name: 2026-11-11_phase-B-knowledge-refresh
 type: small-plan
 parent_plan: readme-and-wiki-drift-fixes
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
