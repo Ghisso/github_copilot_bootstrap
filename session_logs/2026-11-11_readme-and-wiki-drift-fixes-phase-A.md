@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-11
 **Plan:** `.claude/plans/2026-11-11_phase-A-readme-wording-fixes.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -20,6 +20,7 @@ Fix two `README.md` sentences that disagree with the code, without changing the 
 - Review round 1 (`code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`): gate PASS, no findings, no open requests. The reviewer checked each sentence against the generated configs, the Antigravity bridge, `phase_checks` in `verify.py`, and `docs/runtime-checks.md` line 113.
 - CLOSEOUT step 4, first attempt: findings recorded (0 findings, `ponytail_reviewed=true`, gate PASS) and `verify.py phase --persist` PASS (Ruff, mypy, pytest), but the `verify.py closeout` dry run failed: `rg: command not found` (exit 127) on the second required item. The first item, `! rg ...`, had reported PASS only because the negated missing command exits 0. Cause: in the interactive tool shell `rg` is a shell function supplied by Claude Code (`type -t rg` prints `function`), while `verify.py` runs each item with `bash -c`, where only `/usr/bin/grep` exists.
 - Fix (back to IMPLEMENT, plan text only; `README.md` unchanged, so the review stands): both small plans now use `grep`, and each absence check is `test "$(grep -c -F '<text>' <file>)" = "0"`. Under `env -i PATH="$PATH" bash -c` all four phase A text checks exit 0; negative controls: the absence check exits 1 against a file that contains the phrase and exits 1 with `grep` unavailable, while the old `! grep ...` form exits 0 with `grep` unavailable.
+- CLOSEOUT steps 3 and 4 redone: the first dry run after the fix failed only `VFY-FRESH-002` (governing control-plane provenance is stale), because the first phase receipt had bound the old small-plan digest. After a new nested checkpoint, findings were re-recorded (0 findings, gate PASS), `verify.py phase --persist` passed, and the `verify.py closeout` dry run passed with every required item PASS.
 
 ## [LEARN] Entries
 
@@ -28,8 +29,16 @@ Fix two `README.md` sentences that disagree with the code, without changing the 
 ## Verification
 
 ```text
-# filled in from verify closeout --format text at CLOSEOUT step 4
+PASS        0.0s  test "$(grep -c -F 'All three generated targets' README.md)" = "0"
+PASS        0.0s  grep -n -F 'The fourth generated target, Google Antigravity' README.md
+PASS        0.0s  grep -n -F 'shown for a consumer project with a `src/` layout' README.md
+PASS        0.0s  test "$(git diff --numstat dev -- README.md | cut -f1,2 | tr '\t' ' ')" = "2 2"
+PASS       47.0s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
 ```
+
+- Phase receipt: `.claude/quality_reports/verification-phase-2026-11-11_phase-A-readme-wording-fixes.json` (PASS; Ruff 0 violations, mypy 0 errors, pytest 5014 passed and 1 skipped in 306 s).
+- Findings: `.claude/quality_reports/findings-2026-11-11_phase-A-readme-wording-fixes.json` (0 findings, gate PASS, six profiles, `ponytail_reviewed=true`).
 
 - optional 1: PASS — rendered lines 1391 and 1426 with `markdown-it-py`: both links (`shared/hooks/scripts/context-mode-dispatch.sh`, `docs/runtime-checks.md`) resolve to existing files from the README location, 27 code spans render, and no stray backtick remains.
 
