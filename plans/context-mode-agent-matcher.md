@@ -70,7 +70,7 @@ One constant in `scripts/generate_targets.py`, next to `OPENWIKI_BEGIN_MATCHER`:
 
 ## Phases
 
-- [ ] `2026-11-11_phase-A-context-mode-agent-matcher` — anchored Claude matcher, validator, tests, docs, and the stale-claims audit.
+- [x] `2026-11-11_phase-A-context-mode-agent-matcher` — anchored Claude matcher, validator, tests, docs, and the stale-claims audit.
 
 ## Verification
 

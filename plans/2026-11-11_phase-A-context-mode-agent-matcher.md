@@ -3,8 +3,8 @@ name: 2026-11-11_phase-A-context-mode-agent-matcher
 type: small-plan
 parent_plan: context-mode-agent-matcher
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-11_context-mode-agent-matcher-phase-A.md
 ---
 
 # Small Plan: Context Mode PreToolUse Matcher Skips Agent
@@ -15,7 +15,7 @@ Generated Claude Code settings run `context-mode-dispatch.sh claude-code pretool
 
 ## Steps
 
-- [ ] **1. Write the tests first.**
+- [x] **1. Write the tests first.**
   - Owner: `coder`. Files: `tests/test_lifecycle_hooks.py`, `tests/test_validate_targets.py` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - In `tests/test_lifecycle_hooks.py`, add `test_rendered_claude_context_mode_pretool_matcher_skips_agent`. Render with `render_claude_settings(tmp_path / "settings.json")`. Select the PreToolUse groups whose handler commands contain `context-mode-dispatch.sh` and assert there is exactly one. Check its matcher with a small module helper, `_claude_matcher_fires(matcher: str, tool: str) -> bool`, that copies Claude Code 2.1.226's PreToolUse rules:
@@ -27,7 +27,7 @@ Generated Claude Code settings run `context-mode-dispatch.sh claude-code pretool
   - In `tests/test_validate_targets.py`, add `test_pretool_routing_requires_target_specific_context_mode_matcher`, built from the four-group hooks object of `test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift`, with the Context Mode group's matcher set per case and the anchored string written literally: `claude-code` with `*` returns an error naming the anchored matcher; `claude-code` with `^(Bash|Read|Grep|WebFetch|mcp__.*)$` returns `[]`; `openai-codex` with the anchored matcher returns an error. (`openai-codex` with `*` is already covered by the existing test.)
   - Negative control, before Step 2: `uv run pytest tests/test_lifecycle_hooks.py tests/test_validate_targets.py -q --tb=line -k "context_mode_pretool or context_mode_matcher"`. Record in the session log which cases fail on today's code and why. Expected: the lifecycle test fails because the matcher is `*`; the `claude-code` with `*` case fails because today's validator accepts it; the `claude-code` with the anchored matcher case fails because today's validator requires `*`; the `openai-codex` with the anchored matcher case already passes.
 
-- [ ] **2. Narrow the matcher and the validator.**
+- [x] **2. Narrow the matcher and the validator.**
   - Owner: `coder`. Files: `scripts/generate_targets.py`, `scripts/validate_targets.py`, `tests/test_validate_targets.py` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - `scripts/generate_targets.py`: add `CLAUDE_CONTEXT_MODE_MATCHER = "^(Bash|Read|Grep|WebFetch|mcp__.*)$"` right after `OPENWIKI_BEGIN_MATCHER`, with a comment of at most five lines in the style of the comment above `OPENWIKI_BEGIN_MATCHER`: Claude Code reads it as an unanchored regex that it also tries on legacy tool names, hence the anchors; it lists what Context Mode 1.0.169 routes except Agent, whose only action rewrites the subagent prompt, a change auto mode refuses. Use the constant as the matcher of the Context Mode PreToolUse group in `render_claude_settings`. `render_codex_hooks` keeps `"*"`.
@@ -35,11 +35,11 @@ Generated Claude Code settings run `context-mode-dispatch.sh claude-code pretool
   - Must not: change the dispatcher, the filter, the Codex output, the Copilot `shared/hooks/hooks.json`, the Antigravity output, group order, timeouts, or any other validator message.
   - Run Step 1's command again (every case passes), then `uv run python .claude/scripts/verify.py fast --format text`.
 
-- [ ] **3. Regenerate and refresh the self-install.**
+- [x] **3. Regenerate and refresh the self-install.**
   - Owner: orchestrator.
   - `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. Confirm that `dist/multi-agent/.claude/settings.json` and `.claude/settings.json` carry the new matcher and that `dist/multi-agent/.codex/hooks.json` keeps `*`. Never hand-copy.
 
-- [ ] **4. Update the documentation.**
+- [x] **4. Update the documentation.**
   - Owner: `documenter` (CLOSEOUT step 1; runs in parallel with Steps 1-2 because the files do not overlap). Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `docs/architecture.md`, "Target-native PreToolUse routing" (about lines 293-296): Claude's Context Mode group matches only `^(Bash|Read|Grep|WebFetch|mcp__.*)$`; Codex keeps the wildcard; one sentence on why (Context Mode's Agent action rewrites the subagent prompt, and Claude Code auto mode refuses a call whose input a hook changed).
   - `docs/smoke-tests.md` (about lines 209 and 220): the same correction; keep the dispatcher-filter sentence.
@@ -47,7 +47,7 @@ Generated Claude Code settings run `context-mode-dispatch.sh claude-code pretool
   - Check `docs/target-mapping.md` and `README.md` for a claim that Claude's Context Mode PreToolUse hook runs for every tool; fix any you find.
   - Use plain words and short sentences.
 
-- [ ] **5. Audit live advice for stale claims and record lessons.**
+- [x] **5. Audit live advice for stale claims and record lessons.**
   - Owner: `documenter` for `README.md`, `docs/`, and `shared/` text; orchestrator for `.claude/MEMORY.md` and the session log.
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - This phase is the big plan's last entry, so it runs the standing final-phase documentation, memory, and LEARN audit. Surfaces: root guidance (`CLAUDE.md`, `AGENTS.md`), `README.md`, `docs/`, `shared/policies/`, `shared/skills/`, `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, state READMEs, the installed `.claude/` overlay after the self-install, and `.claude/MEMORY.md`.
@@ -60,7 +60,7 @@ Generated Claude Code settings run `context-mode-dispatch.sh claude-code pretool
     - `[LEARN:tooling] Claude Code 2.1.226 reads a hook matcher as exact names only when it holds just letters, digits, _, |, comma, space, or -; anything else is an unanchored JavaScript regex that is also tried on a tool's legacy names (Task for Agent, BashOutput for TaskOutput, KillBash for TaskStop). Anchor regex matchers: Bash|Read|mcp__.* also fires for TaskOutput and ReadMcpResourceTool. In auto mode a PreToolUse hook that returns updatedInput makes the call fail ("a hook changed this call's input after auto mode reviewed it").`
     - `[LEARN:workflow] Check a forwarded consumer report against the kit version the consumer runs. The 2026-11-11 report blamed the "*" Context Mode matcher for failing Agent calls in auto mode, but the kit has dropped hook input rewrites since de5a2f8 (2026-10-17); an Agent call that fails while curl is still redirected points to an unfiltered hook (an old install or the user-level context-mode plugin).`
 
-- [ ] **6. Review.**
+- [x] **6. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus: the matcher cannot fire for Agent or Task under Claude Code's rules and still fires for every tool Context Mode routes; the test's copy of the matcher rules matches the evidence; the Codex, Copilot, and Antigravity outputs are unchanged; the validator still rejects safety-lane drift; the docs state exactly what changed.
 
@@ -86,14 +86,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

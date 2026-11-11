@@ -1690,12 +1690,12 @@
   receipt file at all; a malformed receipt, a later date, or an undated slug
   still fails. Slug dates are planning dates, so pair them with a date that
   marks completion, and test with a fixture shaped like the real consumer.
-- [LEARN:tooling] Claude Code 2.1.226 reads a hook matcher as exact names
-  only when it holds just letters, digits, `_`, `|`, comma, space, or `-` (a
-  listed legacy name such as `Task` still counts for `Agent`); anything else
-  is an unanchored JavaScript regex that is also tried on a tool's legacy
-  names (`Task` for `Agent`, `BashOutput` for `TaskOutput`, `KillBash` for
-  `TaskStop`). Anchor regex matchers: `Bash|Read|mcp__.*` also fires for
+- [LEARN:tooling] Claude Code 2.1.226 reads a PreToolUse hook matcher as
+  exact names only when it holds just letters, digits, `_`, `|`, comma,
+  space, or `-` (a listed legacy name such as `Task` still counts for
+  `Agent`); anything else is an unanchored JavaScript regex that is also
+  tried on a tool's legacy names (`Task` for `Agent`, `BashOutput` for
+  `TaskOutput`, `KillBash` for `TaskStop`). Anchor regex matchers: `Bash|Read|mcp__.*` also fires for
   `TaskOutput` and `ReadMcpResourceTool`. In auto mode a PreToolUse hook that
   returns `updatedInput` makes the call fail ("a hook changed this call's
   input after auto mode reviewed it"). Found by running the matcher function
