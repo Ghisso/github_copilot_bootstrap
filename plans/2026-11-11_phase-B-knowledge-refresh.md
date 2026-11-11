@@ -17,7 +17,7 @@ Known stale statements (recorded by the PR #52 and PR #53 audits and the 2026-11
 
 - `openwiki/architecture/hooks-and-guardrails.md` line 88 says the Context Mode PreToolUse group matches `*` on both Claude Code and Codex. Since PR #53, Claude Code uses `^(Bash|Read|Grep|WebFetch|mcp__.*)$` (`CLAUDE_CONTEXT_MODE_MATCHER` in `scripts/generate_targets.py`); Codex keeps `*`.
 - `openwiki/workflows/lifecycle-and-task-lanes.md` line 115 ("across every completed phase") and `openwiki/operations/deterministic-verification.md` near line 157 ("walks every earlier completed phase") omit PR #52's exception: the push and PR checks skip a plan's leading run of phases dated before 2026-08-29 that have no receipt file (`RECEIPT_CHAIN_SINCE` and `leading_pre_receipt_count` in `shared/scripts/verify.py`).
-- Any page whose claims cite `README.md` line 1390 or line 1426, which phase A changed.
+- Any page whose claims cite `README.md` line 1391 or line 1426, which phase A changed.
 
 ## Steps
 

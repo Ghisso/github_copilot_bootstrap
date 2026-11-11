@@ -1,14 +1,14 @@
 ---
 name: readme-and-wiki-drift-fixes
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: readme-and-wiki-drift-fixes_implementation
-started_at:
+started_at: 2026-11-11T14:29:35Z
 phases:
   - 2026-11-11_phase-A-readme-wording-fixes
   - 2026-11-11_phase-B-knowledge-refresh
-current_phase:
+current_phase: 2026-11-11_phase-A-readme-wording-fixes
 ---
 
 # Big Plan: README and Wiki Drift Fixes
@@ -20,7 +20,7 @@ The 2026-11-11 onboarding refresh (`.claude/instructions/project-context.instruc
 ## Goals
 
 - `README.md` line 1426 describes Context Mode routing for all four generated targets correctly.
-- `README.md` line 1390 says the "Verification Defaults" commands assume a consumer project with a `src/` layout.
+- `README.md` line 1391 says the "Verification Defaults" commands assume a consumer project with a `src/` layout.
 - The three stale OpenWiki statements describe the current code: the Claude Code Context Mode PreToolUse matcher (PR #53) and the receipt-chain exception for a plan's leading phases dated before 2026-08-29 (PR #52).
 
 ## Non-Goals and Constraints

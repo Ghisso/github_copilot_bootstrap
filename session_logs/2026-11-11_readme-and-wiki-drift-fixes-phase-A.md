@@ -6,7 +6,7 @@
 
 ## Goal
 
-Fix two `README.md` sentences that disagree with the code, without changing the file's line count: Context Mode routing for all four generated targets (line 1426), and the consumer `src/` layout behind the "Verification Defaults" commands (line 1390).
+Fix two `README.md` sentences that disagree with the code, without changing the file's line count: Context Mode routing for all four generated targets (line 1426), and the consumer `src/` layout behind the "Verification Defaults" commands (line 1391).
 
 ## Work Log
 
