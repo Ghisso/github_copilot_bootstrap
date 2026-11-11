@@ -17,9 +17,21 @@
   `dist/sidecar/` (personal overlay); it is not a Hydra/BentoML/Haystack/Gradio
   application. Durable project context:
   `.claude/instructions/project-context.instructions.md`.
+- [LEARN:domain] The pinned Context Mode `1.0.169` MCP server checks the npm
+  registry at startup and every hour (the source of the "outdated → v…
+  available" notice; no setting turns it off), and its hooks write
+  `~/.claude/context-mode/heal-partial-install.log` and start the Codex CLI.
+  2.x is a rewrite that needs a planned migration, not a pin bump. Evidence:
+  `.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`.
 
 ## Workflow
 
+- [LEARN:tooling] OpenWiki keeps a base per page (`pageUpdateWindows` in the
+  `openwiki_begin` response), and a claim re-verified in a later refresh
+  carries newer evidence than its page's base. Map a page's moved claim
+  ranges from that page's own base, confirm the mapped text in the current
+  file, and trust OpenWiki's own flags over a mapping that reports changed
+  text for an unflagged claim (README/wiki drift fixes, phase B, 2026-11-11).
 - [LEARN:verification] Never use `rg` in a plan's `## Verification` block.
   `verify.py closeout` runs each required item with `bash -c`, where Claude
   Code's `rg` (a shell function from the session snapshot, not a program on

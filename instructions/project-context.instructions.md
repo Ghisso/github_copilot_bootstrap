@@ -172,9 +172,14 @@ the user's call.
 
 Pinned versions: Context Mode `1.0.169`, OpenWiki `0.7.2` (the guard allows
 only `mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
-(`ponytail-review` stays complexity-only). On 2026-11-11 Context Mode
-reported that `2.1.7` is available; the pin stays until a deliberate bump
-that follows the procedure in `docs/runtime-checks.md`.
+(`ponytail-review` stays complexity-only). Context Mode `2.1.7` (2026-11-08)
+is a full rewrite: it needs Node.js 24.15 or newer (the devcontainer has 22),
+always reports server version `"dev"` (the filter's version gate fails), needs
+a per-host `--agent` server argument (Antigravity has none), ignores
+`CONTEXT_MODE_DIR`, and forwards almost nothing through the kit's advice-only
+filter. A 2026-11-11 evidence spike judged it a planned control-plane
+migration, not a pin bump (`.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`).
+Until then the dispatcher refuses any other version, so `1.0.169` stays safe.
 
 Before merging bootstrap changes, run:
 
@@ -223,18 +228,13 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   `receipt metadata control-plane provenance is invalid`. Run
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after editing either file.
-- `openwiki/architecture/hooks-and-guardrails.md` still says the Claude Code
-  PreToolUse Context Mode group matches `*`; since PR #53 only Codex does.
-  The wiki also does not mention the PR #52 receipt-chain skip
-  (`openwiki/workflows/lifecycle-and-task-lanes.md` says the push and PR
-  gates recheck every completed phase). Refresh these pages only through
-  the `knowledge-refresh` skill, never by hand.
-- The README's "Optional Retrieval Helpers" section says "All three
-  generated targets (GitHub Copilot, Claude Code, OpenAI Codex)" route
-  Context Mode through the dispatcher. There are four targets: Antigravity's
-  generated `.agents/mcp_config.json` routes it too, but Antigravity's
-  PreToolUse bridge denies MCP calls, so that entry is structural only
-  (`docs/runtime-checks.md`).
-- The README's "Verification Defaults" list the consumer `src/` commands.
-  This repository has no `src/`; use the `CLAUDE.md` commands or `verify.py`,
-  which selects `shared`, `scripts`, and `tests` here.
+- The 2026-11-11 onboarding found two README sentences and three OpenWiki
+  statements out of date (Context Mode routing for "three" targets, the
+  consumer `src/` scope of "Verification Defaults", the Claude Code Context
+  Mode matcher from PR #53, and the receipt-chain skip from PR #52). The big
+  plan `readme-and-wiki-drift-fixes` fixed all five on branch
+  `readme-and-wiki-drift-fixes_implementation`; `dev` keeps the old text
+  until that branch is merged.
+- A one-phase plan gets no knowledge-refresh phase, so the wiki drifts until
+  the next refresh (PRs #52 and #53 were the latest case). Refresh pages only
+  through the `knowledge-refresh` skill, never by hand.

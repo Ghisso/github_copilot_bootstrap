@@ -1,0 +1,10 @@
+[
+  {"label": "SessionStart startup", "event": "sessionstart", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "SessionStart", "source": "startup", "model": "gpt-5", "transcript_path": null}},
+  {"label": "UserPromptSubmit (not wired by kit)", "event": "userpromptsubmit", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "UserPromptSubmit", "prompt": "Find the slow latency entries for worker alpha", "turn_id": "t1"}},
+  {"label": "PreToolUse Bash cat big file", "event": "pretooluse", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "cat big.log"}, "turn_id": "t1"}},
+  {"label": "PreToolUse Bash curl", "event": "pretooluse", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "curl -s https://example.com"}, "turn_id": "t1"}},
+  {"label": "PreToolUse apply_patch", "event": "pretooluse", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "PreToolUse", "tool_name": "apply_patch", "tool_input": {"input": "*** Begin Patch\n*** End Patch"}, "turn_id": "t1"}},
+  {"label": "PostToolUse Bash large output", "event": "posttooluse", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_use_id": "c1", "tool_input": {"command": "./run-tests.sh"}, "tool_response": {"stdout": "<BIG:400>"}, "turn_id": "t1"}},
+  {"label": "PreCompact manual", "event": "precompact", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "PreCompact", "trigger": "manual"}},
+  {"label": "SessionStart compact", "event": "sessionstart", "payload": {"session_id": "seq-codex", "cwd": "<TMP>/repo", "hook_event_name": "SessionStart", "source": "compact"}}
+]

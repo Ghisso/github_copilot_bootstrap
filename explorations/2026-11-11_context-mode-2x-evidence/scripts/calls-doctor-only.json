@@ -1,0 +1,10 @@
+[
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_doctor",
+   "arguments": {}
+  },
+  "_timeout": 120
+ }
+]
