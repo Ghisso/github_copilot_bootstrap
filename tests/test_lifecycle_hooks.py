@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -433,6 +434,59 @@ def test_rendered_antigravity_hook_uses_only_proven_pretool_safety(
 
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["decision"] == "deny"
+
+
+# Copies Claude Code 2.1.226's PreToolUse matcher rules and only its legacy-name
+# rows for Agent, TaskOutput, and TaskStop. Per-session tool aliases are not
+# modelled.
+CLAUDE_LEGACY_TOOL_NAMES = {
+    "Agent": ("Task",),
+    "TaskOutput": ("AgentOutputTool", "BashOutputTool", "AgentOutput", "BashOutput"),
+    "TaskStop": ("KillShell", "KillBash"),
+}
+
+
+def _claude_matcher_fires(matcher: str, tool: str) -> bool:
+    """Return whether Claude Code would run a PreToolUse hook for `tool`."""
+    if matcher in ("", "*"):
+        return True
+    names = (tool, *CLAUDE_LEGACY_TOOL_NAMES.get(tool, ()))
+    if re.fullmatch(r"[a-zA-Z0-9_|, -]+", matcher):
+        listed = [n.strip() for n in re.split(r"[|,]", matcher) if n.strip()]
+        return any(name in listed for name in names)
+    return any(re.search(matcher, name) for name in names)
+
+
+def test_rendered_claude_context_mode_pretool_matcher_skips_agent(
+    tmp_path: Path,
+) -> None:
+    """The Context Mode hook runs for the tools it routes, never for Agent."""
+    settings_path = tmp_path / "settings.json"
+
+    render_claude_settings(settings_path)
+
+    groups = [
+        group
+        for group in json.loads(settings_path.read_text(encoding="utf-8"))["hooks"][
+            "PreToolUse"
+        ]
+        if any("context-mode-dispatch.sh" in h["command"] for h in group["hooks"])
+    ]
+    assert len(groups) == 1
+    matcher = groups[0]["matcher"]
+
+    assert matcher not in ("", "*")
+    for tool in ("Agent", "Task", "TaskOutput", "TaskStop"):
+        assert not _claude_matcher_fires(matcher, tool), tool
+    for tool in (
+        "Bash",
+        "Read",
+        "Grep",
+        "WebFetch",
+        "mcp__context-mode__ctx_search",
+        "mcp__semble__search",
+    ):
+        assert _claude_matcher_fires(matcher, tool), tool
 
 
 def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(

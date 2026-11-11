@@ -38,6 +38,11 @@ TARGETS = ("multi-agent", "sidecar")
 # (`mcp__<server>__<tool>`; docs/2026-09-19-openwiki-hook-mechanics-spike.md
 # U2), guarding OpenWiki's one repository-mutating entry point.
 OPENWIKI_BEGIN_MATCHER = "mcp__openwiki__openwiki_begin"
+# Claude Code reads this as an unanchored regex that it also tries on legacy
+# tool names (`Task` for `Agent`), hence the anchors. It lists what Context Mode
+# 1.0.169 routes except Agent, whose only action rewrites the subagent prompt,
+# a change Claude Code auto mode refuses.
+CLAUDE_CONTEXT_MODE_MATCHER = "^(Bash|Read|Grep|WebFetch|mcp__.*)$"
 SUPPORTED_AGENT_TARGETS = (
     "github-copilot",
     "claude-code",
@@ -1125,7 +1130,7 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [cmd("pretool-bash-guard.sh", "claude-code")],
                 },
                 {
-                    "matcher": "*",
+                    "matcher": CLAUDE_CONTEXT_MODE_MATCHER,
                     "hooks": [
                         cmd("context-mode-dispatch.sh", "claude-code", "pretooluse")
                     ],

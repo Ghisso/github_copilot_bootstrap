@@ -23,6 +23,7 @@ from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
+    CLAUDE_CONTEXT_MODE_MATCHER,
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
     OPENWIKI_BEGIN_MATCHER,
@@ -1502,6 +1503,7 @@ def reporting_reminder_script_errors(text: str) -> list[str]:
 def pretool_routing_errors(hooks: object, target: str) -> list[str]:
     """Return errors for the deterministic mutation/observer hook split."""
     native_matcher = "Edit|Write"
+    observer_matcher = CLAUDE_CONTEXT_MODE_MATCHER if target == "claude-code" else "*"
     errors: list[str] = []
     if not isinstance(hooks, dict) or not isinstance(hooks.get("PreToolUse"), list):
         return [f"{target} PreToolUse routing is missing"]
@@ -1509,7 +1511,7 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
     expected: dict[str, tuple[str, ...]] = {
         native_matcher: ("protect-files.sh",),
         "Bash": ("pretool-bash-guard.sh",),
-        "*": ("context-mode-dispatch.sh",),
+        observer_matcher: ("context-mode-dispatch.sh",),
         OPENWIKI_BEGIN_MATCHER: ("openwiki-guard.sh",),
     }
     if len(groups) != len(expected):
@@ -1551,11 +1553,11 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
                 f"{target} PreToolUse {matcher!r} must contain only {scripts}"
             )
     for matcher, scripts in found.items():
-        if matcher == "*" and any(
+        if matcher == observer_matcher and any(
             script != "context-mode-dispatch.sh" for script in scripts
         ):
             errors.append(
-                f"{target} wildcard PreToolUse group must be observability only"
+                f"{target} context-mode PreToolUse group must be observability only"
             )
         if matcher != "Bash" and "pretool-bash-guard.sh" in scripts:
             errors.append(f"{target} Bash safety wrapper must not run for {matcher!r}")

@@ -138,8 +138,47 @@ def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
 
     hooks["PreToolUse"][2]["hooks"].append({"command": "git-protection.sh"})
     errors = pretool_routing_errors(hooks, "openai-codex")
-    assert any("wildcard" in error for error in errors)
+    assert any("context-mode PreToolUse group must be" in error for error in errors)
     assert any("must contain only" in error for error in errors)
+
+
+CLAUDE_CONTEXT_MODE_MATCHER_LITERAL = "^(Bash|Read|Grep|WebFetch|mcp__.*)$"
+
+
+@pytest.mark.parametrize(
+    ("target", "matcher", "error_text"),
+    (
+        ("claude-code", "*", CLAUDE_CONTEXT_MODE_MATCHER_LITERAL),
+        ("claude-code", CLAUDE_CONTEXT_MODE_MATCHER_LITERAL, None),
+        ("openai-codex", CLAUDE_CONTEXT_MODE_MATCHER_LITERAL, "'*'"),
+    ),
+    ids=("claude-wildcard", "claude-anchored", "codex-anchored"),
+)
+def test_pretool_routing_requires_target_specific_context_mode_matcher(
+    target: str, matcher: str, error_text: str | None
+) -> None:
+    """Claude Code requires the anchored Context Mode matcher; others keep `*`."""
+    hooks: dict[str, Any] = {
+        "PreToolUse": [
+            {"matcher": "Edit|Write", "hooks": [{"command": "protect-files.sh"}]},
+            {"matcher": "Bash", "hooks": [{"command": "pretool-bash-guard.sh"}]},
+            {
+                "matcher": matcher,
+                "hooks": [{"command": "context-mode-dispatch.sh"}],
+            },
+            {
+                "matcher": OPENWIKI_BEGIN_MATCHER,
+                "hooks": [{"command": "openwiki-guard.sh"}],
+            },
+        ]
+    }
+
+    errors = pretool_routing_errors(hooks, target)
+
+    if error_text is None:
+        assert errors == []
+    else:
+        assert any(error_text in error for error in errors), errors
 
 
 @pytest.mark.parametrize(
