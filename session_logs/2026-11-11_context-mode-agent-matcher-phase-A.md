@@ -37,7 +37,7 @@ Generated Claude Code settings run the Context Mode PreToolUse hook only for `^(
 - `README.md`: clean; its Context Mode sections cover the pin, the cache, and the MCP filter, with no matcher or every-tool claim.
 - `docs/architecture.md`: fixed; "Target-native PreToolUse routing" gives the per-target matcher, why it is anchored, why Agent is left out, and that the filter already drops the rewrite.
 - `docs/smoke-tests.md`: fixed (the Claude and Codex group list, and the observability bullet now covers both targets).
-- `docs/runtime-checks.md`: fixed (the three-group line, one passage in the Context Mode bullet, and a new pin-bump step 3 to recheck the matcher against `routePreToolUse`). Its Codex line ("wildcard-observability matcher groups", about line 935) is still accurate.
+- `docs/runtime-checks.md`: fixed (the three-group line, one passage in the Context Mode bullet, and a new pin-bump step 3 to recheck the matcher against `routePreToolUse`). Its Codex line ("wildcard-observability matcher groups", line 934) is still accurate.
 - `docs/target-mapping.md`, `docs/native-client-acceptance.md`, `docs/plan-deterministic-commit-gate.md`, `docs/sidecar-provider-contract.md`: clean.
 - The `*` statements about `.agents/hooks.json` in `docs/runtime-checks.md` and `docs/smoke-tests.md`: still accurate; that is the Antigravity safety bridge, not a Context Mode hook.
 - `shared/policies/`: clean; `tool-routing.instructions.md` and `workspace.instructions.md` make no matcher claim.
