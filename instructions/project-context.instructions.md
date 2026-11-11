@@ -37,14 +37,26 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
   (Context Mode is filtered to exactly four guarded tools).
 - `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader
-  (pins OpenWiki `0.7.2`).
+  (pins OpenWiki `0.7.2`). Its `initializeCommand` creates `~/.openwiki` and
+  `~/.cache/huggingface` on the host, because Docker refuses a bind mount
+  whose source folder is missing.
 - `shared/third_party/ponytail/`: vendored Ponytail (a local fork, partially
   merged from upstream `v5.3.2`) with provenance.
-- `shared/sidecar/`: sources for the personal sidecar overlay.
+- `shared/sidecar/`: sources for the personal sidecar overlay. The `workflow`
+  profile ships its own `onboard` skill
+  (`shared/sidecar/workflow/skills/onboard/`), which writes
+  `.ai-bootstrap/project-context.instructions.md` instead of this file.
 - `shared/schemas/`: only `native-client-observation.schema.json` (the stale
   agent schema was removed by gate-repair).
 - `shared/scripts/` and `shared/templates/`: `verify.py`,
   `record_findings.py`, plan templates, and other rendered workflow artifacts.
+- `shared/vscode/tasks.json`: the "AI state: pull" and "AI state: push" VS
+  Code tasks. `shared/MEMORY.md`, `shared/plans/`, `shared/session_logs/`,
+  and `shared/quality_reports/` are starting content that a fresh install
+  copies into a consumer's `.claude/` state.
+- `targets/multi-agent/manifest.json`: the generator's target manifest, with
+  four adapters (GitHub Copilot, Claude Code, OpenAI Codex, Google
+  Antigravity).
 - `scripts/generate_targets.py`: renders `dist/multi-agent/` (the full
   bootstrap) and `dist/sidecar/<profile>/` (the personal per-clone overlay,
   profiles `skills` and `workflow`).
@@ -70,8 +82,10 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `tests/`: pytest suite for hooks, gates, verifier, installer, sidecar,
   state sync, and Context Mode dispatch (recorded hook fixtures).
 - `.github/workflows/validate.yml`: CI for generation and target validation
-  on Ubuntu and macOS plus Python 3.9 hook compatibility. It does not run the
-  full pytest, Ruff, or Mypy suite.
+  on Ubuntu and macOS plus Python 3.9 hook compatibility. It runs the
+  validator as `uv run --with pytest`, because the validator's hook-gate
+  smoke tests need pytest (without it, the validator says how to provide
+  it). CI does not run the full pytest, Ruff, or Mypy suite.
 - `plans/`: older ADRs, implementation plans, closeouts, and architecture
   reviews. Current plans live in `.claude/plans/`.
 - `dist/`: generated and gitignored; never hand-edit it.
@@ -106,34 +120,61 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
 - The commit gate trusts only what it checks: the findings report records the
   reviewer's `gate_result` and open requests (schema version 2), and the gate
   requires the review profiles the branch's changed paths call for. Reports
-  written before schema version 2 stay valid at push.
+  written before schema version 2 stay valid at push. The push and PR gates'
+  receipt-chain check skips only a plan's leading run of phases dated before
+  2026-08-29 that have no receipt file (`RECEIPT_CHAIN_SINCE` in
+  `shared/scripts/verify.py`), because closeout receipts did not exist then.
 - The Context Mode hook lane is advisory only: the dispatcher forwards an
   allowlist of advice fields and never forwards a decision or input rewrite.
+  On Claude Code the PreToolUse group uses the anchored matcher
+  `^(Bash|Read|Grep|WebFetch|mcp__.*)$` (`CLAUDE_CONTEXT_MODE_MATCHER` in
+  `scripts/generate_targets.py`), so it never fires on `Agent`: Context
+  Mode's only `Agent` action rewrites the subagent prompt, and Claude Code's
+  auto mode refuses a call whose input a hook changed. Other targets keep
+  `*`. A Context Mode pin bump must recheck this matcher (procedure in
+  `docs/runtime-checks.md`).
 - Consumer `.claude/` state is a nested `ai-state` Git repository so mutable
   plans, memory, logs, and bootstrap files have an auditable history.
+  `state-sync.sh` lets one run work on a checkout at a time (an `flock` on
+  the repository root), cancels an HTTPS transfer slower than 1,000 bytes per
+  second for 60 seconds, never waits for a typed password, and never commits
+  over an unfinished rebase or merge. Two sessions therefore cannot sync over
+  each other, a stalled network call cannot hang a hook, and a half-finished
+  rebase or merge is never recorded as state.
 - Semble is for semantic code discovery. context-mode is optional; when it is
   unavailable or blocked, direct reads and `rg` are the supported fallback.
 - Tests, hooks, and `verify.py` make no model call.
 
 ## Current status and verification
 
-Onboarding was refreshed on `dev` at `f964551` on 2026-10-20, after the
-`gate-repair` big plan merged (PR #46). `uv run python scripts/check_runtime.py`
-reported only PASS lines. `dev` is 273 commits ahead of `origin/main`, which
-was last updated 2026-05-24; releasing `dev` to `main` is the user's call.
+Onboarding was refreshed on `dev` at `7b221ce` on 2026-11-11.
+`uv run python scripts/check_runtime.py` printed 20 lines, all PASS.
 
-The `backlog-followups` big plan (Phases A to G, 2026-10-20 to 2026-10-21,
-reopened with Phases H to J on 2026-10-21 and 2026-10-22) then ran on
-`backlog-followups_implementation`; opening its pull request to `dev` is
-the user's decision. Phases H and I replaced `shlex` in the file-protection
-guard (`shared/hooks/scripts/protect-files.py`) with a Bash-rules scanner;
-`docs/runtime-checks.md` lists the forms it still does not check, and a
-recorded follow-up asks to split or shrink the hook.
+Pull requests merged into `dev` since the 2026-10-20 refresh:
 
-Pinned versions after the plan: Context Mode `1.0.169`, OpenWiki `0.7.2`
-(from `0.5.2`; the guard allows only `mode: "update"`), and Ponytail
-partially merged from upstream `v5.3.2` (from `v4.8.4`; `ponytail-review`
-stays complexity-only).
+- #47 `backlog-followups` (Phases A to J). Phases H and I replaced `shlex`
+  in the file-protection guard (`shared/hooks/scripts/protect-files.py`)
+  with a Bash-rules scanner; `docs/runtime-checks.md` lists the forms it
+  still does not check, and a recorded follow-up in
+  `docs/target-mapping.md` asks to split or shrink the hook.
+- #49 `sidecar-onboard-and-validator`: the sidecar `workflow` profile's
+  `onboard` skill, and a validator that explains a missing pytest.
+- #51 `state-sync-safety-fixes`: one state sync at a time, bounded network
+  calls, no commit over an unfinished rebase or merge, and a root-adapter
+  restore that refuses a symlinked `.claude` or `.claude/bootstrap-root`.
+- #52 `pre-receipt-phase-exemption`: the receipt-chain skip described above.
+- #53 `context-mode-agent-matcher`: the anchored Claude Code matcher
+  described above.
+
+`origin/main` was last updated on 2026-10-23 by PR #50 (`dev` into `main`);
+`dev` is 9 commits ahead of it (PRs #51 to #53). Releasing `dev` to `main` is
+the user's call.
+
+Pinned versions: Context Mode `1.0.169`, OpenWiki `0.7.2` (the guard allows
+only `mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
+(`ponytail-review` stays complexity-only). On 2026-11-11 Context Mode
+reported that `2.1.7` is available; the pin stays until a deliberate bump
+that follows the procedure in `docs/runtime-checks.md`.
 
 Before merging bootstrap changes, run:
 
@@ -182,3 +223,18 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   `receipt metadata control-plane provenance is invalid`. Run
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after editing either file.
+- `openwiki/architecture/hooks-and-guardrails.md` still says the Claude Code
+  PreToolUse Context Mode group matches `*`; since PR #53 only Codex does.
+  The wiki also does not mention the PR #52 receipt-chain skip
+  (`openwiki/workflows/lifecycle-and-task-lanes.md` says the push and PR
+  gates recheck every completed phase). Refresh these pages only through
+  the `knowledge-refresh` skill, never by hand.
+- The README's "Optional Retrieval Helpers" section says "All three
+  generated targets (GitHub Copilot, Claude Code, OpenAI Codex)" route
+  Context Mode through the dispatcher. There are four targets: Antigravity's
+  generated `.agents/mcp_config.json` routes it too, but Antigravity's
+  PreToolUse bridge denies MCP calls, so that entry is structural only
+  (`docs/runtime-checks.md`).
+- The README's "Verification Defaults" list the consumer `src/` commands.
+  This repository has no `src/`; use the `CLAUDE.md` commands or `verify.py`,
+  which selects `shared`, `scripts`, and `tests` here.
