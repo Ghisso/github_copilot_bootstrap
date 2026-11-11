@@ -20,6 +20,13 @@
 
 ## Workflow
 
+- [LEARN:verification] Never use `rg` in a plan's `## Verification` block.
+  `verify.py closeout` runs each required item with `bash -c`, where Claude
+  Code's `rg` (a shell function from the session snapshot, not a program on
+  `PATH`) does not exist; a negated item such as `! rg ...` then exits 0 and
+  passes without checking anything. Use `grep`, and write an absence check as
+  `test "$(grep -c -F '<text>' <file>)" = "0"`, which also fails when `grep`
+  itself fails (README/wiki drift fixes, phase A, 2026-11-11).
 - [LEARN:validation] A hand-parsed flat frontmatter contract must normalize
   supported scalar spelling before comparing values. Pair each accepted form
   (bare, quoted, and comment-suffixed where promised) with a regression that
