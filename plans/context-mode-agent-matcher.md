@@ -1,13 +1,13 @@
 ---
 name: context-mode-agent-matcher
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: context-mode-agent-matcher_implementation
 started_at: 2026-11-11T12:55:24Z
 phases:
   - 2026-11-11_phase-A-context-mode-agent-matcher
-current_phase: 2026-11-11_phase-A-context-mode-agent-matcher
+current_phase: 
 ---
 
 # Big Plan: Context Mode PreToolUse Matcher Skips Agent
