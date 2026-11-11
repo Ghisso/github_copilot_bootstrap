@@ -3,8 +3,8 @@ name: 2026-11-11_phase-A-readme-wording-fixes
 type: small-plan
 parent_plan: readme-and-wiki-drift-fixes
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-11_readme-and-wiki-drift-fixes-phase-A.md
 ---
 
 # Small Plan: README Wording Fixes
@@ -18,14 +18,14 @@ Two `README.md` sentences disagree with the code (found by the 2026-11-11 onboar
 
 ## Steps
 
-- [ ] **1. Replace the two sentences.**
+- [x] **1. Replace the two sentences.**
   - Owner: orchestrator (two exact one-line replacements; no other README text changes).
   - Required Skills: `.claude/skills/documentation/SKILL.md`.
   - Line 1426: replace "All three generated targets (GitHub Copilot, Claude Code, OpenAI Codex) route through the same dispatcher." with "GitHub Copilot, Claude Code, and OpenAI Codex route through the same dispatcher. The fourth generated target, Google Antigravity, gets the same server entry in `.agents/mcp_config.json`, but its PreToolUse bridge denies any tool it does not recognize, including every MCP call, so Antigravity cannot use it (see [runtime-checks.md](docs/runtime-checks.md))."
   - Line 1391: replace "Expected verification commands after implementation:" with "Expected verification commands after implementation, shown for a consumer project with a `src/` layout (this bootstrap repository has no `src/`; the `verify.py` modes below pick the right scope in either repository):"
   - Keep each replacement on its original line: the diff against `dev` is one file with 2 insertions and 2 deletions.
 
-- [ ] **2. Review.**
+- [x] **2. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`. The plan changes several files, so it is high-risk; in this phase only `documentation` has content to judge.
   - Focus: each new sentence matches the code it describes, and nothing else changed.
 
@@ -50,14 +50,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

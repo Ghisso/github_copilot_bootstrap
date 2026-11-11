@@ -37,7 +37,7 @@ Phase A replaces two `README.md` lines in place. Phase B runs one OpenWiki `upda
 
 ## Phases
 
-- [ ] `2026-11-11_phase-A-readme-wording-fixes` — two README sentences.
+- [x] `2026-11-11_phase-A-readme-wording-fixes` — two README sentences.
 - [ ] `2026-11-11_phase-B-knowledge-refresh` — OpenWiki refresh and the final-phase audit.
 
 ## Verification
