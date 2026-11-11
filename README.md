@@ -1388,7 +1388,7 @@ Design intent:
 
 ## Verification Defaults
 
-Expected verification commands after implementation:
+Expected verification commands after implementation, shown for a consumer project with a `src/` layout (this bootstrap repository has no `src/`; the `verify.py` modes below pick the right scope in either repository):
 
 - uv run pytest tests/ -q --tb=short
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
@@ -1423,7 +1423,7 @@ Documentation gate:
 VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.json):
 
 - `semble` uses `uvx --from "semble[mcp]" semble`.
-- `context-mode` routes through [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) `server` mode, which forwards a public-stdio filter (`shared/hooks/scripts/context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. All three generated targets (GitHub Copilot, Claude Code, OpenAI Codex) route through the same dispatcher. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) locally, before the request reaches upstream. Guarded `ctx_index` accepts content, a contained regular file, or a contained real directory. Directory-policy knobs stay fixed at the pinned upstream defaults, so callers do not pass `include`, `exclude`, `maxDepth`, `maxFiles`, `extensions`, `respectGitignore`, or `followSymlinks`.
+- `context-mode` routes through [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) `server` mode, which forwards a public-stdio filter (`shared/hooks/scripts/context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. GitHub Copilot, Claude Code, and OpenAI Codex route through the same dispatcher. The fourth generated target, Google Antigravity, gets the same server entry in `.agents/mcp_config.json`, but its PreToolUse bridge denies any tool it does not recognize, including every MCP call, so Antigravity cannot use it (see [runtime-checks.md](docs/runtime-checks.md)). The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) locally, before the request reaches upstream. Guarded `ctx_index` accepts content, a contained regular file, or a contained real directory. Directory-policy knobs stay fixed at the pinned upstream defaults, so callers do not pass `include`, `exclude`, `maxDepth`, `maxFiles`, `extensions`, `respectGitignore`, or `followSymlinks`.
 
 **Inside the devcontainer**, Node.js 22 and `context-mode` are pre-installed — no extra setup needed.
 

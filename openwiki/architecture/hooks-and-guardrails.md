@@ -6,6 +6,8 @@ tags: [hooks, guardrails, safety, git, dispatcher, pretooluse, lifecycle]
 sources:
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
+  - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
+    resource: repo://scripts/validate_targets.py
   - id: openwiki-source-2a5d4dff87fa3f15e7c1a4ba
     resource: repo://shared/hooks/git-hooks/commit-msg
   - id: openwiki-source-df4b60402a82ef6f0601d69d
@@ -22,6 +24,8 @@ sources:
     resource: repo://shared/hooks/scripts/claude-stop.sh
   - id: openwiki-source-cc850e3ff1c819282352ebdc
     resource: repo://shared/hooks/scripts/codex-stop.sh
+  - id: openwiki-source-b213a8cd2e1bfd19ba5d119e
+    resource: repo://shared/hooks/scripts/context-mode-mcp-filter.mjs
   - id: openwiki-source-6aab0600aa722da66b818111
     resource: repo://shared/hooks/scripts/enforce-branch-state.sh
   - id: openwiki-source-0bf90ae8af434f0ab6ec0119
@@ -50,14 +54,16 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-8b19687f44543c0a82585f7d
     resource: repo://tests/test_hook_gates.py
+  - id: openwiki-source-69784bc4fc9bf24219a63a05
+    resource: repo://tests/test_lifecycle_hooks.py
   - id: openwiki-source-9815a0c3b2461f2bccdb2429
     resource: repo://tests/test_openwiki_cli_smoke.py
   - id: openwiki-source-ac71b7b5ed0ae12dcdfb1f63
     resource: repo://tests/test_openwiki_guard.py
-generated: { by: "claude-code", at: "2026-10-23T06:45:08.272Z" }
+generated: { by: "claude-code", at: "2026-11-11T15:10:30.745Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-23T06:45:08.272Z
+    at: 2026-11-11T15:10:30.745Z
 ---
 
 # Hook dispatcher and guardrail scripts
@@ -85,15 +91,18 @@ All guardrail logic lives in `shared/hooks/scripts/` and is installed into a con
 Claude Code and Codex share this shape:
 
 - **SessionStart**: `state-sync.sh pull`, `session-log.sh`, `session-start-state.sh` (reports the active plan and phase), `context-mode-dispatch.sh sessionstart`.
-- **PreToolUse**, split by matcher so the safety lane stays narrow: `Edit|Write` runs `protect-files.sh`; `Bash` runs `pretool-bash-guard.sh`; `*` runs only the optional `context-mode-dispatch.sh`; the MCP tool `mcp__openwiki__openwiki_begin` runs `openwiki-guard.sh pre`.
+- **PreToolUse**, split by matcher so the safety lane stays narrow: `Edit|Write` runs `protect-files.sh`; `Bash` runs `pretool-bash-guard.sh`; a Context Mode group runs only the optional `context-mode-dispatch.sh`; the MCP tool `mcp__openwiki__openwiki_begin` runs `openwiki-guard.sh pre`. The Context Mode group's matcher differs by host, as the first difference below explains.
 - **PostToolUse** on `Bash`: `record-branch-state.sh`, `context-mode-dispatch.sh`, `reporting-reminder.sh late-report`. On `openwiki_begin`: `openwiki-guard.sh post`.
 - **Stop**: one ordered wrapper, `claude-stop.sh` or `codex-stop.sh`, runs session logging, the log freshness check, `state-sync.sh checkpoint`, then `state-sync.sh publish`. A failing child is logged and skipped, never fatal.
 
-Both hosts also run `state-sync.sh push` and `reporting-reminder.sh prompt` on `UserPromptSubmit`. Three per-host differences matter:
+Both hosts also run `state-sync.sh push` and `reporting-reminder.sh prompt` on `UserPromptSubmit`. Four per-host differences matter:
 
+- The Context Mode PreToolUse group matches `*` on Codex but only `^(Bash|Read|Grep|WebFetch|mcp__.*)$` on Claude Code (`CLAUDE_CONTEXT_MODE_MATCHER` in `scripts/generate_targets.py`), so on Claude Code it never fires for `Agent`. `pretool_routing_errors` in `scripts/validate_targets.py` requires exactly that matcher for Claude Code and `*` for every other target.
 - Claude Code fires `PostToolUseFailure` when an MCP tool returns an error, so `openwiki-guard.sh post` is wired there too.
 - Codex fires nothing on an MCP tool error, so its Stop also runs a payload-free `openwiki-guard.sh post`.
 - At session end, Codex runs only a local `state-sync.sh checkpoint` on `SessionEnd`. Claude Code runs `state-sync.sh push` on `SessionEnd` and a local `state-sync.sh checkpoint` on `StopFailure`.
+
+Claude Code leaves `Agent` out because Context Mode's only `Agent` action rewrites the subagent prompt, and Claude Code's auto mode refuses a call whose input a hook changed. The dispatcher's output filter already drops that rewrite, so the matcher is a second safeguard. The anchors are needed because Claude Code reads such a matcher as an unanchored regular expression and also tries a tool's older names, such as `Task` for `Agent`.
 
 GitHub Copilot's configuration has no matchers, so it lists the five Bash guards individually under `PreToolUse`, and each guard runs on every Copilot tool call. Antigravity wires only a `*` PreToolUse bridge and, on purpose, no lifecycle hooks.
 

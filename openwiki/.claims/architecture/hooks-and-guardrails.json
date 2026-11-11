@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:07604269dba0106016bd55e63a227ed30d4045bb74881c947f37b97f2f5809a8",
+  "pageVersion": "sha256:5caebef069516a8df454d64b052f68f114a64ad15dd40f7a6355ddfdfe560c38",
   "claims": [
     {
       "id": "claim_577abfccd7214b578dafc049c57d3ba8",
@@ -17,7 +17,7 @@
       "statement": "Google Antigravity's generated .agents/hooks.json wires a single '*' PreToolUse matcher to antigravity-pretool.py, a Python bridge that normalizes the payload and invokes the canonical guards, with no lifecycle hooks.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1294-L1326",
+          "resource": "repo://scripts/generate_targets.py#L1299-L1331",
           "version": "repo-lines-v1:sha256:f79e739ba534e6de73d0f011f17f32447a3dba6ece5cfd1c0283a193cf2ce893:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MjJjNDJjZDE5YzZkMDNkODA4YzQ1MjcyMDU1MjgyNWI3ZWExYzViNDkxYjIxODUxMWNhYzc0MTVjZjlkOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4ZjU5MjA0YzFjM2RmMzlkNGY5ZDVlN2E5N2Q5N2E4NTU1MDExYzM0YTg2MzIxMjQ3YTE3MWQyMzhkOTFmNDIifQ"
         },
         {
@@ -28,14 +28,14 @@
     },
     {
       "id": "claim_dabc98b50b474e5385a3f3b7e13cc9ce",
-      "statement": "Claude Code and Codex PreToolUse routing is split by matcher: Edit|Write runs protect-files.sh, Bash runs pretool-bash-guard.sh, the wildcard runs only context-mode-dispatch.sh, and mcp__openwiki__openwiki_begin runs openwiki-guard.sh pre; PostToolUse on Bash runs record-branch-state.sh, context-mode-dispatch.sh, and reporting-reminder.sh late-report.",
+      "statement": "Claude Code and Codex PreToolUse routing is split by matcher: Edit|Write runs protect-files.sh, Bash runs pretool-bash-guard.sh, a Context Mode group runs only context-mode-dispatch.sh, and mcp__openwiki__openwiki_begin runs openwiki-guard.sh pre; PostToolUse on Bash runs record-branch-state.sh, context-mode-dispatch.sh, and reporting-reminder.sh late-report.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1106-L1174",
-          "version": "repo-lines-v1:sha256:bbc65a54e994bbef4fe257e1aec372e71d990701fa8c14aa4a0127a199f3b43d:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGRkMmNjNTdmYjM4ZDI2Mzc0ZjYyZDU0OTRkNjE1ZDdjOWZlMGRkMmE4YWYzZjZhOTY2ZWNlM2Q0OWI5MmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjNjQ3OWNjMjMwNDQwZmQ0MWU4MjI0MjE4Njc5Njk4NTU5ZDI4OTNiZDY3YjQzODBhZmFiODExYjM4YTU1YWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmNlZGNjZDA4MTkxNTgzNzY1NzhlOWRlMGI5MDE1MzJmODQwYWRhOWYyYWRiOTEwYzg1NzUyZDlhOTg5YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2NTRjYWI1MzQ1ZmQwMTNiYzQwMjMxOTUwNDgyMWQ3ODZlNDUxYjY4ZjlkODM5ZjkxZTllZjY3YmNlMTA1NDUifQ"
+          "resource": "repo://scripts/generate_targets.py#L1111-L1179",
+          "version": "repo-lines-v1:sha256:0bc5c7fa30d4f2835f6a0ba97ff16a15674c89c0f1033626d7feff52d6b48937:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGRkMmNjNTdmYjM4ZDI2Mzc0ZjYyZDU0OTRkNjE1ZDdjOWZlMGRkMmE4YWYzZjZhOTY2ZWNlM2Q0OWI5MmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjNjQ3OWNjMjMwNDQwZmQ0MWU4MjI0MjE4Njc5Njk4NTU5ZDI4OTNiZDY3YjQzODBhZmFiODExYjM4YTU1YWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmNlZGNjZDA4MTkxNTgzNzY1NzhlOWRlMGI5MDE1MzJmODQwYWRhOWYyYWRiOTEwYzg1NzUyZDlhOTg5YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2NTRjYWI1MzQ1ZmQwMTNiYzQwMjMxOTUwNDgyMWQ3ODZlNDUxYjY4ZjlkODM5ZjkxZTllZjY3YmNlMTA1NDUifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1214-L1259",
+          "resource": "repo://scripts/generate_targets.py#L1219-L1264",
           "version": "repo-lines-v1:sha256:69d723cc8a3ee4083215d6dba8cd53ab4494cd286a74f64dac09bf46a918d528:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxOGMyYjk2OWZhOTc5MjJhNTdhYjMxZDgwMTMwZDdlOTUxYmMyMGExNmQxZWU3OTFiMjA5ZGJmOTM0YjkyYmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3YjUzNmM4NjQ5ZWQxNDYwZDU3MjE3ZTVjYzBiMmVkNjEyNDdmMmUwMDE0MjI2NGZhN2EwMjFiY2Q4MDU5OGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg3MjNmZmRiNzVlNGM1ZmIxYjljNjA2NzIxYTJmOTkxOTQwMWM2Mzg3NjU3MmNjMjM4YzQzNTNlYTJhZmY3YjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1OTAzM2YzODE1MmFmMmI5OTk5OWZjZDhhMjFiODdjMDlkOGU2M2RhNWFiOGY2NDMxMTc5Zjg0YTQyYWM0OWEifQ"
         }
       ]
@@ -45,11 +45,11 @@
       "statement": "Claude Code wires openwiki-guard.sh post to PostToolUseFailure as well as PostToolUse, while Codex fires nothing on an MCP error and instead runs a payload-free openwiki-guard.sh post at Stop; both hosts run state-sync.sh push and reporting-reminder.sh prompt on UserPromptSubmit, and at session end Codex runs a local state-sync.sh checkpoint on SessionEnd while Claude Code runs state-sync.sh push on SessionEnd and state-sync.sh checkpoint on StopFailure.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1152-L1186",
+          "resource": "repo://scripts/generate_targets.py#L1157-L1191",
           "version": "repo-lines-v1:sha256:bfea353adbec4b30609919c6fbfa207007af367ed943bc29c23d41811121aaf7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjNWE3ZDQ3MjllYzk2ZDE4ODljOTY1YjBjOTA4ZDI5NWZlMGIwZmM0NjczZGRjOWM5ZTc1ODMwMmIwNmNlNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkYzM1YjRkY2ZjMTVkZTRmM2Y0N2Y3ZjNkMmZmMzFjYTA1Y2QyNWNjZDA5NzJjMTIwM2E4ZGRiZjFjZDAxZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1270-L1290",
+          "resource": "repo://scripts/generate_targets.py#L1275-L1295",
           "version": "repo-lines-v1:sha256:be65230b886fa1b2486643a9f92626186309a7981a2cc6940da316fc3fe6414f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTcxYjViMWRkZDQxNDI4MDkwZDQ5YTA4MTUwZDZhYzBiNTYyYjZmMGYwY2U2MzZkZjcxNWVmMzJlNDZjZmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVlZDM1ODI4Yzg3YjI2YTRhYzdmMjZjM2U3NmZlYzFmNDg2MTQ4OTM2N2UzYmM5MDM4YmI2MWM2ZmE4NjA0OWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
         }
       ]
@@ -211,7 +211,7 @@
       "statement": "hooks-errors.log is local-only diagnostics that state-sync.sh gitignores and untracks in the nested repository, while hooks-bypass.log stays tracked and blocks publication until bypasses are acknowledged in the big plan.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L1557-L1586",
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L1559-L1588",
           "version": "repo-lines-v1:sha256:2e107162c03c9c97f4ca2ad7c7c41fef10428b722d780f151c9db41db3a35904:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyY2RiODAyOThmNTFhM2E2OWQxZWJlZDM5MmQ4NzA3YWNkNDIxZGY4N2Q0YTU0NDY4NDZlYzg5MGNlNjk4ODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjYTcyYzViNDM2MTVkYTU4YWQyNzBjOWFhNWRkNTY3NzA0NWM3OTc0NmM1M2I5YzZiOWYyNzMzYzg1MzI5MjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyZjQwOTVhODViNjYwODY3NTZiN2M1Y2UzNzgyNzBkMjIyZDU5NTk0YjY2MTdhOGQ2Njk3ZTM4N2RlZjYwODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhMzlkYWE4MmViZjRjY2RhZWUxYzNmN2E3YjExNzg5N2ZiYWE3ZjlmNGQyYjVjNmExYjI4MmYxYjIyYjE0MGYifQ"
         },
         {
@@ -367,10 +367,52 @@
           "version": "repo-file-v1:sha256:f546e338b353c3d5675784179241b869974cb7c8c40c2cc5f3f6ef9cba14d82a"
         }
       ]
+    },
+    {
+      "id": "claim_beb1a59ab9914a0eb089bc7c8976e7d2",
+      "statement": "The Context Mode PreToolUse group matches * on Codex but only the anchored ^(Bash|Read|Grep|WebFetch|mcp__.*)$ (CLAUDE_CONTEXT_MODE_MATCHER) on Claude Code, so it never fires for Agent, whose only Context Mode action rewrites the subagent prompt, a change Claude Code auto mode refuses; the anchors are needed because Claude Code reads such a matcher as an unanchored regular expression and also tries legacy tool names such as Task for Agent.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1132-L1137",
+          "version": "repo-lines-v1:sha256:299f04298e66e191dc441c727b8cf60b9fab2bb84296e956c6c9a2a2bebc42a3:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTdiNTM2Yzg2NDllZDE0NjBkNTcyMTdlNWNjMGIyZWQ2MTI0N2YyZTAwMTQyMjY0ZmE3YTAyMWJjZDgwNTk4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTFjYTdhYmI3ODczNzY1NjU4NDE3NGU2NzIwYjBiOTUwZTc2ZTRkOWQ2MmUyN2E4MmJhY2RjYjg0ZWI1NmRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGZiOWU1M2Y5MGVhYTYzYmQ2MGU5NDg5NmI4NWFlYTc1ZGRkZjRlOTM2NzA0MDRlNDJmOWU3Y2Y5MjE4YjI4ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTY3NTE2OTQxYTI2MjQ1YWQwYTBhYzZkNGMxOGEwY2EzMWFhOTI5ODhmNWFkNDU5ODcyNzMzZGQzZTE5NzM0MSJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1238-L1243",
+          "version": "repo-lines-v1:sha256:a97bf52bdf5bf06436cda1d80464a817d23e81489ab3fff645895062f9a97a82:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTdiNTM2Yzg2NDllZDE0NjBkNTcyMTdlNWNjMGIyZWQ2MTI0N2YyZTAwMTQyMjY0ZmE3YTAyMWJjZDgwNTk4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTFjYTdhYmI3ODczNzY1NjU4NDE3NGU2NzIwYjBiOTUwZTc2ZTRkOWQ2MmUyN2E4MmJhY2RjYjg0ZWI1NmRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTNlYzc0YTFkYzE3MDMzNDI0MDgwYWYzYzgwYjkyZmE4ZjFmODI2NjY0OWRjYzRhMzA2MDk5YjMxYjlhNjE5OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTY3NTE2OTQxYTI2MjQ1YWQwYTBhYzZkNGMxOGEwY2EzMWFhOTI5ODhmNWFkNDU5ODcyNzMzZGQzZTE5NzM0MSJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L41-L45",
+          "version": "repo-lines-v1:sha256:9dda13cebf0ac551822da6a16a04596b2260f4616b8d75e5b457d459e0734b0c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWVhZmJhZWY4ZThmZjdlZTEwMTdkNzNiODc3ZDZmMGZlYzEzZjBhNTU1MzExZDhiNGJmMzBkMzM5OWU3Mjc2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjhhOWYwMDJmYjU1MGI4OWFjMTFiNDYwYjIwMWMyMDZjODkzMjEyMmNhZTE3YjQ0NzljZjA2ODA1Mjc5YWM2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjNmMjE4MzA5ZjdmYmMxNGI2N2FhMWMwZGJlYjQyNjIzZDQ1YTUwMzIzYWFjODg0OGU5ODkyMzRiYmY4ZTA0ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjBiMjZlOWM3YzVmN2MzY2ExMTRiMTU3ODZmMTYyYTM0NTM1YWU0NzM3YWU0MmJjYWRhNGUyMTRmM2Q1Y2RmMyJ9"
+        },
+        {
+          "resource": "repo://tests/test_lifecycle_hooks.py#L439-L489",
+          "version": "repo-lines-v1:sha256:7dc1d5fc83b076dbad12a2915063838c58f8fce77c39195c12ab2463ea928996:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiODJhNmE2NmI3ZDVmN2MwMmE4NDk0NTk5OWZkMmQzNzZiNmQ3ZjdjNjE5ZWFhMDc1NjBlMDA1YTcyZTZlNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIwMmVmNDIwMDg0YzdjYTRmYjY5ZDQ2NmY3Y2UzMmRiNWJiNDE5YzhhZTk2NzlmNmU1NDk2NzkxYTFlMzJmZjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNmMGU0ZWRkMDc1M2NiZjM3OTJmZTQ1YTBiOGM5MWI4Yzg4Y2ViYjVjYjRlZTU0OWE0NDUzYTBiNGRiZTNlNGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE3MTFjYTAwZmQ2OTVmMThkMjFlODQ4YjNlYjE1ODAxOWQ2NzBjOWExNWIwMWIzMzdlYWQxZTc2ZjMwMjUxZmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3ee54c45a6374683a0b8aef258e22890",
+      "statement": "The Context Mode hook-output filter copies only hookEventName and additionalContext and drops every decision and input rewrite, so the Claude Code matcher is a second safeguard against the Agent prompt rewrite.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L20-L41",
+          "version": "repo-lines-v1:sha256:00cc835ab1248d85c2ed8f6d356763c68edf03d27066ca48f99628b66699fe94:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxNTgwZjY1MjI2NjBlNjUzYzVmZjU3NTU4YTFhMjdhMjFmMDk4ZmVjYzZjZWI4MzVjYTc3NDZkZjVhM2Q2YWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1NjYzODIzNjNlYzBhMGZmMzJhYzhiNmQ5OTE2NzYzNGI0ZTk5NGVlM2Q5NWZmMTIyMTM4YjZlNTRjY2E2N2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlMGVhYzQ1ZGRlZDljNTk2YTY5YWJkZDBhNTRmYTczMzIwYjQwNTdjZDQxY2ViZjhkMTc5MjZjZGMwMjRmMTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkZTYyYTJhMmE3N2E4MTc5YWUyNWRmMWU4YjVhZjI5MmFlNzliNjM3Yzc0MjA3OWUxMjAyNTg5YTBmNWJiZGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_da118ad36ffd407ab1dbd86dd685a84d",
+      "statement": "pretool_routing_errors in scripts/validate_targets.py requires CLAUDE_CONTEXT_MODE_MATCHER for the claude-code Context Mode PreToolUse group and * for every other target, and rejects a Context Mode group that runs anything except context-mode-dispatch.sh.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L1503-L1564",
+          "version": "repo-lines-v1:sha256:44e2eaf5bbe9d010ad13b0ea2bad077d1dd768d3f6b7cf9e76ab3de486ae5c3f:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiZjY1NTRkNGUwMjViMzUxMGI3YzYwOWJlZDBjZTM2NWIxZDI1YTQ5MmJiZDlmNGI4NGM4MDlhZjFmODkzNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2ZjE0OTBlODU4MGY5YjU1OWQwZDNmMTExNmIyZDY0Mzc0MzFiZDU0MmMxY2M4YmE1Njc5YTIwZDk4Yzc5ZTcifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-23T06:45:08.272Z"
+    "at": "2026-11-11T15:10:30.745Z"
   }
 }
