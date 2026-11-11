@@ -18,7 +18,7 @@ current_phase:
 
 Approve this plan now. Start it in this order:
 
-1. Wait until the release stream settles (decision 1). The earliest date is 2026-11-22.
+1. Wait until the release stream settles (decision 1). The earliest date is 2026-11-26 (see "Approval record").
 2. Run the pre-branch spike below. It is evidence only.
 3. The planner writes the spike's exact pin, Node.js image, and server identity into Phases A and B.
 4. The start gate passes, and the branch is created.
@@ -26,6 +26,11 @@ Approve this plan now. Start it in this order:
 - **Not a pin bump.** Context Mode 2.x is a full rewrite. It changes the Node.js requirement, the server command, the server identity, the storage variable, and the hook output. This plan is a control-plane migration in three phases.
 - **Why not start now.** Upstream shipped 11 stable releases in 4 days (2.0.0 on 2026-11-04 to 2.1.7 on 2026-11-08). On 2026-11-12, npm still shows `latest: 2.1.7`. A fast release stream can change a contract during the work, and that forces a second spike. Waiting costs little: the dispatcher refuses every version except `1.0.169`, and the evidence found no 1.0.169 flaw that the kit is exposed to (medium confidence, REPORT.md §1).
 - **Why not "no-go".** 1.0.169 is the last 1.x release and gets no fixes. Its server calls the npm registry at startup and every hour, and no setting turns that off. Its install script can rewrite user-level Claude Code plugin files. The package has no npm provenance (a signed record of how the package was built). 2.x has no install script, signed provenance, no startup or hourly network calls, a working `--version`, and no Agent prompt rewrite (REPORT.md "Go or no-go").
+
+## Approval record
+
+- 2026-11-12: the user approved this plan and chose the recommended option for all seven decisions below: wait for the settle check and run the spike before the branch (1), drop Antigravity's Context Mode entry (2), drop `ctx_doctor` (3), MCP-only (4), Node.js 24 with the required slim-image check and an optional full CUDA build (5), `CONTEXT_MODE_DATA_DIR` under `.claude/.cache/context-mode/` (6), and one server identity chosen by spike S2 (7).
+- 2026-11-12 start-gate run: the docs branch is merged into `dev` (PR #54), Node.js is v24.15.0, and Docker is 28.3.1, but the settle check failed. The newest stable release is 2.1.8 (2026-11-11T22:11Z, npm `latest`), so nothing runs before 2026-11-26.
 
 ## Decisions for the user
 
@@ -35,7 +40,7 @@ Each decision lists the options, what each means in practice, and the recommenda
 
 - **Recommended: wait until the release stream settles, then run the spike before the branch.**
   - "Settled" means: the newest stable 2.x release on npm is at least 14 days old, and npm's `latest` tag points at it. The start gate checks both with one command.
-  - With 2.1.7 published on 2026-11-08, the earliest start is 2026-11-22. The 14-day window is a judgment: it is more than three times the length of the 4-day burst.
+  - Each new stable release restarts the window. 2.1.8 was published on 2026-11-11, so the earliest start is 2026-11-26. The 14-day window is a judgment: it is more than three times the length of the 4-day burst.
   - The spike then runs as an exploration under `.claude/explorations/`, like the 2026-11-11 spike. The planner writes its results into Phases A and B before you see the final phases, so nothing on the branch waits for a later answer.
   - If the settle check still fails on 2026-12-20, the orchestrator asks you whether to pin the newest release anyway (the spike still runs on it) or keep waiting.
 - **Start now (after the docs branch merges).** The spike runs on 2.1.7 now. This works, because everything is pinned. But a fix release during the work means a second spike, and possibly a second pin bump and another cache reset.

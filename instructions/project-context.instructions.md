@@ -165,9 +165,12 @@ Pull requests merged into `dev` since the 2026-10-20 refresh:
 - #52 `pre-receipt-phase-exemption`: the receipt-chain skip described above.
 - #53 `context-mode-agent-matcher`: the anchored Claude Code matcher
   described above.
+- #54 `readme-and-wiki-drift-fixes` (2026-11-12): README wording for Context
+  Mode routing and the "Verification Defaults" scope, and an OpenWiki refresh
+  for PRs #52 and #53.
 
 `origin/main` was last updated on 2026-10-23 by PR #50 (`dev` into `main`);
-`dev` is 9 commits ahead of it (PRs #51 to #53). Releasing `dev` to `main` is
+`dev` is 12 commits ahead of it (PRs #51 to #54). Releasing `dev` to `main` is
 the user's call.
 
 Pinned versions: Context Mode `1.0.169`, OpenWiki `0.7.2` (the guard allows
@@ -180,6 +183,10 @@ a per-host `--agent` server argument (Antigravity has none), ignores
 filter. A 2026-11-11 evidence spike judged it a planned control-plane
 migration, not a pin bump (`.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`).
 Until then the dispatcher refuses any other version, so `1.0.169` stays safe.
+The migration plan `.claude/plans/context-mode-2x-migration.md` was approved
+on 2026-11-12 with every recommended option (MCP-only, drop `ctx_doctor`,
+drop Antigravity's entry, one server identity). It waits for its settle
+check: 2.1.8 shipped on 2026-11-11, so nothing runs before 2026-11-26.
 
 Before merging bootstrap changes, run:
 
@@ -232,9 +239,8 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   statements out of date (Context Mode routing for "three" targets, the
   consumer `src/` scope of "Verification Defaults", the Claude Code Context
   Mode matcher from PR #53, and the receipt-chain skip from PR #52). The big
-  plan `readme-and-wiki-drift-fixes` fixed all five on branch
-  `readme-and-wiki-drift-fixes_implementation`; `dev` keeps the old text
-  until that branch is merged.
+  plan `readme-and-wiki-drift-fixes` fixed all five, merged into `dev` as
+  PR #54 on 2026-11-12.
 - A one-phase plan gets no knowledge-refresh phase, so the wiki drifts until
   the next refresh (PRs #52 and #53 were the latest case). Refresh pages only
   through the `knowledge-refresh` skill, never by hand.
