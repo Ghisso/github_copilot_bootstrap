@@ -3,8 +3,8 @@ name: 2026-11-11_phase-B-knowledge-refresh
 type: small-plan
 parent_plan: readme-and-wiki-drift-fixes
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-11_readme-and-wiki-drift-fixes-phase-B.md
 ---
 
 # Small Plan: Knowledge Refresh and Stale-Claims Audit
@@ -21,21 +21,21 @@ Known stale statements (recorded by the PR #52 and PR #53 audits and the 2026-11
 
 ## Steps
 
-- [ ] **1. Refresh OpenWiki through its own tools.**
+- [x] **1. Refresh OpenWiki through its own tools.**
   - Owner: orchestrator (only the main session has the OpenWiki MCP tools).
   - Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
   - Call `openwiki_begin` with `mode: "update"`. In the planning step, include the three pages above plus every page OpenWiki flags. Write each page, reconcile every flagged claim, and require `openwiki_finish` to return `complete`. Right after `openwiki_begin`, run `git status --porcelain -- AGENTS.md CLAUDE.md` (the skill's restore check).
   - On every page the run rewrites, map each cited range from the recorded base (`gitHead` in `openwiki/.last-update.json`) to the current file and check the text there. Quote any page `description:` that holds a colon.
   - No other agent edits tracked files while the run is open. Never hand-edit a generated page, a `.claims` file, or the root snippet; a wrong page is fixed by another `update` run.
 
-- [ ] **2. Audit live advice for stale claims.**
+- [x] **2. Audit live advice for stale claims.**
   - Owner: orchestrator, after `openwiki_finish` returns `complete`.
   - This phase is the big plan's last entry, so it runs the standing final-phase documentation, memory, and LEARN audit. Surfaces: `CLAUDE.md`, `AGENTS.md`, `README.md`, undated `docs/`, `shared/policies/`, `shared/skills/`, `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, state READMEs, `.claude/instructions/project-context.instructions.md`, and `.claude/MEMORY.md`.
   - Claims to look for: Context Mode routing described for "three" generated targets; a Claude Code Context Mode PreToolUse matcher of `*`; a receipt-chain check said to cover every completed phase with no exception.
   - Correct each live claim found. A fix made after `openwiki_finish` keeps the line count of the text it replaces. Leave dated records unchanged.
   - Record each surface and its outcome under the exact heading `## Stale-claims surfaces checked` in this phase's closeout session log.
 
-- [ ] **3. Review.**
+- [x] **3. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus: the refreshed pages match the code they cite; the three known statements are fixed; no root adapter carries an OpenWiki block; no `openwiki/.run.json` remains.
 
@@ -62,14 +62,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

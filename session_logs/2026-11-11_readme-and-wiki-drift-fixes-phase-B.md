@@ -23,6 +23,7 @@ Refresh the OpenWiki layer through OpenWiki's own MCP tools so it matches PR #52
 - Focused checks after the refresh: all eight required items exit 0 (`bash -c` with a minimal environment); `validate_targets.py` PASS; plan lint PASS; `verify.py fast` NOT_APPLICABLE.
 - Review round 1 (`code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`): gate PASS, no open requests, two MINORs. (1) `claim_52638dcd…` still asserts closed-log immutability and the errata rule, but my narrowed evidence (`docs/runtime-checks.md` 831-850) no longer covered that clause, which sits at 869-874. (2) The new hooks-page list item ran six sentences against the brief's one-or-two rule. Both fixed rather than accepted.
 - Corrective OpenWiki run `c5c0c5e7-5f84-4b4d-852c-c0d4ee771f42` (two page jobs, `openwiki_finish` `complete`): `claim_52638dcd…` gained `docs/runtime-checks.md#L869-L874` with its statement unchanged; the hooks bullet is now two sentences, and the reason moved to a three-sentence paragraph after the list. Afterwards root adapters unchanged, no `.run.json`, `.last-update.json` `complete` at `3d55f40`, the four grep items exit 0, and both pages' frontmatter parses.
+- Review round 2 (same six profiles, same reviewer): gate PASS, no findings, no open requests; both round-1 MINORs resolved, no other claim or range moved, and `.page-manifest.json` page versions match their sidecars.
 
 ## [LEARN] Entries
 
@@ -49,6 +50,8 @@ Refresh the OpenWiki layer through OpenWiki's own MCP tools so it matches PR #52
 ```text
 # filled in from verify closeout --format text at CLOSEOUT step 4
 ```
+
+- optional 1: PASS — each refreshed page's prose was read against the code it cites (generator, validator, filter, verifier, workflow policy, runtime docs, tests) by me and by the reviewer in two rounds; round 1 found one claim whose evidence missed its last clause and one over-long list item, a corrective OpenWiki run fixed both, and round 2 found no mismatch.
 
 ## Open Questions / Next Steps
 
