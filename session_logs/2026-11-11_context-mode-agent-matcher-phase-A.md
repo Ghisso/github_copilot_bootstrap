@@ -22,6 +22,8 @@ Generated Claude Code settings run the Context Mode PreToolUse hook only for `^(
 - Documenter (Step 4 and the docs half of Step 5): `docs/architecture.md`, `docs/smoke-tests.md` (two lines), `docs/runtime-checks.md` (three-group line and one passage in the Context Mode bullet). I re-wrapped one long line in `docs/runtime-checks.md`. Audit outcomes are under `## Stale-claims surfaces checked`.
 - Step 3: `generate_targets.py --all`, then `install_bootstrap.py . --allow-self --local-only`. `dist/multi-agent/.claude/settings.json` and `.claude/settings.json` now carry `^(Bash|Read|Grep|WebFetch|mcp__.*)$`; `dist/multi-agent/.codex/hooks.json` keeps `*`.
 - Checks on that tree: the plan's pytest set 403 passed, 1 skipped (the opt-in real-binary test); `validate_targets.py` PASS; `check_runtime.py` PASS; `validate_plan_frontmatter.py` exit 0. Optional: Claude Code 2.1.226's own matcher code on the generated value fires for Bash, Read, Grep, WebFetch, and three MCP names, and not for Agent, Task, TaskOutput, TaskStop, ReadMcpResourceTool, Edit, Write, Glob, NotebookEdit, WebSearch, or Skill; `CONTEXT_MODE_REAL=1 ... -k real_upstream` 1 passed.
+- `verify.py phase --format text` on that tree: PASS (ruff 0, mypy 0, pytest 5014 passed, 1 skipped; VFY-GEN-001 PASS).
+- Review round 1 started: `reviewer` with `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`; the diff packet is the outer-repo `git diff`.
 
 ## [LEARN] Entries
 
