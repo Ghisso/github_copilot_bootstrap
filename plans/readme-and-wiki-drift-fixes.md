@@ -1,14 +1,14 @@
 ---
 name: readme-and-wiki-drift-fixes
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: readme-and-wiki-drift-fixes_implementation
 started_at: 2026-11-11T14:29:35Z
 phases:
   - 2026-11-11_phase-A-readme-wording-fixes
   - 2026-11-11_phase-B-knowledge-refresh
-current_phase: 2026-11-11_phase-B-knowledge-refresh
+current_phase: 
 ---
 
 # Big Plan: README and Wiki Drift Fixes
