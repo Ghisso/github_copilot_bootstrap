@@ -92,11 +92,12 @@ regenerate/reinstall command.
 Optional helpers:
 
 - `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
-  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
+  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. On Claude Code the `PreToolUse` hook runs only under the anchored matcher `^(Bash|Read|Grep|WebFetch|mcp__.*)$`. It is anchored because Claude Code reads such a matcher as an unanchored regular expression and also tries a tool's older names, so `TaskOutput` would otherwise match. `Agent` is left out because Context Mode's only `Agent` action rewrites the subagent prompt, and auto mode refuses a call whose input a hook changed. The filter already drops that rewrite, so leaving `Agent` out is a second safeguard. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
 
   1. Run `uv run python tests/fixtures/context_mode_hook/capture.py [--out-root DIR]`. It records raw upstream output, not filtered output, by running the pinned `context-mode hook <target> <event>` directly with the `CONTEXT_MODE_DIR` and `CONTEXT_MODE_PROJECT_ROOT` the dispatcher passes, in a temporary Git repository with a temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and a private `TMPDIR` (upstream keeps once-per-session tip files in the OS temp directory). It copies the hook scripts there only to run `--self-check` first, which asserts the direct pinned launcher. It reads the pinned version and client-to-target mapping from `shared/hooks/scripts/context-mode-dispatch.sh`, so run it in this authoring repository. It uses one session id per client, redacts temporary paths as `<TMP>`, and writes `<out-root>/<PINNED_CONTEXT_MODE_VERSION>/<client-id>/<event>-<case>.json` (default out-root: the fixture directory).
   2. Review the new outputs for decisions, input rewrites, and advice blocks. Update the filter if a new shape appears.
-  3. Run the hook tests, including the real-binary test:
+  3. Compare `CLAUDE_CONTEXT_MODE_MATCHER` in `scripts/generate_targets.py` with the tool branches of `routePreToolUse` in the new version's `hooks/core/routing.mjs`. The recorded fixtures cover only a fixed set of tools, so they do not show a newly routed one. Add any newly routed Claude tool except `Agent`, and add it to `test_rendered_claude_context_mode_pretool_matcher_skips_agent` in `tests/test_lifecycle_hooks.py`.
+  4. Run the hook tests, including the real-binary test:
 
   ```bash
   CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
@@ -245,8 +246,10 @@ Gemini CLI is out of scope.
 For the primary targets, generated `PreToolUse` routing must remain split into
 three groups: native file mutations (`Edit|Write` for both Claude and Codex)
 call `protect-files.sh`; `Bash` calls the single ordered
-`pretool-bash-guard.sh`; and `*` calls only best-effort
-`context-mode-dispatch.sh`. `Read` and MCP tools must have no mutation handler.
+`pretool-bash-guard.sh`; and a third group calls only best-effort
+`context-mode-dispatch.sh`. On Claude that group's matcher is
+`^(Bash|Read|Grep|WebFetch|mcp__.*)$`; on Codex it is `*`. `Read` and MCP
+tools must have no mutation handler.
 The Bash wrapper must preserve the guard order: protected files, dangerous Git,
 branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
 outside that lane and retain their existing sequencing.
