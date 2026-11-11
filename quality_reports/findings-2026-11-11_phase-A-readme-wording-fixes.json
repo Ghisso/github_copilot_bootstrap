@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-11-11T14:33:37Z",
+  "branch": "readme-and-wiki-drift-fixes_implementation",
+  "head_sha": "7b221ceeada1002882cbeca2502df32bdb815636",
+  "base_ref": "dev",
+  "merge_base_sha": "7b221ceeada1002882cbeca2502df32bdb815636",
+  "phase": "2026-11-11_phase-A-readme-wording-fixes",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "4cd37348a0d21a4610d689ea22196c8f2556a42a",
+  "changed_files": [
+    "README.md"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
