@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-11-11T13:20:04Z",
+  "branch": "context-mode-agent-matcher_implementation",
+  "head_sha": "d65099993368db1541333cde54a38f6b08f90ba2",
+  "base_ref": "dev",
+  "merge_base_sha": "d65099993368db1541333cde54a38f6b08f90ba2",
+  "phase": "2026-11-11_phase-A-context-mode-agent-matcher",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "885f22417a9b792f48701bf11f2db2c9f43ae9a0",
+  "changed_files": [
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
