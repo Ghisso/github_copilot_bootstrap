@@ -1690,3 +1690,19 @@
   receipt file at all; a malformed receipt, a later date, or an undated slug
   still fails. Slug dates are planning dates, so pair them with a date that
   marks completion, and test with a fixture shaped like the real consumer.
+- [LEARN:tooling] Claude Code 2.1.226 reads a hook matcher as exact names
+  only when it holds just letters, digits, `_`, `|`, comma, space, or `-` (a
+  listed legacy name such as `Task` still counts for `Agent`); anything else
+  is an unanchored JavaScript regex that is also tried on a tool's legacy
+  names (`Task` for `Agent`, `BashOutput` for `TaskOutput`, `KillBash` for
+  `TaskStop`). Anchor regex matchers: `Bash|Read|mcp__.*` also fires for
+  `TaskOutput` and `ReadMcpResourceTool`. In auto mode a PreToolUse hook that
+  returns `updatedInput` makes the call fail ("a hook changed this call's
+  input after auto mode reviewed it"). Found by running the matcher function
+  extracted from the installed binary under Node.
+- [LEARN:workflow] Check a forwarded consumer report against the kit version
+  the consumer runs. The 2026-11-11 report blamed the `*` Context Mode
+  matcher for failing Agent calls in auto mode, but the kit has dropped hook
+  input rewrites since `de5a2f8` (2026-10-17); an Agent call that fails while
+  `curl` is still redirected points to an unfiltered hook (an old install or
+  the user-level `context-mode@context-mode` plugin).

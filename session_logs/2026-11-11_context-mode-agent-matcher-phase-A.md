@@ -23,11 +23,29 @@ Generated Claude Code settings run the Context Mode PreToolUse hook only for `^(
 - Step 3: `generate_targets.py --all`, then `install_bootstrap.py . --allow-self --local-only`. `dist/multi-agent/.claude/settings.json` and `.claude/settings.json` now carry `^(Bash|Read|Grep|WebFetch|mcp__.*)$`; `dist/multi-agent/.codex/hooks.json` keeps `*`.
 - Checks on that tree: the plan's pytest set 403 passed, 1 skipped (the opt-in real-binary test); `validate_targets.py` PASS; `check_runtime.py` PASS; `validate_plan_frontmatter.py` exit 0. Optional: Claude Code 2.1.226's own matcher code on the generated value fires for Bash, Read, Grep, WebFetch, and three MCP names, and not for Agent, Task, TaskOutput, TaskStop, ReadMcpResourceTool, Edit, Write, Glob, NotebookEdit, WebSearch, or Skill; `CONTEXT_MODE_REAL=1 ... -k real_upstream` 1 passed.
 - `verify.py phase --format text` on that tree: PASS (ruff 0, mypy 0, pytest 5014 passed, 1 skipped; VFY-GEN-001 PASS).
-- Review round 1 started: `reviewer` with `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`; the diff packet is the outer-repo `git diff`.
+- Review round 1 (six profiles): gate PASS, no CRITICAL or MAJOR, two MINORs, both fixed. (1) `docs/runtime-checks.md`: the pin-bump procedure did not say to recheck the Claude matcher against the new version's routed tools, and the recorded fixtures cover a fixed tool set, so a newly routed tool would be skipped silently; added step 3 (compare `CLAUDE_CONTEXT_MODE_MATCHER` with `routePreToolUse` and extend the test). (2) `tests/test_lifecycle_hooks.py`: the helper comment claimed a full copy of the legacy-name table and the `TaskStop` row was never asserted; the coder reworded the comment (only the rows for Agent, TaskOutput, TaskStop; session aliases not modelled) and added `TaskStop` to the must-not-fire tuple. Reviewer notes also acted on: re-wrapped the orphan line in `docs/architecture.md`, and both `docs/architecture.md` and `docs/runtime-checks.md` now say the filter already drops the Agent rewrite, so leaving Agent out is a second safeguard.
+- After the fixes: regenerated, refreshed the self-install, and re-ran `verify.py phase`.
 
 ## [LEARN] Entries
 
-- (filled at closeout)
+- [LEARN:tooling] Claude Code 2.1.226 reads a hook matcher as exact names only when it holds just letters, digits, `_`, `|`, comma, space, or `-` (a listed legacy name such as `Task` still counts for `Agent`); anything else is an unanchored JavaScript regex that is also tried on a tool's legacy names (`Task` for `Agent`, `BashOutput` for `TaskOutput`, `KillBash` for `TaskStop`). Anchor regex matchers: `Bash|Read|mcp__.*` also fires for `TaskOutput` and `ReadMcpResourceTool`. In auto mode a PreToolUse hook that returns `updatedInput` makes the call fail ("a hook changed this call's input after auto mode reviewed it"). Found by running the matcher function extracted from the installed binary under Node.
+- [LEARN:workflow] Check a forwarded consumer report against the kit version the consumer runs. The 2026-11-11 report blamed the `*` Context Mode matcher for failing Agent calls in auto mode, but the kit has dropped hook input rewrites since `de5a2f8` (2026-10-17); an Agent call that fails while `curl` is still redirected points to an unfiltered hook (an old install or the user-level `context-mode@context-mode` plugin).
+
+## Stale-claims surfaces checked
+
+- `CLAUDE.md`, `AGENTS.md`: clean (no Context Mode matcher claim).
+- `README.md`: clean; its Context Mode sections cover the pin, the cache, and the MCP filter, with no matcher or every-tool claim.
+- `docs/architecture.md`: fixed; "Target-native PreToolUse routing" gives the per-target matcher, why it is anchored, why Agent is left out, and that the filter already drops the rewrite.
+- `docs/smoke-tests.md`: fixed (the Claude and Codex group list, and the observability bullet now covers both targets).
+- `docs/runtime-checks.md`: fixed (the three-group line, one passage in the Context Mode bullet, and a new pin-bump step 3 to recheck the matcher against `routePreToolUse`). Its Codex line ("wildcard-observability matcher groups", about line 935) is still accurate.
+- `docs/target-mapping.md`, `docs/native-client-acceptance.md`, `docs/plan-deterministic-commit-gate.md`, `docs/sidecar-provider-contract.md`: clean.
+- The `*` statements about `.agents/hooks.json` in `docs/runtime-checks.md` and `docs/smoke-tests.md`: still accurate; that is the Antigravity safety bridge, not a Context Mode hook.
+- `shared/policies/`: clean; `tool-routing.instructions.md` and `workspace.instructions.md` make no matcher claim.
+- `shared/skills/`, `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, and state READMEs under `shared/`: clean. The agent prompts already carry static Context Mode guidance (the four guarded tools).
+- Installed `.claude/` overlay: refreshed by the self-install; `.claude/settings.json` carries the anchored matcher.
+- `.claude/MEMORY.md`: no entry recommended `*` for Context Mode; the gate-repair entry on upstream hook output is still accurate. Two new entries added (above).
+- `openwiki/architecture/hooks-and-guardrails.md:88` ("`*` runs only the optional `context-mode-dispatch.sh`"): stale, left for the next knowledge-refresh phase; OpenWiki pages change only through OpenWiki's tools, and a one-phase plan gets no refresh phase. `docs/architecture.md` links to that page for the matcher groups, so the two disagree until then.
+- Dated records (`docs/2026-*`, archived plans, closed session logs): left unchanged.
 
 ## Verification
 
