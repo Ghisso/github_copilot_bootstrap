@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-11-11T15:13:20Z",
+  "branch": "readme-and-wiki-drift-fixes_implementation",
+  "head_sha": "3d55f40294672daf937c9c98433eaf4ccd3ad534",
+  "base_ref": "dev",
+  "merge_base_sha": "7b221ceeada1002882cbeca2502df32bdb815636",
+  "phase": "2026-11-11_phase-B-knowledge-refresh",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "09b15e1fb0a140f156219902b30a81eb4416bd7e",
+  "changed_files": [
+    "README.md",
+    "openwiki/.claims/architecture/hooks-and-guardrails.json",
+    "openwiki/.claims/operations/deterministic-verification.json",
+    "openwiki/.claims/quickstart.json",
+    "openwiki/.claims/workflows/lifecycle-and-task-lanes.json",
+    "openwiki/.last-update.json",
+    "openwiki/.page-manifest.json",
+    "openwiki/architecture/hooks-and-guardrails.md",
+    "openwiki/operations/deterministic-verification.md",
+    "openwiki/quickstart.md",
+    "openwiki/workflows/lifecycle-and-task-lanes.md"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
