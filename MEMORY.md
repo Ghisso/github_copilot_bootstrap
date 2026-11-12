@@ -1778,3 +1778,17 @@
   starts a planning run, because each page keeps its own base window. Use it
   to apply review fixes to generated pages instead of hand-editing them;
   `openwiki_finish` then records the same `gitHead` with a newer time.
+- [LEARN:tooling] Claude Code 2.1.226 can ask an MCP server for `tools/list`
+  before the `initialize` reply arrives (its newer client path, debug fields
+  `protocolEra`/`negotiatedProtocolVersion`, gated by
+  `tengu_mcp_protocol_negotiation_stdio` or `MCP_PROTOCOL_NEGOTIATION`). A
+  proxy that refuses requests until it has seen an accepted `initialize`
+  must queue requests that arrive while an `initialize` is pending, or the
+  whole session gets no tools. Reproduce by writing `initialize` and
+  `tools/list` back to back. Evidence:
+  `.claude/explorations/2026-11-12_context-mode-2x-live-checks/REPORT.md`.
+- [LEARN:tooling] Codex names MCP tools `mcp__<server with _ for ->__<tool>`
+  (for example `mcp__context_mode__ctx_index`) and treats a tool without
+  `readOnlyHint: true` as needing approval; `codex exec` with
+  `approval_policy=never` cancels such a call ("user cancelled MCP tool
+  call") before it reaches the server.
