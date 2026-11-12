@@ -10,8 +10,8 @@ const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats"]);
 const INDEX_ARGS = new Set(["content", "path", "source"]);
 const MAX_SOURCE_LENGTH = 200;
 const MAX_PENDING_LIST_IDS = 256;
-// One sentence per tool, naming no other tool and giving no routing advice.
-// Clients see these instead of the upstream descriptions.
+// One sentence per tool, each naming no tool outside the allowlist and giving
+// no routing advice. Clients see these instead of the upstream descriptions.
 const TOOL_DESCRIPTIONS = {
   ctx_index:
     "Index raw text, or one regular file inside this repository, into this repository's local Context Mode store; folders, links, and URLs are rejected.",
@@ -143,6 +143,20 @@ function handleClient(message, raw) {
   }
   const hasId = Object.hasOwn(message, "id");
   const key = idKey(message.id);
+  // MCP revision 2026-07-28 clients probe with `server/discover` and skip
+  // `initialize` when the probe succeeds. Context Mode 2.1.8 answers it, with
+  // its upstream `instructions`, and the filter would then refuse that client's
+  // `tools/list` and `tools/call` with -32001, because no `initialize` was
+  // accepted. -32601 is what an older server answers, so the client falls back
+  // to `initialize`. Never forwarded, before or after an accepted `initialize`.
+  if (message.method === "server/discover") {
+    if (!hasId) {
+      process.stderr.write("context-mode-filter: dropped a server/discover notification\n");
+      return;
+    }
+    send(process.stdout, errorResponse(message.id, -32601, "Method not found"));
+    return;
+  }
   if (message.method === "initialize" && hasId) {
     initializeIds.add(key);
   }

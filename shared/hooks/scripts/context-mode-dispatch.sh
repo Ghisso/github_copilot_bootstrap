@@ -14,10 +14,11 @@ PINNED_CONTEXT_MODE_VERSION="2.1.8"
 MIN_NODE_VERSION="24.15.0"
 FILTER_CONTRACT="ctx-index-files-only-v2"
 FILTER_SCRIPT="$SCRIPT_DIR/context-mode-mcp-filter.mjs"
-# Outside the ai-state working tree (.claude/) on purpose: state-sync.sh never
-# adds, commits, or restores anything at $REPO_ROOT other than under .claude/,
-# so a hostile/compromised ai-state remote can never read or overwrite this
-# file. See configure_storage below.
+# Outside the ai-state working tree (.claude/) on purpose: state-sync.sh adds
+# and commits only under .claude/, so this file never enters ai-state history,
+# and the root restore it runs copies only allowlisted adapter files, never this
+# one. This gives no protection against a remote that replaces the synced
+# scripts themselves. See configure_storage below.
 PROVENANCE_SECRET_FILE="$REPO_ROOT/.context-mode-provenance.secret"
 
 # Prints the installed package version of a direct `context-mode` executable.
@@ -148,12 +149,13 @@ select_storage_root() {
 }
 
 # Generates (once) and returns a random secret stored at
-# $PROVENANCE_SECRET_FILE, outside the nested ai-state repository. Comparing
-# this value is what makes the on-disk provenance marker unforgeable by a
-# hostile ai-state remote: the three plaintext fields it also checks
-# (repository, pinned version, filter contract) are public/predictable, but
-# the remote can never read or write this file, so it cannot learn or plant
-# a matching secret.
+# $PROVENANCE_SECRET_FILE, outside the nested ai-state repository. The marker
+# also checks three plaintext fields (repository, pinned version, filter
+# contract) that are public or predictable, so a marker planted without the
+# secret does not match. state-sync.sh adds and commits only under .claude/, so
+# this file never enters ai-state history, and the root restore copies only
+# allowlisted adapter files, never this one. This gives no protection against a
+# remote that replaces the synced scripts themselves.
 read_or_create_provenance_secret() {
   if [[ ! -s "$PROVENANCE_SECRET_FILE" ]]; then
     local secret="" tmp_secret

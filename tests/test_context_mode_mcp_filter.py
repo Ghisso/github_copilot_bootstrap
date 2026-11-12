@@ -34,6 +34,13 @@ KIT_DESCRIPTIONS = {
         "store."
     ),
 }
+# The `_meta` a client of MCP revision 2026-07-28 puts on its requests. Real
+# Context Mode 2.1.8 answers `server/discover` only when it carries these keys.
+MODERN_META = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientCapabilities": {},
+    "io.modelcontextprotocol/clientInfo": {"name": "pytest", "version": "0"},
+}
 
 FAKE_UPSTREAM = """
 import json, os, sys
@@ -84,6 +91,14 @@ def tool(name):
 
 def handle(m):
     mid = m.get('id'); method = m.get('method')
+    # The trace comes before any `id` check, so it also records a message that
+    # gets no reply.
+    if method == 'tools/call':
+        open(os.environ['FAKE_TRACE'], 'a').write(m['params']['name'] + '\\n')
+    elif method == 'server/discover':
+        open(os.environ['FAKE_TRACE'], 'a').write('server/discover\\n')
+    if 'id' not in m:
+        return  # a real server does not answer a notification
     if method == 'initialize':
         capabilities = {'experimental': {'x': {}}, 'prompts': {}, 'resources': {}}
         if not os.environ.get('FAKE_NO_TOOLS_CAPABILITY'):
@@ -102,7 +117,15 @@ def handle(m):
         names = ['ctx_index', 'ctx_search', 'ctx_stats', 'ctx_doctor', 'ctx_execute', 'ctx_fetch_and_index', 'future_tool']
         r = {'tools': [tool(n) for n in names]}
     elif method == 'tools/call':
-        open(os.environ['FAKE_TRACE'], 'a').write(m['params']['name'] + '\\n'); r = {'content': [{'type': 'text', 'text': 'ok'}]}
+        r = {'content': [{'type': 'text', 'text': 'ok'}]}
+    elif method == 'server/discover':
+        # Like Context Mode 2.1.8 for a request that carries the 2026-07-28 `_meta`.
+        r = {
+            'supportedVersions': ['2026-07-28'],
+            'capabilities': {'tools': {}},
+            'instructions': 'Upstream advice: use ctx_execute for large output.',
+            '_meta': {'io.modelcontextprotocol/serverInfo': {'name': 'context-mode', 'version': 'dev'}},
+        }
     else:
         r = {'echo': method}
     print(json.dumps({'jsonrpc': '2.0', 'id': mid, 'result': r}), flush=True)
@@ -180,12 +203,17 @@ def _descriptions(schema: Any, path: str = "") -> list[str]:
     return found
 
 
+def _send(process: subprocess.Popen[str], message: dict[str, object]) -> None:
+    assert process.stdin is not None
+    process.stdin.write(json.dumps({"jsonrpc": "2.0", **message}) + "\n")
+    process.stdin.flush()
+
+
 def _request(
     process: subprocess.Popen[str], message: dict[str, object]
 ) -> dict[str, object]:
-    assert process.stdin is not None and process.stdout is not None
-    process.stdin.write(json.dumps(message) + "\n")
-    process.stdin.flush()
+    assert process.stdout is not None
+    _send(process, message)
     return json.loads(process.stdout.readline())
 
 
@@ -322,16 +350,34 @@ def test_tools_list_passes_through_only_boolean_annotations(
     process.terminate()
 
 
+@pytest.mark.parametrize(
+    "extra_params",
+    [{}, {"_meta": MODERN_META}],
+    ids=["plain-params", "modern-meta"],
+)
 def test_tools_list_and_call_are_refused_until_an_initialize_is_accepted(
-    tmp_path: Path, fake_upstream: tuple[Path, Path]
+    tmp_path: Path, fake_upstream: tuple[Path, Path], extra_params: dict[str, object]
 ) -> None:
     """No `initialize` has been sent, so the identity gate is shut: a
     request-shaped `tools/list` and `tools/call` get -32001 and never reach
-    upstream. Unlike the mismatch test below, silence cannot pass this."""
+    upstream, also when they carry the 2026-07-28 `_meta`, as a client that
+    skipped `initialize` would send them. Unlike the mismatch test below,
+    silence cannot pass this."""
     fake, trace = fake_upstream
     process = _start(tmp_path, fake, trace)
-    listing = _request(process, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-    call = _call(process, 3, "ctx_search", {})
+    listing = _request(
+        process,
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": extra_params},
+    )
+    call = _request(
+        process,
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {"name": "ctx_search", "arguments": {}, **extra_params},
+        },
+    )
     assert (listing["id"], listing["error"]["code"]) == (2, -32001)  # type: ignore[index]
     assert (call["id"], call["error"]["code"]) == (3, -32001)  # type: ignore[index]
     assert not trace.exists()
@@ -761,22 +807,120 @@ class _LineReader:
         self._fd = stream.fileno()
         self._buffer = b""
 
+    def next(
+        self, waiting_for: str = "the next message", *, deadline: float | None = None
+    ) -> dict[str, Any]:
+        """Return the next message, whatever it is: a line is never skipped."""
+        deadline = deadline or time.monotonic() + REAL_TIMEOUT_SECONDS
+        while b"\n" not in self._buffer:
+            remaining = deadline - time.monotonic()
+            ready = remaining > 0 and select.select([self._fd], [], [], remaining)[0]
+            assert ready, f"no message in time while waiting for {waiting_for}"
+            chunk = os.read(self._fd, 65536)
+            assert chunk, f"server closed stdout while waiting for {waiting_for}"
+            self._buffer += chunk
+        line, _, self._buffer = self._buffer.partition(b"\n")
+        message: dict[str, Any] = json.loads(line)
+        return message
+
     def response(self, request_id: int) -> dict[str, Any]:
         deadline = time.monotonic() + REAL_TIMEOUT_SECONDS
         while True:
-            while b"\n" not in self._buffer:
-                remaining = deadline - time.monotonic()
-                ready = (
-                    remaining > 0 and select.select([self._fd], [], [], remaining)[0]
-                )
-                assert ready, f"no response to request {request_id} in time"
-                chunk = os.read(self._fd, 65536)
-                assert chunk, f"server closed stdout before answering {request_id}"
-                self._buffer += chunk
-            line, _, self._buffer = self._buffer.partition(b"\n")
-            message: dict[str, Any] = json.loads(line)
+            message = self.next(f"request {request_id}", deadline=deadline)
             if message.get("id") == request_id:
                 return message
+
+
+def _assert_method_not_found(reply: dict[str, Any], request_id: int) -> None:
+    """An older server's answer to `server/discover`: an error and no result."""
+    assert "result" not in reply, reply
+    assert reply["id"] == request_id, reply
+    assert reply["error"]["code"] == -32601, reply
+
+
+def _discover(request_id: int | None = None) -> dict[str, object]:
+    """A `server/discover` probe with the 2026-07-28 `_meta`; no id makes it a
+    notification."""
+    message: dict[str, object] = {
+        "method": "server/discover",
+        "params": {"_meta": MODERN_META},
+    }
+    if request_id is not None:
+        message["id"] = request_id
+    return message
+
+
+def test_discover_probe_is_refused_before_initialize(
+    tmp_path: Path, fake_upstream: tuple[Path, Path]
+) -> None:
+    """The 2026-07-28 probe must get the error an older server gives, so a client
+    that speaks both revisions falls back to `initialize`. Forwarded, the real
+    2.1.8 answers it and the client never calls `initialize`."""
+    fake, trace = fake_upstream
+    process = _start(tmp_path, fake, trace)
+    assert process.stdout is not None
+    replies = _LineReader(process.stdout)
+    _send(process, _discover(0))
+    _assert_method_not_found(replies.next("the probe"), 0)
+    # Barrier: the fake upstream answers in order, so once the ping reply is
+    # back, a forwarded probe would already have written the trace.
+    _send(process, {"id": 2, "method": "ping"})
+    assert replies.next("the ping")["id"] == 2
+    assert not trace.exists()
+    process.terminate()
+
+
+def test_notification_shaped_discover_probe_is_dropped_before_initialize(
+    tmp_path: Path, fake_upstream: tuple[Path, Path]
+) -> None:
+    """A probe with no `id` has nobody to answer: it is dropped, not forwarded."""
+    fake, trace = fake_upstream
+    process = _start(tmp_path, fake, trace)
+    assert process.stdout is not None
+    replies = _LineReader(process.stdout)
+    _send(process, _discover())
+    _send(process, {"id": 2, "method": "ping"})
+    assert replies.next("the ping")["id"] == 2
+    assert not trace.exists()
+    process.terminate()
+
+
+def test_discover_probe_falls_back_to_initialize_and_is_refused_again_after_it(
+    tmp_path: Path, fake_upstream: tuple[Path, Path]
+) -> None:
+    """The whole fallback: probe refused, `initialize` accepted and reduced,
+    three tools listed, then the probe is refused again, in both forms. Every
+    reply is read in order, so a missing or extra line fails the test."""
+    fake, trace = fake_upstream
+    process = _start(tmp_path, fake, trace)
+    assert process.stdout is not None
+    replies = _LineReader(process.stdout)
+    _send(process, _discover(0))
+    _assert_method_not_found(replies.next("the probe"), 0)
+    _send(process, {"id": 1, "method": "initialize", "params": {}})
+    initialized = replies.next("initialize")
+    assert initialized["id"] == 1
+    assert set(initialized["result"]) == {
+        "protocolVersion",
+        "capabilities",
+        "serverInfo",
+    }
+    _send(process, {"method": "notifications/initialized"})
+    _send(process, {"id": 2, "method": "tools/list"})
+    listing = replies.next("tools/list")
+    assert listing["id"] == 2
+    tools = listing["result"]["tools"]
+    assert [tool["name"] for tool in tools] == TOOL_NAMES
+    assert [tool["description"] for tool in tools] == [
+        KIT_DESCRIPTIONS[name] for name in TOOL_NAMES
+    ]
+    _send(process, _discover(3))
+    _assert_method_not_found(replies.next("the second probe"), 3)
+    _send(process, _discover())
+    _send(process, {"id": 4, "method": "ping"})
+    assert replies.next("the ping")["id"] == 4
+    assert not trace.exists()
+    process.terminate()
 
 
 @pytest.mark.skipif(
@@ -862,6 +1006,13 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
             return replies.response(request_id)
 
         try:
+            # The 2026-07-28 probe comes first, as a client that speaks both
+            # revisions sends it. Real 2.1.8 would answer it, with upstream
+            # `instructions`; the filter must give the error an older server
+            # gives, so the client falls back to `initialize`.
+            send(_discover(0))
+            _assert_method_not_found(replies.response(0), 0)
+
             send(
                 {
                     "id": 1,

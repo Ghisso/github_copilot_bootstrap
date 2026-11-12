@@ -98,7 +98,7 @@ Optional helpers:
   - **Older caches.** A cache the dispatcher did not produce for this exact pin is moved aside as `<cache>.untrusted.<timestamp>.<pid>`, never migrated and never deleted. Provenance includes the exact version, so every pin bump starts with an empty cache, and the 1.x cache is not imported. The moved folders use disk space; delete them by hand when you no longer need them.
   - **Lost race.** Two servers that start together may both try to move the old cache. When the move fails and the cache folder no longer exists, the dispatcher treats the other server as the winner, warns once, and continues with a fresh root. When the folder still exists, the move fails as before and the server exits nonzero.
 
-  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs.
+  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. The filter answers `server/discover`, the probe of the 2026-07-28 MCP revision, itself with `-32601` and never forwards it, so a client that speaks both revisions falls back to `initialize` and never receives the upstream `instructions` that the probe's answer would carry. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs.
 
   To bump `PINNED_CONTEXT_MODE_VERSION`:
 
@@ -121,6 +121,7 @@ Optional helpers:
   - Upstream 2.x folder indexing has no bound on files, depth, or size, follows symbolic links inside the repository's parent folder, and ignores a `.gitignore` above the folder. That is why the filter accepts only content or one regular file.
   - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
   - Antigravity gets no Context Mode server entry, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - The filter speaks only the `initialize`-based MCP revisions (2025-11-25 and earlier). A client that speaks both revisions falls back to them; a client that only speaks 2026-07-28 gets no Context Mode tools.
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
 
   Rollback: reverting the merge brings back the previous pin.
