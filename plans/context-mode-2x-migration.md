@@ -1,7 +1,7 @@
 ---
 name: context-mode-2x-migration
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: context-mode-2x-migration_implementation
 started_at: 2026-11-12T07:07:18Z
@@ -9,7 +9,9 @@ phases:
   - 2026-11-12_phase-A-context-mode-mcp-only-surface
   - 2026-11-12_phase-B-context-mode-2x-switch
   - 2026-11-12_phase-C-knowledge-refresh
-current_phase: 
+  - 2026-11-12_phase-D-context-mode-discover-fallback
+  - 2026-11-12_phase-E-knowledge-refresh
+current_phase: 2026-11-12_phase-D-context-mode-discover-fallback
 ---
 
 # Big Plan: context-mode-2x-migration
@@ -23,7 +25,7 @@ On 2026-11-12 the user overrode step 1 and chose "Start now" (see "Approval reco
 3. The planner writes the spike's exact pin, Node.js image, and server identity into Phases A and B. Done on 2026-11-12.
 4. The start gate passes, and the branch is created.
 
-- **Not a pin bump.** Context Mode 2.x is a full rewrite. It changes the Node.js requirement, the server command, the server identity, the storage variable, and the hook output. This plan is a control-plane migration in three phases.
+- **Not a pin bump.** Context Mode 2.x is a full rewrite. It changes the Node.js requirement, the server command, the server identity, the storage variable, and the hook output. This plan is a control-plane migration in three phases (two more were added when it was reopened on 2026-11-12).
 - **Why not start now.** Upstream shipped 11 stable releases in 4 days (2.0.0 on 2026-11-04 to 2.1.7 on 2026-11-08). On 2026-11-12, npm still shows `latest: 2.1.7`. A fast release stream can change a contract during the work, and that forces a second spike. Waiting costs little: the dispatcher refuses every version except `1.0.169`, and the evidence found no 1.0.169 flaw that the kit is exposed to (medium confidence, REPORT.md §1).
 - **Why not "no-go".** 1.0.169 is the last 1.x release and gets no fixes. Its server calls the npm registry at startup and every hour, and no setting turns that off. Its install script can rewrite user-level Claude Code plugin files. The package has no npm provenance (a signed record of how the package was built). 2.x has no install script, signed provenance, no startup or hourly network calls, a working `--version`, and no Agent prompt rewrite (REPORT.md "Go or no-go").
 
@@ -32,6 +34,21 @@ On 2026-11-12 the user overrode step 1 and chose "Start now" (see "Approval reco
 - 2026-11-12: the user approved this plan and chose the recommended option for all seven decisions below: wait for the settle check and run the spike before the branch (1), drop Antigravity's Context Mode entry (2), drop `ctx_doctor` (3), MCP-only (4), Node.js 24 with the required slim-image check and an optional full CUDA build (5), `CONTEXT_MODE_DATA_DIR` under `.claude/.cache/context-mode/` (6), and one server identity chosen by spike S2 (7).
 - 2026-11-12 start-gate run: the docs branch is merged into `dev` (PR #54), Node.js is v24.15.0, and Docker is 28.3.1, but the settle check failed. The newest stable release is 2.1.8 (2026-11-11T22:11Z, npm `latest`), so nothing runs before 2026-11-26.
 - 2026-11-12, later the same day: the user changed decision 1 to "Start now" ("start the Context Mode migration now, don't want to wait. we can bump it up later"). The settle check is waived for this start. The spike runs on the newest stable release on npm at spike time (2.1.8), and a later release is a pin bump through Phase B's pin-bump procedure, not a second spike before this branch. Decisions 2 to 7 keep their recommended options.
+
+## Reopened 2026-11-12
+
+- All three phases were complete at `7895856`. Live client checks after that (`.claude/explorations/2026-11-12_context-mode-2x-live-checks/REPORT.md`) found a Claude Code 2.1.226 session with no Context Mode tools (`Failed to fetch tools: Context Mode server is not initialized`). The quality report `.claude/quality_reports/2026-11-12_context-mode-2x-live-check-findings.md` records it as Finding 1 (MAJOR), next to three MINOR findings.
+- The user asked to "fix problem 1" on this branch before the pull request. The branch exists and is not merged, so the plan is reopened under "Reopening a completed big plan" in `.claude/instructions/workflow.instructions.md`.
+- The live check blamed a client that sends `tools/list` before the `initialize` reply. A planner probe of the real 2.1.8 server on 2026-11-12 found the actual cause, and two independent plan reviews reproduced it: the filter forwards the MCP 2026-07-28 `server/discover` probe; 2.1.8 answers it, with its upstream `instructions`, when the probe carries the new revision's `_meta`; the client then skips `initialize`, and the filter refuses its `tools/list` with `-32001`. Phase D records the evidence and appends a correction to both reports.
+- New phases:
+  - D, `2026-11-12_phase-D-context-mode-discover-fallback`: the filter answers `server/discover` itself with `-32601`, so clients fall back to `initialize` (Finding 1, REQ-007). Its Step 5 holds the Finding 3 comment and README fixes as a separable unit, which the user can drop together with the matching Phase E items;
+  - E, `2026-11-12_phase-E-knowledge-refresh`: the new final OpenWiki refresh and stale-claims audit. The plan already has a knowledge-refresh phase (C), so it must end with a new one.
+- Findings 2 and 4 are not in scope; the quality report gives the reasons.
+- Phases A to C keep their small plans, session logs, findings, and receipts unchanged. Phase C stays where it is in `phases:`.
+- Reopen rule, steps 7 and 8: the orchestrator sets Phase D to `in-progress` by hand when its work starts, because no hook does this on an existing branch, and checkpoints the nested `.claude` repository right after saving these plans.
+- Follow-ups, not in this plan:
+  - refuse every method except `initialize` and `ping` before an accepted `initialize`, instead of passing other methods through;
+  - check whether VS Code Copilot or Codex send `server/discover`.
 
 ## Decisions for the user
 
@@ -303,7 +320,7 @@ Terms:
   - `ctx_index` with `url`;
   - the Copilot CLI agent id;
   - migrating 1.x data, and deleting quarantined caches;
-  - filtering MCP methods other than `initialize`, `tools/list`, and `tools/call`;
+  - filtering MCP methods other than `initialize`, `tools/list`, and `tools/call` (Phase D adds one exception: the filter answers `server/discover` itself with `-32601`);
   - changing the provenance scheme;
   - rewriting tool-name text inside tool results;
   - updating the host's global Context Mode install, and refreshing consumers (the user's call after the merge);
@@ -350,12 +367,15 @@ Existing contracts this plan touches:
 | REQ-004 | No Context Mode hook runs on any client; a legacy hook call exits 0 silently | `2026-11-12_phase-A-context-mode-mcp-only-surface` | Lifecycle, validator, dispatcher tests |
 | REQ-005 | 2.x data lives only under `.claude/.cache/context-mode/`; older caches are moved aside, never deleted; a lost quarantine race does not fail | `2026-11-12_phase-B-context-mode-2x-switch` | Dispatcher and state-sync tests; real server test |
 | REQ-006 | The server starts with the spike's single identity: `--agent codex`, from the outer repository root | `2026-11-12_phase-B-context-mode-2x-switch` | Dispatcher tests; real server test |
+| REQ-007 | The filter answers the MCP 2026-07-28 `server/discover` probe itself with `-32601` and never forwards it, so a client that speaks both revisions falls back to `initialize` and gets the three tools; no upstream `instructions` reach a client through the probe | `2026-11-12_phase-D-context-mode-discover-fallback` | Filter tests; real server test |
 
 ## Phases
 
 - [x] `2026-11-12_phase-A-context-mode-mcp-only-surface` — on 1.0.169: no Context Mode hooks, three tools, filtered `initialize`, kit descriptions, files-only `ctx_index`, no Antigravity entry
 - [x] `2026-11-12_phase-B-context-mode-2x-switch` — Node.js 24 image, the 2.1.8 pin, one server identity started from the repository root, data root, Node.js floor, quarantine race, docs
 - [x] `2026-11-12_phase-C-knowledge-refresh` — OpenWiki refresh and the stale-claims audit
+- [ ] `2026-11-12_phase-D-context-mode-discover-fallback` — reopen: the filter answers the 2026-07-28 `server/discover` probe itself, so clients use `initialize` (Finding 1); docs; the separable Finding 3 comment fixes
+- [ ] `2026-11-12_phase-E-knowledge-refresh` — reopen: OpenWiki refresh and the stale-claims audit after Phase D
 
 ## Phase Summary
 
@@ -364,8 +384,10 @@ Existing contracts this plan touches:
 | A | coder, documenter, orchestrator, reviewer | filter, dispatcher, generator, `shared/hooks/hooks.json`, validator, tests, fixture deletion, agent prompts, `onboard` skill, routing policy, root guidance, docs | `ponytail` (full), `testing-patterns`, `integration-gate-spike`, `documentation` | `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation` | `CONTEXT_MODE_REAL=1` server test against the host's 1.0.169 |
 | B | coder, documenter, orchestrator, reviewer | dispatcher, Dockerfile, validator, tests, routing policy, docs | `ponytail` (full), `testing-patterns`, `integration-gate-spike`, `documentation` | `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation` | private-prefix `--version`; `CONTEXT_MODE_REAL=1` server test; slim-image checks |
 | C | orchestrator, documenter, reviewer | `openwiki/**` (through OpenWiki only), live-advice surfaces | `knowledge-refresh`, `openwiki`, `documentation` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | none |
+| D | coder, documenter, orchestrator, reviewer | filter (`server/discover` branch), filter tests, one README sentence, `docs/runtime-checks.md`, live-check correction notes (AI state); Finding 3 unit: one filter comment, two dispatcher comments, one README sentence | `ponytail` (full), `testing-patterns`, `integration-gate-spike`, `documentation` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | private-prefix `CONTEXT_MODE_REAL=1` server test, now sending the `server/discover` probe first |
+| E | orchestrator, documenter, reviewer | `openwiki/**` (through OpenWiki only), live-advice surfaces | `knowledge-refresh`, `openwiki`, `documentation` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | none |
 
-The order is A, then B, then C. Phase B's filter and test changes build on Phase A.
+The order is A, then B, then C, then D, then E. Phase B's filter and test changes build on Phase A. Phase D changes the filter that Phases A and B built, and Phase E refreshes OpenWiki after it.
 
 ## Re-plan Notes (non-recommended options)
 
@@ -403,13 +425,14 @@ The order is A, then B, then C. Phase B's filter and test changes build on Phase
 
 ## Done Criteria
 
-- All three phases are complete, with `verify phase` PASS and `verify closeout` PASS on their required items.
+- All five phases are complete, with `verify phase` PASS and `verify closeout` PASS on their required items. Since the 2026-11-12 reopen, the final phase is `2026-11-12_phase-E-knowledge-refresh`.
 - No Context Mode hook runs on any client, and a legacy hook call exits 0 silently.
 - The dispatcher pins 2.1.8, refuses every other version, refuses Node.js older than 24.15.0 in server mode, and starts the server as `--agent codex` from the repository root.
 - The client sees exactly three tools, kit descriptions, and no upstream `instructions`, and `ctx_index` accepts only content or one regular file inside the repository.
+- The filter answers the MCP 2026-07-28 `server/discover` probe itself with `-32601`, so a client that speaks both revisions falls back to `initialize` and gets the three tools (Phase D).
 - 2.x data lives under `.claude/.cache/context-mode/`. Older caches are moved aside, not deleted.
 - The devcontainer's Node.js image is 24.15 or newer and runs the pinned release.
-- No live surface outside dated records names `1.0.169`, and OpenWiki is refreshed.
+- No live surface outside dated records names `1.0.169`, and OpenWiki is refreshed after Phase D (Phase E).
 
 ## Verification
 
@@ -433,6 +456,8 @@ may also need to be a dedicated knowledge-refresh phase: see the canonical
 Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
 for exactly when and how, including its recursion guard.
 
+Since the 2026-11-12 reopen, that final phase is `2026-11-12_phase-E-knowledge-refresh`, and its closeout session log holds the `## Stale-claims surfaces checked` section. Phase C's earlier audit stays in Phase C's own log.
+
 ## Planner Self-Check (devil's advocate)
 
 A separate devil's advocate review ran on the first draft. Its items are resolved in this version. This table is the planner's own check of this version.
@@ -444,3 +469,10 @@ A separate devil's advocate review ran on the first draft. Its items are resolve
 | MCP-only gives up future session continuity | LOW | "Narrow" | ACCEPT: nothing reaches the model as wired; full continuity belongs in a later plan after live payloads are seen |
 | Phase A is large | MEDIUM | Split hooks and MCP surface | ACCEPT: most of it is deletion, and both halves rewrite the same sentences and files |
 | Kit descriptions can drift from upstream behavior | LOW | Keep upstream text and scrub blocked names | ACCEPT: upstream moved routing advice into the descriptions, and the kit's routing policy is the authority |
+| Phase D refuses the 2026-07-28 probe, so a client that only speaks 2026-07-28 gets no tools | LOW | Support the new revision in the filter | ACCEPT: no such client is in use; both Claude Code builds fall back to `initialize` on `-32601`; supporting the new revision needs its own plan |
+| Phase D's fix may get no live client confirmation | MEDIUM | Make a live client run a required check | ACCEPT: a live run needs a signed-in client and network, and the 2.1.226 build did not probe on 2026-11-12. The real-binary test proves against 2.1.8 that the filter answers the probe with `-32601`; Optional Verification records live runs of both builds |
+| Other methods still pass through before an accepted `initialize` | LOW | Refuse every method except `initialize` and `ping` until then | ACCEPT for this reopen: recorded as a follow-up under "Reopened 2026-11-12" |
+| Phase D's Finding 3 comment fixes are outside "fix problem 1" | LOW | A separate plan | ACCEPT for now: Phase D's Step 5 isolates them with their own checks, so the user can drop them as a unit |
+| Phase E's wording checks could fail a correct refreshed page | LOW | No wording checks | ACCEPT: they look only for the method name `server/discover` and exact known stale phrases; a failing correct page gets another OpenWiki `update`, never a hand edit |
+
+The last five rows cover Phases D and E. Two devil's advocate rounds and two independent reviews checked them at the 2026-11-12 reopen.

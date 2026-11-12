@@ -1,0 +1,15 @@
+=== A: modern server/discover with _meta
+id=0 result keys=['_meta', 'cacheScope', 'capabilities', 'instructions', 'resultType', 'supportedVersions', 'ttlMs']
+   supportedVersions=["2026-07-28"]
+   _meta={"io.modelcontextprotocol/serverInfo": {"name": "context-mode", "version": "dev"}}
+   instructions starts: 'context-mode keeps large output out of the conversation.\n\nWhen a step counts, sums, filters or finds something in over about 20 lines of data (logs, test or bui'
+=== B: server/discover without _meta
+id=0 -> {"jsonrpc": "2.0", "id": 0, "error": {"code": -32601, "message": "Method not found"}}
+=== C: modern discover then modern tools/list, no initialize
+id=0 result keys=['_meta', 'cacheScope', 'capabilities', 'instructions', 'resultType', 'supportedVersions', 'ttlMs']
+   supportedVersions=["2026-07-28"]
+   _meta={"io.modelcontextprotocol/serverInfo": {"name": "context-mode", "version": "dev"}}
+   instructions starts: 'context-mode keeps large output out of the conversation.\n\nWhen a step counts, sums, filters or finds something in over about 20 lines of data (logs, test or bui'
+id=1 result keys=['_meta', 'cacheScope', 'resultType', 'tools', 'ttlMs']
+   _meta={"io.modelcontextprotocol/serverInfo": {"name": "context-mode", "version": "dev"}}
+   tools=['ctx_execute', 'ctx_batch', 'ctx_index', 'ctx_search', 'ctx_resume', 'ctx_stats', 'ctx_doctor', 'ctx_upgrade', 'ctx_purge']
