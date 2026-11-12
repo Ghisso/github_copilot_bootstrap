@@ -147,8 +147,10 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
 
 ## Current status and verification
 
-Onboarding was refreshed on `dev` at `7b221ce` on 2026-11-11.
-`uv run python scripts/check_runtime.py` printed 20 lines, all PASS.
+Onboarding was refreshed on `dev` at `9be6955` on 2026-11-12. `dev` matched
+`origin/dev`. `uv run python scripts/check_runtime.py` printed 20 lines, all
+PASS, and `uv run pytest tests/ -q` gave 5014 passed, 1 skipped (about
+5 minutes).
 
 Pull requests merged into `dev` since the 2026-10-20 refresh:
 
