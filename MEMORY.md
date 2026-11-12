@@ -1800,3 +1800,8 @@
   before checking the trace, because a forwarded message may be read after
   the check. Prove it with a mutation that answers AND forwards (Context
   Mode filter `server/discover` test, 2026-11-12).
+- [LEARN:documentation] OpenWiki copies each page's `description:` into the
+  generated folder `index.md`, so a wording fix in a description also changes
+  that index; stage and review both. Give a reviewer of generated wiki pages
+  a scoped `git diff -- openwiki/` file: it shows OpenWiki-only changes
+  (timestamps, key reordering in `.page-manifest.json`) apart from real edits.

@@ -36,14 +36,19 @@ Refresh OpenWiki through its own MCP tools so it matches Phase D (the filter ans
 - User-level memory outside the repository: `project_docs_drift_and_cm2_plan.md` and its index line updated with the reopen and Phase D.
 - OpenWiki: refreshed in Step 1; afterwards `1.0.169` in 0 pages, `fixtures/context_mode` in 0 pages, `neither read nor plant` in 0 pages, `server/discover` named on the dispatcher page. Not refreshed (recorded follow-up, Finding 4): five pages outside these runs with drifted Claim ranges and correct prose.
 
+- Review round 2 (same reviewer, six profiles): gate PASS, 0 findings, no open requests. It confirmed both fixes against the scoped diff, that the diff holds only the described changes (the hooks page prose is unchanged; `.page-manifest.json` only re-serialized two unchanged entries), and that no Phase C wording came back.
+- Closeout AI state: small plan `status: complete`, boxes ticked, Phase E ticked in the big plan (the post-commit hook sets the big plan `complete`); one documentation lesson in MEMORY.md and below.
+
 ## [LEARN] Entries
 
-- (filled at closeout)
+- [LEARN:documentation] OpenWiki copies each page's `description:` into the generated folder `index.md`, so a wording fix in a description also changes that index; stage and review both. Give a reviewer of generated wiki pages a scoped `git diff -- openwiki/` file, which separates OpenWiki-only changes (timestamps, key reordering) from real edits.
 
 ## Verification
 
-(filled at closeout)
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-E-knowledge-refresh.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had two MINORs and one open request, all resolved by the second OpenWiki run and the scoped diff).
+- optional 1: PASS — the reviewer read the refreshed prose and every cited range on both pages against the filter, the dispatcher, `state-sync.sh`, `restore-root-adapters.sh`, and the filter tests in two rounds; round 1's two mismatches were fixed by the second OpenWiki run and confirmed in round 2.
 
 ## Open Questions / Next Steps
 
-- Step 3 review, then closeout; this is the big plan's last phase.
+- This is the big plan's last phase. After its commit, opening a PR from `context-mode-2x-migration_implementation` to `dev` is the user's call.
+- Recorded follow-ups: refuse every method except `initialize` and `ping` before an accepted `initialize`; check whether VS Code Copilot or Codex send `server/discover`; refresh the five OpenWiki pages with drifted Claim ranges; Codex asks approval for `ctx_index`.

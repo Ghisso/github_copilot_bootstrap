@@ -375,7 +375,7 @@ Existing contracts this plan touches:
 - [x] `2026-11-12_phase-B-context-mode-2x-switch` — Node.js 24 image, the 2.1.8 pin, one server identity started from the repository root, data root, Node.js floor, quarantine race, docs
 - [x] `2026-11-12_phase-C-knowledge-refresh` — OpenWiki refresh and the stale-claims audit
 - [x] `2026-11-12_phase-D-context-mode-discover-fallback` — reopen: the filter answers the 2026-07-28 `server/discover` probe itself, so clients use `initialize` (Finding 1); docs; the separable Finding 3 comment fixes
-- [ ] `2026-11-12_phase-E-knowledge-refresh` — reopen: OpenWiki refresh and the stale-claims audit after Phase D
+- [x] `2026-11-12_phase-E-knowledge-refresh` — reopen: OpenWiki refresh and the stale-claims audit after Phase D
 
 ## Phase Summary
 
