@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-12
 **Plan:** `.claude/plans/2026-11-12_phase-A-context-mode-mcp-only-surface.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -56,6 +56,30 @@ start gate: PASS
 - [LEARN:testing] A refusal test that accepts "no reply" cannot fail when the refusal is deleted. Make the forwarded path produce a `result`, assert the exact error code and id, and prove the test fails against a copy with the refusal removed.
 
 ## Verification
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS      146.1s  uv run pytest tests/test_context_mode_mcp_filter.py tests/test_context_mode_dispatch.py tests/test_validate_targets.py tests/test_lifecycle_hooks.py tests/test_openwiki_guard.py tests/test_hook_gates.py -q --tb=short
+PASS        4.8s  uv run pytest tests/test_state_sync.py -q --tb=short -k cache
+PASS        4.4s  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q --tb=short -k real_upstream
+PASS        0.0s  test ! -e tests/fixtures/context_mode_hook
+PASS        0.0s  test "$(grep -c -F 'ctx_doctor' shared/hooks/scripts/context-mode-mcp-filter.mjs)" = "0"
+PASS        0.0s  test "$(grep -c -F 'PINNED_VERSION' shared/hooks/scripts/context-mode-mcp-filter.mjs)" = "0"
+PASS        0.0s  test "$(grep -c -F 'isDirectory' shared/hooks/scripts/context-mode-mcp-filter.mjs)" = "0"
+PASS        0.0s  test "$(grep -c -F 'ctx-index-file-content-v1' shared/hooks/scripts/context-mode-dispatch.sh)" = "0"
+PASS        0.0s  test "$(cat README.md scripts/generate_targets.py shared/policies/tool-routing.instructions.md shared/agents/orchestrator/prompt.md shared/skills/onboard/SKILL.md | grep -c -F -e 'contained real directory' -e 'bounded directory index' -e 'bounded project index' -e 'absolute repository root' -e 'Directory indexing')" = "0"
+PASS        0.0s  test "$(cat shared/hooks/scripts/context-mode-mcp-filter.mjs shared/hooks/scripts/context-mode-dispatch.sh | grep -c -F -e '--hook-output')" = "0"
+PASS        0.0s  test "$(cat shared/hooks/hooks.json dist/multi-agent/.claude/settings.json dist/multi-agent/.codex/hooks.json .claude/settings.json .github/hooks/hooks.json | grep -c -F 'context-mode-dispatch.sh')" = "0"
+PASS        0.0s  test "$(grep -c -F 'context-mode' dist/multi-agent/.agents/mcp_config.json)" = "0"
+PASS        0.0s  test "$(cat README.md docs/runtime-checks.md docs/smoke-tests.md scripts/generate_targets.py shared/agents/*/prompt.md shared/skills/onboard/SKILL.md shared/policies/tool-routing.instructions.md | grep -c -F 'four guarded')" = "0"
+PASS        0.0s  test "$(cat CLAUDE.md AGENTS.md | grep -c -i 'session continuity')" = "0"
+PASS        0.0s  test "$(cat scripts/generate_targets.py scripts/validate_targets.py tests/test_lifecycle_hooks.py tests/test_validate_targets.py docs/runtime-checks.md | grep -c -F 'CLAUDE_CONTEXT_MODE_MATCHER')" = "0"
+PASS        0.0s  git diff --quiet HEAD -- .mcp.json .vscode/mcp.json .codex/config.toml
+PASS       50.4s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      329.9s  uv run python .claude/scripts/verify.py phase --format text
+```
 
 - Findings: `.claude/quality_reports/findings-2026-11-12_phase-A-context-mode-mcp-only-surface.json` (0 findings after review round 2; gate PASS; seven profiles; round 1 had two MAJORs and one MINOR, all fixed before round 2).
 - optional 1: NOT RUN — needs the user to reconnect the Context Mode server with `/mcp` in a live Claude Code session; this session's running server process predates the change, so its tool list is not evidence. The real-binary test (`CONTEXT_MODE_REAL=1 ... -k real_upstream`) covers the same filtered surface against the host's 1.0.169 without a client.
