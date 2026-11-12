@@ -3,8 +3,8 @@ name: 2026-11-12_phase-B-context-mode-2x-switch
 type: small-plan
 parent_plan: context-mode-2x-migration
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-12_context-mode-2x-migration-phase-B.md
 ---
 
 # Small Plan: Switch to Context Mode 2.x and Node.js 24
@@ -28,11 +28,11 @@ The MCP adapters and the filter do not change. Phase A already made `ctx_index` 
 
 ## Steps
 
-- [ ] **1. Prepare the private binary.**
+- [x] **1. Prepare the private binary.**
   - Owner: orchestrator.
   - Run `npm install -g --prefix "$HOME/.cache/context-mode-pin" --ignore-scripts "context-mode@2.1.8"`. 2.x has no install scripts; the flag keeps that true, and the prefix leaves the global install and every other repository untouched.
 
-- [ ] **2. Write the tests first.**
+- [x] **2. Write the tests first.**
   - Owner: `coder`. Files (modify): `tests/test_context_mode_dispatch.py`, `tests/test_context_mode_mcp_filter.py`, `tests/test_validate_targets.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Dispatcher tests:
@@ -55,7 +55,7 @@ The MCP adapters and the filter do not change. Phase A already made `ctx_index` 
     - `ctx_index` with a folder `path` gets `-32602`.
   - Negative control before Step 3: run the new tests on today's code, and record in the session log which ones fail and why.
 
-- [ ] **3. Dispatcher.**
+- [x] **3. Dispatcher.**
   - Owner: `coder`. File: `shared/hooks/scripts/context-mode-dispatch.sh` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/integration-gate-spike/SKILL.md`.
   - Set `PINNED_CONTEXT_MODE_VERSION="2.1.8"`, and add `MIN_NODE_VERSION="24.15.0"`.
@@ -78,12 +78,12 @@ The MCP adapters and the filter do not change. Phase A already made `ctx_index` 
   - Rewrite the comments that describe 1.0.169 (no `--version`, a slow `doctor`). The manifest check stays because it needs no Node.js start. Update the network comment near lines 22-28.
   - Must not change: storage selection, the override rule, the provenance secret, quarantine without deletion, the legacy hook no-op, or `FILTER_CONTRACT`.
 
-- [ ] **4. Filter: no change.**
+- [x] **4. Filter: no change.**
   - Owner: `coder` (check only). File: `shared/hooks/scripts/context-mode-mcp-filter.mjs` (unchanged). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Spike S3 required the files-only `ctx_index` fallback, and Phase A made it: `validateIndex` accepts `content` or one regular file inside the repository, `FILTER_CONTRACT` has its new value, and the kit description says so. Do not change them here.
   - The 2.1.8 `ctx_index` schema has `path`, `content`, `url`, and `source` (spike S2). `INDEX_ARGS` keeps stripping `url`. The real server test from Step 2 covers the filtered surface on 2.1.8; a different `tools/list` there stops the phase for a re-plan.
 
-- [ ] **5. Devcontainer and validator.**
+- [x] **5. Devcontainer and validator.**
   - Owner: `coder`. Files (modify): `shared/devcontainer/Dockerfile`, `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Dockerfile:
     - `FROM node:24.22.3-bookworm-slim AS nodejs`;
@@ -95,12 +95,12 @@ The MCP adapters and the filter do not change. Phase A already made `ctx_index` 
     - The Dockerfile checks require the `--version` test instead of `--help`.
     - `CONTEXT_MODE_BLOCKED_TOOLS` adds `ctx_batch` and `ctx_resume`.
 
-- [ ] **6. Regenerate and refresh the self-install.**
+- [x] **6. Regenerate and refresh the self-install.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. Never hand-copy.
   - Reconnect the Context Mode MCP server in the running client.
   - After the self-install, this repository's own sessions use the pin through the dispatcher. On this host the global `context-mode` is still 1.0.169, so the dispatcher refuses it and uses `npx` with the pin (a one-time download into the npm cache). Updating the global install is the user's choice.
 
-- [ ] **7. Documentation.**
+- [x] **7. Documentation.**
   - Owner: `documenter`. Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `docs/runtime-checks.md`, Context Mode bullet:
     - the pin and the Node.js 24.15.0 floor;
@@ -136,7 +136,7 @@ The MCP adapters and the filter do not change. Phase A already made `ctx_index` 
     - `[LEARN:tooling] Context Mode 2.x with --agent codex keys its project to the working folder's Git repository; start it from the outer repository root, or a nested .claude repository becomes a separate project.`
     - `[LEARN:workflow] Check a hook-lane claim against the generated matcher, not only a replayed fixture: the Codex SessionStart matcher startup|resume|clear never delivered compact.`
 
-- [ ] **8. Review.**
+- [x] **8. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation`.
   - Focus:
     - the dispatcher refuses every version except the pin, and Node.js below 24.15.0 in server mode;
@@ -190,14 +190,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

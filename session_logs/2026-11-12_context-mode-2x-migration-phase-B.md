@@ -38,6 +38,7 @@ Move the kit from Context Mode 1.0.169 to 2.1.8 and the devcontainer's Node.js i
 ## Verification
 
 - Findings: `.claude/quality_reports/findings-2026-11-12_phase-B-context-mode-2x-switch.json` (0 findings after review round 2; gate PASS; seven profiles; round 1 had one MAJOR and two MINORs, all documentation, all fixed before round 2).
+- optional 1: PASS — `docker build -t context-mode-2x-devcontainer-check -f shared/devcontainer/Dockerfile shared/devcontainer` exit 0 (1 s: every layer was cached from the spike's identical three-change build), then the plan's `docker run` check passed (`openwiki integrations list`, global `jsdom` require, `mermaid` present) and printed `node=v24.22.3 context-mode=2.1.8`; the check image was removed afterwards.
 - optional 2: NOT RUN — opening the devcontainer from VS Code with "Rebuild Container" needs the user's editor session.
 - optional 3: PASS — with the host's global 1.x `context-mode` first on `PATH`, `--self-check` reported `version-contract=pinned-via-npx@2.1.8`, and a real server launch through real `npx` listed exactly `ctx_index`, `ctx_search`, `ctx_stats` (probe client instead of `/mcp`, which needs the user; see the work log).
 - optional 4: NOT RUN — live Claude Code, Codex, and VS Code Copilot sessions need the user; the probe-client launch above covers the server side.
