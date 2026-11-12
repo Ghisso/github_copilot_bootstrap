@@ -1,0 +1,16 @@
+cli 'bare': exit 0 stdout[0:100]=['Usage: context-mode <command> [options]'] stderr[0:100]=[]
+cli '--version': exit 0 stdout[0:100]=['2.1.8'] stderr[0:100]=[]
+cli '-v': exit 0 stdout[0:100]=['2.1.8'] stderr[0:100]=[]
+cli 'version': exit 2 stdout[0:100]=[] stderr[0:100]=['context-mode: unknown command "version". Run context-mode --help.']
+alias `mcp --agent codex`: tools 9 stats isError False
+unpatched kit filter vs 2.1.8: initialize -> {"jsonrpc": "2.0", "id": 1, "error": {"code": -32002, "message": "Context Mode 1.0.169 required"}} | tools/list -> {"jsonrpc": "2.0", "id": 2, "error": {"code": -32001, "message": "pinned Context Mode runtime is not initialized"}} | exit 1
+gate-patched filter: initialize keys ['capabilities', 'instructions', 'protocolVersion', 'serverInfo'] instructions chars 509 | tools: ['ctx_index', 'ctx_search', 'ctx_stats', 'ctx_doctor']
+  ctx_index properties after filter: ['path', 'content', 'source']
+  ctx_index ['content', 'source']: result isError=False 'Indexed 1 source(s), 1 chunk(s) from s1. Label: n'
+  ctx_index ['url']: error {'code': -32602, 'message': 'ctx_index argument url is not allowed by repository policy'}
+  ctx_index ['path']: result isError=False 'Indexed 1 source(s), 1 chunk(s) from s2. Label: README.md'
+  ctx_search ['queries']: result isError=False 'Query "quokka":\nn #0: filter note quokka'
+  ctx_doctor []: result isError=False 'Environment: context-mode 2.1.8 (92c1ad2), agent codex 0.0.0'
+  ctx_execute ['language', 'code']: error {'code': -32601, 'message': 'Context Mode tool is not allowed by repository policy'}
+  ctx_batch ['commands']: error {'code': -32601, 'message': 'Context Mode tool is not allowed by repository policy'}
+  ctx_resume []: error {'code': -32601, 'message': 'Context Mode tool is not allowed by repository policy'}

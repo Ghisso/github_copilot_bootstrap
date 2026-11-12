@@ -1,0 +1,8 @@
+step1 1.0.169 index/search: ['Indexed 1 sections (0 with code) from: legacy-note | Use ctx_search(queries: ["..."]) to que', '## heron protocol |  | --- [current-session | 2026-11-12 06:42 | legacy-note] --- | ### Untitled']
+1.x files: ['repo/.claude/.cache/context-mode/content/40648623cae985e1.db', 'repo/.claude/.cache/context-mode/sessions/stats-pid-194838.json']
+step2 2.1.8, only CONTEXT_MODE_DIR set (DATA_DIR dropped): ['No hits in scope "worktree" across 0 source(s).']
+  files under HOME/.context-mode: ['home/.context-mode/projects/ac0b05463e2fb0ad/context.db']
+  1.x files unchanged: True
+step3 2.1.8 with CONTEXT_MODE_DATA_DIR=<same folder>: ['No hits in scope "worktree" across 0 source(s).']
+  new files in that folder: ['repo/.claude/.cache/context-mode/projects/ac0b05463e2fb0ad/context.db']
+  1.x files still present and byte-for-byte unchanged: True

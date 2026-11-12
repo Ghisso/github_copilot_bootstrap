@@ -1,0 +1,9 @@
+1 content seed
+2 path sub/.gitignore
+3 path sub/kept.txt
+4 path .gitignore
+5 path readme.txt
+6 path .claude/note.md
+7 path .claude/.cache/context-mode/projects/476e24cda9530b98/owners/69342b93-bbb5-4f4a-947d-341c4ca8fdd2.pid
+8 path sub/.gitignore
+9 path sub/kept.txt

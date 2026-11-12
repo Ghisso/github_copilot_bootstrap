@@ -1,0 +1,5 @@
+== network syscalls (call, args, result): count
+== write/create/remove attempts, grouped
+== operations OUTSIDE the run folder (call, path, result):
+  (none)
+== inside-run operations not under the data root (call, path, result):

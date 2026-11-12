@@ -1,0 +1,25 @@
+isError: False
+Environment: context-mode 2.1.8 (92c1ad2), agent codex 0.0.0 (client codex-mcp-client)
+Environment: linux-x64, Node v24.15.0, shell sh
+| Check | Status | Detail | Fix |
+|---|---|---|---|
+| D1 version | UNKNOWN | 2.1.8 (92c1ad2): latest unknown, npm registry: getaddrinfo EAI_AGAIN registry.npmjs.org; git exit 128: fatal: unable to access 'https://github.com/mksglu/context-mode.git/': Could not resolve host: github.com | Fix: git ls-remote --tags --refs https://github.com/mksglu/context-mode.git "v*" |
+| D2 node | PASS | ok |  |
+| D3 host config | FAIL | wrong: MCP entry, hook entries | FAIL codex: D3 — wrong: MCP entry, hook entries. Fix: context-mode setup --agents codex |
+| D4 old entries | PASS | ok |  |
+| D5 hook round trip | PASS | ok |  |
+| D5b double-fire | PASS | ok |  |
+| D6 MCP | PASS | ok |  |
+| D7 project and worktree | PASS | ok |  |
+| D8 context.db | PASS | ok |  |
+| D9 index | PASS | 0 sources, 0 chunks indexed |  |
+| D10 enforcement mode | PASS | enforcement mode: deny-reason |  |
+| D11 shell | PASS | sh: /usr/bin/sh |  |
+Run in a terminal: context-mode setup --agents codex
+Docs: https://contextmode.ai/docs/engine/doctor?utm_source=ctx_doctor&utm_medium=doctor&utm_content=D3#checks
+Report file: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-doctor/repo/.claude/.cache/context-mode/reports/doctor-2026-11-12T06-42-07-043Z.md
+File it: gh issue create --repo mksglu/context-mode --label bug \
+  --title "ctx_doctor codex: D3 host config FAIL" \
+  --body-file /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-doctor/repo/.claude/.cache/context-mode/reports/doctor-2026-11-12T06-42-07-043Z.md
+Or open: https://github.com/mksglu/context-mode/issues/new?template=agent-report.yml&title=ctx_doctor%20codex%3A%20D3%20host%20config%20FAIL&summary=D3%20host%20config%20FAIL%20on%20codex%3A%20wrong%3A%20MCP%20entry%2C%20hook%20entries
+Rules: https://github.com/mksglu/context-mode/blob/main/.github/AGENT_ISSUE.md

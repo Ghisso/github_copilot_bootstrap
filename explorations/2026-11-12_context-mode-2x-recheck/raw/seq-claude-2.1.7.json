@@ -1,0 +1,198 @@
+[
+  {
+    "label": "SessionStart startup",
+    "event": "sessionstart",
+    "exit_code": 0,
+    "stdout_bytes": 198,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__plugin_context-mode_context-mode__ctx_resume for a summary of what happened.\"}}",
+    "hso_keys": [
+      "additionalContext",
+      "hookEventName"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "UserPromptSubmit (not wired by kit)",
+    "event": "userpromptsubmit",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Read big file",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Read big file offset/limit",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Bash cat big file",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse PowerShell Get-Content big file (not in kit matcher)",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Edit (not in kit matcher)",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Grep",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse other MCP tool",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Agent",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PostToolUse Bash large output",
+    "event": "posttooluse",
+    "exit_code": 0,
+    "stdout_bytes": 274,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"updatedToolOutput\":{\"interrupted\":false,\"stdout\":\"mcp__plugin_context-mode_context-mode__ctx_search({queries:[\\\"run the test suite\\\",\\\"alpha worker\\\"], source:\\\"s1\\\"}) searches the whole output (23550 B).\",\"stderr\":\"\"}}}",
+    "hso_keys": [
+      "hookEventName",
+      "updatedToolOutput"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PostToolUse Bash failing small",
+    "event": "posttooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PostToolUse Edit (kit matcher is Bash only)",
+    "event": "posttooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PostToolUse Grep large content (kit matcher is Bash only)",
+    "event": "posttooluse",
+    "exit_code": 0,
+    "stdout_bytes": 269,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"updatedToolOutput\":{\"mode\":\"content\",\"content\":\"mcp__plugin_context-mode_context-mode__ctx_search({queries:[\\\"alpha\\\",\\\"worker\\\"], source:\\\"s2\\\"}) searches the whole output (17661 B).\",\"numFiles\":1,\"filenames\":[]}}}",
+    "hso_keys": [
+      "hookEventName",
+      "updatedToolOutput"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreCompact manual",
+    "event": "precompact",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [
+      "hooks: decode failed: claude-code: unknown hook event PreCompact"
+    ],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "SessionStart compact",
+    "event": "sessionstart",
+    "exit_code": 0,
+    "stdout_bytes": 463,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"<context_mode_state session=\\\"seq-claude\\\" upto=\\\"4\\\">\\nnow: Find the slow latency entries for worker alpha\\nedited <TMP>/repo/README.md x1\\nmore: mcp__plugin_context-mode_context-mode__ctx_search(queries:[], scope:\\\"session\\\")\\n</context_mode_state>\"}}",
+    "hso_keys": [
+      "additionalContext",
+      "hookEventName"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "UserPromptSubmit after compact (not wired by kit)",
+    "event": "userpromptsubmit",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "Stop",
+    "event": "stop",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [
+      "hooks: decode failed: claude-code: unknown hook event Stop"
+    ],
+    "filtered_stdout": ""
+  }
+]

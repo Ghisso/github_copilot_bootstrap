@@ -1,0 +1,23 @@
+## --self-check, 2.1.8 first on PATH: exit 0
+PASS context-mode-dispatch: required-version=1.0.169
+PASS context-mode-dispatch: resolved-path=/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/pkg/node_modules/.bin/context-mode
+PASS context-mode-dispatch: observed-version=2.1.8
+PASS context-mode-dispatch: launcher=npx
+PASS context-mode-dispatch: version-contract=pinned-via-npx@1.0.169
+PASS context-mode-dispatch: filter=/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/context-mode-mcp-filter.mjs
+PASS context-mode-dispatch: storage-root=/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/.claude/.cache/context-mode
+PASS context-mode-dispatch: nested-ignore=not-initialized
+WARN context-mode-dispatch: context-mode on PATH does not satisfy the version contract; using pinned npx instead
+WARN context-mode-dispatch: ignoring unsupported CONTEXT_MODE_DIR '/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-dispatch/repo/.claude/.cache/context-mode': only /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/.claude/.cache/context-mode and paths beneath it are bootstrap-owned; using the project-local cache and leaving that path untouched
+WARN context-mode-dispatch: ignoring unsupported CONTEXT_MODE_DIR '/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchp
+## --self-check, host-1.0.169 first on PATH: exit 0
+PASS context-mode-dispatch: required-version=1.0.169
+PASS context-mode-dispatch: resolved-path=/home/ghisso/.local/bin/context-mode
+PASS context-mode-dispatch: observed-version=1.0.169
+PASS context-mode-dispatch: launcher=context-mode
+PASS context-mode-dispatch: version-contract=pinned-direct-binary
+PASS context-mode-dispatch: filter=/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/context-mode-mcp-filter.mjs
+PASS context-mode-dispatch: storage-root=/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/.claude/.cache/context-mode
+PASS context-mode-dispatch: nested-ignore=not-initialized
+WARN context-mode-dispatch: ignoring unsupported CONTEXT_MODE_DIR '/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-dispatch/repo/.claude/.cache/context-mode': only /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/.claude/.cache/context-mode and paths beneath it are bootstrap-owned; using the project-local cache and leaving that path untouched
+WARN context-mode-dispatch: ignoring unsupported CONTEXT_MODE_DIR '/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-dispatch/repo/.claude/.cache/context-mode': only /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/.claude/.cache/context-mode and paths beneath it are bootstrap-owned; using the project-loc

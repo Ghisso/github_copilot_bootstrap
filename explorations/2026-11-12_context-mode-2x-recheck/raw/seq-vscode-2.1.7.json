@@ -1,0 +1,102 @@
+[
+  {
+    "label": "SessionStart startup",
+    "event": "sessionstart",
+    "exit_code": 0,
+    "stdout_bytes": 176,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp_context-mode_ctx_resume for a summary of what happened.\"}}",
+    "hso_keys": [
+      "additionalContext",
+      "hookEventName"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "UserPromptSubmit (not wired by kit)",
+    "event": "userpromptsubmit",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse read_file big",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse fetch_webpage",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 378,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: WebFetch sends its body into the conversation.\\nRun it here instead; the full output is indexed and only the part that matches your intent comes back.\\nTool: mcp_context-mode_ctx_index, then mcp_context-mode_ctx_search\\n{\\\"url\\\":\\\"https://example.com\\\"}\"}}",
+    "hso_keys": [
+      "hookEventName",
+      "permissionDecision",
+      "permissionDecisionReason"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse run_in_terminal cat big",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PostToolUse run_in_terminal large",
+    "event": "posttooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreCompact manual",
+    "event": "precompact",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "SessionStart compact",
+    "event": "sessionstart",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "UserPromptSubmit after compact (not wired by kit)",
+    "event": "userpromptsubmit",
+    "exit_code": 0,
+    "stdout_bytes": 298,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"<context_mode_state session=\\\"seq-vscode\\\" upto=\\\"3\\\">\\nnow: continue\\nasked #1: Find the slow latency entries for worker alpha\\nmore: mcp_context-mode_ctx_search(queries:[], scope:\\\"session\\\")\\n</context_mode_state>\"}}",
+    "hso_keys": [
+      "additionalContext",
+      "hookEventName"
+    ],
+    "stderr": [],
+    "filtered_stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"<context_mode_state session=\\\"seq-vscode\\\" upto=\\\"3\\\">\\nnow: continue\\nasked #1: Find the slow latency entries for worker alpha\\nmore: mcp_context-mode_ctx_search(queries:[], scope:\\\"session\\\")\\n</context_mode_state>\"}}\n"
+  }
+]

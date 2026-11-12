@@ -1,0 +1,38 @@
+## check 1: node version floor
+Unable to find image 'node:24.22.3-bookworm-slim' locally
+24.22.3-bookworm-slim: Pulling from library/node
+dd051e1b8c92: Pulling fs layer
+22a7c5e442cd: Pulling fs layer
+5030a48eb5b0: Pulling fs layer
+e727da478d47: Pulling fs layer
+c34f02d00fde: Pulling fs layer
+c34f02d00fde: Waiting
+e727da478d47: Waiting
+22a7c5e442cd: Verifying Checksum
+22a7c5e442cd: Download complete
+5030a48eb5b0: Download complete
+e727da478d47: Verifying Checksum
+e727da478d47: Download complete
+dd051e1b8c92: Verifying Checksum
+dd051e1b8c92: Download complete
+c34f02d00fde: Download complete
+dd051e1b8c92: Pull complete
+22a7c5e442cd: Pull complete
+5030a48eb5b0: Pull complete
+e727da478d47: Pull complete
+c34f02d00fde: Pull complete
+Digest: sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+Status: Downloaded newer image for node:24.22.3-bookworm-slim
+
+real	0m9.920s
+user	0m0.007s
+sys	0m0.031s
+check1 exit=0
+v24.22.3
+## check 2: npm install -g --ignore-scripts + --version
+
+real	0m1.098s
+user	0m0.007s
+sys	0m0.025s
+output=[2.1.8]
+check2 PASS: version equals 2.1.8

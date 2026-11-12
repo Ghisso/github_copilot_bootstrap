@@ -1,0 +1,72 @@
+== s2s-X-codex-nocpd-flat-nocaps
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['2ae15ed6f5b8b20f'] | outer key 2ae15ed6f5b8b20f | nested key -
+  files outside data root (excluding .git, README fixture): []
+== s2s-X-codex-nocpd-flat-roots
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['5cdeec9c18be13cd'] | outer key 5cdeec9c18be13cd | nested key -
+  files outside data root (excluding .git, README fixture): []
+== s2s-X-codex-nocpd-nested-nocaps
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['930517f2174afcf1'] | outer key b8d0acb0cb511271 | nested key 930517f2174afcf1
+  files outside data root (excluding .git, README fixture): []
+== s2s-X-codex-nocpd-nested-roots
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['6b2ebbe84ce31bad'] | outer key 9a5c7afbc2eeefbe | nested key 6b2ebbe84ce31bad
+  files outside data root (excluding .git, README fixture): []
+== s2s-X2-codex-cpd-flat-nocaps
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['a7470da5c0c4e9e6'] | outer key a7470da5c0c4e9e6 | nested key -
+  files outside data root (excluding .git, README fixture): []
+== s2s-X2-codex-cpd-flat-roots
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['847781d389973b85'] | outer key 847781d389973b85 | nested key -
+  files outside data root (excluding .git, README fixture): []
+== s2s-X2-codex-cpd-nested-nocaps
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['32cd47b37b0fa33a'] | outer key 3dbc592a62c34dec | nested key 32cd47b37b0fa33a
+  files outside data root (excluding .git, README fixture): []
+== s2s-X2-codex-cpd-nested-roots
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['e58ba98397c645f3'] | outer key f6b5bab867d4f154 | nested key e58ba98397c645f3
+  files outside data root (excluding .git, README fixture): []
+== s2s-Y-noagent-cpd-flat-nocaps
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['cf564ec493099f33'] | outer key cf564ec493099f33 | nested key -
+  files outside data root (excluding .git, README fixture): []
+== s2s-Y-noagent-cpd-flat-roots
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['17d1f540482c3b36'] | outer key 17d1f540482c3b36 | nested key -
+  files outside data root (excluding .git, README fixture): []
+== s2s-Y-noagent-cpd-nested-nocaps
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['9d949d3375b2ae99'] | outer key 9d949d3375b2ae99 | nested key 7f79a54c30ee5a1b
+  files outside data root (excluding .git, README fixture): []
+== s2s-Y-noagent-cpd-nested-roots
+  claude-code          index='Indexed 1 source(s), 1 chunk(s) from s1. Label: note-alpha' search-own='Query "alpha protocol": | note-alpha #0: # Note alpha | The alpha prot' search-other='Query "bravo protocol": | note-alpha #0: # Note al' srv-reqs=[]
+  codex-mcp-client     index='Indexed 1 source(s), 1 chunk(s) from s2. Label: note-bravo' search-own='Query "bravo protocol": | note-bravo #0: # Note bravo | The bravo prot' search-other='Query "alpha protocol": | note-bravo #0: # Note br' srv-reqs=[]
+  Visual Studio Code   index='Indexed 1 source(s), 1 chunk(s) from s3. Label: note-charlie' search-own='Query "charlie protocol": | note-charlie #0: # Note charlie | The char' search-other='Query "alpha protocol": | note-charlie #0: # Note ' srv-reqs=[]
+  project folders: ['92c508028550b8e7'] | outer key 92c508028550b8e7 | nested key dd6ab89e770d5aa1
+  files outside data root (excluding .git, README fixture): []

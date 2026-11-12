@@ -1,0 +1,8 @@
+npm warn EBADENGINE }
+exit-after-install=0
+--version: 2.1.8
+ 
+exit 1 responses ['1', '2', '3', '4', '5'] stderr []
+Node 22.22.0 server: serverInfo {'name': 'context-mode', 'version': 'dev'} tools ['ctx_doctor']
+  tool call 3: {"jsonrpc": "2.0", "id": 3, "error": {"code": -32602, "message": "Tool ctx_index not found"}}
+  stderr: []

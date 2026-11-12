@@ -1,0 +1,30 @@
+{
+  "dist": {
+    "shasum": "69b65a6a7383b9baf3ba637fe91b6819a6bf0fac",
+    "tarball": "https://registry.npmjs.org/context-mode/-/context-mode-2.1.8.tgz",
+    "fileCount": 39,
+    "integrity": "sha512-S8n2P0oky1KCFK+styH1wLNqsldKHZrr/npA6MbuGC2oEo7eDmfhrKtB1+3uBgiUsVQQClfWM8qD6o6TdYRVbg==",
+    "signatures": [
+      {
+        "sig": "MEUCIQCia+jHY889XO+7DzWlNY3bHqULJzbDZrImAQhcThZ5VgIgezjedjANSousq9hR/RJfYJULn3/PoojUbaxPjVZnnOE=",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      },
+      {
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+        "sig": "MEUCIQDVCELvM6BTM7YHpyI9Jfyxd16kZQDhRnErW2oV4AshiQIgGAV/BKIfs00BZIr6b3QyUw9CIqtM54PcggupbkWX0MY="
+      }
+    ],
+    "attestations": {
+      "url": "https://registry.npmjs.org/-/npm/v1/attestations/context-mode@2.1.8",
+      "provenance": {
+        "predicateType": "https://slsa.dev/provenance/v1"
+      }
+    },
+    "unpackedSize": 6609959
+  },
+  "gitHead": "92c1ad26d57b45e786a3dc9149549c416badca09",
+  "repository": {
+    "url": "git+https://github.com/mksglu/context-mode.git",
+    "type": "git"
+  }
+}

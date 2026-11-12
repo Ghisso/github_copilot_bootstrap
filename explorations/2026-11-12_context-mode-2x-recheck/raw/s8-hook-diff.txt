@@ -1,0 +1,3 @@
+cases=32 identical_2.1.7_vs_2.1.8=32 changed=0
+2.1.8 stdout identical to 1.0.169 fixture: 7/32; cases where the kit filter forwards anything: 1
+FORWARDED by filter: openai-codex sessionstart-compact 246 B

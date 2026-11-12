@@ -1,0 +1,225 @@
+[
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "bulk"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "zzzznomatchzzzz"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "ignoredtoken"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "ignoreddirtoken"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "siblingtoken"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "siblingdirtoken"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "outsidetoken"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "bulktoken000"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "bulktoken007"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "bulktoken299"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "deep"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "deeptoken"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "many"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "zzzznomatchzzzz"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "manytoken2999"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "huge/big.txt"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_search",
+   "arguments": {
+    "queries": [
+     "hugetoken0399999"
+    ]
+   }
+  }
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "../sibling.txt"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/outside-parent.txt"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "bulk/link-sibling.txt"
+   }
+  },
+  "_timeout": 300
+ },
+ {
+  "method": "tools/call",
+  "params": {
+   "name": "ctx_index",
+   "arguments": {
+    "path": "bulk/link-outside.txt"
+   }
+  },
+  "_timeout": 300
+ }
+]

@@ -1,0 +1,8 @@
+a1-claude-with-cpd | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'ok', 'search': 'ok', 'stats': 'ok'} | dbs: ['repo/.claude/.cache/context-mode/projects/fd18343cff53755e/context.db'] | exit 1 | srv-reqs 0
+a2-claude-no-cpd | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'ok', 'search': 'ok', 'stats': 'ok'} | dbs: ['repo/.claude/.cache/context-mode/projects/94d7030e318fee5d/context.db'] | exit 1 | srv-reqs 0
+b1-codex-no-cpd | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'ok', 'search': 'ok', 'stats': 'ok'} | dbs: ['repo/.claude/.cache/context-mode/projects/640cb9c3f52b8518/context.db'] | exit 1 | srv-reqs 0
+b2-codex-with-cpd | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'ok', 'search': 'ok', 'stats': 'ok'} | dbs: ['repo/.claude/.cache/context-mode/projects/91991dda86493a89/context.db'] | exit 1 | srv-reqs 0
+c1-vscode-ws | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'ok', 'search': 'ok', 'stats': 'ok'} | dbs: ['repo/.claude/.cache/context-mode/projects/a567f293b1590c86/context.db'] | exit 1 | srv-reqs 0
+c2-vscode-nows | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'error', 'search': 'error', 'stats': 'error'} | dbs: [] | exit 1 | srv-reqs 0
+d1-noagent-cpd | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'ok', 'search': 'ok', 'stats': 'ok'} | dbs: ['repo/.claude/.cache/context-mode/projects/e500b711ba2660cd/context.db'] | exit 1 | srv-reqs 0
+d2-noagent-nocpd | init: {'name': 'context-mode', 'version': 'dev'} | tools: 9 | {'index': 'error', 'search': 'error', 'stats': 'error'} | dbs: [] | exit 1 | srv-reqs 0

@@ -1,0 +1,175 @@
+== network syscalls (call, args, result): count
+  bind      21, {sa_family=AF_NETLINK, nl_pid=0, nl_groups=00000000}, 12                                                   -> 0  x1
+  bind      33, {sa_family=AF_INET, sin_port=htons(0                                                                       -> 0  x1
+  bind      4, {sa_family=AF_NETLINK, nl_pid=193774, nl_groups=00000000}, 12                                               -> 0  x1
+  connect   21, {sa_family=AF_INET, sin_port=htons(53                                                                      -> -1  x4
+  connect   21, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110                                                  -> -1  x2
+  connect   7, {sa_family=AF_INET, sin_port=htons(53                                                                       -> -1  x4
+  connect   7, {sa_family=AF_INET, sin_port=htons(53                                                                       -> inet_addr("1.1.1.1")},  x2
+  connect   7, {sa_family=AF_INET, sin_port=htons(53                                                                       -> inet_addr("8.8.8.8")},  x2
+  connect   7, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110                                                   -> -1  x2
+  connect   7, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110 <unfinished ...>                                  -> "/var/run/nscd/socket"},  x2
+  recvfrom  4, [{nlmsg_len=36, nlmsg_type=NLMSG_ERROR, nlmsg_flags=NLM_F_CAPPED, nlmsg_seq=0, nlmsg_pid=193774}, {error=0, -> 36  x1
+  recvfrom  4, [{nlmsg_len=36, nlmsg_type=NLMSG_ERROR, nlmsg_flags=NLM_F_CAPPED, nlmsg_seq=1, nlmsg_pid=193774}, {error=0, -> 36  x1
+  sendto    21, [{nlmsg_len=20, nlmsg_type=RTM_GETADDR, nlmsg_flags=NLM_F_REQUEST|NLM_F_DUMP, nlmsg_seq=1794465724, nlmsg_ -> 00000000},  x1
+  sendto    33, "\367\6\1\0\0\1\0\0\0\0\0\0\7chatgpt\3com\0\0\1\0\1", 29, MSG_NOSIGNAL, {sa_family=AF_INET, sin_port=htons -> inet_addr("1.1.1.1")},  x1
+  sendto    33, "\367\6\1\0\0\1\0\0\0\0\0\0\7chatgpt\3com\0\0\1\0\1", 29, MSG_NOSIGNAL, {sa_family=AF_INET, sin_port=htons -> inet_addr("8.8.8.8")},  x1
+  sendto    33, "\370\331\1\0\0\1\0\0\0\0\0\0\7chatgpt\3com\0\0\34\0\1", 29, MSG_NOSIGNAL, {sa_family=AF_INET, sin_port=ht -> inet_addr("1.1.1.1")},  x1
+  sendto    33, "\370\331\1\0\0\1\0\0\0\0\0\0\7chatgpt\3com\0\0\34\0\1", 29, MSG_NOSIGNAL, {sa_family=AF_INET, sin_port=ht -> inet_addr("8.8.8.8")},  x1
+  sendto    4, [{nlmsg_len=32, nlmsg_type=0x10 /* NLMSG_??? */, nlmsg_flags=NLM_F_REQUEST|NLM_F_ACK, nlmsg_seq=1, nlmsg_pi -> 32  x1
+  sendto    4, [{nlmsg_len=40, nlmsg_type=0x14 /* NLMSG_??? */, nlmsg_flags=NLM_F_REQUEST|NLM_F_ACK|0x600, nlmsg_seq=0, nl -> 40  x1
+  socket    AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP                                                     -> 21  x4
+  socket    AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP                                                     -> 33  x1
+  socket    AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP                                                     -> 7  x5
+  socket    AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP <unfinished ...>                                    -> AF_INET,  x3
+  socket    AF_INET6, SOCK_DGRAM, IPPROTO_IP                                                                               -> 5  x2
+  socket    AF_NETLINK, SOCK_RAW|SOCK_CLOEXEC, NETLINK_ROUTE                                                               -> 21  x1
+  socket    AF_NETLINK, SOCK_RAW|SOCK_CLOEXEC, NETLINK_ROUTE                                                               -> 4  x1
+  socket    AF_UNIX, SOCK_DGRAM|SOCK_CLOEXEC, 0                                                                            -> 4  x1
+  socket    AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0                                                             -> 21  x2
+  socket    AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0                                                             -> 7  x2
+  socket    AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 <unfinished ...>                                            -> AF_UNIX,  x2
+== write/create/remove attempts, grouped
+  inside run folder: home/.codex: 125 path operations
+  inside run folder: repo/.claude: 25 path operations
+  inside run folder: tmp/cm-d5-stop-uP4GQ4: 3 path operations
+== operations OUTSIDE the run folder (call, path, result):
+  openat     /dev/null  -> 3
+  symlink    /home/ghisso/.local/nodejs/node-v24.15.0-linux-x64/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex  -> 0
+  open       /dev/null  -> 29
+  openat     uid_map  -> 5
+  openat     setgroups  -> 5
+  openat     gid_map  -> 5
+  mkdir      newroot  -> 0
+  mkdir      oldroot  -> 0
+== inside-run operations not under the data root (call, path, result):
+  mkdir      repo/.claude/.cache  -> -1
+  mkdir      repo/.claude  -> 0
+  mkdir      home/.codex  -> -1
+  mkdir      home/.codex/tmp/arg0  -> -1
+  mkdir      home/.codex/tmp  -> 0
+  chmod      home/.codex/tmp/arg0  -> 0
+  mkdir      home/.codex/tmp/arg0/codex-arg0CgodUw  -> 0
+  open       home/.codex/tmp/arg0/codex-arg0CgodUw/.lock  -> 3
+  symlink    home/.codex/tmp/arg0/codex-arg0CgodUw/apply_patch  -> 0
+  symlink    home/.codex/tmp/arg0/codex-arg0CgodUw/applypatch  -> 0
+  symlink    home/.codex/tmp/arg0/codex-arg0CgodUw/codex-linux-sandbox  -> 0
+  symlink    home/.codex/tmp/arg0/codex-arg0CgodUw/codex-execve-wrapper  -> 0
+  open       home/.codex/state_5.sqlite  -> 10
+  open       home/.codex/state_5.sqlite-journal  -> 11
+  unlink     home/.codex/state_5.sqlite-journal  -> 0
+  open       home/.codex/state_5.sqlite-wal  -> 11
+  open       home/.codex/state_5.sqlite-shm  -> 12
+  open       home/.codex/logs_2.sqlite  -> 15
+  open       home/.codex/logs_2.sqlite-journal  -> 16
+  unlink     home/.codex/logs_2.sqlite-journal  -> 0
+  open       home/.codex/logs_2.sqlite-wal  -> 16
+  open       home/.codex/logs_2.sqlite-shm  -> 17
+  open       home/.codex/goals_1.sqlite  -> 18
+  open       home/.codex/goals_1.sqlite-journal  -> 19
+  unlink     home/.codex/goals_1.sqlite-journal  -> 0
+  open       home/.codex/goals_1.sqlite-wal  -> 19
+  open       home/.codex/goals_1.sqlite-shm  -> 20
+  open       home/.codex/memories_1.sqlite  -> 21
+  open       home/.codex/memories_1.sqlite-journal  -> 22
+  unlink     home/.codex/memories_1.sqlite-journal  -> 0
+  open       home/.codex/memories_1.sqlite-wal  -> 22
+  open       home/.codex/memories_1.sqlite-shm  -> 23
+  open       home/.codex/queue_1.sqlite  -> 24
+  open       home/.codex/queue_1.sqlite-journal  -> 25
+  unlink     home/.codex/queue_1.sqlite-journal  -> 0
+  open       home/.codex/queue_1.sqlite-wal  -> 25
+  open       home/.codex/queue_1.sqlite-shm  -> 26
+  open       home/.codex/installation_id  -> 29
+  mkdir      home/.codex/skills  -> 0
+  mkdir      home/.codex/skills/.system  -> 0
+  mkdir      home/.codex/skills/.system/imagegen  -> 0
+  open       home/.codex/skills/.system/imagegen/LICENSE.txt  -> 29
+  open       home/.codex/skills/.system/imagegen/SKILL.md  -> 29
+  mkdir      home/.codex/skills/.system/imagegen/agents  -> 0
+  open       home/.codex/skills/.system/imagegen/agents/openai.yaml  -> 29
+  mkdir      home/.codex/skills/.system/imagegen/assets  -> 0
+  open       home/.codex/skills/.system/imagegen/assets/imagegen-small.svg  -> 29
+  open       home/.codex/skills/.system/imagegen/assets/imagegen.png  -> 29
+  mkdir      home/.codex/skills/.system/imagegen/references  -> 0
+  open       home/.codex/skills/.system/imagegen/references/cli.md  -> 29
+  open       home/.codex/skills/.system/imagegen/references/codex-network.md  -> 29
+  open       home/.codex/skills/.system/imagegen/references/image-api.md  -> 29
+  open       home/.codex/skills/.system/imagegen/references/prompting.md  -> 29
+  open       home/.codex/skills/.system/imagegen/references/sample-prompts.md  -> 29
+  mkdir      home/.codex/skills/.system/imagegen/scripts  -> 0
+  open       home/.codex/skills/.system/imagegen/scripts/image_gen.py  -> 29
+  open       home/.codex/skills/.system/imagegen/scripts/remove_chroma_key.py  -> 29
+  mkdir      home/.codex/skills/.system/openai-docs  -> 0
+  open       home/.codex/skills/.system/openai-docs/LICENSE.txt  -> 29
+  open       home/.codex/skills/.system/openai-docs/SKILL.md  -> 29
+  mkdir      home/.codex/skills/.system/openai-docs/agents  -> 0
+  open       home/.codex/skills/.system/openai-docs/agents/openai.yaml  -> 29
+  mkdir      home/.codex/skills/.system/openai-docs/assets  -> 0
+  open       home/.codex/skills/.system/openai-docs/assets/openai-small.svg  -> 29
+  open       home/.codex/skills/.system/openai-docs/assets/openai.png  -> 29
+  mkdir      home/.codex/skills/.system/openai-docs/references  -> 0
+  open       home/.codex/skills/.system/openai-docs/references/codex-self-knowledge.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/latest-model.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/mcp-diagnostics.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/model-migration.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/model-selection.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/official-docs.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/prompting-guide.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/upgrade-guide.md  -> 29
+  open       home/.codex/skills/.system/openai-docs/references/upgrading-to-gpt-5p6-sol.md  -> 29
+  mkdir      home/.codex/skills/.system/openai-docs/scripts  -> 0
+  open       home/.codex/skills/.system/openai-docs/scripts/fetch-codex-manual.mjs  -> 29
+  open       home/.codex/skills/.system/openai-docs/scripts/resolve-latest-model-info  -> 29
+  open       home/.codex/skills/.system/openai-docs/scripts/resolve-latest-model-info.cjs  -> 29
+  mkdir      home/.codex/skills/.system/plugin-creator  -> 0
+  open       home/.codex/skills/.system/plugin-creator/SKILL.md  -> 29
+  mkdir      home/.codex/skills/.system/plugin-creator/agents  -> 0
+  open       home/.codex/skills/.system/plugin-creator/agents/openai.yaml  -> 29
+  mkdir      home/.codex/skills/.system/plugin-creator/assets  -> 0
+  open       home/.codex/skills/.system/plugin-creator/assets/plugin-creator-small.svg  -> 29
+  open       home/.codex/skills/.system/plugin-creator/assets/plugin-creator.png  -> 29
+  mkdir      home/.codex/skills/.system/plugin-creator/references  -> 0
+  open       home/.codex/skills/.system/plugin-creator/references/installing-and-updating.md  -> 29
+  open       home/.codex/skills/.system/plugin-creator/references/plugin-json-spec.md  -> 29
+  mkdir      home/.codex/skills/.system/plugin-creator/scripts  -> 0
+  open       home/.codex/skills/.system/plugin-creator/scripts/create_basic_plugin.py  -> 29
+  open       home/.codex/skills/.system/plugin-creator/scripts/read_marketplace_name.py  -> 29
+  open       home/.codex/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py  -> 29
+  open       home/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py  -> 29
+  mkdir      home/.codex/skills/.system/review-agent  -> 0
+  open       home/.codex/skills/.system/review-agent/SKILL.md  -> 29
+  mkdir      home/.codex/skills/.system/review-agent/agents  -> 0
+  open       home/.codex/skills/.system/review-agent/agents/openai.yaml  -> 29
+  mkdir      home/.codex/skills/.system/skill-creator  -> 0
+  open       home/.codex/skills/.system/skill-creator/SKILL.md  -> 29
+  mkdir      home/.codex/skills/.system/skill-creator/agents  -> 0
+  open       home/.codex/skills/.system/skill-creator/agents/openai.yaml  -> 29
+  mkdir      home/.codex/skills/.system/skill-creator/assets  -> 0
+  open       home/.codex/skills/.system/skill-creator/assets/skill-creator-small.svg  -> 29
+  open       home/.codex/skills/.system/skill-creator/assets/skill-creator.png  -> 29
+  open       home/.codex/skills/.system/skill-creator/license.txt  -> 29
+  mkdir      home/.codex/skills/.system/skill-creator/references  -> 0
+  open       home/.codex/skills/.system/skill-creator/references/openai_yaml.md  -> 29
+  mkdir      home/.codex/skills/.system/skill-creator/scripts  -> 0
+  open       home/.codex/skills/.system/skill-creator/scripts/generate_openai_yaml.py  -> 29
+  open       home/.codex/skills/.system/skill-creator/scripts/init_skill.py  -> 29
+  open       home/.codex/skills/.system/skill-creator/scripts/quick_validate.py  -> 29
+  mkdir      home/.codex/skills/.system/skill-installer  -> 0
+  open       home/.codex/skills/.system/skill-installer/LICENSE.txt  -> 29
+  open       home/.codex/skills/.system/skill-installer/SKILL.md  -> 29
+  mkdir      home/.codex/skills/.system/skill-installer/agents  -> 0
+  open       home/.codex/skills/.system/skill-installer/agents/openai.yaml  -> 29
+  mkdir      home/.codex/skills/.system/skill-installer/assets  -> 0
+  open       home/.codex/skills/.system/skill-installer/assets/skill-installer-small.svg  -> 29
+  open       home/.codex/skills/.system/skill-installer/assets/skill-installer.png  -> 29
+  mkdir      home/.codex/skills/.system/skill-installer/scripts  -> 0
+  open       home/.codex/skills/.system/skill-installer/scripts/github_utils.py  -> 29
+  open       home/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py  -> 29
+  open       home/.codex/skills/.system/skill-installer/scripts/list-skills.py  -> 29
+  open       home/.codex/skills/.system/.codex-system-skills.marker  -> 29
+  mkdir      home/.codex/.tmp  -> "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-doctor/home/.codex/.tmp",
+  open       home/.codex/.tmp/plugins.sync.lock  -> "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/7bec07eb-a588-4e43-bc49-7ba8e1c8dc3b/scratchpad/cm2-recheck/run/s8-doctor/home/.codex/.tmp/plugins.sync.lock",
+  mkdir      tmp/cm-d5-stop-uP4GQ4  -> 0
+  unlink     tmp/cm-d5-stop-uP4GQ4  -> -1
+  rmdir      tmp/cm-d5-stop-uP4GQ4  -> 0

@@ -1,0 +1,8 @@
+== network syscalls (call, args, result): count
+== write/create/remove attempts, grouped
+  inside run folder: repo/.claude: 23 path operations
+== operations OUTSIDE the run folder (call, path, result):
+  openat     /dev/null  -> 3
+== inside-run operations not under the data root (call, path, result):
+  mkdir      repo/.claude/.cache  -> -1
+  mkdir      repo/.claude  -> 0

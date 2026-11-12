@@ -1,0 +1,41 @@
+claude 2.1.7 rc 0 steps 18
+codex 2.1.7 rc 0 steps 8
+vscode 2.1.7 rc 0 steps 9
+claude 2.1.8 rc 0 steps 18
+codex 2.1.8 rc 0 steps 8
+vscode 2.1.8 rc 0 steps 9
+  claude/SessionStart startup: identical=True stdout_bytes 198 -> 198 hso_keys ['additionalContext', 'hookEventName']
+  claude/UserPromptSubmit (not wired by kit): identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse Read big file: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse Read big file offset/limit: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse Bash cat big file: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse PowerShell Get-Content big file (not in kit matcher): identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse Edit (not in kit matcher): identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse Grep: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse other MCP tool: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PreToolUse Agent: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PostToolUse Bash large output: identical=True stdout_bytes 274 -> 274 hso_keys ['hookEventName', 'updatedToolOutput']
+  claude/PostToolUse Bash failing small: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PostToolUse Edit (kit matcher is Bash only): identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/PostToolUse Grep large content (kit matcher is Bash only): identical=True stdout_bytes 269 -> 269 hso_keys ['hookEventName', 'updatedToolOutput']
+  claude/PreCompact manual: identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/SessionStart compact: identical=True stdout_bytes 463 -> 463 hso_keys ['additionalContext', 'hookEventName']
+  claude/UserPromptSubmit after compact (not wired by kit): identical=True stdout_bytes 0 -> 0 hso_keys None
+  claude/Stop: identical=True stdout_bytes 0 -> 0 hso_keys None
+  codex/SessionStart startup: identical=True stdout_bytes 178 -> 178 hso_keys ['additionalContext', 'hookEventName']
+  codex/UserPromptSubmit (not wired by kit): identical=True stdout_bytes 0 -> 0 hso_keys None
+  codex/PreToolUse Bash cat big file: identical=True stdout_bytes 0 -> 0 hso_keys None
+  codex/PreToolUse Bash curl: identical=True stdout_bytes 426 -> 426 hso_keys ['hookEventName', 'permissionDecision', 'permissionDecisionReason']
+  codex/PreToolUse apply_patch: identical=True stdout_bytes 0 -> 0 hso_keys None
+  codex/PostToolUse Bash large output: identical=True stdout_bytes 0 -> 0 hso_keys None
+  codex/PreCompact manual: identical=True stdout_bytes 0 -> 0 hso_keys None
+  codex/SessionStart compact: identical=True stdout_bytes 275 -> 275 hso_keys ['additionalContext', 'hookEventName']
+  vscode/SessionStart startup: identical=True stdout_bytes 176 -> 176 hso_keys ['additionalContext', 'hookEventName']
+  vscode/UserPromptSubmit (not wired by kit): identical=True stdout_bytes 0 -> 0 hso_keys None
+  vscode/PreToolUse read_file big: identical=True stdout_bytes 0 -> 0 hso_keys None
+  vscode/PreToolUse fetch_webpage: identical=True stdout_bytes 378 -> 378 hso_keys ['hookEventName', 'permissionDecision', 'permissionDecisionReason']
+  vscode/PreToolUse run_in_terminal cat big: identical=True stdout_bytes 0 -> 0 hso_keys None
+  vscode/PostToolUse run_in_terminal large: identical=True stdout_bytes 0 -> 0 hso_keys None
+  vscode/PreCompact manual: identical=True stdout_bytes 0 -> 0 hso_keys None
+  vscode/SessionStart compact: identical=True stdout_bytes 0 -> 0 hso_keys None
+  vscode/UserPromptSubmit after compact (not wired by kit): identical=True stdout_bytes 298 -> 298 hso_keys ['additionalContext', 'hookEventName']

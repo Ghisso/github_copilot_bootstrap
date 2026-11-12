@@ -1,0 +1,1 @@
+[{"method": "tools/call", "params": {"name": "ctx_index", "arguments": {"content": "# Note alpha\nThe alpha protocol handles marmot frames.", "source": "note-alpha"}}}, {"method": "tools/call", "params": {"name": "ctx_search", "arguments": {"queries": ["alpha protocol"]}}}, {"method": "tools/call", "params": {"name": "ctx_search", "arguments": {"queries": ["bravo protocol"]}}}]

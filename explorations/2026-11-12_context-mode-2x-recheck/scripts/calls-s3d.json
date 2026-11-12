@@ -1,0 +1,3 @@
+[{"method":"tools/call","params":{"name":"ctx_search","arguments":{"queries":["seedtoken"],"scope":"project"}}},
+ {"method":"tools/call","params":{"name":"ctx_search","arguments":{"queries":["context.db"],"scope":"project"}}},
+ {"method":"tools/call","params":{"name":"ctx_search","arguments":{"queries":["CREATE TABLE sources"],"scope":"project"}}}]

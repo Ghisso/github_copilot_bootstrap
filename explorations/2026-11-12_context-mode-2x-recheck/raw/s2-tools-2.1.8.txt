@@ -1,0 +1,83 @@
+initialize keys: ['capabilities', 'instructions', 'protocolVersion', 'serverInfo'] | serverInfo: {'name': 'context-mode', 'version': 'dev'}
+capabilities: {"experimental": {"codex/sandbox-state-meta": {}}, "tools": {"listChanged": true}}
+instructions chars: 509
+tool names: ['ctx_execute', 'ctx_batch', 'ctx_index', 'ctx_search', 'ctx_resume', 'ctx_stats', 'ctx_doctor', 'ctx_upgrade', 'ctx_purge']
+
+======================================================================
+ctx_index
+tool keys: ['description', 'inputSchema', 'name']
+_meta: null | annotations: null
+description (439 chars):
+Example: `ctx_index({path:"docs/api.md"})`. Required: one of path, content, url.
+Stores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.
+inputSchema: {"type": "object", "$schema": "https://json-schema.org/draft/2020-12/schema", "additionalProperties": false}
+  property path: {"type": "string"}
+  property content: {"type": "string"}
+  property url: {"type": "string"}
+  property source: {"type": "string"}
+
+======================================================================
+ctx_search
+tool keys: ['annotations', 'description', 'inputSchema', 'name']
+_meta: null | annotations: {"readOnlyHint": true}
+description (838 chars):
+Example: `ctx_search({queries:["auth middleware"]})`. Required: queries.
+Searches content stored with ctx_index and earlier sandbox output in this project. Memory files such as AGENTS.md are searched too. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.
+inputSchema: {"type": "object", "$schema": "https://json-schema.org/draft/2020-12/schema", "required": ["queries"], "additionalProperties": false}
+  property queries: {"type": "array", "items": {"type": "string"}}
+  property scope: {"type": "string", "enum": ["session", "worktree", "project"]}
+  property source: {"type": "string"}
+  property offset: {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+  property sort: {"type": "string", "enum": ["relevance", "timeline"]}
+  property after: {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+
+======================================================================
+ctx_stats
+tool keys: ['annotations', 'description', 'inputSchema', 'name']
+_meta: null | annotations: {"readOnlyHint": true}
+description (259 chars):
+Example: `ctx_stats({})`. Required: none.
+Reports the bytes context-mode kept out of the chat: a text report (bars, per tool, per agent) and a Markdown table. Show the text block to the user unchanged, in a code block. Use it when the user asks what it saved.
+inputSchema: {"type": "object", "$schema": "https://json-schema.org/draft/2020-12/schema", "additionalProperties": false}
+
+--- diff vs raw/mcp/a1-claude-with-cpd.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True
+
+--- diff vs raw/mcp/a2-claude-no-cpd.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True
+
+--- diff vs raw/mcp/b2-codex-with-cpd.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True
+
+--- diff vs raw/mcp/c1-vscode-ws.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True
+
+--- diff vs raw/mcp/c2-vscode-nows.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True
+
+--- diff vs raw/mcp/d1-noagent-cpd.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True
+
+--- diff vs raw/mcp/d2-noagent-nocpd.json
+  tool names equal: True | initialize equal: True
+  ctx_index identical: True
+  ctx_search identical: True
+  ctx_stats identical: True

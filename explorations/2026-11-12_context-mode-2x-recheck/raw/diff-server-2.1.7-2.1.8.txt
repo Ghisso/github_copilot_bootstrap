@@ -1,0 +1,423 @@
+3490c3490
+< function isRecursive(inst, stack2, resolve7) {
+---
+> function isRecursive(inst, stack2, resolve10) {
+3500c3500
+<       const answer3 = isRecursive(child, stack2, resolve7);
+---
+>       const answer3 = isRecursive(child, stack2, resolve10);
+3511c3511
+<       const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack2, resolve7) : NONE;
+---
+>       const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack2, resolve10) : NONE;
+3575c3575
+<       const inner = def._cachedInner ?? (resolve7 ? inst._zod.innerType : void 0);
+---
+>       const inner = def._cachedInner ?? (resolve10 ? inst._zod.innerType : void 0);
+11019c11019
+< function isRecursive2(inst, stack2, resolve7) {
+---
+> function isRecursive2(inst, stack2, resolve10) {
+11029c11029
+<       const answer3 = isRecursive2(child, stack2, resolve7);
+---
+>       const answer3 = isRecursive2(child, stack2, resolve10);
+11040c11040
+<       const child = desc.get ? ASSUMED2 : desc.value?._zod ? isRecursive2(desc.value, stack2, resolve7) : NONE2;
+---
+>       const child = desc.get ? ASSUMED2 : desc.value?._zod ? isRecursive2(desc.value, stack2, resolve10) : NONE2;
+11104c11104
+<       const inner = def._cachedInner ?? (resolve7 ? inst._zod.innerType : void 0);
+---
+>       const inner = def._cachedInner ?? (resolve10 ? inst._zod.innerType : void 0);
+17708c17708
+<   return new Promise((resolve7, reject) => {
+---
+>   return new Promise((resolve10, reject) => {
+17715c17715
+<       resolve7();
+---
+>       resolve10();
+18514c18514
+<     return new Promise((resolve7, reject) => {
+---
+>     return new Promise((resolve10, reject) => {
+18583c18583
+<           if (options?.allowInputRequired === true) return resolve7(manualInputRequiredValue(decoded));
+---
+>           if (options?.allowInputRequired === true) return resolve10(manualInputRequiredValue(decoded));
+18595c18595
+<           return resolve7(this._resolveNonCompleteResult(decoded, flow));
+---
+>           return resolve10(this._resolveNonCompleteResult(decoded, flow));
+18599c18599
+<           if (parseResult.success) resolve7(parseResult.data);
+---
+>           if (parseResult.success) resolve10(parseResult.data);
+21515c21515
+<     let _sch = resolve7.call(this, root, ref);
+---
+>     let _sch = resolve10.call(this, root, ref);
+21541c21541
+<   function resolve7(root, ref) {
+---
+>   function resolve10(root, ref) {
+21991c21991
+<   function resolve7(baseURI, relativeURI, options) {
+---
+>   function resolve10(baseURI, relativeURI, options) {
+22165c22165
+<     resolve: resolve7,
+---
+>     resolve: resolve10,
+27630c27630
+<     return new Promise((resolve7, reject) => {
+---
+>     return new Promise((resolve10, reject) => {
+27645c27645
+<         resolve7();
+---
+>         resolve10();
+27652c27652
+<         resolve7();
+---
+>         resolve10();
+27706c27706
+<     return await new Promise((resolve7) => {
+---
+>     return await new Promise((resolve10) => {
+27709c27709
+<         resolve7(true);
+---
+>         resolve10(true);
+27713c27713
+<         resolve7(false);
+---
+>         resolve10(false);
+28449c28449
+< var BUNDLE_SHA = true ? "5539b632975049a99de986448417a10bd246e506" : void 0;
+---
+> var BUNDLE_SHA = true ? "92c1ad26d57b45e786a3dc9149549c416badca09" : void 0;
+28852a28853,28860
+> var V1_CODEX_SCRIPT_NAMES = Object.freeze([
+>   "pretooluse.mjs",
+>   "posttooluse.mjs",
+>   "sessionstart.mjs",
+>   "precompact.mjs",
+>   "userpromptsubmit.mjs",
+>   "stop.mjs"
+> ]);
+28912d28919
+< var V1_SCRIPT_EXT = ".mjs";
+28928c28935
+<   codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
+---
+>   codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/<event>.mjs",
+28966d28972
+< var MCP_ENV_FIELD = "env";
+29662c29668
+< import { basename as basename2, dirname as dirname3, join as join3, resolve as resolve2 } from "node:path";
+---
+> import { basename as basename2, dirname as dirname3, join as join3, resolve as resolve3 } from "node:path";
+29665c29671
+< import { dirname as dirname2, join as join2, relative, sep } from "node:path";
+---
+> import { dirname as dirname2, isAbsolute, join as join2, relative, resolve as resolve2, sep } from "node:path";
+29884c29890
+<       return { commonDir: realpathSync3.native(common === null ? gitDir : resolve2(gitDir, common)), worktree: cur, start };
+---
+>       return { commonDir: realpathSync3.native(common === null ? gitDir : resolve3(gitDir, common)), worktree: cur, start };
+29899c29905
+<       gitDir = resolve2(dirname3(dotGit), line.slice(GITDIR_FILE_PREFIX.length));
+---
+>       gitDir = resolve3(dirname3(dotGit), line.slice(GITDIR_FILE_PREFIX.length));
+44313c44319
+<   return new Promise((resolve7) => {
+---
+>   return new Promise((resolve10) => {
+44316c44322
+<     if (start === null) return resolve7(NOT_STARTED);
+---
+>     if (start === null) return resolve10(NOT_STARTED);
+44330c44336
+<       return resolve7(NOT_STARTED);
+---
+>       return resolve10(NOT_STARTED);
+44364c44370
+<       resolve7({
+---
+>       resolve10({
+44811c44817
+<   if (sort === "timeline" && input.offset !== void 0) {
+---
+>   if (sort === "timeline" && (input.offset ?? 0) !== 0) {
+44814c44820
+<   if (sort === "relevance" && input.after !== void 0) {
+---
+>   if (sort === "relevance" && (input.after ?? 0) !== 0) {
+44816a44823,44826
+>   if (input.source !== void 0 && input.source.trim() === "") {
+>     const { source: _blank, ...rest } = input;
+>     input = rest;
+>   }
+45789a45800
+>   if (p.keep === true) info.keep = true;
+45865a45877,45881
+>   if (typeof p.agentID === "string" && p.agentID !== "") {
+>     ev.agentId = p.agentID;
+>     ev.agentType = p.agentID;
+>   }
+>   if (Array.isArray(p.agentTools)) ev.agentTools = p.agentTools.filter((t) => typeof t === "string");
+45886c45902
+<       return { stdout: "", exitCode: 0 };
+---
+>       return { stdout: ev.event === "PostToolUse" ? d.output : "", exitCode: 0 };
+46091c46107
+< var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "gemini", "copilot-cli", "pi"]);
+---
+> var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "gemini", "copilot-cli", "pi", "opencode"]);
+46123c46139
+< import { dirname as dirname7, join as join11 } from "node:path";
+---
+> import { dirname as dirname7, isAbsolute as isAbsolute3, join as join11, resolve as resolve4 } from "node:path";
+48809c48825
+< var isCodexScript = (cmd) => cmd.includes(V1_SCRIPT_EXT) && V1_PATH_SEPS.some((sep3) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep3) + sep3));
+---
+> var isCodexScript = (cmd) => V1_PATH_SEPS.some((sep3) => V1_CODEX_SCRIPT_NAMES.some((name) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep3) + sep3 + name)));
+48857,48858c48873
+<     if (span2.path.length === 2 && isV2McpTable(hostConfigValueAt(config4, span2.path))) continue;
+<     if (span2.path.length === 3 && span2.path[2] === MCP_ENV_FIELD && isV2McpTable(hostConfigValueAt(config4, span2.path.slice(0, 2)))) continue;
+---
+>     if (isV2McpTable(hostConfigValueAt(config4, span2.path.slice(0, 2)))) continue;
+49021c49036
+< import { dirname as dirname6, isAbsolute, join as join10, sep as sep2 } from "node:path";
+---
+> import { dirname as dirname6, isAbsolute as isAbsolute2, join as join10, sep as sep2 } from "node:path";
+49133c49148
+<   if (typeof script !== "string" || !isAbsolute(script)) throw missing(adapter.id, file2);
+---
+>   if (typeof script !== "string" || !isAbsolute2(script)) throw missing(adapter.id, file2);
+49352a49368,49375
+> function opencodeEntrySpec(entry) {
+>   return isObject4(entry) ? entry[OPENCODE_PACKAGE_FIELD] : Array.isArray(entry) ? entry[0] : entry;
+> }
+> function isNativeOpencodeEntry(entry, key) {
+>   const spec = opencodeEntrySpec(entry);
+>   if (typeof spec !== "string") return false;
+>   return spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
+> }
+49354c49377
+<   const spec = isObject4(entry) ? entry[OPENCODE_PACKAGE_FIELD] : Array.isArray(entry) ? entry[0] : entry;
+---
+>   const spec = opencodeEntrySpec(entry);
+49356,49357c49379,49483
+<   if (spec === OPENCODE_GIT_SPEC || spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || own4.includes(spec)) return true;
+<   return key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
+---
+>   return spec === OPENCODE_GIT_SPEC || own4.includes(spec) || isNativeOpencodeEntry(entry, key);
+> }
+> function stringLiterals(src) {
+>   const out = [];
+>   let i = 0;
+>   while (i < src.length) {
+>     const c = src[i];
+>     if (c === "/" && src[i + 1] === "/") {
+>       const n = src.indexOf("\n", i);
+>       i = n < 0 ? src.length : n;
+>       continue;
+>     }
+>     if (c === "/" && src[i + 1] === "*") {
+>       const n = src.indexOf("*/", i + 2);
+>       i = n < 0 ? src.length : n + 2;
+>       continue;
+>     }
+>     if (c === '"' || c === "'" || c === "`") {
+>       let j = i + 1;
+>       let s = "";
+>       while (j < src.length && src[j] !== c) {
+>         if (src[j] === "\\") {
+>           s += src[j + 1] ?? "";
+>           j += 2;
+>           continue;
+>         }
+>         s += src[j];
+>         j++;
+>       }
+>       out.push(s);
+>       i = j + 1;
+>       continue;
+>     }
+>     i++;
+>   }
+>   return out;
+> }
+> var OPENCODE_PLUGINS_DIR = "plugins";
+> var OPENCODE_PROJECT_DIR = ".opencode";
+> var OPENCODE_PLUGIN_EXTS = [".js", ".mjs", ".ts"];
+> var OPENCODE_PLUGIN_INDEX = "index";
+> var OPENCODE_DIR_FILE_MAX = 64 * 1024;
+> var OWN_PLUGIN_MODULES = [SERVER_KEY, `${SERVER_KEY}/server`];
+> var FILE_URL_PREFIX = "file://";
+> var NODE_MODULES_DIR = "node_modules";
+> var PACKAGE_JSON_FILE = "package.json";
+> var OPENCODE_PACKAGE_DIR_HINT = `${NODE_MODULES_DIR}/${SERVER_KEY}`;
+> function opencodePluginDirs(configDir, worktree) {
+>   return [configDir, opencodeProjectDir(worktree)];
+> }
+> function opencodeProjectDir(worktree) {
+>   return join11(worktree, OPENCODE_PROJECT_DIR);
+> }
+> function packageResolves(fromDir) {
+>   for (let d = fromDir; ; d = dirname7(d)) {
+>     if (existsSync10(join11(d, NODE_MODULES_DIR, SERVER_KEY, PACKAGE_JSON_FILE))) return true;
+>     if (dirname7(d) === d) return false;
+>   }
+> }
+> function opencodeDirPlugins(dirs) {
+>   const bundle = opencodePluginFile();
+>   const ownFile = join11(bundle, ...OPENCODE_PLUGIN_PATH).split("\\").join("/");
+>   const isModule = (p) => OWN_PLUGIN_MODULES.includes(p);
+>   const isPath = (p) => {
+>     if (p === ownFile || p === `${FILE_URL_PREFIX}${ownFile}`) return true;
+>     const seg = p.split("/");
+>     const n = seg.length;
+>     return n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === SERVER_KEY;
+>   };
+>   const out = [];
+>   for (const dir of dirs) {
+>     const pdir = join11(dir, OPENCODE_PLUGINS_DIR);
+>     let names;
+>     try {
+>       names = readdirSync7(pdir);
+>     } catch {
+>       continue;
+>     }
+>     for (const name of names) {
+>       const loose = OPENCODE_PLUGIN_EXTS.some((x) => name.endsWith(x)) ? [join11(pdir, name)] : [];
+>       const files = [...loose, ...OPENCODE_PLUGIN_EXTS.map((x) => join11(pdir, name, `${OPENCODE_PLUGIN_INDEX}${x}`))];
+>       for (const f of files) {
+>         let text;
+>         try {
+>           const b = readFileSync9(f);
+>           if (b.length > OPENCODE_DIR_FILE_MAX) continue;
+>           text = b.toString("utf8");
+>         } catch {
+>           continue;
+>         }
+>         const lits = stringLiterals(text).map((s) => s.split("\\").join("/")).filter((p) => isModule(p) || isPath(p));
+>         if (!lits.length) continue;
+>         const loads = lits.some((p) => {
+>           if (isModule(p)) return packageResolves(dirname7(f));
+>           const bare2 = p.startsWith(FILE_URL_PREFIX) ? p.slice(FILE_URL_PREFIX.length) : p;
+>           return existsSync10(isAbsolute3(bare2) ? bare2 : resolve4(dirname7(f), bare2));
+>         });
+>         out.push({ file: f, loads });
+>       }
+>     }
+>   }
+>   return out;
+> }
+> function opencodeDirPlugin(dirs) {
+>   return opencodeDirPlugins(dirs).find((p) => p.loads)?.file;
+49378c49504,49505
+<   return dirs.some((dir) => OPENCODE_CONFIG_FILES.some((name) => opencodeValueListed(opencodeFileValue(join11(dir, name)))));
+---
+>   if (dirs.some((dir) => OPENCODE_CONFIG_FILES.some((name) => opencodeValueListed(opencodeFileValue(join11(dir, name)))))) return true;
+>   return opencodeDirPlugin(opencodePluginDirs(dirname7(file2), worktree)) !== void 0;
+49601c49728
+< import { isAbsolute as isAbsolute2, join as join12, relative as relative2 } from "node:path";
+---
+> import { isAbsolute as isAbsolute4, join as join12, relative as relative2 } from "node:path";
+49770c49897
+<   return rel === "" || !rel.startsWith("..") && !isAbsolute2(rel);
+---
+>   return rel === "" || !rel.startsWith("..") && !isAbsolute4(rel);
+51554c51681
+< function resolve3(root, ref) {
+---
+> function resolve5(root, ref) {
+51567c51694
+<   if (typeof schema.$ref === "string") errs.push(...shapeErrors(resolve3(root, schema.$ref), value, root, at));
+---
+>   if (typeof schema.$ref === "string") errs.push(...shapeErrors(resolve5(root, schema.$ref), value, root, at));
+51734c51861
+<   return new Promise((resolve7) => {
+---
+>   return new Promise((resolve10) => {
+51741c51868
+<       resolve7({ kind: "silent" });
+---
+>       resolve10({ kind: "silent" });
+51751c51878
+<       resolve7(done_(result));
+---
+>       resolve10(done_(result));
+52110c52237
+< import { join as join14, resolve as resolve4 } from "node:path";
+---
+> import { join as join14, resolve as resolve7 } from "node:path";
+52117c52244
+< import { extname as extname2, join as join13 } from "node:path";
+---
+> import { extname as extname2, join as join13, resolve as resolve6 } from "node:path";
+52693c52820
+< import { dirname as dirname10, join as join18, parse as parse5, resolve as resolve5 } from "node:path";
+---
+> import { dirname as dirname10, join as join18, parse as parse5, resolve as resolve8 } from "node:path";
+52879c53006
+<     const abs = resolve5(cwd, input.file);
+---
+>     const abs = resolve8(cwd, input.file);
+52934c53061
+< import { dirname as dirname11, extname as extname3, join as join20, relative as relative3, resolve as resolve6 } from "node:path";
+---
+> import { dirname as dirname11, extname as extname3, join as join20, relative as relative3, resolve as resolve9 } from "node:path";
+53221c53348
+<   return new Promise((resolve7, reject) => {
+---
+>   return new Promise((resolve10, reject) => {
+53226c53353
+<       req.on("response", resolve7).on("error", onErr).end();
+---
+>       req.on("response", resolve10).on("error", onErr).end();
+53232c53359
+<       req.on("response", resolve7).on("error", onErr).end();
+---
+>       req.on("response", resolve10).on("error", onErr).end();
+53252c53379
+<       req.on("response", resolve7).on("error", onErr).end();
+---
+>       req.on("response", resolve10).on("error", onErr).end();
+53258c53385
+<   return new Promise((resolve7, reject) => {
+---
+>   return new Promise((resolve10, reject) => {
+53261c53388
+<     res.on("end", () => resolve7(Buffer.concat(parts)));
+---
+>     res.on("end", () => resolve10(Buffer.concat(parts)));
+57139c57266
+<   const abs = resolve6(project.worktree, input.path);
+---
+>   const abs = resolve9(project.worktree, input.path);
+57571c57698,57699
+<   const sessionId = input.session ?? ctx.sessionId;
+---
+>   const given = input.session !== void 0 && input.session.trim() !== "" ? input.session : void 0;
+>   const sessionId = given ?? ctx.sessionId;
+58471c58599
+< var FILE_URL_PREFIX = "file:";
+---
+> var FILE_URL_PREFIX2 = "file:";
+58476c58604
+<   if (!cwd.startsWith(FILE_URL_PREFIX)) return cwd;
+---
+>   if (!cwd.startsWith(FILE_URL_PREFIX2)) return cwd;
+58500c58628
+<       if (root.uri.startsWith(FILE_URL_PREFIX)) return fileURLToPath3(root.uri);
+---
+>       if (root.uri.startsWith(FILE_URL_PREFIX2)) return fileURLToPath3(root.uri);
+58667c58795
+<   await new Promise((resolve7) => process.once("exit", () => resolve7()));
+---
+>   await new Promise((resolve10) => process.once("exit", () => resolve10()));

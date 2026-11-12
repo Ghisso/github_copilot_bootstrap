@@ -1,0 +1,6 @@
+start=root after X-codex-nocpd: project folders ['8cc663a6d2747efc']
+start=root after Y-noagent-cpd: project folders ['8cc663a6d2747efc']
+start=root: outer key 8cc663a6d2747efc nested key d4ae91d66746a0d5
+start=nested after X-codex-nocpd: project folders ['48e77e3bf88689d2']
+start=nested after Y-noagent-cpd: project folders ['34007567d4222f5f', '48e77e3bf88689d2']
+start=nested: outer key 34007567d4222f5f nested key 48e77e3bf88689d2

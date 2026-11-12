@@ -1,0 +1,94 @@
+[
+  {
+    "label": "SessionStart startup",
+    "event": "sessionstart",
+    "exit_code": 0,
+    "stdout_bytes": 178,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"This session may have run before. Call mcp__context_mode__ctx_resume for a summary of what happened.\"}}",
+    "hso_keys": [
+      "additionalContext",
+      "hookEventName"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "UserPromptSubmit (not wired by kit)",
+    "event": "userpromptsubmit",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Bash cat big file",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse Bash curl",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 426,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: This curl/wget call sends its body into the conversation.\\nRun it here instead; the full output is indexed and only the part that matches your intent comes back.\\nTool: mcp__context_mode__ctx_execute\\n{\\\"language\\\":\\\"shell\\\",\\\"code\\\":\\\"curl -s https://example.com\\\",\\\"intent\\\":\\\"state what you need\\\"}\"}}",
+    "hso_keys": [
+      "hookEventName",
+      "permissionDecision",
+      "permissionDecisionReason"
+    ],
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreToolUse apply_patch",
+    "event": "pretooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PostToolUse Bash large output",
+    "event": "posttooluse",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "PreCompact manual",
+    "event": "precompact",
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stdout": "",
+    "hso_keys": null,
+    "stderr": [
+      "hooks: decode failed: codex: unknown hook event PreCompact"
+    ],
+    "filtered_stdout": ""
+  },
+  {
+    "label": "SessionStart compact",
+    "event": "sessionstart",
+    "exit_code": 0,
+    "stdout_bytes": 275,
+    "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"<context_mode_state session=\\\"seq-codex\\\" upto=\\\"2\\\">\\nnow: Find the slow latency entries for worker alpha\\nmore: mcp__context_mode__ctx_search(queries:[], scope:\\\"session\\\")\\n</context_mode_state>\"}}",
+    "hso_keys": [
+      "additionalContext",
+      "hookEventName"
+    ],
+    "stderr": [],
+    "filtered_stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"<context_mode_state session=\\\"seq-codex\\\" upto=\\\"2\\\">\\nnow: Find the slow latency entries for worker alpha\\nmore: mcp__context_mode__ctx_search(queries:[], scope:\\\"session\\\")\\n</context_mode_state>\"}}\n"
+  }
+]

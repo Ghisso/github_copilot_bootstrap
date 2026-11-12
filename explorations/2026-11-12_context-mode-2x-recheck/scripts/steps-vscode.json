@@ -1,0 +1,11 @@
+[
+  {"label": "SessionStart startup", "event": "sessionstart", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "SessionStart", "source": "startup"}},
+  {"label": "UserPromptSubmit (not wired by kit)", "event": "userpromptsubmit", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "UserPromptSubmit", "prompt": "Find the slow latency entries for worker alpha"}},
+  {"label": "PreToolUse read_file big", "event": "pretooluse", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "PreToolUse", "tool_name": "read_file", "tool_input": {"filePath": "<TMP>/repo/big.log"}}},
+  {"label": "PreToolUse fetch_webpage", "event": "pretooluse", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "PreToolUse", "tool_name": "fetch_webpage", "tool_input": {"urls": ["https://example.com"], "query": "x"}}},
+  {"label": "PreToolUse run_in_terminal cat big", "event": "pretooluse", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "PreToolUse", "tool_name": "run_in_terminal", "tool_input": {"command": "cat big.log"}}},
+  {"label": "PostToolUse run_in_terminal large", "event": "posttooluse", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "PostToolUse", "tool_name": "run_in_terminal", "tool_input": {"command": "./run-tests.sh"}, "tool_response": "<BIG:400>"}},
+  {"label": "PreCompact manual", "event": "precompact", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "PreCompact", "trigger": "manual"}},
+  {"label": "SessionStart compact", "event": "sessionstart", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "SessionStart", "source": "compact"}},
+  {"label": "UserPromptSubmit after compact (not wired by kit)", "event": "userpromptsubmit", "payload": {"session_id": "seq-vscode", "cwd": "<TMP>/repo", "hook_event_name": "UserPromptSubmit", "prompt": "continue"}}
+]
