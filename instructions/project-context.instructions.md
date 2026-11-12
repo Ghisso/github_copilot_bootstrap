@@ -33,7 +33,8 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `shared/agents/`: canonical agent metadata and target-neutral prompts.
 - `shared/review-profiles/`: profile checklists used by the unified reviewer.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
-  including `context-mode-dispatch.sh` (pins Context Mode `1.0.169`).
+  including `context-mode-dispatch.sh` (pins Context Mode `2.1.8` on the
+  migration branch).
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
   (Context Mode is filtered to exactly three tools: `ctx_index`,
   `ctx_search`, `ctx_stats`; Antigravity gets no Context Mode entry).
@@ -186,16 +187,22 @@ On 2026-11-12 none of the four local full consumers (`~/work/RAG`,
 They need a refresh through `scripts/update_consumers.py`; that is the user's
 call.
 
-Pinned versions: Context Mode `1.0.169`, OpenWiki `0.7.2` (the guard allows
-only `mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
-(`ponytail-review` stays complexity-only). Context Mode `2.1.7` (2026-11-08)
-is a full rewrite: it needs Node.js 24.15 or newer (the devcontainer has 22),
-always reports server version `"dev"` (the filter's version gate fails), needs
-a per-host `--agent` server argument (Antigravity has none), ignores
-`CONTEXT_MODE_DIR`, and forwards almost nothing through the kit's advice-only
-filter. A 2026-11-11 evidence spike judged it a planned control-plane
-migration, not a pin bump (`.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`).
-Until then the dispatcher refuses any other version, so `1.0.169` stays safe.
+Pinned versions: Context Mode `2.1.8` (on the migration branch since Phase
+B; `dev` still pins the previous 1.x release until the merge), OpenWiki
+`0.7.2` (the guard allows only `mode: "update"`), and Ponytail partially
+merged from upstream `v5.3.2` (`ponytail-review` stays complexity-only).
+Context Mode 2.x is a full rewrite: it needs Node.js 24.15.0 or newer (the
+dispatcher enforces it in server mode and `--self-check`; the devcontainer
+image is `node:24.22.3-bookworm-slim`), always reports server version
+`"dev"` (so the dispatcher's manifest or `npx` pin is the only version
+proof), needs `--agent` (the kit uses `codex` for every client, started from
+the outer repository root), ignores `CONTEXT_MODE_DIR` (the dispatcher
+exports `CONTEXT_MODE_DATA_DIR` to the guarded root), and has no Antigravity
+id. Evidence: `.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`
+and `.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`.
+The global `context-mode` on this host is still the 1.x release, so the
+dispatcher refuses it and uses `npx -y context-mode@2.1.8`; tests use a
+private copy in `$HOME/.cache/context-mode-pin`.
 The migration plan `.claude/plans/context-mode-2x-migration.md` was approved
 on 2026-11-12 with every recommended option (MCP-only, drop `ctx_doctor`,
 drop Antigravity's entry, one server identity). Later that day the user
