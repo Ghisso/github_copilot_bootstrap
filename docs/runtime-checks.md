@@ -91,27 +91,44 @@ regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
-  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. On Claude Code the `PreToolUse` hook runs only under the anchored matcher `^(Bash|Read|Grep|WebFetch|mcp__.*)$`. It is anchored because Claude Code reads such a matcher as an unanchored regular expression and also tries a tool's older names, so `TaskOutput` would otherwise match. `Agent` is left out because Context Mode's only `Agent` action rewrites the subagent prompt, and auto mode refuses a call whose input a hook changed. The filter already drops that rewrite, so leaving `Agent` out is a second safeguard. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
+- `context-mode` (optional filtered `ctx_index`/`ctx_search`/`ctx_stats` MCP server, routed through `context-mode-dispatch.sh` and pinned to `2.1.8`). The kit wires no Context Mode hooks on any client; a hook call from stale wiring reads its input, prints nothing, and exits 0. The filter accepts the server only when `serverInfo.name` is exactly `context-mode`. The 2.x server reports `serverInfo.version` as `"dev"`, so the version is never proved over the wire. The dispatcher alone proves it: for a direct `context-mode` executable it resolves the file and reads the owning package manifest's `name`/`version` before running it; for the `npx` route it pins the version in the command (`npx -y context-mode@2.1.8`). A binary that is not provably exactly `2.1.8`, including one whose version cannot be determined, is never executed; the pinned `npx` fallback is used instead when available, and otherwise the server warns and exits nonzero. The 2.x binary has a working `context-mode --version`, and the Dockerfile checks it. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, a `version-contract` result, and `required-node`/`observed-node`.
+  - **Node.js floor.** Context Mode 2.x needs Node.js 24.15.0 or newer (`engines.node`). In server mode and `--self-check`, the dispatcher reads `node --version`. Server mode exits 1 with one error line when Node.js is older; `--self-check` warns. Legacy hook calls run no Node.js check. The devcontainer image is `node:24.22.3-bookworm-slim`.
+  - **One server identity.** Every client starts `context-mode server --agent codex` (or `npx -y context-mode@2.1.8 server --agent codex`) through the filter. The dispatcher changes to the outer repository root first, and sets no `CLAUDE_PROJECT_DIR` and no `--workspace-folder`. Under `--agent codex` the server keys its project to the working folder's Git repository, so a server started inside the nested `.claude` repository would use a separate project. Starting from the root also lets the server and the filter resolve a relative `ctx_index` path from the same folder.
+  - **Storage.** The dispatcher exports `CONTEXT_MODE_DATA_DIR` as the guarded root `.claude/.cache/context-mode/`, overwriting any inherited value. 2.x ignores `CONTEXT_MODE_DIR`; the dispatcher still reads it as the kit's own override, subject to the same guard. Everything the three tools write is under that root (spike S4 saw no network calls and no writes elsewhere).
+  - **Older caches.** A cache the dispatcher did not produce for this exact pin is moved aside as `<cache>.untrusted.<timestamp>.<pid>`, never migrated and never deleted. Provenance includes the exact version, so every pin bump starts with an empty cache, and the 1.x cache is not imported. The moved folders use disk space; delete them by hand when you no longer need them.
+  - **Lost race.** Two servers that start together may both try to move the old cache. When the move fails and the cache folder no longer exists, the dispatcher treats the other server as the winner, warns once, and continues with a fresh root. When the folder still exists, the move fails as before and the server exits nonzero.
 
-  1. Run `uv run python tests/fixtures/context_mode_hook/capture.py [--out-root DIR]`. It records raw upstream output, not filtered output, by running the pinned `context-mode hook <target> <event>` directly with the `CONTEXT_MODE_DIR` and `CONTEXT_MODE_PROJECT_ROOT` the dispatcher passes, in a temporary Git repository with a temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and a private `TMPDIR` (upstream keeps once-per-session tip files in the OS temp directory). It copies the hook scripts there only to run `--self-check` first, which asserts the direct pinned launcher. It reads the pinned version and client-to-target mapping from `shared/hooks/scripts/context-mode-dispatch.sh`, so run it in this authoring repository. It uses one session id per client, redacts temporary paths as `<TMP>`, and writes `<out-root>/<PINNED_CONTEXT_MODE_VERSION>/<client-id>/<event>-<case>.json` (default out-root: the fixture directory).
-  2. Review the new outputs for decisions, input rewrites, and advice blocks. Update the filter if a new shape appears.
-  3. Compare `CLAUDE_CONTEXT_MODE_MATCHER` in `scripts/generate_targets.py` with the tool branches of `routePreToolUse` in the new version's `hooks/core/routing.mjs`. The recorded fixtures cover only a fixed set of tools, so they do not show a newly routed one. Add any newly routed Claude tool except `Agent`, and add it to `test_rendered_claude_context_mode_pretool_matcher_skips_agent` in `tests/test_lifecycle_hooks.py`.
-  4. Run the hook tests, including the real-binary test:
+  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. The filter answers `server/discover`, the probe of the 2026-07-28 MCP revision, itself with `-32601` and never forwards it, so a client that speaks both revisions falls back to `initialize` and never receives the upstream `instructions` that the probe's answer would carry. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs.
 
-  ```bash
-  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
-  ```
+  To bump `PINNED_CONTEXT_MODE_VERSION`:
+
+  1. Install the candidate into a private prefix: `npm install -g --prefix "$HOME/.cache/context-mode-pin" --ignore-scripts "context-mode@<candidate>"`.
+  2. Set `PINNED_CONTEXT_MODE_VERSION` in `shared/hooks/scripts/context-mode-dispatch.sh` to the candidate. The real-binary test in the next step runs the dispatcher, which accepts a direct binary only when its version equals the pin and never falls back to `npx` there.
+  3. Run the real-binary server test with the private prefix first on `PATH`:
+
+     ```bash
+     PATH="$HOME/.cache/context-mode-pin/bin:$PATH" CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q -k real_upstream
+     ```
+
+  4. Compare the candidate's `tools/list` (schemas and property descriptions) with the kit descriptions and `INDEX_ARGS` in the filter.
+  5. Run the two slim-image checks: the Node.js engine check on the Dockerfile's `FROM` image, and `npm install -g --ignore-scripts context-mode@<candidate>` followed by `context-mode --version` in that image.
+  6. Optionally build the full devcontainer image.
+  7. Bump the pin in the Dockerfile and `CONTEXT_MODE_PINNED_VERSION` in the validator to match the dispatcher, then update every doc that names the pin, found with `rg -F '<old pin>'`.
 
   Known limits:
 
-  - A restored-data block that mentions any non-allowlisted `ctx_` name is dropped whole (fail-closed).
-  - Unclosed, nested, or differently cased advice tags are not stripped. For such text only the name safety net applies: the whole field is dropped if it still names a plugin-prefixed or non-allowlisted `ctx_` tool, otherwise the leftover text is forwarded.
-  - The event name must be a plain word (letters only), or nothing is forwarded.
-  - Codex and Copilot restore shapes were not observed.
+  - Tool-result text can name another client's tool prefix, because one identity serves every client and the filter does not rewrite results. The routing policy names the real tools.
+  - Upstream 2.x folder indexing has no bound on files, depth, or size, follows symbolic links inside the repository's parent folder, and ignores a `.gitignore` above the folder. That is why the filter accepts only content or one regular file.
   - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
-  - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - Antigravity gets no Context Mode server entry, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - The filter speaks only the `initialize`-based MCP revisions (2025-11-25 and earlier). A client that speaks both revisions falls back to them; a client that only speaks 2026-07-28 gets no Context Mode tools.
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
+
+  Rollback: reverting the merge brings back the previous pin.
+  Its dispatcher moves the 2.x cache aside on the first run, but it does not restore the older cache.
+  To get the old index back, do this by hand before that first run:
+  move the current `.claude/.cache/context-mode` folder out of the way (a fresh one exists after 2.x started),
+  then rename the `.untrusted.*` folder that holds the 1.x index (moved aside when 2.x first started) to `context-mode`.
 - `openwiki` (the OpenWiki command-line tool and MCP server, installed globally and pinned in `shared/devcontainer/Dockerfile`; `OPENWIKI_PINNED_VERSION` in `scripts/validate_targets.py` names the same version). OpenWiki has no `openwiki --version`, so the Dockerfile reads the version from the installed package's own `package.json`, then runs `openwiki integrations list </dev/null`. `tests/test_openwiki_cli_smoke.py` requires the binary on `PATH` to report exactly the pinned version. It fails when the version differs or the binary is missing, and it never downloads anything. To move to a new pin:
 
   1. Diff the contents of `npm pack openwiki@<old>` and `npm pack openwiki@<new>`, and read the release notes between them. Look for changes to the tool names, `openwiki_begin`'s input, the managed-block markers, which paths a begin call writes, and the host integrations.
@@ -206,7 +223,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `openwiki-guard.sh`
 - `pretool-bash-guard.sh`
 - `git-protection.sh`
-- `context-mode-dispatch.sh`
+- `context-mode-dispatch.sh` (MCP server mode only)
 - `session-log.sh`
 - `state-sync.sh`
 - `claude-stop.sh`
@@ -244,12 +261,11 @@ every-N-tool reminders, `Stop` rewriting, or
 Gemini CLI is out of scope.
 
 For the primary targets, generated `PreToolUse` routing must remain split into
-three groups: native file mutations (`Edit|Write` for both Claude and Codex)
-call `protect-files.sh`; `Bash` calls the single ordered
-`pretool-bash-guard.sh`; and a third group calls only best-effort
-`context-mode-dispatch.sh`. On Claude that group's matcher is
-`^(Bash|Read|Grep|WebFetch|mcp__.*)$`; on Codex it is `*`. `Read` and MCP
-tools must have no mutation handler.
+groups: native file mutations (`Edit|Write` for both Claude and Codex)
+call `protect-files.sh`, and `Bash` calls the single ordered
+`pretool-bash-guard.sh`. No group runs `context-mode-dispatch.sh`; the
+validator rejects any hook handler that does. `Read` and MCP tools must have
+no mutation handler.
 The Bash wrapper must preserve the guard order: protected files, dangerous Git,
 branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
 outside that lane and retain their existing sequencing.
@@ -930,8 +946,7 @@ Codex-specific runtime notes:
 - `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
 - `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
-- `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
-- `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
+- `.codex/hooks.json` uses the narrow native-edit and ordered-Bash matcher groups; it must not send every tool through the mutation guard.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define
   `name`, `description`, `model`, `model_reasoning_effort`, and
   `developer_instructions`; model and effort must match canonical `agent.yaml`

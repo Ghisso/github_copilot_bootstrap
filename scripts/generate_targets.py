@@ -38,11 +38,6 @@ TARGETS = ("multi-agent", "sidecar")
 # (`mcp__<server>__<tool>`; docs/2026-09-19-openwiki-hook-mechanics-spike.md
 # U2), guarding OpenWiki's one repository-mutating entry point.
 OPENWIKI_BEGIN_MATCHER = "mcp__openwiki__openwiki_begin"
-# Claude Code reads this as an unanchored regex that it also tries on legacy
-# tool names (`Task` for `Agent`), hence the anchors. It lists what Context Mode
-# 1.0.169 routes except Agent, whose only action rewrites the subagent prompt,
-# a change Claude Code auto mode refuses.
-CLAUDE_CONTEXT_MODE_MATCHER = "^(Bash|Read|Grep|WebFetch|mcp__.*)$"
 SUPPORTED_AGENT_TARGETS = (
     "github-copilot",
     "claude-code",
@@ -87,8 +82,8 @@ SHARED_BASIS_NAMESPACE = ".claude"
 # `mcp__<server>__*` grants every tool from that MCP server (Claude Code
 # subagent frontmatter `tools:` field: code.claude.com/docs/en/subagents.md).
 # mcp__context-mode is included for the same reason: the dispatcher-backed
-# server only ever advertises its filtered ctx_index/ctx_search/ctx_stats/
-# ctx_doctor allowlist (shared/hooks/scripts/context-mode-mcp-filter.mjs), so
+# server only ever advertises its filtered ctx_index/ctx_search/ctx_stats
+# allowlist (shared/hooks/scripts/context-mode-mcp-filter.mjs), so
 # granting the whole server here cannot expose a blocked tool.
 # mcp__context7 is granted for the same reason: tool-routing.instructions.md
 # tells every subagent to use Context7 for external library documentation, and
@@ -1027,7 +1022,7 @@ def render_codex_config(path: Path) -> None:
     lines = [
         "# Generated from shared/mcp/servers.json.",
         "# Skills are sourced from the shared .claude basis; project trust is required.",
-        "# Semble and Context Mode hooks are optional; missing binaries should warn, not block.",
+        "# Semble and Context Mode are optional; missing binaries should warn, not block.",
         "# Hooks are enabled by default in current Codex, so no flat features block is emitted.",
         "# Preserve the MultiAgent V2 routing shim until trusted native probes prove removal.",
         "# See docs/2026-08-08-codex-routing-compatibility.md in the bootstrap source.",
@@ -1114,7 +1109,6 @@ def render_claude_settings(path: Path) -> None:
                         cmd("state-sync.sh", "pull", timeout=60),
                         cmd("session-log.sh", "claude-code"),
                         cmd("session-start-state.sh", "claude-code"),
-                        cmd("context-mode-dispatch.sh", "claude-code", "sessionstart"),
                     ]
                 }
             ],
@@ -1130,12 +1124,6 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [cmd("pretool-bash-guard.sh", "claude-code")],
                 },
                 {
-                    "matcher": CLAUDE_CONTEXT_MODE_MATCHER,
-                    "hooks": [
-                        cmd("context-mode-dispatch.sh", "claude-code", "pretooluse")
-                    ],
-                },
-                {
                     "matcher": OPENWIKI_BEGIN_MATCHER,
                     "hooks": [cmd("openwiki-guard.sh", "pre")],
                 },
@@ -1145,7 +1133,6 @@ def render_claude_settings(path: Path) -> None:
                     "matcher": "Bash",
                     "hooks": [
                         cmd("record-branch-state.sh", "claude-code"),
-                        cmd("context-mode-dispatch.sh", "claude-code", "posttooluse"),
                         cmd("reporting-reminder.sh", "late-report", "claude-code"),
                     ],
                 },
@@ -1163,13 +1150,6 @@ def render_claude_settings(path: Path) -> None:
                     "matcher": OPENWIKI_BEGIN_MATCHER,
                     "hooks": [cmd("openwiki-guard.sh", "post")],
                 },
-            ],
-            "PreCompact": [
-                {
-                    "hooks": [
-                        cmd("context-mode-dispatch.sh", "claude-code", "precompact")
-                    ]
-                }
             ],
             "Stop": [
                 {
@@ -1220,7 +1200,6 @@ def render_codex_hooks(path: Path) -> None:
                         cmd("state-sync.sh", "pull", timeout=60),
                         cmd("session-log.sh", "openai-codex"),
                         cmd("session-start-state.sh", "openai-codex"),
-                        cmd("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
                     ],
                 }
             ],
@@ -1236,12 +1215,6 @@ def render_codex_hooks(path: Path) -> None:
                     "hooks": [cmd("pretool-bash-guard.sh", "openai-codex")],
                 },
                 {
-                    "matcher": "*",
-                    "hooks": [
-                        cmd("context-mode-dispatch.sh", "openai-codex", "pretooluse")
-                    ],
-                },
-                {
                     "matcher": OPENWIKI_BEGIN_MATCHER,
                     "hooks": [cmd("openwiki-guard.sh", "pre")],
                 },
@@ -1251,7 +1224,6 @@ def render_codex_hooks(path: Path) -> None:
                     "matcher": "Bash",
                     "hooks": [
                         cmd("record-branch-state.sh", "openai-codex"),
-                        cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
                         cmd("reporting-reminder.sh", "late-report", "openai-codex"),
                     ],
                 },
@@ -1259,13 +1231,6 @@ def render_codex_hooks(path: Path) -> None:
                     "matcher": OPENWIKI_BEGIN_MATCHER,
                     "hooks": [cmd("openwiki-guard.sh", "post")],
                 },
-            ],
-            "PreCompact": [
-                {
-                    "hooks": [
-                        cmd("context-mode-dispatch.sh", "openai-codex", "precompact")
-                    ]
-                }
             ],
             # Codex fires nothing at all when an MCP tool returns
             # isError: true (spike U6, outcome O2) - there is no failure
@@ -1386,7 +1351,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
 - Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
 - Reporting rules are output requirements. For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
-- Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. A guarded bounded project index is optional for broader discovery, never repository truth, and missing optional helpers are warnings, not hard failures.
+- Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly three guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`); these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. `ctx_index` takes text or one file, never a folder or URL; cached content is never repository truth, and missing optional helpers are warnings, not hard failures.
 - An optional OpenWiki knowledge layer, enabled when `openwiki/INSTRUCTIONS.md` exists, is derived context, never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 
 ## Task Lanes
@@ -1824,9 +1789,17 @@ def render_antigravity_agent_adapter(agent: dict[str, Any]) -> str:
 def render_antigravity(target_root: Path) -> None:
     """Render the static Google Antigravity provider adapter surface."""
     copy_tree(REPO_ROOT / "shared" / "skills", target_root / ".agents" / "skills")
+    # Antigravity's pre-tool bridge denies every MCP call, so a Context Mode
+    # entry would never be used.
     write_json(
         target_root / ".agents" / "mcp_config.json",
-        {"mcpServers": shared_mcp_servers()},
+        {
+            "mcpServers": {
+                name: server
+                for name, server in shared_mcp_servers().items()
+                if name != "context-mode"
+            }
+        },
     )
     render_antigravity_hooks(target_root / ".agents" / "hooks.json")
     for agent, _agent_dir in shared_agents("google-antigravity"):

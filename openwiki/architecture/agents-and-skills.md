@@ -5,7 +5,7 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-22T17:57:02.699Z
+    at: 2026-11-12T09:39:07.876Z
 sources:
   - id: openwiki-source-5939cd6c98209174dac35ee6
     resource: repo://docs/2026-10-06-behavioral-pilot-evidence.md
