@@ -1,15 +1,15 @@
 ---
 name: context-mode-2x-migration
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: context-mode-2x-migration_implementation
-started_at:
+started_at: 2026-11-12T07:07:18Z
 phases:
   - 2026-11-12_phase-A-context-mode-mcp-only-surface
   - 2026-11-12_phase-B-context-mode-2x-switch
   - 2026-11-12_phase-C-knowledge-refresh
-current_phase:
+current_phase: 2026-11-12_phase-A-context-mode-mcp-only-surface
 ---
 
 # Big Plan: context-mode-2x-migration
