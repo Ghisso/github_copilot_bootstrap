@@ -17,12 +17,21 @@
   `dist/sidecar/` (personal overlay); it is not a Hydra/BentoML/Haystack/Gradio
   application. Durable project context:
   `.claude/instructions/project-context.instructions.md`.
-- [LEARN:domain] The pinned Context Mode `1.0.169` MCP server checks the npm
-  registry at startup and every hour (the source of the "outdated → v…
-  available" notice; no setting turns it off), and its hooks write
-  `~/.claude/context-mode/heal-partial-install.log` and start the Codex CLI.
-  2.x is a rewrite that needs a planned migration, not a pin bump. Evidence:
-  `.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`.
+- [LEARN:domain] Context Mode 1.x (pinned until the 2026-11-12
+  `context-mode-2x-migration`) checks the npm registry at startup and every
+  hour (the "outdated → v… available" notice; no setting turns it off), and
+  its hooks write `~/.claude/context-mode/heal-partial-install.log` and start
+  the Codex CLI. 2.x was a rewrite that needed a planned migration, not a pin
+  bump; the kit now pins 2.1.8, MCP-only, which makes no network call for the
+  three kit tools (spike S4). Evidence:
+  `.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md` and
+  `.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`.
+- [LEARN:tooling] Context Mode 2.x reports `serverInfo.version` `"dev"`, so
+  prove its version from the package manifest or the `npx` pin, never over the
+  wire. It ignores `CONTEXT_MODE_DIR` (`CONTEXT_MODE_DATA_DIR` sets its data
+  root, and 1.x data is not imported). With `--agent codex` it keys its project
+  to the working folder's Git repository: start it from the outer repository
+  root, or the nested `.claude` repository becomes a separate project.
 - [LEARN:security] Context Mode 2.x folder indexing has no bound on files,
   depth, or size, follows symlinks anywhere inside the repository's parent
   folder (sibling projects), and ignores a `.gitignore` above the indexed
@@ -1747,3 +1756,15 @@
   upstream that answers), assert the exact error code and id, and prove the
   test fails against a copy with the refusal removed (Context Mode filter
   identity gate, 2026-11-12).
+- [LEARN:testing] A real-binary test guards a working-folder `cd` only when it
+  starts from the folder the `cd` exists to escape. The Context Mode server
+  test passed with the dispatcher's `cd` removed until it started from a
+  nested `<repo>/.claude` Git repository (2026-11-12 mutation check).
+- [LEARN:documentation] A pin-bump procedure must change the pin before any
+  test that runs the pinned launcher against the candidate. The Context Mode
+  real-binary test accepts a direct binary only when it equals the
+  dispatcher's pin, so "test first, bump last" fails at the test.
+- [LEARN:workflow] Check a hook-lane claim against the generated matcher, not
+  only a replayed fixture: the kit's Codex SessionStart matcher
+  `startup|resume|clear` never delivered `compact`, so the replayed
+  compaction output never reached Codex.
