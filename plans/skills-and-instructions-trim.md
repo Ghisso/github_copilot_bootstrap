@@ -8,12 +8,9 @@ implementation_branch: skills-and-instructions-trim_implementation
 started_at:
 phases:
   - 2026-11-12_phase-A-project-owned-skills
-  - 2026-11-12_phase-B-closeout-and-wording-defects
-  - 2026-11-12_phase-C-skill-removals-and-merges
-  - 2026-11-12_phase-D-skill-description-cap
-  - 2026-11-12_phase-E-workflow-split
-  - 2026-11-12_phase-F-guidance-trims
-  - 2026-11-12_phase-G-knowledge-refresh
+  - 2026-11-12_phase-B-instructions
+  - 2026-11-12_phase-C-skill-set
+  - 2026-11-12_phase-D-knowledge-refresh
 current_phase:
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
@@ -34,6 +31,8 @@ Approved by the user on 2026-11-12:
 - a project-owned skills mechanism comes first;
 - a short Codex evidence check runs before any step relies on Codex behavior.
 
+On 2026-11-12 the user also asked for fewer phases: three work phases plus the required knowledge-refresh phase.
+
 ### Open decision (confirm at approval)
 
 The user rejected `disable-model-invocation: true` ("manual-only"). The proposal:
@@ -42,7 +41,7 @@ The user rejected `disable-model-invocation: true` ("manual-only"). The proposal
 - the hash-pinned `ponytail` and `ponytail-review` are exempt;
 - `scripts/validate_targets.py` gets a check that enforces the cap.
 
-Measured result: 37 skills and about 10,100 description characters instead of 19,579. 14 descriptions need new text. Phase D is written for this option.
+Measured result: 37 skills and about 10,100 description characters instead of 19,579. 14 descriptions need new text. Phase C is written for this option.
 
 If the user rejects it, there are two alternatives:
 - rewrite the 14 descriptions without a cap, which leaves nothing to stop them growing again;
@@ -63,10 +62,9 @@ If the user rejects it, there are two alternatives:
 ## Goals
 
 - Protect skills a consumer project writes itself from bootstrap refreshes, for every client (Phase A).
-- Fix defects 2 to 6 from section 7 before the later closeouts use them (Phase B).
-- Reach 37 model-visible skills with short, trigger-first descriptions, and enforce the cap (Phases C and D).
-- Split the workflow policy, so CLOSEOUT is read only at the closeout step, and trim the always-read guidance (Phases E and F).
-- Refresh the derived wiki and audit live advice for stale claims (Phase G).
+- Fix defects 2 to 6 from section 7. Split the workflow policy, so CLOSEOUT is read only at the closeout step. Trim the always-read guidance (Phase B).
+- Reach 37 model-visible skills with short, trigger-first descriptions, and enforce the cap (Phase C).
+- Refresh the derived wiki and audit live advice for stale claims (Phase D).
 
 ## Non-Goals and Constraints (optional)
 
@@ -77,12 +75,43 @@ If the user rejects it, there are two alternatives:
   - the sidecar's own MEMORY rule.
 - Do not re-propose section 6's rejected cuts. Stack-specific content (Hydra, BentoML, Haystack, Gradio) stays.
 - Never edit `shared/skills/ponytail/SKILL.md` or `shared/skills/ponytail-review/SKILL.md`.
-- Never loosen the root-guidance validator. Phase F only tightens it.
+- Never loosen the root-guidance validator. Phase B only tightens it.
 - Regenerate `dist/` only with `uv run python scripts/generate_targets.py --all`. Refresh this repository with `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. Only one agent runs generation or the validators at a time.
 - Every phase is control-plane/high-risk: a full small plan and the `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles, plus `documentation` when docs change.
+- Inside a phase, each file is edited in one step.
 - A repeated procedural mistake is fixed by a numbered procedure in canonical instructions, not a memory note.
 
 ## Design Overview
+
+### Phase order and done criteria
+
+| Order | Phase | Content |
+|---|---|---|
+| Before the branch | Evidence spike | Codex duplication and hiding; Claude Code listing budget (below) |
+| A | `2026-11-12_phase-A-project-owned-skills` | Project skill marker, clash refusal, `.agents/skills/` mirror, learn pointer |
+| B | `2026-11-12_phase-B-instructions` | Defects 2 to 6; CLOSEOUT and plan-lifecycle files; MEMORY rule; root guidance, policy, and prompt trims |
+| C | `2026-11-12_phase-C-skill-set` | 55 to 37 skills; 300-character cap and validator check; loading rules; Codex spike result |
+| D | `2026-11-12_phase-D-knowledge-refresh` | OpenWiki refresh and stale-claims audit |
+
+Why this order:
+- A comes first by user decision.
+- B before C: the corrected closeout procedure then governs the closeouts of C and D.
+- The workspace trim in B rewrites that policy's Skills section once, so C never edits the workspace policy.
+- C depends only on the pre-branch spike.
+
+Split fallback: if Phase B is too large to review as one commit, split it into B1 and B2:
+- B1: defects 2 to 6 and the workflow split, including all orchestrator prompt edits;
+- B2: the size trims (root guidance, workspace, quality, tool-routing, config-first, documenter).
+
+Done criteria:
+- Phases A to D are `complete`, with passing receipts and findings that show zero CRITICAL and MAJOR and gate result `PASS`.
+- A marked project skill survives a real install and refresh, is mirrored to `.agents/skills/`, and a name clash is refused before any write.
+- Defects 2 to 6 are fixed.
+- The workflow core is 16,000 bytes or less. CLOSEOUT lives in `closeout.instructions.md` as 8 numbered steps, each with a reason, and a validator pin protects it. `plan-lifecycle.instructions.md` exists. The MEMORY rule is a targeted search.
+- The generated `CLAUDE.md` is 4,500 bytes or less, and `AGENTS.md` is 4,800 bytes or less. The validator budget is tightened to 5 KiB.
+- `dist` holds 37 skills. The total description length is 10,500 characters or less. Only the two Ponytail skills exceed 300 characters. The validator enforces the cap.
+- OpenWiki is refreshed, and `## Stale-claims surfaces checked` is recorded.
+- The optional host check records whether a fresh Claude Code session lists every skill with its description.
 
 ### Project-owned skills (Phase A)
 
@@ -126,7 +155,7 @@ The orchestrator runs this before branch creation, reads `.claude/skills/integra
 - no `git commit`;
 - no edit to `~/.codex/config.toml` or `~/.claude/`.
 
-The planner then writes the results into Phase D (and A, when a stop row fires) before the branch.
+The planner then writes the results into Phase C (and A, when a stop row fires) before the branch.
 
 ```bash
 SPIKE="<runner scratchpad>/skills-trim-spike"; mkdir -p "$SPIKE/tools"
@@ -163,50 +192,47 @@ Stop conditions: each S-check runs at most twice. A failing command is recorded 
 
 | Result | Plan change before the branch |
 |---|---|
-| S1: every shipped skill listed once from `.agents/skills/`; the config-only run lists none | Expected. Phase D Step 4 corrects the false comment in `render_codex_config` (`scripts/generate_targets.py:1024`) and any doc that repeats it. Removing the entries is a user follow-up. |
-| S1: any shipped skill listed twice | The planner revises Phase D Step 4: stop emitting `[[skills.config]]`; update the two validator assertions, the comment, and this repository's tracked `.codex/config.toml`. |
-| S1: the config-only run lists skills, and the full run lists each once | The planner revises Phase D Step 4 to record which copy Codex keeps. No config change. |
+| S1: every shipped skill listed once from `.agents/skills/`; the config-only run lists none | Expected. Phase C Step 5 corrects the false comment in `render_codex_config` (`scripts/generate_targets.py:1024`) and any doc that repeats it. Removing the entries is a user follow-up. |
+| S1: any shipped skill listed twice | The planner revises Phase C Steps 1 and 5: stop emitting `[[skills.config]]`; update the two validator assertions, the comment, and this repository's tracked `.codex/config.toml`. |
+| S1: the config-only run lists skills, and the full run lists each once | The planner revises Phase C Step 5 to record which copy Codex keeps. No config change. |
 | S4: `spike-project-skill` not listed | Stop and re-plan Phase A's mirror step. |
-| S5: the after run shows no listing-budget warning | Expected. Phase D's Optional Verification greps for the warning text that S5 recorded. |
+| S5: the after run shows no listing-budget warning | Expected. Phase C's Optional Verification greps for the warning text that S5 recorded. |
 | S5: the after run still warns | Ask the user before the branch: (a) cap at 200 characters; (b) also set `skillListingBudgetFraction` in the generated `.claude/settings.json` (needs an S5 rerun); (c) move the personal `opik*` skills; (d) accept description loss for the least-used tail. |
-| S5: the baseline run shows no warning either | Record it. The cap stands (approved for size), and Phase D keeps the debug-log check. |
+| S5: the baseline run shows no warning either | Record it. The cap stands (approved for size), and Phase C keeps the debug-log check. |
 | S2 | Record only. Manual-only was rejected. |
 
 ### Before and after
 
 | Surface | Before | After (acceptance) | Phase |
 |---|---|---|---|
-| `dist/multi-agent/CLAUDE.md` | 6,507 B | ≤ 4,500 B (about 4.3 KB); validator budget 5 KiB | F |
-| `dist/multi-agent/AGENTS.md` | 9,467 B | ≤ 4,800 B; validator budget 5 KiB | F |
-| `shared/policies/workflow.instructions.md` (core) | 40,797 B | ≤ 16,000 B (about 15 KB); validator budget 16 KiB | E |
-| Skill descriptions | 55 skills, 19,579 chars | 37 skills, ≤ 10,500 chars (about 10,100) | C, D |
-| `workspace` / `quality-and-testing` / `tool-routing` | 11,707 / 10,287 / 5,545 B | ≤ 7,500 / 3,000 / 3,000 B | F |
-| Orchestrator / documenter prompts | 16,178 / 7,626 B | ≤ 12,500 / 6,500 B | F |
+| `dist/multi-agent/CLAUDE.md` | 6,507 B | ≤ 4,500 B (about 4.3 KB); validator budget 5 KiB | B |
+| `dist/multi-agent/AGENTS.md` | 9,467 B | ≤ 4,800 B; validator budget 5 KiB | B |
+| `shared/policies/workflow.instructions.md` (core) | 40,797 B | ≤ 16,000 B (about 15 KB); validator budget 16 KiB | B |
+| `workspace` / `quality-and-testing` / `tool-routing` | 11,707 / 10,287 / 5,545 B | ≤ 7,500 / 3,000 / 3,000 B | B |
+| Orchestrator / documenter prompts | 16,178 / 7,626 B | ≤ 12,500 / 6,500 B | B |
+| Skill descriptions | 55 skills, 19,579 chars | 37 skills, ≤ 10,500 chars (about 10,100) | C |
 
 ## Requirement Map (optional)
 
 | Requirement | Acceptance and existing contract | Owning phase | Evidence |
 |---|---|---|---|
 | REQ-001 | A marked `.claude/skills/<name>/` survives install and refresh, a clash is refused before any write, the folder is mirrored to `.agents/skills/<name>/`, and learn points there (`owned_files()`, `copy_ignore`, `is_third_party_skill_dir`) | `2026-11-12_phase-A-project-owned-skills` | `-k project_skill` tests, including a real CLI install run three times |
-| REQ-002 | Defects 2 to 6 fixed: plan-small checklist, Completion Protocol, one control-plane list, "loaded into every session", Copilot root file | `2026-11-12_phase-B-closeout-and-wording-defects` | validator and test pins; grep checks |
-| REQ-003 | 37 skills: 9 removed, 4 + 4 merged, deploy-service into bentoml-service, 2 rules into the tests policy, every list updated, section 6 cuts kept | `2026-11-12_phase-C-skill-removals-and-merges` | count checks, absence grep, sidecar set test |
-| REQ-004 | Description ≤ 300 characters except Ponytail, enforced by `shared_skill_integrity_errors`; total ≤ 10,500 (open decision) | `2026-11-12_phase-D-skill-description-cap` | `-k description_cap`; total one-liner |
-| REQ-005 | The planner skips plan-decomposition in micro-plan mode; the coder's always-load tier is Ponytail only | `2026-11-12_phase-D-skill-description-cap` | grep checks |
-| REQ-006 | The Codex duplication and hiding check runs before any step relies on it, and its result is applied | pre-branch spike, `2026-11-12_phase-D-skill-description-cap` | REPORT.md, Phase D Step 4 |
-| REQ-007 | CLOSEOUT in `closeout.instructions.md` as 8 numbered steps with reasons, plus a validator pin; `plan-lifecycle.instructions.md`; core ≤ 16 KB; targeted MEMORY search | `2026-11-12_phase-E-workflow-split` | `-k closeout_procedure`, size checks |
-| REQ-008 | Root guidance and policy trims within budget; Antigravity pointer; validator only tightened | `2026-11-12_phase-F-guidance-trims` | byte checks, validators |
-| REQ-009 | A fresh Claude Code session lists every shipped skill with its description | `2026-11-12_phase-D-skill-description-cap` | Optional Verification: debug log has no listing-budget warning; `/context` |
-| REQ-010 | Wiki refreshed; stale-claims audit recorded | `2026-11-12_phase-G-knowledge-refresh` | wiki grep checks; closeout log heading |
+| REQ-002 | Defects 2 to 6 fixed: plan-small checklist, Completion Protocol, one control-plane list, "loaded into every session", Copilot root file | `2026-11-12_phase-B-instructions` | validator and test pins; grep checks |
+| REQ-007 | CLOSEOUT in `closeout.instructions.md` as 8 numbered steps with reasons, plus a validator pin; `plan-lifecycle.instructions.md`; core ≤ 16 KB; targeted MEMORY search | `2026-11-12_phase-B-instructions` | `-k closeout_procedure`; size checks |
+| REQ-008 | Root guidance and policy and prompt trims within budget; Antigravity pointer; validator only tightened | `2026-11-12_phase-B-instructions` | byte checks; validators |
+| REQ-003 | 37 skills: 9 removed, 4 + 4 merged, deploy-service into bentoml-service, 2 rules into the tests policy, every list updated, section 6 cuts kept | `2026-11-12_phase-C-skill-set` | count checks, absence grep, sidecar set test |
+| REQ-004 | Description ≤ 300 characters except Ponytail, enforced by `shared_skill_integrity_errors`; total ≤ 10,500 (open decision) | `2026-11-12_phase-C-skill-set` | `-k description_cap`; total one-liner |
+| REQ-005 | The planner skips plan-decomposition in micro-plan mode; the coder's always-load tier is Ponytail only | `2026-11-12_phase-C-skill-set` | grep checks |
+| REQ-006 | The Codex duplication and hiding check runs before any step relies on it, and its result is applied | pre-branch spike, `2026-11-12_phase-C-skill-set` | REPORT.md; Phase C Steps 1 and 5 |
+| REQ-009 | A fresh Claude Code session lists every shipped skill with its description | `2026-11-12_phase-C-skill-set` | Optional Verification: debug log has no listing-budget warning; `/context` |
+| REQ-010 | Wiki refreshed; stale-claims audit recorded | `2026-11-12_phase-D-knowledge-refresh` | wiki grep checks; closeout log heading |
 
 ## Phases
 
 - [ ] `2026-11-12_phase-A-project-owned-skills` — project skill marker, clash refusal, and `.agents/skills/` mirror
-- [ ] `2026-11-12_phase-B-closeout-and-wording-defects` — exploration section 7 defects 2 to 6
-- [ ] `2026-11-12_phase-C-skill-removals-and-merges` — 55 to 37 skills
-- [ ] `2026-11-12_phase-D-skill-description-cap` — 300-character cap, loading rules, spike result
-- [ ] `2026-11-12_phase-E-workflow-split` — CLOSEOUT and plan-lifecycle files, core trim, MEMORY rule
-- [ ] `2026-11-12_phase-F-guidance-trims` — root guidance and policy trims
-- [ ] `2026-11-12_phase-G-knowledge-refresh` — OpenWiki refresh and stale-claims audit
+- [ ] `2026-11-12_phase-B-instructions` — defects 2 to 6, workflow split, root guidance and policy and prompt trims
+- [ ] `2026-11-12_phase-C-skill-set` — 55 to 37 skills, 300-character cap, loading rules, spike result
+- [ ] `2026-11-12_phase-D-knowledge-refresh` — OpenWiki refresh and stale-claims audit
 
 ## Verification
 
@@ -216,7 +242,7 @@ uv run python .claude/scripts/verify.py fast --format json
 
 ## Completion Evidence
 
-The final phase listed under `phases:` (`2026-11-12_phase-G-knowledge-refresh`) must also run a documentation, memory, and LEARN audit:
+The final phase listed under `phases:` (`2026-11-12_phase-D-knowledge-refresh`) must also run a documentation, memory, and LEARN audit:
 - sweep every live-advice surface for claims that this plan or earlier work invalidated;
 - correct or supersede each one;
 - leave dated records (archived plans, dated design narratives, closed session logs) unchanged;
@@ -224,4 +250,4 @@ The final phase listed under `phases:` (`2026-11-12_phase-G-knowledge-refresh`) 
 
 `verify.py`'s closeout gate requires that exact heading, non-empty, whenever the phase it is closing out is this list's last entry.
 
-In a repository where `openwiki/INSTRUCTIONS.md` exists, that final phase may also need to be a dedicated knowledge-refresh phase. See the canonical Knowledge-Refresh Final Phase rule for when and how, including its recursion guard. The rule is in `.claude/instructions/workflow.instructions.md` until Phase E moves it to `.claude/instructions/plan-lifecycle.instructions.md`.
+In a repository where `openwiki/INSTRUCTIONS.md` exists, that final phase may also need to be a dedicated knowledge-refresh phase. See the canonical Knowledge-Refresh Final Phase rule for when and how, including its recursion guard. The rule is in `.claude/instructions/workflow.instructions.md` until Phase B moves it to `.claude/instructions/plan-lifecycle.instructions.md`.

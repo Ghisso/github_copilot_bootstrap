@@ -37,6 +37,8 @@ Risk notes:
 - Antigravity discovery is documented, not observed.
 - This phase relies on Codex reading `.agents/skills/`. A native run observed that, and spike S4 checks it again before the branch.
 
+<!-- Cite the big plan's requirement IDs where present; do not copy the requirements. -->
+
 ## Steps
 
 - [ ] **1. Write the failing tests first.**
