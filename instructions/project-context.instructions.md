@@ -171,7 +171,14 @@ Pull requests merged into `dev` since the 2026-10-20 refresh:
 
 `origin/main` was last updated on 2026-10-23 by PR #50 (`dev` into `main`);
 `dev` is 12 commits ahead of it (PRs #51 to #54). Releasing `dev` to `main` is
-the user's call.
+the user's call. Every local implementation branch is already merged into
+`dev`.
+
+On 2026-11-12 none of the four local full consumers (`~/work/RAG`,
+`~/work/git_projects/img-classification`, `industrial-inspection`, and
+`schema-bootstrap-llm-wiki`) had PR #53's matcher in `.claude/settings.json`.
+They need a refresh through `scripts/update_consumers.py`; that is the user's
+call.
 
 Pinned versions: Context Mode `1.0.169`, OpenWiki `0.7.2` (the guard allows
 only `mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
@@ -186,7 +193,8 @@ Until then the dispatcher refuses any other version, so `1.0.169` stays safe.
 The migration plan `.claude/plans/context-mode-2x-migration.md` was approved
 on 2026-11-12 with every recommended option (MCP-only, drop `ctx_doctor`,
 drop Antigravity's entry, one server identity). It waits for its settle
-check: 2.1.8 shipped on 2026-11-11, so nothing runs before 2026-11-26.
+check: 2.1.8 shipped on 2026-11-11, so nothing runs before 2026-11-26. On
+2026-11-12 npm `latest` was still 2.1.8.
 
 Before merging bootstrap changes, run:
 
