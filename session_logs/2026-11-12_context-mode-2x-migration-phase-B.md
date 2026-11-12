@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-12
 **Plan:** `.claude/plans/2026-11-12_phase-B-context-mode-2x-switch.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -36,6 +36,22 @@ Move the kit from Context Mode 1.0.169 to 2.1.8 and the devcontainer's Node.js i
 - [LEARN:workflow] Check a hook-lane claim against the generated matcher, not only a replayed fixture: the kit's Codex SessionStart matcher `startup|resume|clear` never delivered `compact`.
 
 ## Verification
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       84.7s  uv run pytest tests/test_context_mode_dispatch.py tests/test_context_mode_mcp_filter.py tests/test_validate_targets.py -q --tb=short
+PASS        5.2s  uv run pytest tests/test_state_sync.py -q --tb=short -k cache
+PASS        0.0s  test "$("$HOME/.cache/context-mode-pin/bin/context-mode" --version)" = "$(sed -n 's/^PINNED_CONTEXT_MODE_VERSION="\(.*\)"$/\1/p' shared/hooks/scripts/context-mode-dispatch.sh)"
+PASS        3.8s  PATH="$HOME/.cache/context-mode-pin/bin:$PATH" CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q --tb=short -k real_upstream
+PASS        1.6s  docker run --rm "$(sed -n 's/^FROM \(node:[^ ]*\) AS nodejs$/\1/p' shared/devcontainer/Dockerfile)" node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>24||(a===24&&b>=15)?0:1)'
+PASS        1.6s  PIN="$(sed -n 's/^PINNED_CONTEXT_MODE_VERSION="\(.*\)"$/\1/p' shared/hooks/scripts/context-mode-dispatch.sh)"; test "$(docker run --rm "$(sed -n 's/^FROM \(node:[^ ]*\) AS nodejs$/\1/p' shared/devcontainer/Dockerfile)" bash -c "npm install -g --ignore-scripts context-mode@$PIN >/dev/null 2>&1 && context-mode --version")" = "$PIN"
+PASS        0.0s  test "$(grep -r -l -I -F '1.0.169' shared scripts tests | wc -l)" = "0"
+PASS        0.0s  test "$(cat README.md docs/runtime-checks.md docs/smoke-tests.md docs/target-mapping.md docs/architecture.md CLAUDE.md AGENTS.md | grep -c -F '1.0.169')" = "0"
+PASS       50.4s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      330.2s  uv run python .claude/scripts/verify.py phase --format text
+```
 
 - Findings: `.claude/quality_reports/findings-2026-11-12_phase-B-context-mode-2x-switch.json` (0 findings after review round 2; gate PASS; seven profiles; round 1 had one MAJOR and two MINORs, all documentation, all fixed before round 2).
 - optional 1: PASS — `docker build -t context-mode-2x-devcontainer-check -f shared/devcontainer/Dockerfile shared/devcontainer` exit 0 (1 s: every layer was cached from the spike's identical three-change build), then the plan's `docker run` check passed (`openwiki integrations list`, global `jsdom` require, `mermaid` present) and printed `node=v24.22.3 context-mode=2.1.8`; the check image was removed afterwards.
