@@ -38,3 +38,14 @@
 - Codex's tool names are `mcp__context_mode__ctx_*`; Claude Code's are `mcp__context-mode__ctx_*` (an open question in the 2026-11-11 report).
 - The user-level `~/.codex/config.toml` defines its own `[mcp_servers.context-mode]` that runs the global 1.x `context-mode` directly, with `CONTEXT_MODE_DIR` set to this repository's `.context-mode`. In this repository the project entry took over (the capture shows the filter in use), and the dispatcher refuses that `CONTEXT_MODE_DIR` override. In other repositories that user-level entry runs Context Mode 1.x unfiltered; that is the user's own configuration.
 - Codex started two server processes in one session (two `initialize` requests in the capture); both went through the filter.
+
+## Correction (2026-11-12, later the same day)
+
+Finding 1's explanation above is wrong; the original text is kept as written.
+
+- The cause is the forwarded MCP 2026-07-28 `server/discover` probe, not a pipelined `tools/list`. Claude Code's newer client path probes a stdio server with `server/discover` first; the filter forwarded it; Context Mode 2.1.8 answers the probe when it carries the 2026-07-28 `_meta` fields (`era_probe-output.txt`, case A: `supportedVersions: ["2026-07-28"]`, `serverInfo` `context-mode`/`dev`, and the full upstream `instructions`). The client then skipped `initialize`, and the filter refused its `tools/list` with `-32001`.
+- `discover_probe.py` above sent the probe without `_meta`, so 2.1.8 answered `-32601`; that is why this report wrongly said 2.1.8 does not implement the probe (`era_probe-output.txt`, case B).
+- The pipelined-`tools/list` theory cannot produce the logged `negotiatedProtocolVersion: "2026-07-28"`: through `initialize`, 2.1.8 negotiates `2025-11-25`.
+- Side effect in the failing session: the probe's answer carried the upstream `instructions` that Phase A removes from `initialize` (they name tools the filter blocks).
+- Two independent plan reviews (an Opus devil's-advocate subagent and a GPT-6 Sol agent) reproduced the failure and the fix (answer the probe with `-32601` so the client falls back to `initialize`) against the real 2.1.8; review B read the fallback rule (every probe error other than `-32022` means legacy) from both Claude Code binaries, 2.1.226 and the VS Code extension's 2.1.322.
+- The fix is the reopened plan's Phase D (`.claude/plans/2026-11-12_phase-D-context-mode-discover-fallback.md`).

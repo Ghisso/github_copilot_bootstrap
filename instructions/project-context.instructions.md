@@ -134,7 +134,12 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
   from `initialize`, replaces tool descriptions with kit text, and gates on
   `serverInfo.name == "context-mode"` (Context Mode 1.x and 2.x report the same
   name, so the dispatcher's manifest or `npx` pin is the only version
-  proof). `ctx_index` takes raw text or one regular file inside the
+  proof). The filter answers the MCP 2026-07-28 `server/discover` probe
+  itself with `-32601` and never forwards it (reopened Phase D), so clients
+  use `initialize`: the 2.1.8 answer to the probe carries upstream
+  `instructions`, and a client that accepts it skips `initialize`, so the
+  filter would refuse its `tools/list` and `tools/call` with `-32001` and the
+  session would get no tools. `ctx_index` takes raw text or one regular file inside the
   repository, never a folder: 2.x folder indexing has no bound and follows
   symlinks into sibling projects (2026-11-12 spike S3).
   `FILTER_CONTRACT="ctx-index-files-only-v2"` moves older caches aside.

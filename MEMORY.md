@@ -1778,15 +1778,18 @@
   starts a planning run, because each page keeps its own base window. Use it
   to apply review fixes to generated pages instead of hand-editing them;
   `openwiki_finish` then records the same `gitHead` with a newer time.
-- [LEARN:tooling] Claude Code 2.1.226 can ask an MCP server for `tools/list`
-  before the `initialize` reply arrives (its newer client path, debug fields
-  `protocolEra`/`negotiatedProtocolVersion`, gated by
-  `tengu_mcp_protocol_negotiation_stdio` or `MCP_PROTOCOL_NEGOTIATION`). A
-  proxy that refuses requests until it has seen an accepted `initialize`
-  must queue requests that arrive while an `initialize` is pending, or the
-  whole session gets no tools. Reproduce by writing `initialize` and
-  `tools/list` back to back. Evidence:
-  `.claude/explorations/2026-11-12_context-mode-2x-live-checks/REPORT.md`.
+- [LEARN:mcp] MCP 2026-07-28 clients (Claude Code 2.1.226 and 2.1.322 on
+  their newer client path, debug fields `protocolEra`/
+  `negotiatedProtocolVersion`, gated by `tengu_mcp_protocol_negotiation_stdio`
+  or `MCP_PROTOCOL_NEGOTIATION`) probe a stdio server with `server/discover`
+  and skip `initialize` when the probe succeeds. A proxy that gates on
+  `initialize` must answer the probe itself with `-32601` so the client falls
+  back; every error other than `-32022` means "legacy" to both builds.
+  Context Mode 2.1.8 answers the probe only when it carries the 2026-07-28
+  `_meta`, so a probe without `_meta` proves nothing (that mistake first
+  blamed a pipelined `tools/list`). Evidence:
+  `.claude/explorations/2026-11-12_context-mode-2x-live-checks/` (Correction
+  section and `era_probe-output.txt`).
 - [LEARN:tooling] Codex names MCP tools `mcp__<server with _ for ->__<tool>`
   (for example `mcp__context_mode__ctx_index`) and treats a tool without
   `readOnlyHint: true` as needing approval; `codex exec` with

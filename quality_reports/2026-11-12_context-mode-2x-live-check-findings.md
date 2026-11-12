@@ -28,3 +28,9 @@ Live client checks after the three completed phases (`.claude/explorations/2026-
 ## Reopen record
 
 Per `workflow.instructions.md` "Reopening a completed big plan": the branch exists and is unmerged; new phases D (fix) and E (`-knowledge-refresh`, required because the plan already has knowledge-refresh phases) are appended as `planned`; the big plan returns to `in-progress` with `current_phase` set to Phase D.
+
+---
+
+## Correction (2026-11-12, later the same day)
+
+Finding 1's cause is the forwarded MCP 2026-07-28 `server/discover` probe, not a pipelined `tools/list`: 2.1.8 answers the probe when it carries the 2026-07-28 `_meta` (with its upstream `instructions`), the client then skips `initialize`, and the filter refuses its `tools/list` with `-32001`. Evidence: `.claude/explorations/2026-11-12_context-mode-2x-live-checks/era_probe-output.txt` and that report's Correction section. Two independent plan reviews reproduced the failure and the `-32601` fix against the real 2.1.8. The fix is Phase D, `2026-11-12_phase-D-context-mode-discover-fallback` (renamed from the "pending initialize queue" design, which would not have fixed it). Finding 3 is kept in Phase D as a separable step at the user's choice.
