@@ -31,6 +31,7 @@ Approve this plan now. Start it in this order:
 
 - 2026-11-12: the user approved this plan and chose the recommended option for all seven decisions below: wait for the settle check and run the spike before the branch (1), drop Antigravity's Context Mode entry (2), drop `ctx_doctor` (3), MCP-only (4), Node.js 24 with the required slim-image check and an optional full CUDA build (5), `CONTEXT_MODE_DATA_DIR` under `.claude/.cache/context-mode/` (6), and one server identity chosen by spike S2 (7).
 - 2026-11-12 start-gate run: the docs branch is merged into `dev` (PR #54), Node.js is v24.15.0, and Docker is 28.3.1, but the settle check failed. The newest stable release is 2.1.8 (2026-11-11T22:11Z, npm `latest`), so nothing runs before 2026-11-26.
+- 2026-11-12, later the same day: the user changed decision 1 to "Start now" ("start the Context Mode migration now, don't want to wait. we can bump it up later"). The settle check is waived for this start. The spike runs on the newest stable release on npm at spike time (2.1.8), and a later release is a pin bump through Phase B's pin-bump procedure, not a second spike before this branch. Decisions 2 to 7 keep their recommended options.
 
 ## Decisions for the user
 
