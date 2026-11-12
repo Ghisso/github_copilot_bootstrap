@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:5caebef069516a8df454d64b052f68f114a64ad15dd40f7a6355ddfdfe560c38",
+  "pageVersion": "sha256:b5437f4933d4a1cb7418a5b51ec0f473c6abcf14c640e1fb68d0271ad0600d28",
   "claims": [
     {
       "id": "claim_577abfccd7214b578dafc049c57d3ba8",
@@ -17,7 +17,7 @@
       "statement": "Google Antigravity's generated .agents/hooks.json wires a single '*' PreToolUse matcher to antigravity-pretool.py, a Python bridge that normalizes the payload and invokes the canonical guards, with no lifecycle hooks.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1299-L1331",
+          "resource": "repo://scripts/generate_targets.py#L1264-L1296",
           "version": "repo-lines-v1:sha256:f79e739ba534e6de73d0f011f17f32447a3dba6ece5cfd1c0283a193cf2ce893:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MjJjNDJjZDE5YzZkMDNkODA4YzQ1MjcyMDU1MjgyNWI3ZWExYzViNDkxYjIxODUxMWNhYzc0MTVjZjlkOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4ZjU5MjA0YzFjM2RmMzlkNGY5ZDVlN2E5N2Q5N2E4NTU1MDExYzM0YTg2MzIxMjQ3YTE3MWQyMzhkOTFmNDIifQ"
         },
         {
@@ -28,15 +28,19 @@
     },
     {
       "id": "claim_dabc98b50b474e5385a3f3b7e13cc9ce",
-      "statement": "Claude Code and Codex PreToolUse routing is split by matcher: Edit|Write runs protect-files.sh, Bash runs pretool-bash-guard.sh, a Context Mode group runs only context-mode-dispatch.sh, and mcp__openwiki__openwiki_begin runs openwiki-guard.sh pre; PostToolUse on Bash runs record-branch-state.sh, context-mode-dispatch.sh, and reporting-reminder.sh late-report.",
+      "statement": "Claude Code and Codex PreToolUse routing is split by matcher into exactly three groups: Edit|Write runs protect-files.sh, Bash runs pretool-bash-guard.sh, and mcp__openwiki__openwiki_begin runs openwiki-guard.sh pre; PostToolUse on Bash runs record-branch-state.sh and reporting-reminder.sh late-report, and pretool_routing_errors requires exactly the three PreToolUse groups.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1111-L1179",
-          "version": "repo-lines-v1:sha256:0bc5c7fa30d4f2835f6a0ba97ff16a15674c89c0f1033626d7feff52d6b48937:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGRkMmNjNTdmYjM4ZDI2Mzc0ZjYyZDU0OTRkNjE1ZDdjOWZlMGRkMmE4YWYzZjZhOTY2ZWNlM2Q0OWI5MmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjNjQ3OWNjMjMwNDQwZmQ0MWU4MjI0MjE4Njc5Njk4NTU5ZDI4OTNiZDY3YjQzODBhZmFiODExYjM4YTU1YWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmNlZGNjZDA4MTkxNTgzNzY1NzhlOWRlMGI5MDE1MzJmODQwYWRhOWYyYWRiOTEwYzg1NzUyZDlhOTg5YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2NTRjYWI1MzQ1ZmQwMTNiYzQwMjMxOTUwNDgyMWQ3ODZlNDUxYjY4ZjlkODM5ZjkxZTllZjY3YmNlMTA1NDUifQ"
+          "resource": "repo://scripts/generate_targets.py#L1106-L1142",
+          "version": "repo-lines-v1:sha256:c749683fb68d41102f8866fe313cd1e378a307840e84c883a090b54df6206cbf:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGRkMmNjNTdmYjM4ZDI2Mzc0ZjYyZDU0OTRkNjE1ZDdjOWZlMGRkMmE4YWYzZjZhOTY2ZWNlM2Q0OWI5MmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxY2E3YWJiNzg3Mzc2NTY1ODQxNzRlNjcyMGIwYjk1MGU3NmU0ZDlkNjJlMjdhODJiYWNkY2I4NGViNTZkYTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmNlZGNjZDA4MTkxNTgzNzY1NzhlOWRlMGI5MDE1MzJmODQwYWRhOWYyYWRiOTEwYzg1NzUyZDlhOTg5YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU2ZDcxMjFjNGIyYWU3YjczNWJkM2RkZWFiMjRjZWQ4M2EyNDcxNGQ2ZThkNjdhMWU5MTNhNDgwZGNlN2ZmYTkifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1219-L1264",
-          "version": "repo-lines-v1:sha256:69d723cc8a3ee4083215d6dba8cd53ab4494cd286a74f64dac09bf46a918d528:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxOGMyYjk2OWZhOTc5MjJhNTdhYjMxZDgwMTMwZDdlOTUxYmMyMGExNmQxZWU3OTFiMjA5ZGJmOTM0YjkyYmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3YjUzNmM4NjQ5ZWQxNDYwZDU3MjE3ZTVjYzBiMmVkNjEyNDdmMmUwMDE0MjI2NGZhN2EwMjFiY2Q4MDU5OGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg3MjNmZmRiNzVlNGM1ZmIxYjljNjA2NzIxYTJmOTkxOTQwMWM2Mzg3NjU3MmNjMjM4YzQzNTNlYTJhZmY3YjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1OTAzM2YzODE1MmFmMmI5OTk5OWZjZDhhMjFiODdjMDlkOGU2M2RhNWFiOGY2NDMxMTc5Zjg0YTQyYWM0OWEifQ"
+          "resource": "repo://scripts/generate_targets.py#L1206-L1235",
+          "version": "repo-lines-v1:sha256:fb7dd0b356bb20f714731cea772bdb0a0affa5c7dd3b213095b73a80b05aacce:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhNzA1Zjc4YzgxNmNjM2Y5MmY0ZTU4YzQ3ZmIzNGY4ZGU2M2MwNjc2YzcxZjU0YTExNGRjYWE5NWFlYTQ2ODYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0YWU4NDhmYTA4NjYzY2I3ZTdlNzBhYWI4YmIzM2I2YTFhMDA0MGNiYWQ0NGRiMjE3ZDlmMWFiMGY0YWEzZGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxYzQ4OTNmN2U4ZTQxN2EzM2M5NmYxNTcyNDYwM2FlYjYxOWQxYmNhNzBlYzFhZjVjZDcwMTlmNjAxZThiNGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEyOTQ1Y2NkMDk5OWZkZWFmNTc1OTRhMjQ3NDA0MzZmMmE3YjlkMDFmMTJjNWVkOGUzZmU2OGFlY2YxMzNkMGEifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L1501-L1553",
+          "version": "repo-lines-v1:sha256:d4e55ddf26e53b081f47c164689333de398086ffe595052c7dc6841258818f8c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiZjY1NTRkNGUwMjViMzUxMGI3YzYwOWJlZDBjZTM2NWIxZDI1YTQ5MmJiZDlmNGI4NGM4MDlhZjFmODkzNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2ZjE0OTBlODU4MGY5YjU1OWQwZDNmMTExNmIyZDY0Mzc0MzFiZDU0MmMxY2M4YmE1Njc5YTIwZDk4Yzc5ZTcifQ"
         }
       ]
     },
@@ -45,22 +49,22 @@
       "statement": "Claude Code wires openwiki-guard.sh post to PostToolUseFailure as well as PostToolUse, while Codex fires nothing on an MCP error and instead runs a payload-free openwiki-guard.sh post at Stop; both hosts run state-sync.sh push and reporting-reminder.sh prompt on UserPromptSubmit, and at session end Codex runs a local state-sync.sh checkpoint on SessionEnd while Claude Code runs state-sync.sh push on SessionEnd and state-sync.sh checkpoint on StopFailure.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1157-L1191",
-          "version": "repo-lines-v1:sha256:bfea353adbec4b30609919c6fbfa207007af367ed943bc29c23d41811121aaf7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjNWE3ZDQ3MjllYzk2ZDE4ODljOTY1YjBjOTA4ZDI5NWZlMGIwZmM0NjczZGRjOWM5ZTc1ODMwMmIwNmNlNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkYzM1YjRkY2ZjMTVkZTRmM2Y0N2Y3ZjNkMmZmMzFjYTA1Y2QyNWNjZDA5NzJjMTIwM2E4ZGRiZjFjZDAxZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
+          "resource": "repo://scripts/generate_targets.py#L1144-L1171",
+          "version": "repo-lines-v1:sha256:303c8664c44ff51dd2b59ec86920f3cc214e353221b8d212d9426f05693eff39:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjNWE3ZDQ3MjllYzk2ZDE4ODljOTY1YjBjOTA4ZDI5NWZlMGIwZmM0NjczZGRjOWM5ZTc1ODMwMmIwNmNlNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkYzM1YjRkY2ZjMTVkZTRmM2Y0N2Y3ZjNkMmZmMzFjYTA1Y2QyNWNjZDA5NzJjMTIwM2E4ZGRiZjFjZDAxZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1275-L1295",
+          "resource": "repo://scripts/generate_targets.py#L1240-L1260",
           "version": "repo-lines-v1:sha256:be65230b886fa1b2486643a9f92626186309a7981a2cc6940da316fc3fe6414f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTcxYjViMWRkZDQxNDI4MDkwZDQ5YTA4MTUwZDZhYzBiNTYyYjZmMGYwY2U2MzZkZjcxNWVmMzJlNDZjZmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVlZDM1ODI4Yzg3YjI2YTRhYzdmMjZjM2U3NmZlYzFmNDg2MTQ4OTM2N2UzYmM5MDM4YmI2MWM2ZmE4NjA0OWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
         }
       ]
     },
     {
       "id": "claim_772a4fb0d28f46228762876e9942510d",
-      "statement": "GitHub Copilot's hooks.json has no matchers and lists protect-files.sh, git-protection.sh, enforce-branch-state.sh, enforce-commit-gate.sh, and enforce-pr-gate.sh individually under PreToolUse, with state-sync.sh pull, session-log.sh, session-start-state.sh, and context-mode-dispatch.sh on SessionStart and session-log.sh, stop-session-log-check.sh, and state-sync.sh push on Stop.",
+      "statement": "GitHub Copilot's hooks.json has no matchers and lists protect-files.sh, git-protection.sh, enforce-branch-state.sh, enforce-commit-gate.sh, and enforce-pr-gate.sh individually under PreToolUse, with state-sync.sh pull, session-log.sh, and session-start-state.sh on SessionStart, record-branch-state.sh on PostToolUse, and session-log.sh, stop-session-log-check.sh, and state-sync.sh push on Stop.",
       "evidence": [
         {
           "resource": "repo://shared/hooks/hooks.json",
-          "version": "repo-file-v1:sha256:c9f1cc1901d9b57dce12b531e0dbcdeb5867cc90fa8fc0b70ef015767f0506c0"
+          "version": "repo-file-v1:sha256:131ef48bb0e94861dce1503c529dad24407fc06e476a3dfe97d31507532a0717"
         }
       ]
     },
@@ -369,50 +373,54 @@
       ]
     },
     {
-      "id": "claim_beb1a59ab9914a0eb089bc7c8976e7d2",
-      "statement": "The Context Mode PreToolUse group matches * on Codex but only the anchored ^(Bash|Read|Grep|WebFetch|mcp__.*)$ (CLAUDE_CONTEXT_MODE_MATCHER) on Claude Code, so it never fires for Agent, whose only Context Mode action rewrites the subagent prompt, a change Claude Code auto mode refuses; the anchors are needed because Claude Code reads such a matcher as an unanchored regular expression and also tries legacy tool names such as Task for Agent.",
+      "id": "claim_444494a37256485ebc60b41975da5df6",
+      "statement": "No host wires a Context Mode hook: context_mode_hook_errors fails validation when any handler of any event runs context-mode-dispatch.sh, and validate_targets.py applies it to the Antigravity, Codex, Copilot, and Claude Code hook configurations.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1132-L1137",
-          "version": "repo-lines-v1:sha256:299f04298e66e191dc441c727b8cf60b9fab2bb84296e956c6c9a2a2bebc42a3:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTdiNTM2Yzg2NDllZDE0NjBkNTcyMTdlNWNjMGIyZWQ2MTI0N2YyZTAwMTQyMjY0ZmE3YTAyMWJjZDgwNTk4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTFjYTdhYmI3ODczNzY1NjU4NDE3NGU2NzIwYjBiOTUwZTc2ZTRkOWQ2MmUyN2E4MmJhY2RjYjg0ZWI1NmRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGZiOWU1M2Y5MGVhYTYzYmQ2MGU5NDg5NmI4NWFlYTc1ZGRkZjRlOTM2NzA0MDRlNDJmOWU3Y2Y5MjE4YjI4ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTY3NTE2OTQxYTI2MjQ1YWQwYTBhYzZkNGMxOGEwY2EzMWFhOTI5ODhmNWFkNDU5ODcyNzMzZGQzZTE5NzM0MSJ9"
+          "resource": "repo://scripts/validate_targets.py#L2959-L2967",
+          "version": "repo-lines-v1:sha256:98890cdd368b2e0dfb5ae6fef9353790541fdb05388a5a0d1bb42d4b5ce54819:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ1ZDk1NWU2ZTM2YmE0Yzk2MGRlMmE2Y2VkNGQzMzAwZTIzM2ZmNmU3MGM1NWEyOTcyMmVkNmEyYzUwMzNlNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGEwMTc0ZDg0MzVmYzA1MWNjMWJiYjNlOTlkYzczNDA3MTg2ZDYwODk1ODZiZjYyY2M5NzNkNDY1ZGVmMjdiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmE2Y2NkOWJiOWJmMzE5MmQ2M2JjMzQ0NDJhZjU1MjQ2Y2FjZTAyMTNmZGU5NmE1NDg0MjM2ZTZlMGU5MGIzYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWMwMzI1Y2IwNmU1YzNjNjlhYjI0MTA1ZDY3YTE1NjNhZDQwM2UwYWMwNWMxNGRhODEyMDA3Nzc1MzY2YzRjOCJ9"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1238-L1243",
-          "version": "repo-lines-v1:sha256:a97bf52bdf5bf06436cda1d80464a817d23e81489ab3fff645895062f9a97a82:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTdiNTM2Yzg2NDllZDE0NjBkNTcyMTdlNWNjMGIyZWQ2MTI0N2YyZTAwMTQyMjY0ZmE3YTAyMWJjZDgwNTk4YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTFjYTdhYmI3ODczNzY1NjU4NDE3NGU2NzIwYjBiOTUwZTc2ZTRkOWQ2MmUyN2E4MmJhY2RjYjg0ZWI1NmRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTNlYzc0YTFkYzE3MDMzNDI0MDgwYWYzYzgwYjkyZmE4ZjFmODI2NjY0OWRjYzRhMzA2MDk5YjMxYjlhNjE5OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTY3NTE2OTQxYTI2MjQ1YWQwYTBhYzZkNGMxOGEwY2EzMWFhOTI5ODhmNWFkNDU5ODcyNzMzZGQzZTE5NzM0MSJ9"
+          "resource": "repo://scripts/validate_targets.py#L3055-L3055",
+          "version": "repo-lines-v1:sha256:6eedb31cc61cc08fb72c803768c4677bbe7f9cc003abaa693b58bed361b93e38:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmVlZGIzMWNjNjFjYzA4ZmI3MmM4MDM3NjhjNDY3N2JiZTdmOWNjMDAzYWJhYTY5M2I1OGJlZDM2MWI5M2UzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmVlZGIzMWNjNjFjYzA4ZmI3MmM4MDM3NjhjNDY3N2JiZTdmOWNjMDAzYWJhYTY5M2I1OGJlZDM2MWI5M2UzOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWU0MzRkNTc5YWU5OWQxMmRiMGUzMjQ2NmQyZWUxNDA3M2YyNjdlNjhhMzE0ZTE1MjU5NTU0NDkyMzM2NGU1OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTFiNTE3MzkwN2NjMjNjNTc0MTQ5YTA0MGQ1MjM2NTg1MzZlMzAyNDNjMDYxNzE4MzQ5MmU2NmRkZDFiZDhkYSJ9"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L41-L45",
-          "version": "repo-lines-v1:sha256:9dda13cebf0ac551822da6a16a04596b2260f4616b8d75e5b457d459e0734b0c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWVhZmJhZWY4ZThmZjdlZTEwMTdkNzNiODc3ZDZmMGZlYzEzZjBhNTU1MzExZDhiNGJmMzBkMzM5OWU3Mjc2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjhhOWYwMDJmYjU1MGI4OWFjMTFiNDYwYjIwMWMyMDZjODkzMjEyMmNhZTE3YjQ0NzljZjA2ODA1Mjc5YWM2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjNmMjE4MzA5ZjdmYmMxNGI2N2FhMWMwZGJlYjQyNjIzZDQ1YTUwMzIzYWFjODg0OGU5ODkyMzRiYmY4ZTA0ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjBiMjZlOWM3YzVmN2MzY2ExMTRiMTU3ODZmMTYyYTM0NTM1YWU0NzM3YWU0MmJjYWRhNGUyMTRmM2Q1Y2RmMyJ9"
+          "resource": "repo://scripts/validate_targets.py#L3170-L3170",
+          "version": "repo-lines-v1:sha256:e81763bff446f586a22fc04a4660c4d4cc9efb97c04728f41535a397764bd539:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTgxNzYzYmZmNDQ2ZjU4NmEyMmZjMDRhNDY2MGM0ZDRjYzllZmI5N2MwNDcyOGY0MTUzNWEzOTc3NjRiZDUzOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTgxNzYzYmZmNDQ2ZjU4NmEyMmZjMDRhNDY2MGM0ZDRjYzllZmI5N2MwNDcyOGY0MTUzNWEzOTc3NjRiZDUzOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmIzN2ZhNDMzMzcyMjFlMjNhN2UzYzEzNDI1ZjQ0Yzc2ZjIxMzE3ZjdmM2VlNmE5MGNjZTk2ZjU5NmM4NGY1NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDU0YWQwZWUwYjQxMzM1ZWMwOGZmMzllNTI5YmFjNTliMGMyM2U3NmIzZDllNGU3YTUzOTliODc0NTlhMjRmYSJ9"
         },
         {
-          "resource": "repo://tests/test_lifecycle_hooks.py#L439-L489",
-          "version": "repo-lines-v1:sha256:7dc1d5fc83b076dbad12a2915063838c58f8fce77c39195c12ab2463ea928996:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiODJhNmE2NmI3ZDVmN2MwMmE4NDk0NTk5OWZkMmQzNzZiNmQ3ZjdjNjE5ZWFhMDc1NjBlMDA1YTcyZTZlNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIwMmVmNDIwMDg0YzdjYTRmYjY5ZDQ2NmY3Y2UzMmRiNWJiNDE5YzhhZTk2NzlmNmU1NDk2NzkxYTFlMzJmZjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNmMGU0ZWRkMDc1M2NiZjM3OTJmZTQ1YTBiOGM5MWI4Yzg4Y2ViYjVjYjRlZTU0OWE0NDUzYTBiNGRiZTNlNGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE3MTFjYTAwZmQ2OTVmMThkMjFlODQ4YjNlYjE1ODAxOWQ2NzBjOWExNWIwMWIzMzdlYWQxZTc2ZjMwMjUxZmEifQ"
+          "resource": "repo://scripts/validate_targets.py#L3406-L3406",
+          "version": "repo-lines-v1:sha256:b15862cc3d9ce9315a6fdce7ccc2f26f4b95dfcdad449b1f4a5b6fa0393633c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE1ODYyY2MzZDljZTkzMTVhNmZkY2U3Y2NjMmYyNmY0Yjk1ZGZjZGFkNDQ5YjFmNGE1YjZmYTAzOTM2MzNjMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE1ODYyY2MzZDljZTkzMTVhNmZkY2U3Y2NjMmYyNmY0Yjk1ZGZjZGFkNDQ5YjFmNGE1YjZmYTAzOTM2MzNjMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWViOGRhMzg2MmMxMWU2ZDg3YmEwMmYwZGE4NjBkMjA3MjRhZWM5ZmI5MmRiYzY4ZjE2MDQxYmYzOTBmNzk1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWRiMjYzODFmMmJlMmY0ZTI1ZjY2ODFkZTU2NjZlYjU1NjFkMmRiNTA1YzdmMjU1NjgwOGIzZGExNGUzYjc0MCJ9"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L3495-L3495",
+          "version": "repo-lines-v1:sha256:05bf84e198352bd2d4f0f0a2de6a70b0d59f2fc9630270fc2928bc86d5e1eb91:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDViZjg0ZTE5ODM1MmJkMmQ0ZjBmMGEyZGU2YTcwYjBkNTlmMmZjOTYzMDI3MGZjMjkyOGJjODZkNWUxZWI5MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDViZjg0ZTE5ODM1MmJkMmQ0ZjBmMGEyZGU2YTcwYjBkNTlmMmZjOTYzMDI3MGZjMjkyOGJjODZkNWUxZWI5MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjkxMTZlMTg1M2YwYzhmMjY2NmY4N2JhNDNmN2IzZTNkMTA1ZWE2YzI4ZWZlMDI0ZjE1OWRmNzIwOTYyMTc2YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODk1MjNkMDYzYWZjZmY2ODdjZTlkNTI5OGY1MDgyNGU5NTkxZGQzZGVkN2QwNzI5NWMwNzY0NWQzODI5MjE4YSJ9"
         }
       ]
     },
     {
-      "id": "claim_3ee54c45a6374683a0b8aef258e22890",
-      "statement": "The Context Mode hook-output filter copies only hookEventName and additionalContext and drops every decision and input rewrite, so the Claude Code matcher is a second safeguard against the Agent prompt rewrite.",
+      "id": "claim_86fd6a44a4524ae999a0a09210bde128",
+      "statement": "A hook call from stale wiring reaches context-mode-dispatch.sh in a mode other than server, so the dispatcher reads its input, prints nothing, and exits 0 before any storage setup.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L20-L41",
-          "version": "repo-lines-v1:sha256:00cc835ab1248d85c2ed8f6d356763c68edf03d27066ca48f99628b66699fe94:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxNTgwZjY1MjI2NjBlNjUzYzVmZjU3NTU4YTFhMjdhMjFmMDk4ZmVjYzZjZWI4MzVjYTc3NDZkZjVhM2Q2YWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1NjYzODIzNjNlYzBhMGZmMzJhYzhiNmQ5OTE2NzYzNGI0ZTk5NGVlM2Q5NWZmMTIyMTM4YjZlNTRjY2E2N2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlMGVhYzQ1ZGRlZDljNTk2YTY5YWJkZDBhNTRmYTczMzIwYjQwNTdjZDQxY2ViZjhkMTc5MjZjZGMwMjRmMTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkZTYyYTJhMmE3N2E4MTc5YWUyNWRmMWU4YjVhZjI5MmFlNzliNjM3Yzc0MjA3OWUxMjAyNTg5YTBmNWJiZGUifQ"
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L326-L334",
+          "version": "repo-lines-v1:sha256:34edc6876562f4bf75ef8d41a7fa66c5305212902aee6594d85bc0cae316e079:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDIyYWJlM2RhYWRkYzU0MGI3Njg5OTk2ZDBhZGNhNzdkNGUxYzM5Njg2NTkyMTFjZDNkMTlmNWMxMjdlODhiMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmYwYzU5Zjk3ZTJlNDZjNGMxMmViNTMwMmEwM2UyYmE5MmMwZjNjMmFlYWQ0YTYxM2FiNWVjNTdlZTc1OGZkMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjY4MDc1ODZmNzllYmJkMTQ4YzYyOWY2YjQ5NGViMWQwOGFmYzlkMTBkNWE5MzRkMmM1Zjg3MzdiMmY2OTFhNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmM4ODE1YzIxMDZhYmNlMTIyM2EyMmIzM2E2OWNkYTA0ZTNhOTFjYjFjNTBkOGExNjE4NTU4ZDcwZTNmODQ1YyJ9"
         }
       ]
     },
     {
-      "id": "claim_da118ad36ffd407ab1dbd86dd685a84d",
-      "statement": "pretool_routing_errors in scripts/validate_targets.py requires CLAUDE_CONTEXT_MODE_MATCHER for the claude-code Context Mode PreToolUse group and * for every other target, and rejects a Context Mode group that runs anything except context-mode-dispatch.sh.",
+      "id": "claim_e419332a34d847feba3e2f7459f64c03",
+      "statement": "Codex limits its SessionStart hooks to the sources startup, resume, and clear.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L1503-L1564",
-          "version": "repo-lines-v1:sha256:44e2eaf5bbe9d010ad13b0ea2bad077d1dd768d3f6b7cf9e76ab3de486ae5c3f:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiZjY1NTRkNGUwMjViMzUxMGI3YzYwOWJlZDBjZTM2NWIxZDI1YTQ5MmJiZDlmNGI4NGM4MDlhZjFmODkzNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2ZjE0OTBlODU4MGY5YjU1OWQwZDNmMTExNmIyZDY0Mzc0MzFiZDU0MmMxY2M4YmE1Njc5YTIwZDk4Yzc5ZTcifQ"
+          "resource": "repo://scripts/generate_targets.py#L1196-L1199",
+          "version": "repo-lines-v1:sha256:7b47edacf5e8fe808fac130029ef3d9c0a6b9752c41ec8c712516e0704b61afa:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE4YzJiOTY5ZmE5NzkyMmE1N2FiMzFkODAxMzBkN2U5NTFiYzIwYTE2ZDFlZTc5MWIyMDlkYmY5MzRiOTJiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWYxOTdhMjE3ZjA4YTgxODRmOTA0YjA3OGFjYmE3Y2JjMDhkN2I0MGIzMzU3NDBkYmE3MmEwYTdkMDJiYjZhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzAyYWJhM2Y0MGRmNTg0MTc3OTdmYjRjNjVjZDMwYzc3ZmQ5NjQzOWRhNDA4YjA4OTY1YWRiNDVjZDhhNjNmOSJ9"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-11T15:10:30.745Z"
+    "at": "2026-11-12T09:39:07.876Z"
   }
 }

@@ -27,7 +27,7 @@ sources:
 generated: { by: "claude-code", at: "2026-10-23T07:02:22.284Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-23T07:02:22.284Z
+    at: 2026-11-12T09:54:42.940Z
 ---
 
 # Git-backed AI-state sync

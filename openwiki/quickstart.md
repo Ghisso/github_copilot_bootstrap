@@ -22,10 +22,10 @@ sources:
     resource: repo://shared/scripts/verify.py
   - id: openwiki-source-1c38db574c5e411bfd8c36ea
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
-generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
+generated: { by: "claude-code", at: "2026-11-12T09:54:42.940Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-11T14:51:38.121Z
+    at: 2026-11-12T09:54:42.940Z
 ---
 
 # Quickstart: where to look for what
@@ -62,7 +62,7 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 | install the sidecar's `workflow` profile (`--profile workflow`: agents, relaxed rules, review profiles, templates, and a hidden personal state folder for plans, memory, and logs), switch profiles, back up the state folder with `--backup-state`, or purge it with `--uninstall --purge-state` | [Sidecar overlay](operations/sidecar-overlay.md), "What it installs" and "Profile switching" | `scripts/runtime_ownership.py`, `shared/sidecar/workflow/`, `tests/test_sidecar_workflow_scenario.py` |
 | learn a team repository's code placement, naming, test, and commit conventions after installing the workflow sidecar | [Sidecar overlay](operations/sidecar-overlay.md), then [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md) | `shared/sidecar/workflow/skills/onboard/SKILL.md`, `.ai-bootstrap/project-context.instructions.md` in the consumer |
 | understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
-| understand the Context Mode pin, tool filter, hook-output filter, or cache quarantine | [Context Mode dispatcher](operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs`, `tests/fixtures/context_mode_hook/` |
+| understand the Context Mode pin, Node.js floor, server identity, tool filter, or cache quarantine | [Context Mode dispatcher](operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs`, `tests/test_context_mode_dispatch.py`, `tests/test_context_mode_mcp_filter.py` |
 | check which guard or capability each client (Claude Code, Codex, GitHub Copilot, Antigravity) actually gets, and the recorded gaps | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md), then [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md) | `docs/target-mapping.md` ("Gate-Repair Client Parity" and "Backlog-Followups Client Parity"), `shared/hooks/scripts/protect-files.py` |
 | refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.sh` (the hook entry point) and `shared/hooks/scripts/openwiki-guard.py` |
 
