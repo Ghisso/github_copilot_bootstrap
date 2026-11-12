@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-12
 **Plan:** `.claude/plans/2026-11-12_phase-E-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -44,6 +44,23 @@ Refresh OpenWiki through its own MCP tools so it matches Phase D (the filter ans
 - [LEARN:documentation] OpenWiki copies each page's `description:` into the generated folder `index.md`, so a wording fix in a description also changes that index; stage and review both. Give a reviewer of generated wiki pages a scoped `git diff -- openwiki/` file, which separates OpenWiki-only changes (timestamps, key reordering) from real edits.
 
 ## Verification
+
+```text
+PASS        0.0s  test "$(grep -r -l -I -F '1.0.169' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  PIN="$(sed -n 's/^PINNED_CONTEXT_MODE_VERSION="\(.*\)"$/\1/p' shared/hooks/scripts/context-mode-dispatch.sh)" && test -n "$PIN" && grep -r -l -F "$PIN" openwiki --include=*.md
+PASS        0.0s  test "$(grep -r -l -F 'WebFetch|mcp__.*)$' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -E 'ctx_index.{0,40}ctx_search.{0,40}ctx_stats.{0,40}ctx_doctor' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -E 'context-mode-dispatch\.sh (claude-code|openai-codex|github-copilot)' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -F 'fixtures/context_mode' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  grep -q -F 'server/discover' openwiki/operations/context-mode-dispatcher.md
+PASS        0.0s  test "$(grep -r -l -F 'neither read nor plant' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -F 'never adds, commits, or restores' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  test "$(cat AGENTS.md CLAUDE.md | grep -c -F '<!-- OPENWIKI:START -->')" = "0"
+PASS       50.6s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      335.5s  uv run python .claude/scripts/verify.py phase --format text
+```
 
 - Findings: `.claude/quality_reports/findings-2026-11-12_phase-E-knowledge-refresh.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had two MINORs and one open request, all resolved by the second OpenWiki run and the scoped diff).
 - optional 1: PASS — the reviewer read the refreshed prose and every cited range on both pages against the filter, the dispatcher, `state-sync.sh`, `restore-root-adapters.sh`, and the filter tests in two rounds; round 1's two mismatches were fixed by the second OpenWiki run and confirmed in round 2.
