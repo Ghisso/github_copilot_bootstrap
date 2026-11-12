@@ -11,34 +11,35 @@ closeout_session_log:
 
 ## Scope
 
-Move the kit from Context Mode 1.0.169 to `PIN_FROM_SPIKE`, and the devcontainer to `NODE_IMAGE_FROM_SPIKE`. Both values come from the pre-branch spike report (big plan, decisions 5, 6, and 7). The planner writes the real values into this file before the branch is created, and the start gate fails while a token remains.
+Move the kit from Context Mode 1.0.169 to `2.1.8`, and the devcontainer's Node.js image to `node:24.22.3-bookworm-slim`. Both values come from the pre-branch spike report (`.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`; big plan, decisions 5, 6, and 7). 2.1.8 was npm's `latest` at spike time. A later release is a later pin bump through the procedure in Step 7.
 
 What changes:
 
 - **Dispatcher:**
   - the pin;
-  - the server starts as `context-mode server --agent AGENT_FROM_SPIKE`, plus the extras the spike recorded as needed for that identity;
+  - the server starts as `context-mode server --agent codex`, from the outer repository root, with no `CLAUDE_PROJECT_DIR` and no `--workspace-folder` (spike S2);
   - `CONTEXT_MODE_DATA_DIR` is exported to the guarded root;
   - a Node.js 24.15.0 floor in server mode and `--self-check` only;
   - a quarantine move that loses a race with another dispatcher no longer fails.
 - **Devcontainer:** the Node.js image, the pin, and a `--version` check.
 - **Docs:** 2.x behavior, storage, a new pin-bump procedure, and a rollback note.
 
-The MCP adapters do not change. Covers REQ-001, REQ-005, and REQ-006.
+The MCP adapters and the filter do not change. Phase A already made `ctx_index` files-only (spike S3). Covers REQ-001, REQ-005, and REQ-006.
 
 ## Steps
 
 - [ ] **1. Prepare the private binary.**
   - Owner: orchestrator.
-  - Run `npm install -g --prefix "$HOME/.cache/context-mode-pin" --ignore-scripts "context-mode@PIN_FROM_SPIKE"`. 2.x has no install scripts; the flag keeps that true, and the prefix leaves the global install and every other repository untouched.
+  - Run `npm install -g --prefix "$HOME/.cache/context-mode-pin" --ignore-scripts "context-mode@2.1.8"`. 2.x has no install scripts; the flag keeps that true, and the prefix leaves the global install and every other repository untouched.
 
 - [ ] **2. Write the tests first.**
-  - Owner: `coder`. Files (modify): `tests/test_context_mode_dispatch.py`, `tests/test_context_mode_mcp_filter.py`, `tests/test_validate_targets.py`, `tests/test_state_sync.py`.
+  - Owner: `coder`. Files (modify): `tests/test_context_mode_dispatch.py`, `tests/test_context_mode_mcp_filter.py`, `tests/test_validate_targets.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Dispatcher tests:
     - **Fakes:** they default to the pin read from the dispatcher source. Wrong versions are `0.0.0` and `2.0.0-next.1`.
-    - **Server arguments:** `server --agent AGENT_FROM_SPIKE` through the filter, both direct and through `npx -y context-mode@<pin>`, plus the extras the spike recorded as needed for that identity (a change of working folder to the repository root, `CLAUDE_PROJECT_DIR`, or `--workspace-folder`).
-    - **Data root:** `CONTEXT_MODE_DATA_DIR` equals the chosen storage root, and an inherited value that points elsewhere is overwritten. Extend `_fake_node` to record it.
+    - **Server arguments:** `server --agent codex` through the filter, both direct and through `npx -y context-mode@<pin>`, with no `--workspace-folder` argument.
+    - **Working folder:** start the dispatcher from a subfolder, for example a nested Git repository at `<repo>/.claude`. The fake `node` records `$PWD`, and it equals the repository root. With no `CLAUDE_PROJECT_DIR` in the caller's environment, the launched environment has none either.
+    - **Data root:** `CONTEXT_MODE_DATA_DIR` equals the chosen storage root, and an inherited value that points elsewhere is overwritten. Extend `_fake_node` to record it and `$PWD`, and to answer `--version` with `v24.15.0` unless a test sets another version.
     - **Node.js floor**, server mode and `--self-check` only:
       - a fake `node` that reports `v22.22.0` or `v24.14.9` makes server mode exit 1 with one error line naming 24.15.0, and makes `--self-check` report `required-node=24.15.0` with a warning;
       - `v24.15.0` and `v25.0.0` pass;
@@ -46,40 +47,51 @@ The MCP adapters do not change. Covers REQ-001, REQ-005, and REQ-006.
     - **Old pin, correct secret:** a cache whose marker holds the correct secret and `context-mode=0.0.0`, plus a sentinel file, is moved aside on the first server start. Afterwards the sentinel is under `context-mode.untrusted.*`, the new marker names the pin, and `CONTEXT_MODE_DATA_DIR` equals the fresh root.
     - **Lost race:** a fake `mv` first on `PATH` removes the source folder and exits 1, as when another server moved it first. The server still launches with a fresh root and one warning line.
   - Validator test: the pin assertion near line 2602 reads the dispatcher pin instead of a literal.
-  - State-sync test: `test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted` writes the forged marker with the current pin and filter contract, read from the dispatcher source. Only the secret then differs, so the test still proves that the secret triggers the quarantine.
-  - Real server test: extend `test_real_upstream_server_surface_is_filtered` so that no `.context-mode` folder appears under the scratch `HOME`, and a `projects/` folder appears under the data root.
+  - State-sync test: no change. Since Phase A, `test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted` runs `server` mode with a fake `node` above the floor and reads the pin and `FILTER_CONTRACT` from the dispatcher source, so it follows the new pin. The Verification block still runs it.
+  - Real server test: extend `test_real_upstream_server_surface_is_filtered`:
+    - run `git init` in the scratch repository (every spike probe ran in a Git repository, and 2.x keys its project by the Git folder);
+    - no `.context-mode` folder appears under the scratch `HOME`, and a `projects/` folder appears under the data root;
+    - add a regular file with a unique word to the scratch repository; `ctx_index` with its relative `path` succeeds, and a `ctx_search` finds the word, which shows that the filter and the server resolve the path from the same folder;
+    - `ctx_index` with a folder `path` gets `-32602`.
   - Negative control before Step 3: run the new tests on today's code, and record in the session log which ones fail and why.
 
 - [ ] **3. Dispatcher.**
   - Owner: `coder`. File: `shared/hooks/scripts/context-mode-dispatch.sh` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/integration-gate-spike/SKILL.md`.
-  - Set `PINNED_CONTEXT_MODE_VERSION="PIN_FROM_SPIKE"`, and add `MIN_NODE_VERSION="24.15.0"`.
+  - Set `PINNED_CONTEXT_MODE_VERSION="2.1.8"`, and add `MIN_NODE_VERSION="24.15.0"`.
   - Server mode:
     - one `node --version` call, compared in Bash (major above 24, or major 24 with a minor of 15 or more);
     - if Node.js is too old: one error line and exit 1;
-    - otherwise launch `context-mode server --agent AGENT_FROM_SPIKE` (or `npx -y context-mode@<pin> server --agent AGENT_FROM_SPIKE`) through the filter, with the spike's extras.
+    - otherwise launch `context-mode server --agent codex` (or `npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION" server --agent codex`) through the filter.
+  - Working folder. Spike S2: `--agent codex` keys the project to the working folder, and started in `<repo>/.claude` it used the nested repository as a separate project.
+    - `server` and `--self-check` run `cd "$REPO_ROOT"` before they resolve the launcher. `REPO_ROOT` is the value the dispatcher already computes from its own location (`$SCRIPT_DIR/../../..`, resolved with `pwd -P`), so it is the outer repository root from any starting folder, `.claude` included.
+    - The `cd` comes before the launcher lookup, so the version proof, the self-check report, and the filter's later start of `context-mode` all search `PATH` from the same folder.
+    - The filter and the server then run in that folder too, so the server resolves a relative `ctx_index` path from the same folder the filter checks it against (`CONTEXT_MODE_PROJECT_ROOT`).
+    - In server mode, a failed `cd` prints one error line and exits 1. In `--self-check`, it prints a warning. Legacy hook calls do not `cd`.
+    - Set no `CLAUDE_PROJECT_DIR` and pass no `--workspace-folder`. An inherited `CLAUDE_PROJECT_DIR` is left alone: under `--agent codex` the server keys the project by its working folder and ignores it (spike S2, case X2).
   - `--self-check` prints `required-node` and `observed-node`, and warns when Node.js is too old.
   - `configure_storage`:
     - exports `CONTEXT_MODE_DATA_DIR="$CONTEXT_MODE_DIR"`, overwriting any inherited value;
     - keeps exporting `CONTEXT_MODE_DIR`, and `CONTEXT_MODE_PROJECT_ROOT`, which the filter reads;
     - when the quarantine move fails and the cache folder no longer exists, treats it as a lost race with another dispatcher and continues; when the folder still exists, keeps today's failure path.
-  - `FILTER_CONTRACT` stays unless spike S3 required the files-only fallback in Step 4.
+  - `FILTER_CONTRACT` keeps the value Phase A set. The pin change alone moves older caches aside.
   - Rewrite the comments that describe 1.0.169 (no `--version`, a slow `doctor`). The manifest check stays because it needs no Node.js start. Update the network comment near lines 22-28.
-  - Must not change: storage selection, the override rule, the provenance secret, quarantine without deletion, or the legacy hook no-op.
+  - Must not change: storage selection, the override rule, the provenance secret, quarantine without deletion, the legacy hook no-op, or `FILTER_CONTRACT`.
 
-- [ ] **4. Filter (only when spike S3 requires it).**
-  - Owner: `coder`. File: `shared/hooks/scripts/context-mode-mcp-filter.mjs`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
-  - When the planner revision marked it necessary: `validateIndex` accepts only content and regular files, `FILTER_CONTRACT` gets a new value, and the `ctx_index` kit description drops "folder".
+- [ ] **4. Filter: no change.**
+  - Owner: `coder` (check only). File: `shared/hooks/scripts/context-mode-mcp-filter.mjs` (unchanged). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
+  - Spike S3 required the files-only `ctx_index` fallback, and Phase A made it: `validateIndex` accepts `content` or one regular file inside the repository, `FILTER_CONTRACT` has its new value, and the kit description says so. Do not change them here.
+  - The 2.1.8 `ctx_index` schema has `path`, `content`, `url`, and `source` (spike S2). `INDEX_ARGS` keeps stripping `url`. The real server test from Step 2 covers the filtered surface on 2.1.8; a different `tools/list` there stops the phase for a re-plan.
 
 - [ ] **5. Devcontainer and validator.**
   - Owner: `coder`. Files (modify): `shared/devcontainer/Dockerfile`, `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Dockerfile:
-    - `FROM NODE_IMAGE_FROM_SPIKE AS nodejs`;
-    - `npm install -g context-mode@PIN_FROM_SPIKE`;
-    - replace `context-mode --help >/dev/null` with `test "$(context-mode --version)" = "PIN_FROM_SPIKE"`.
+    - `FROM node:24.22.3-bookworm-slim AS nodejs`;
+    - `npm install -g context-mode@2.1.8`;
+    - replace `context-mode --help >/dev/null` with `test "$(context-mode --version)" = "2.1.8"`.
   - Validator:
-    - `CONTEXT_MODE_PINNED_VERSION = "PIN_FROM_SPIKE"`.
-    - `OPENWIKI_NODE_IMAGE = "NODE_IMAGE_FROM_SPIKE"`, with its message saying that the image must meet both OpenWiki's and Context Mode's engine requirements.
+    - `CONTEXT_MODE_PINNED_VERSION = "2.1.8"`.
+    - `OPENWIKI_NODE_IMAGE = "node:24.22.3-bookworm-slim"`, with its message saying that the image must meet both OpenWiki's and Context Mode's engine requirements.
     - The Dockerfile checks require the `--version` test instead of `--help`.
     - `CONTEXT_MODE_BLOCKED_TOOLS` adds `ctx_batch` and `ctx_resume`.
 
@@ -93,7 +105,7 @@ The MCP adapters do not change. Covers REQ-001, REQ-005, and REQ-006.
   - `docs/runtime-checks.md`, Context Mode bullet:
     - the pin and the Node.js 24.15.0 floor;
     - how the version is proved (the manifest, or the `npx` pin; the server itself reports `"dev"`);
-    - the single server identity;
+    - the single server identity: `--agent codex`, started from the repository root, with no `CLAUDE_PROJECT_DIR`;
     - `CONTEXT_MODE_DATA_DIR`, and that everything 2.x writes is under it;
     - older caches are moved aside and never migrated; exact-version provenance resets the cache on every bump;
     - the lost-race behavior.
@@ -106,6 +118,7 @@ The MCP adapters do not change. Covers REQ-001, REQ-005, and REQ-006.
     6. bump the pin in the dispatcher, the Dockerfile, and the validator together.
   - Known limits:
     - tool-result text can name another client's tool prefix, because one identity serves all clients and the filter does not rewrite results;
+    - upstream 2.x folder indexing has no limit, follows symlinks inside the repository's parent folder, and ignores a `.gitignore` above the folder (spike S3), which is why the filter accepts only content or one regular file;
     - the user-level plugin note stays.
   - Rollback note, three lines: reverting the merge brings back the previous pin; its dispatcher moves the 2.x cache aside on the first run; it does not restore the older cache by itself, so a user who wants the old index back moves the newest untrusted folder back by hand before that first run.
   - `README.md`:
@@ -113,19 +126,21 @@ The MCP adapters do not change. Covers REQ-001, REQ-005, and REQ-006.
     - install commands (near lines 1436-1456) with the pin, `context-mode --version`, and the Node.js floor;
     - the version-pinning and storage paragraphs (near lines 1430-1432);
     - the rollback note.
-  - `shared/policies/tool-routing.instructions.md`: the pin; the data root variable; the bounded-index sentence, matched to spike S3; and the filtered-tool list with the 2.x names (`ctx_execute`, `ctx_batch`, `ctx_resume`, `ctx_upgrade`, `ctx_purge`, `ctx_doctor`).
+  - `shared/policies/tool-routing.instructions.md`: the pin; the data root variable; and the filtered-tool list with the 2.x names (`ctx_execute`, `ctx_batch`, `ctx_resume`, `ctx_upgrade`, `ctx_purge`, `ctx_doctor`). The files-only `ctx_index` sentence from Phase A stays.
   - `docs/smoke-tests.md` (near lines 283-285): the self-check lines.
   - Write "the 1.x cache" or "the previous pin" instead of the old version number; a required item checks for it.
   - Orchestrator: update the pinned-versions paragraph in `.claude/instructions/project-context.instructions.md` (AI state).
   - LEARN candidates:
     - `[LEARN:tooling] Context Mode 2.x reports serverInfo.version "dev"; prove its version from the package manifest or the npx pin, never over the wire.`
     - `[LEARN:tooling] Context Mode 2.x ignores CONTEXT_MODE_DIR; CONTEXT_MODE_DATA_DIR sets its data root, and 1.x data is not imported.`
+    - `[LEARN:tooling] Context Mode 2.x with --agent codex keys its project to the working folder's Git repository; start it from the outer repository root, or a nested .claude repository becomes a separate project.`
     - `[LEARN:workflow] Check a hook-lane claim against the generated matcher, not only a replayed fixture: the Codex SessionStart matcher startup|resume|clear never delivered compact.`
 
 - [ ] **8. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation`.
   - Focus:
     - the dispatcher refuses every version except the pin, and Node.js below 24.15.0 in server mode;
+    - the dispatcher runs `cd "$REPO_ROOT"` before it resolves the launcher, and sets no `CLAUDE_PROJECT_DIR`;
     - no inherited `CONTEXT_MODE_DATA_DIR` can move data;
     - the lost-race path never treats an existing, unaudited folder as trusted;
     - the quarantine still never deletes;
@@ -137,6 +152,7 @@ The MCP adapters do not change. Covers REQ-001, REQ-005, and REQ-006.
 - A later 2.x release changes `tools/list`. The pin-bump procedure's step 3 catches it.
 - Quarantined caches use disk space in every consumer. The docs say so, and the user deletes them by hand.
 - The tool-name text inside tool results can name another client's tool prefix, because one server identity serves every client and the filter does not rewrite results. This is cosmetic; the kit's routing policy names the real tools.
+- Without the `cd`, a server started inside `.claude` would use a separate project for the nested repository (spike S2). The working-folder test in Step 2 guards it.
 
 ## Verification
 

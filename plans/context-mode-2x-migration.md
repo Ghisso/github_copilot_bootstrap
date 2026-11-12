@@ -14,13 +14,13 @@ current_phase:
 
 # Big Plan: context-mode-2x-migration
 
-## Recommendation: wait, then go
+## Recommendation: wait, then go (step 1 overridden)
 
-Approve this plan now. Start it in this order:
+On 2026-11-12 the user overrode step 1 and chose "Start now" (see "Approval record"). The bullets after the list keep the reasons for the original recommendation. The start order is now:
 
-1. Wait until the release stream settles (decision 1). The earliest date is 2026-11-26 (see "Approval record").
-2. Run the pre-branch spike below. It is evidence only.
-3. The planner writes the spike's exact pin, Node.js image, and server identity into Phases A and B.
+1. No wait. The settle check is waived. The pin is the newest stable release on npm at spike time: 2.1.8.
+2. Run the pre-branch spike below. It is evidence only. Done: `.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`, with no stop condition hit.
+3. The planner writes the spike's exact pin, Node.js image, and server identity into Phases A and B. Done on 2026-11-12.
 4. The start gate passes, and the branch is created.
 
 - **Not a pin bump.** Context Mode 2.x is a full rewrite. It changes the Node.js requirement, the server command, the server identity, the storage variable, and the hook output. This plan is a control-plane migration in three phases.
@@ -39,6 +39,7 @@ Each decision lists the options, what each means in practice, and the recommenda
 
 ### 1. When to start, and where the spike runs
 
+- **Chosen on 2026-11-12: start now** (see "Approval record"). The spike ran on 2.1.8, the newest stable release at spike time, not on 2.1.7 as the "Start now" option below says.
 - **Recommended: wait until the release stream settles, then run the spike before the branch.**
   - "Settled" means: the newest stable 2.x release on npm is at least 14 days old, and npm's `latest` tag points at it. The start gate checks both with one command.
   - Each new stable release restarts the window. 2.1.8 was published on 2026-11-11, so the earliest start is 2026-11-26. The 14-day window is a judgment: it is more than three times the length of the 4-day burst.
@@ -142,7 +143,7 @@ The "Re-plan notes" section lists what each non-recommended option changes in th
 
 ## Pre-Branch Spike
 
-Evidence only. It runs after the settle check passes and before the start gate. There is no branch and no outer-repository change.
+Evidence only. It runs before the start gate. The settle check was waived on 2026-11-12 (decision 1). There is no branch and no outer-repository change.
 
 - **Owner:** orchestrator, delegating to an evidence-only `coder` with a scratch download folder. Required Skills: `.claude/skills/integration-gate-spike/SKILL.md`, and `.claude/skills/ponytail/SKILL.md` (`full` mode, for harness edits).
 - **Output:** the orchestrator saves the report and any harness changes under `.claude/explorations/<run-date>_context-mode-2x-recheck/` (AI state).
@@ -208,14 +209,14 @@ It has one section per probe, and a `## Plan impact` section with one line each 
 
 Stop conditions:
 
-- The settle check fails: stop, and run nothing.
+- The settle check fails: stop, and run nothing. (Waived on 2026-11-12 by the change to decision 1.)
 - The candidate's server is degraded, or `ctx_index`, `ctx_search`, or `ctx_stats` is missing or renamed: stop and re-plan.
 - Any write lands outside the data root (other than the scratch npm cache): stop and re-plan. The storage contract no longer holds.
 - The Node.js image checks fail: stop.
 - These do not stop the spike; they go back to you or to the planner:
   - no single identity passes S2 → decision 7;
   - S7 finds an Antigravity id → decision 2;
-  - S3 finds no bound, or symlinks followed → the files-only fallback in Phase B.
+  - S3 finds no bound, or symlinks followed → the files-only fallback (moved to Phase A by the planner revision below).
 
 Planner revision before the branch (one planner run):
 
@@ -224,13 +225,24 @@ Planner revision before the branch (one planner run):
 - Phase B: the server extras that S2 found necessary (change of working folder, `CLAUDE_PROJECT_DIR`, `--workspace-folder`), and the `ctx_index` files-only fallback when S3 requires it.
 - Per-client ids, if decision 7 changes (see Re-plan notes).
 
+Done on 2026-11-12. Spike results: pin 2.1.8, image `node:24.22.3-bookworm-slim`, `--agent codex` started from the outer repository root, and the server name `context-mode` for both 1.0.169 and 2.1.8.
+
+- Phase A: the identity gate accepts exactly `"context-mode"` and never checks the version, so it works on 1.0.169 and on 2.1.8.
+- The files-only `ctx_index` fallback is required. S3 found no bound, symlinks followed into the repository's parent folder, and a `.gitignore` above the indexed folder ignored.
+  - It moved from Phase B to Phase A. It is a filter change that also works on 1.0.169, and Phase A already rewrites every surface that describes `ctx_index`, so each one changes once.
+  - Phase A also sets the new `FILTER_CONTRACT`, and removes the orchestrator's optional whole-repository index.
+- Phase B: the dispatcher changes its working folder to `REPO_ROOT` before it resolves and launches the server, exports `CONTEXT_MODE_DATA_DIR`, and sets no `CLAUDE_PROJECT_DIR` and no `--workspace-folder`.
+- Decision 7 keeps one identity, so the per-client Re-plan notes do not apply.
+
 ## Start Gate
 
 Every command must pass before the branch is created. The orchestrator records the output in the Phase A session log.
 
 ```bash
-# Needs network (npm registry): the newest stable 2.x is at least 14 days old and is npm's latest.
-npm view context-mode time dist-tags --json | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));const v=Object.keys(j.time).filter(k=>/^2\.\d+\.\d+$/.test(k)).sort((a,b)=>new Date(j.time[a])-new Date(j.time[b])).pop();process.exit((Date.now()-new Date(j.time[v]))/864e5>=14&&j["dist-tags"].latest===v?0:1)'
+# Needs network (npm registry): the pin 2.1.8 is a published, non-deprecated release, and Phase B uses that pin. The settle check is waived (decision 1, 2026-11-12).
+test "$(npm view context-mode@2.1.8 version)" = "2.1.8"
+test -z "$(npm view context-mode@2.1.8 deprecated)"
+grep -q -F 'PINNED_CONTEXT_MODE_VERSION="2.1.8"' .claude/plans/2026-11-12_phase-B-context-mode-2x-switch.md
 node -e 'const[a,b]=process.versions.node.split(".").map(Number);process.exit(a>24||(a===24&&b>=15)?0:1)'
 test "$(git rev-parse --abbrev-ref HEAD)" = "dev"
 test -z "$(git status --porcelain)"
@@ -241,7 +253,7 @@ test -n "$(ls .claude/explorations/*_context-mode-2x-recheck/REPORT.md 2>/dev/nu
 test "$(cat .claude/plans/2026-11-12_phase-A-context-mode-mcp-only-surface.md .claude/plans/2026-11-12_phase-B-context-mode-2x-switch.md | grep -c -F '_FROM_SPIKE')" = "0"
 ```
 
-The two `git show dev:` lines prove that the docs branch `readme-and-wiki-drift-fixes_implementation` (both of its phases) is merged into `dev`. The orchestrator also records your choices for the seven decisions in this plan.
+The two `git show dev:` lines prove that the docs branch `readme-and-wiki-drift-fixes_implementation` (both of its phases) is merged into `dev`. The orchestrator also records your choices for the seven decisions in this plan. A newer release on npm does not fail the gate: the pin stays 2.1.8, and a later bump follows Phase B's pin-bump procedure.
 
 ## Context
 
@@ -302,8 +314,8 @@ Terms:
 ```mermaid
 flowchart LR
   A["MCP adapters (unchanged)<br/>... context-mode-dispatch.sh server"] --> D["dispatcher server mode<br/>Node.js >= 24.15 check<br/>exact version proof<br/>guarded data root<br/>one server identity"]
-  D --> F["filter<br/>identity gate<br/>initialize allowlist<br/>3 tools, kit descriptions"]
-  F --> U["context-mode server --agent AGENT<br/>CONTEXT_MODE_DATA_DIR=.claude/.cache/context-mode"]
+  D --> F["filter<br/>identity gate<br/>initialize allowlist<br/>3 tools, kit descriptions<br/>ctx_index: text or one file"]
+  F --> U["context-mode server --agent codex<br/>working folder = repository root<br/>CONTEXT_MODE_DATA_DIR=.claude/.cache/context-mode"]
   H["stale hook call from a kept adapter"] --> N["dispatcher: read stdin, exit 0"]
 ```
 
@@ -313,7 +325,7 @@ Existing contracts this plan touches:
 | --- | --- | --- | --- | --- |
 | Exact version pin | `PINNED_CONTEXT_MODE_VERSION`, `direct_context_mode_version`, `resolve_context_mode` | The manifest proves a direct binary; otherwise `npx -y context-mode@<pin>` | Pin value; Node.js floor in server mode | REPORT.md §4 |
 | Server version gate | `PINNED_VERSION` in the filter | Tools blocked until `initialize` succeeds | Gate on `serverInfo.name` | REPORT.md §7 (`"dev"`) |
-| MCP surface | `ALLOWED_TOOLS`, `INDEX_ARGS`, `validateIndex` | Allowlist, local rejection, containment | Three tools; `initialize` allowlist; kit descriptions | REPORT.md §7 |
+| MCP surface | `ALLOWED_TOOLS`, `INDEX_ARGS`, `validateIndex`, `FILTER_CONTRACT` | Allowlist, local rejection, containment | Three tools; `initialize` allowlist; kit descriptions; `ctx_index` takes content or one regular file; new `FILTER_CONTRACT` | REPORT.md §7; 2026-11-12 recheck S3 |
 | Advice-only hook lane | dispatcher hook mode, `sanitizeHookOutput` | Fail-open: a hook call always exits 0 | Removed; legacy calls are silent no-ops | REPORT.md §5-6; `generate_targets.py:1218` |
 | Guarded storage | `select_storage_root`, `configure_storage` | One root; secret; quarantine, never delete | Export `CONTEXT_MODE_DATA_DIR`; lost-race tolerance | REPORT.md §8 |
 | One server entry | `shared/mcp/servers.json` | One base command for Claude, Codex, Copilot | No Antigravity entry | REPORT.md §7; `install_bootstrap.py:560-571` |
@@ -322,11 +334,11 @@ Existing contracts this plan touches:
 
 | Assumption | Evidence | Remaining limit | Settled by |
 | --- | --- | --- | --- |
-| One server identity serves all three clients | REPORT.md §7 (I2: `--agent codex` works from the working folder; `CLAUDE_PROJECT_DIR` selects `claude-code`) | Not tried with three client handshakes | Spike S2; fallback: per-client ids (decision 7) |
-| The chosen Node.js 24 image runs 2.x and the other global tools | This host runs OpenWiki 0.7.2 and Context Mode 1.0.169 on Node.js 24.15.0; declared engines | No image built yet | Spike S6; Phase B required slim checks; full build optional |
-| `ctx_index` folder indexing is bounded | None (the 2.x schema has no bound arguments) | Bounds and symlinks unknown | Spike S3; fallback: files only |
-| 2.x writes only under the data root | REPORT.md §10 | Nested-repository working folder not probed | Spike S2 and S4; stop on failure |
-| No hook output reaches a client as wired | `generate_targets.py:1218`; REPORT.md §5 | Whether Codex sends `compact` at all | Spike S5 (matters only for an alternative) |
+| One server identity serves all three clients | REPORT.md §7; spike S2 (2026-11-12): `--agent codex` from the outer repository root served three client names with no difference | Probe clients only, not live Claude Code, Codex, or VS Code sessions | Settled by spike S2; live clients stay Optional Verification |
+| The chosen Node.js 24 image runs 2.x and the other global tools | Spike S6: `node:24.22.3-bookworm-slim` built the full devcontainer and ran 2.1.8, OpenWiki, jsdom, and mermaid | The full build depends on `uv:latest` and network | Settled by spike S6; Phase B required slim checks; full build optional |
+| `ctx_index` folder indexing is bounded | Spike S3: false. No bound on files, depth, or size; symlinks followed into the repository's parent folder; a `.gitignore` above the folder ignored | None for the kit: folders are rejected | Files-only fallback, in Phase A |
+| 2.x writes only under the data root | REPORT.md §10; spike S2 and S4: no write outside the data root, nested layout included | `ctx_doctor` writes elsewhere, but the filter rejects it | Settled by spike S2 and S4 |
+| No hook output reaches a client as wired | `generate_targets.py:1218`; REPORT.md §5; spike S5: Codex sends `compact`, and the kit's matcher does not deliver it | None as wired | Settled by spike S5 (matters only for an alternative) |
 
 ## Requirement Map
 
@@ -334,15 +346,15 @@ Existing contracts this plan touches:
 | --- | --- | --- | --- |
 | REQ-001 | The dispatcher enforces the exact pin and the Node.js 24.15 floor on the server route and in `--self-check` | `2026-11-12_phase-B-context-mode-2x-switch` | Dispatcher tests; real server test |
 | REQ-002 | MCP adapters for Claude, Codex, and Copilot keep today's command; Antigravity has no Context Mode entry | `2026-11-12_phase-A-context-mode-mcp-only-surface` | Validator; root adapters unchanged |
-| REQ-003 | The client sees only `ctx_index`, `ctx_search`, `ctx_stats`, kit descriptions, and no upstream `instructions` | `2026-11-12_phase-A-context-mode-mcp-only-surface` | Filter tests; real server test |
+| REQ-003 | The client sees only `ctx_index`, `ctx_search`, `ctx_stats`, kit descriptions, and no upstream `instructions`; `ctx_index` accepts only content or one regular file inside the repository | `2026-11-12_phase-A-context-mode-mcp-only-surface` | Filter tests; real server test |
 | REQ-004 | No Context Mode hook runs on any client; a legacy hook call exits 0 silently | `2026-11-12_phase-A-context-mode-mcp-only-surface` | Lifecycle, validator, dispatcher tests |
 | REQ-005 | 2.x data lives only under `.claude/.cache/context-mode/`; older caches are moved aside, never deleted; a lost quarantine race does not fail | `2026-11-12_phase-B-context-mode-2x-switch` | Dispatcher and state-sync tests; real server test |
-| REQ-006 | The server starts with the spike's single identity | `2026-11-12_phase-B-context-mode-2x-switch` | Dispatcher tests; real server test |
+| REQ-006 | The server starts with the spike's single identity: `--agent codex`, from the outer repository root | `2026-11-12_phase-B-context-mode-2x-switch` | Dispatcher tests; real server test |
 
 ## Phases
 
-- [ ] `2026-11-12_phase-A-context-mode-mcp-only-surface` — on 1.0.169: no Context Mode hooks, three tools, filtered `initialize`, kit descriptions, no Antigravity entry
-- [ ] `2026-11-12_phase-B-context-mode-2x-switch` — Node.js 24 image, the 2.x pin, one server identity, data root, Node.js floor, quarantine race, docs
+- [ ] `2026-11-12_phase-A-context-mode-mcp-only-surface` — on 1.0.169: no Context Mode hooks, three tools, filtered `initialize`, kit descriptions, files-only `ctx_index`, no Antigravity entry
+- [ ] `2026-11-12_phase-B-context-mode-2x-switch` — Node.js 24 image, the 2.1.8 pin, one server identity started from the repository root, data root, Node.js floor, quarantine race, docs
 - [ ] `2026-11-12_phase-C-knowledge-refresh` — OpenWiki refresh and the stale-claims audit
 
 ## Phase Summary
@@ -381,7 +393,8 @@ The order is A, then B, then C. Phase B's filter and test changes build on Phase
 ## Risks and Fallbacks
 
 - **A new 2.x release lands during Phases A and B.** Keep the spike's pin. A later bump follows Phase B's pin-bump procedure.
-- **Removing the filter's version gate removes one layer of checking.** The dispatcher is the only program that starts the filter. It proves the version from the manifest, or pins it in the `npx` command. Phase A's review checks every caller.
+- **Removing the filter's version gate removes one layer of checking.** The dispatcher is the only program that starts the filter. It proves the version from the manifest, or pins it in the `npx` command. Phase A's review checks every caller. The name gate cannot replace it: 1.0.169 and 2.1.8 both report `context-mode`.
+- **Files-only `ctx_index` removes folder indexing** and the orchestrator's optional whole-repository index (Phase A). Agents index one large file or text at a time. Discovery stays with direct reads, `rg`, and Semble.
 - **Consumers that commit `.codex/` or `.github/hooks` keep stale Context Mode hook entries.** The dispatcher answers them with a silent exit 0, and the README tells them how to regenerate.
 - **The required slim-image checks need Docker and network.** The full CUDA build is optional. That build's layers after `COPY --from=ghcr.io/astral-sh/uv:latest` (`shared/devcontainer/Dockerfile:62`) rebuild whenever that tag moves, so a cache from the spike is not guaranteed.
 - **Two MCP servers starting together on the first 2.x run** both try to move the old cache. Phase B treats the lost race as success when the folder is already gone.
@@ -392,8 +405,8 @@ The order is A, then B, then C. Phase B's filter and test changes build on Phase
 
 - All three phases are complete, with `verify phase` PASS and `verify closeout` PASS on their required items.
 - No Context Mode hook runs on any client, and a legacy hook call exits 0 silently.
-- The dispatcher pins the spike's release, refuses every other version, refuses Node.js older than 24.15.0 in server mode, and starts the server with one identity.
-- The client sees exactly three tools, kit descriptions, and no upstream `instructions`.
+- The dispatcher pins 2.1.8, refuses every other version, refuses Node.js older than 24.15.0 in server mode, and starts the server as `--agent codex` from the repository root.
+- The client sees exactly three tools, kit descriptions, and no upstream `instructions`, and `ctx_index` accepts only content or one regular file inside the repository.
 - 2.x data lives under `.claude/.cache/context-mode/`. Older caches are moved aside, not deleted.
 - The devcontainer's Node.js image is 24.15 or newer and runs the pinned release.
 - No live surface outside dated records names `1.0.169`, and OpenWiki is refreshed.
@@ -427,7 +440,7 @@ A separate devil's advocate review ran on the first draft. Its items are resolve
 | Concern | Risk | Alternative | Recommendation |
 | --- | --- | --- | --- |
 | Without the filter's version gate, the dispatcher is the only version proof | MEDIUM | Pass the expected version to the filter | ACCEPT: 2.x reports `"dev"`, so a wire check proves nothing, and the dispatcher is the only program that starts the filter |
-| One server identity may change behavior for some client | MEDIUM | Per-client ids | INVESTIGATE (spike S2), with per-client ids as the planned fallback |
+| One server identity may change behavior for some client | LOW | Per-client ids | ACCEPT: spike S2 passed with three probe clients; live clients stay Optional Verification |
 | MCP-only gives up future session continuity | LOW | "Narrow" | ACCEPT: nothing reaches the model as wired; full continuity belongs in a later plan after live payloads are seen |
 | Phase A is large | MEDIUM | Split hooks and MCP surface | ACCEPT: most of it is deletion, and both halves rewrite the same sentences and files |
 | Kit descriptions can drift from upstream behavior | LOW | Keep upstream text and scrub blocked names | ACCEPT: upstream moved routing advice into the descriptions, and the kit's routing policy is the authority |
