@@ -1118,3 +1118,4 @@
 2026-11-12T10:48:44.000Z,event=SessionStart,target=openai-codex,sessionId=01a1cf5f-c361-74a0-a95f-f9d1dd1dbce3,source=startup
 2026-11-12T10:49:21.000Z,event=Stop,target=openai-codex,sessionId=01a1cf5f-c361-74a0-a95f-f9d1dd1dbce3
 2026-11-12T10:50:09.000Z,event=SessionStart,target=claude-code,sessionId=94e52052-461c-4881-996a-f81a17f90fd0,source=startup
+2026-11-12T10:50:57.000Z,event=Stop,target=claude-code,sessionId=94e52052-461c-4881-996a-f81a17f90fd0
