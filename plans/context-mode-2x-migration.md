@@ -11,7 +11,7 @@ phases:
   - 2026-11-12_phase-C-knowledge-refresh
   - 2026-11-12_phase-D-context-mode-discover-fallback
   - 2026-11-12_phase-E-knowledge-refresh
-current_phase: 2026-11-12_phase-D-context-mode-discover-fallback
+current_phase: 2026-11-12_phase-E-knowledge-refresh
 ---
 
 # Big Plan: context-mode-2x-migration
