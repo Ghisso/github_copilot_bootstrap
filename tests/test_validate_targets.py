@@ -2749,12 +2749,19 @@ def test_validate_mcp_and_hooks_runs_the_root_adapter_check(
 
 def test_context_mode_tool_surface_is_exactly_three_tools_everywhere() -> None:
     """The approved allowlist is exact and closed: exactly three tools, pinned
-    to 1.0.169, and no blocked tool name (`ctx_doctor` included) reaches any
-    generated routing or permission surface (agent tool grants, MCP server
-    configs, hook scripts)."""
+    to the version the dispatcher pins, and no blocked tool name (`ctx_doctor`
+    included) reaches any generated routing or permission surface (agent tool
+    grants, MCP server configs, hook scripts)."""
     assert CONTEXT_MODE_ALLOWED_TOOLS == ("ctx_index", "ctx_search", "ctx_stats")
-    assert "ctx_doctor" in CONTEXT_MODE_BLOCKED_TOOLS
-    assert CONTEXT_MODE_PINNED_VERSION == "1.0.169"
+    # Context Mode 2.x adds two tools the kit never exposes.
+    assert {"ctx_doctor", "ctx_batch", "ctx_resume"} <= set(CONTEXT_MODE_BLOCKED_TOOLS)
+    dispatcher_pin = re.search(
+        r'^PINNED_CONTEXT_MODE_VERSION="([^"]+)"$',
+        (REPO_ROOT / "shared/hooks/scripts/context-mode-dispatch.sh").read_text(),
+        re.MULTILINE,
+    )
+    assert dispatcher_pin is not None
+    assert CONTEXT_MODE_PINNED_VERSION == dispatcher_pin.group(1)
 
     target_root = REPO_ROOT / "dist" / "multi-agent"
     surfaces = [

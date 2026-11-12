@@ -257,12 +257,12 @@ REQUIRED_HOOK_SCRIPTS = (
 # Approved Context Mode capability contract (Phase F). The allowlist is exact
 # and closed; a new upstream tool needs a later approved plan before it can
 # join CONTEXT_MODE_ALLOWED_TOOLS.
-CONTEXT_MODE_PINNED_VERSION = "1.0.169"
+CONTEXT_MODE_PINNED_VERSION = "2.1.8"
 # Upgrade procedure: docs/runtime-checks.md ("Optional helpers", `openwiki`).
 OPENWIKI_PINNED_VERSION = "0.7.2"
 MERMAID_PINNED_VERSION = "11.16.0"
 JSDOM_PINNED_VERSION = "29.1.1"
-OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"
+OPENWIKI_NODE_IMAGE = "node:24.22.3-bookworm-slim"
 # Exact, closed allowlist of legitimate devcontainer containerEnv keys. Any
 # other key -- most importantly a provider credential such as OPENAI_API_KEY
 # or ANTHROPIC_API_KEY -- must fail validation instead of silently passing.
@@ -282,6 +282,8 @@ CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_execute",
     "ctx_execute_file",
     "ctx_batch_execute",
+    "ctx_batch",
+    "ctx_resume",
     "ctx_fetch_and_index",
     "ctx_upgrade",
     "ctx_purge",
@@ -9607,7 +9609,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         dockerfile = read(devcontainer_root / "Dockerfile")
         check(
             f"FROM {OPENWIKI_NODE_IMAGE} AS nodejs" in dockerfile,
-            "devcontainer Dockerfile must pin a Node image that satisfies OpenWiki's engine",
+            "devcontainer Dockerfile must pin a Node image that meets both "
+            "OpenWiki's and Context Mode's engine requirements",
             errors,
         )
         check(
@@ -9626,8 +9629,10 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
         check(
-            "context-mode --help >/dev/null" in dockerfile,
-            "devcontainer Dockerfile must verify context-mode CLI execution",
+            f'test "$(context-mode --version)" = "{CONTEXT_MODE_PINNED_VERSION}"'
+            in dockerfile,
+            "devcontainer Dockerfile must verify the installed context-mode "
+            f"version is {CONTEXT_MODE_PINNED_VERSION}",
             errors,
         )
         for package, version in (

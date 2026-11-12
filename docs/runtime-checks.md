@@ -91,18 +91,43 @@ regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode` (optional filtered `ctx_index`/`ctx_search`/`ctx_stats` MCP server, routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The kit wires no Context Mode hooks on any client; a hook call from stale wiring reads its input, prints nothing, and exits 0. The filter accepts the server only when `serverInfo.name` is exactly `context-mode`. The dispatcher alone proves the version: it verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise the server warns and exits nonzero. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
-  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs. Context Mode 2.x folder indexing has no bound on files, depth, or size, and it follows symbolic links into sibling projects. When you bump `PINNED_CONTEXT_MODE_VERSION`, run the real-binary server test:
+- `context-mode` (optional filtered `ctx_index`/`ctx_search`/`ctx_stats` MCP server, routed through `context-mode-dispatch.sh` and pinned to `2.1.8`). The kit wires no Context Mode hooks on any client; a hook call from stale wiring reads its input, prints nothing, and exits 0. The filter accepts the server only when `serverInfo.name` is exactly `context-mode`. The 2.x server reports `serverInfo.version` as `"dev"`, so the version is never proved over the wire. The dispatcher alone proves it: for a direct `context-mode` executable it resolves the file and reads the owning package manifest's `name`/`version` before running it; for the `npx` route it pins the version in the command (`npx -y context-mode@2.1.8`). A binary that is not provably exactly `2.1.8`, including one whose version cannot be determined, is never executed; the pinned `npx` fallback is used instead when available, and otherwise the server warns and exits nonzero. The 2.x binary has a working `context-mode --version`, and the Dockerfile checks it. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, a `version-contract` result, and `required-node`/`observed-node`.
+  - **Node.js floor.** Context Mode 2.x needs Node.js 24.15.0 or newer (`engines.node`). In server mode and `--self-check`, the dispatcher reads `node --version`. Server mode exits 1 with one error line when Node.js is older; `--self-check` warns. Legacy hook calls run no Node.js check. The devcontainer image is `node:24.22.3-bookworm-slim`.
+  - **One server identity.** Every client starts `context-mode server --agent codex` (or `npx -y context-mode@2.1.8 server --agent codex`) through the filter. The dispatcher changes to the outer repository root first, and sets no `CLAUDE_PROJECT_DIR` and no `--workspace-folder`. Under `--agent codex` the server keys its project to the working folder's Git repository, so a server started inside the nested `.claude` repository would use a separate project. Starting from the root also lets the server and the filter resolve a relative `ctx_index` path from the same folder.
+  - **Storage.** The dispatcher exports `CONTEXT_MODE_DATA_DIR` as the guarded root `.claude/.cache/context-mode/`, overwriting any inherited value. 2.x ignores `CONTEXT_MODE_DIR`; the dispatcher still reads it as the kit's own override, subject to the same guard. Everything the three tools write is under that root (spike S4 saw no network calls and no writes elsewhere).
+  - **Older caches.** A cache the dispatcher did not produce for this exact pin is moved aside as `<cache>.untrusted.<timestamp>.<pid>`, never migrated and never deleted. Provenance includes the exact version, so every pin bump starts with an empty cache, and the 1.x cache is not imported. The moved folders use disk space; delete them by hand when you no longer need them.
+  - **Lost race.** Two servers that start together may both try to move the old cache. When the move fails and the cache folder no longer exists, the dispatcher treats the other server as the winner, warns once, and continues with a fresh root. When the folder still exists, the move fails as before and the server exits nonzero.
 
-  ```bash
-  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q -k real_upstream
-  ```
+  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs.
+
+  To bump `PINNED_CONTEXT_MODE_VERSION`:
+
+  1. Install the candidate into a private prefix: `npm install -g --prefix "$HOME/.cache/context-mode-pin" --ignore-scripts "context-mode@<candidate>"`.
+  2. Set `PINNED_CONTEXT_MODE_VERSION` in `shared/hooks/scripts/context-mode-dispatch.sh` to the candidate. The real-binary test in the next step runs the dispatcher, which accepts a direct binary only when its version equals the pin and never falls back to `npx` there.
+  3. Run the real-binary server test with the private prefix first on `PATH`:
+
+     ```bash
+     PATH="$HOME/.cache/context-mode-pin/bin:$PATH" CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q -k real_upstream
+     ```
+
+  4. Compare the candidate's `tools/list` (schemas and property descriptions) with the kit descriptions and `INDEX_ARGS` in the filter.
+  5. Run the two slim-image checks: the Node.js engine check on the Dockerfile's `FROM` image, and `npm install -g --ignore-scripts context-mode@<candidate>` followed by `context-mode --version` in that image.
+  6. Optionally build the full devcontainer image.
+  7. Bump the pin in the Dockerfile and `CONTEXT_MODE_PINNED_VERSION` in the validator to match the dispatcher, then update every doc that names the pin, found with `rg -F '<old pin>'`.
 
   Known limits:
 
+  - Tool-result text can name another client's tool prefix, because one identity serves every client and the filter does not rewrite results. The routing policy names the real tools.
+  - Upstream 2.x folder indexing has no bound on files, depth, or size, follows symbolic links inside the repository's parent folder, and ignores a `.gitignore` above the folder. That is why the filter accepts only content or one regular file.
   - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
   - Antigravity gets no Context Mode server entry, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
+
+  Rollback: reverting the merge brings back the previous pin.
+  Its dispatcher moves the 2.x cache aside on the first run, but it does not restore the older cache.
+  To get the old index back, do this by hand before that first run:
+  move the current `.claude/.cache/context-mode` folder out of the way (a fresh one exists after 2.x started),
+  then rename the `.untrusted.*` folder that holds the 1.x index (moved aside when 2.x first started) to `context-mode`.
 - `openwiki` (the OpenWiki command-line tool and MCP server, installed globally and pinned in `shared/devcontainer/Dockerfile`; `OPENWIKI_PINNED_VERSION` in `scripts/validate_targets.py` names the same version). OpenWiki has no `openwiki --version`, so the Dockerfile reads the version from the installed package's own `package.json`, then runs `openwiki integrations list </dev/null`. `tests/test_openwiki_cli_smoke.py` requires the binary on `PATH` to report exactly the pinned version. It fails when the version differs or the binary is missing, and it never downloads anything. To move to a new pin:
 
   1. Diff the contents of `npm pack openwiki@<old>` and `npm pack openwiki@<new>`, and read the release notes between them. Look for changes to the tool names, `openwiki_begin`'s input, the managed-block markers, which paths a begin call writes, and the host integrations.

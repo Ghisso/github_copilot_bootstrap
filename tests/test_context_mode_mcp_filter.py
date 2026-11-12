@@ -787,7 +787,10 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
     """Machine-run check of the whole `server` path against the real binary in
     an isolated repository and HOME. It fails (never skips) when the variable
     is set but the direct binary is not provably the pinned one, so it can
-    never download through `npx`."""
+    never download through `npx`. Every probe is started from `<repo>/.claude`,
+    a nested Git repository like the one AI-state sync creates, so a relative
+    `ctx_index` path only works when the dispatcher moves the filter and the
+    server to the outer repository root first."""
     root = tmp_path / "repo"
     scripts = root / ".claude/hooks/scripts"
     scripts.mkdir(parents=True)
@@ -795,6 +798,7 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
     shutil.copy(DISPATCHER, dispatcher)
     shutil.copy(FILTER, scripts / FILTER.name)
     subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "init", "-q", str(root / ".claude")], check=True)
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     (home / ".codex").mkdir()
@@ -809,10 +813,11 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
         "PATH": os.environ["PATH"],
         "LANG": "C.UTF-8",
     }
+    start_folder = root / ".claude"
     check = subprocess.run(
         ["bash", str(dispatcher), "--self-check"],
         env=env,
-        cwd=root,
+        cwd=start_folder,
         text=True,
         capture_output=True,
         check=False,
@@ -823,12 +828,16 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
     )
 
     word = f"zq{uuid.uuid4().hex}"
+    file_word = f"yq{uuid.uuid4().hex}"
+    notes = root / "docs/file-notes.md"
+    notes.parent.mkdir()
+    notes.write_text(f"# File notes\n\nThe {file_word} routine lives in this file.\n")
     stderr_log = tmp_path / "server-stderr.log"
     with stderr_log.open("w") as stderr:
         server = subprocess.Popen(
             ["bash", str(dispatcher), "server"],
             env=env,
-            cwd=root,
+            cwd=start_folder,
             text=True,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -873,16 +882,15 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
             tools = replies.response(2)["result"]["tools"]
             assert sorted(tool["name"] for tool in tools) == sorted(TOOL_NAMES)
             for tool in tools:
-                assert set(tool) == {
-                    "name",
-                    "description",
-                    "inputSchema",
-                    "annotations",
-                }
+                required = {"name", "description", "inputSchema"}
+                assert required <= set(tool) <= required | {"annotations"}
                 assert tool["description"] == KIT_DESCRIPTIONS[tool["name"]]
-                # Upstream sets boolean hints on every tool; nothing else passes.
-                assert tool["annotations"]
-                assert all(isinstance(v, bool) for v in tool["annotations"].values())
+                # 2.x sends no annotations for `ctx_index`, so the key may be
+                # absent; when present, only boolean hints pass.
+                if "annotations" in tool:
+                    assert all(
+                        isinstance(v, bool) for v in tool["annotations"].values()
+                    )
                 assert _descriptions(tool["inputSchema"]) == [], tool["name"]
 
             indexed = call(
@@ -897,12 +905,25 @@ def test_real_upstream_server_surface_is_filtered(tmp_path: Path) -> None:
             searched = call(4, "ctx_search", {"queries": [word]})
             assert word in json.dumps(searched["result"]), searched
             assert call(5, "ctx_doctor", {})["error"]["code"] == -32601
+
+            # A relative file path resolves from the same folder in the filter
+            # (which checks it) and in the server (which reads it).
+            indexed_file = call(6, "ctx_index", {"path": "docs/file-notes.md"})
+            assert "result" in indexed_file, indexed_file
+            assert not indexed_file["result"].get("isError"), indexed_file
+            found = call(7, "ctx_search", {"queries": [file_word]})
+            assert file_word in json.dumps(found["result"]), found
+            # A folder is refused by the filter, before the server sees it.
+            folder = call(8, "ctx_index", {"path": "docs"})
+            assert folder["error"]["code"] == -32602, folder
         finally:
             server.terminate()
             server.wait(timeout=30)
 
     assert not (home / ".context-mode").exists(), stderr_log.read_text()
     cache = root / ".claude/.cache/context-mode"
+    # 2.x keeps everything under CONTEXT_MODE_DATA_DIR, one folder per project.
+    assert (cache / "projects").is_dir(), stderr_log.read_text()
     stored = [
         path
         for path in cache.rglob("*")

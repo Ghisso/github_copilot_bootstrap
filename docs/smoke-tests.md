@@ -126,12 +126,12 @@ Expected:
   tool calls and subagent MCP access is unverified (see the
   [parity section](target-mapping.md#gate-repair-client-parity)). An optional local server that is
   unavailable follows the normal fallback behavior.
-- The filtered Context Mode MCP surface advertises exactly `ctx_index`, `ctx_search`, and `ctx_stats`; every other tool (`ctx_doctor`, `ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) is filtered out of `tools/list` and rejected locally before reaching upstream.
+- The filtered Context Mode MCP surface advertises exactly `ctx_index`, `ctx_search`, and `ctx_stats`; every other tool (`ctx_execute`, `ctx_batch`, `ctx_resume`, `ctx_upgrade`, `ctx_purge`, `ctx_doctor`, and any unknown tool) is filtered out of `tools/list` and rejected locally before reaching upstream.
 - Tool-routing policy preserves:
   - direct reads for known paths
   - `rg` for exact literals
   - Semble for semantic discovery
-  - the three guarded Context Mode MCP tools, routed through the dispatcher and pinned to `1.0.169`; `ctx_index` takes raw text or one regular file inside the repository, never a folder, link, or URL
+  - the three guarded Context Mode MCP tools, routed through the dispatcher and pinned to `2.1.8`; `ctx_index` takes raw text or one regular file inside the repository, never a folder, link, or URL
   - context7 for current external library API documentation
   - no duplicate broad searches
 
@@ -281,8 +281,9 @@ acceptance gap/blocker.
 - Codex and Claude `UserPromptSubmit` use compatible `push` as a 60-second checkpoint-and-publish retry. Codex delayed, best-effort `SessionEnd` uses only network-free `checkpoint` with timeout `3`; Claude `StopFailure` also checkpoints locally, while Claude `SessionEnd` uses compatible `push` with timeout `60`. Failed publication preserves the local commit for a later retry.
 - The generated `post-commit` git hook retains `state-sync.sh push` after every successful outer-repo commit; git ignores its exit status, so a sync failure never blocks or fails the commit. `checkpoint` is the explicit network-free local durability operation.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
-- `context-mode-dispatch.sh --self-check` reports `required-version=1.0.169`, `resolved-path`, `observed-version` when it can be determined, and a `version-contract` result. A `context-mode` on `PATH` that is not provably `1.0.169` is reported as a failing contract and is never executed; server mode then uses the pinned `npx context-mode@1.0.169` fallback, or warns and exits nonzero when that is unavailable too.
-- `CONTEXT_MODE_DIR` is honoured only at or beneath `.claude/.cache/context-mode`. Any other absolute path — inside the repository or external — warns and falls back to the project-local cache, and the refused path is never created, stamped with a provenance marker, or renamed to a `.untrusted.*` sibling.
+- `context-mode-dispatch.sh --self-check` reports `required-version=2.1.8`, `resolved-path`, `observed-version` when it can be determined, a `version-contract` result, `required-node=24.15.0`, and `observed-node`. A `context-mode` on `PATH` that is not provably `2.1.8` is reported as a failing contract and is never executed; server mode then uses the pinned `npx context-mode@2.1.8` fallback, or warns and exits nonzero when that is unavailable too. Node.js older than 24.15.0 makes `--self-check` warn and makes server mode exit 1.
+- The dispatcher starts the server from the outer repository root as `server --agent codex`, with no `CLAUDE_PROJECT_DIR` and no `--workspace-folder`, and exports `CONTEXT_MODE_DATA_DIR` as the storage root.
+- `CONTEXT_MODE_DIR` is honoured only at or beneath `.claude/.cache/context-mode`. Any other absolute path — inside the repository or external — warns and falls back to the project-local cache, and the refused path is never created, stamped with a provenance marker, or renamed to a `.untrusted.*` sibling. 2.x ignores `CONTEXT_MODE_DIR`; the dispatcher passes the chosen root to it as `CONTEXT_MODE_DATA_DIR`.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
 - `.claude/hooks/git-hooks/commit-msg` exists and is executable in generated output.
 - With `core.hooksPath` set to the generated `git-hooks` directory, on a `<plan_name>_implementation` branch: a `git commit` with no findings report, a findings report with a CRITICAL finding, a stale `content_hash`, an incomplete small plan, a closeout log missing `**Status:** COMPLETED`, or missing `[LEARN]` evidence is each rejected by git; a fully valid commit succeeds.
