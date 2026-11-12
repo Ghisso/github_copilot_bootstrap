@@ -61,7 +61,7 @@ sources:
 generated: { by: "claude-code", at: "2026-11-12T09:39:07.876Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-12T09:39:07.876Z
+    at: 2026-11-12T13:25:12.863Z
 ---
 
 # Hook dispatcher and guardrail scripts

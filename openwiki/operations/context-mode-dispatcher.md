@@ -1,7 +1,7 @@
 ---
 type: operations
 title: "Context Mode dispatcher: version pin, tool filter, and cache security"
-description: How context-mode-dispatch.sh runs the pinned Context Mode 2.1.8 only as a filtered MCP server with one server identity, how it proves the version and the Node.js floor, why it owns exactly one cache location, and how a random provenance secret stops an untrusted cache from ever being trusted.
+description: How context-mode-dispatch.sh runs the pinned Context Mode 2.1.8 only as a filtered MCP server with one server identity, how it proves the version and the Node.js floor, why it owns exactly one cache location, and how a random provenance secret keeps an untrusted cache from being trusted unless a remote replaces the synced scripts themselves.
 tags: [context-mode, mcp, dispatcher, cache, security, version-pin]
 sources:
   - id: openwiki-source-e119253b3c3737247dc63f2a
@@ -22,14 +22,16 @@ sources:
     resource: repo://shared/hooks/scripts/context-mode-mcp-filter.mjs
   - id: openwiki-source-b5b439338ba5fba465bf930c
     resource: repo://shared/hooks/scripts/restore-root-adapters.sh
+  - id: openwiki-source-92c74e76955d0f817db531c4
+    resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-d93dd5f5161771a7b6074981
     resource: repo://tests/test_context_mode_dispatch.py
   - id: openwiki-source-1cc03a6e7c67d535ae1d0cac
     resource: repo://tests/test_context_mode_mcp_filter.py
-generated: { by: "claude-code", at: "2026-11-12T09:54:42.940Z" }
+generated: { by: "claude-code", at: "2026-11-12T13:34:01.699Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-12T09:54:42.940Z
+    at: 2026-11-12T13:34:01.699Z
 ---
 
 # Context Mode dispatcher: version pin, tool filter, and cache security
@@ -77,6 +79,7 @@ Moving to a newer Context Mode release follows the pin-bump procedure in `docs/r
 
 - **Identity gate.** The filter blocks `tools/list` and `tools/call` with `-32001` until an `initialize` response arrives whose `serverInfo.name` is exactly `context-mode`. A different name gets `-32002`, and the filter kills the upstream process. The gate never checks the version: Context Mode 1.x and 2.x report the same name, so the dispatcher's version proof is the only version check.
 - **Reduced `initialize`.** The client receives only `protocolVersion`, `capabilities.tools`, and `serverInfo` with its name and version. Upstream `instructions`, prompts, resources, and experimental capabilities are dropped by construction.
+- **Discovery probe answered locally.** MCP revision 2026-07-28 clients first probe a server with `server/discover` and skip `initialize` when the probe succeeds. Context Mode 2.1.8 answers that probe, with its upstream `instructions`, so a client that accepted it would never send `initialize`, and the identity gate above would refuse its `tools/list` and `tools/call`. The filter therefore answers `server/discover` itself with `-32601` (`Method not found`), drops a probe that has no `id`, and never forwards either, before or after an accepted `initialize`. A client that speaks both revisions treats that error as an older server and falls back to `initialize`. A client that speaks only 2026-07-28 gets no Context Mode tools.
 - **Three tools.** Only `ctx_index`, `ctx_search`, and `ctx_stats` are advertised and allowed. Every other tool call, known or unknown, is answered locally with `-32601` (`Context Mode tool is not allowed by repository policy`) and never reaches upstream.
 - **Kit descriptions.** Each allowed tool gets a fixed one-sentence kit description that names only allowed tools and gives no routing advice. Every string `description` inside a tool's input schema is removed at any depth, and `ctx_index` keeps only the properties in `INDEX_ARGS`.
 - **Annotations.** Only boolean entries of a tool's `annotations` pass through, such as `readOnlyHint` and `destructiveHint`. Codex treats an unannotated tool differently, and a string such as `title` could carry advice text.
@@ -111,12 +114,12 @@ flowchart TD
 ```
 
 - The marker is `.bootstrap-provenance` inside the cache, with four lines: `repository=<root>`, `context-mode=<pin>`, `filter=ctx-index-files-only-v2`, and `secret=<value>`. A pin bump or a new filter contract therefore starts a fresh cache, and the 1.x cache is never imported.
-- The first three fields are public and predictable. The secret is what makes the marker unforgeable: a random 32-byte value generated once with `openssl rand` or `/dev/urandom` and stored at `.context-mode-provenance.secret` in the repository root, outside `.claude/`. `state-sync.sh` adds and commits only under `.claude/`, and the root restore it runs (`restore-root-adapters.sh`) refuses any path outside a closed list of adapter files, so a hostile remote can neither read nor plant the secret. The installer's ignore block and `.openwikiignore` both exclude `.context-mode-provenance.secret*`.
+- The first three fields are public and predictable. The secret is what makes the marker unforgeable: a random 32-byte value generated once with `openssl rand` or `/dev/urandom` and stored at `.context-mode-provenance.secret` in the repository root, outside `.claude/`. `state-sync.sh` adds and commits only under `.claude/`, so the secret file never enters `ai-state` history, and the root restore it runs (`restore-root-adapters.sh`) copies only allowlisted adapter files, never this one. This gives no protection against a remote that replaces the synced scripts themselves. The installer's ignore block and `.openwikiignore` both exclude `.context-mode-provenance.secret*`.
 - The secret is written to a temporary sibling and moved into place with `mv -n`, so two dispatcher invocations racing on first run still end with one secret on disk.
 - A cache missing the marker or with any mismatching line is renamed to `<cache>.untrusted.<UTC timestamp>.<pid>` next to it and never deleted. A warning names the quarantine path. A fresh, empty guarded cache is created and stamped.
 - Two servers that start together may both try to move the same old cache. When the move fails and the folder is gone, the dispatcher warns that another dispatcher already moved it aside and continues with a fresh cache. When the folder is still there, it is never trusted, stamped, or deleted: the dispatcher prints `mv`'s error and the server fails.
 
-The consequence for lifecycle evidence is simple. No cache is ever searched or cited unless this dispatcher produced it locally. Moved-aside folders use disk space until a person deletes them.
+The consequence for lifecycle evidence is simple. Short of a remote that replaces the synced scripts themselves, no cache is searched or cited unless this dispatcher produced it locally. Moved-aside folders use disk space until a person deletes them.
 
 ## Where the rules live
 
@@ -127,8 +130,8 @@ The consequence for lifecycle evidence is simple. No cache is ever searched or c
 ## Representative tests
 
 - `tests/test_context_mode_dispatch.py` drives server mode with a fake `node` and covers the storage rules (relative, traversal, tracked, symlinked, and external overrides all fall back and never create the refused path; an approved subtree is preserved), the version contract (a direct binary only at the exact pin, refusal of wrong or undeterminable versions, the `npx` fallback with `server --agent codex`), the working folder from several start folders, the `CONTEXT_MODE_DATA_DIR` export, the Node.js floor, the self-check fields, the legacy hook no-op, a cache under an older filter contract being moved aside, and both lost-race branches.
-- `tests/test_context_mode_mcp_filter.py` covers the reduced `initialize`, the exact three tools with kit descriptions, no schema description at any depth, boolean-only annotations, the identity gate (including `tools/list` and `tools/call` refused before an accepted `initialize`), blocked and unknown calls never reaching upstream, files-only `ctx_index`, and the duplicate-id and racing-id leak cases.
-- `test_real_upstream_server_surface_is_filtered` is an opt-in real-binary test run with `CONTEXT_MODE_REAL=1 ... -k real_upstream`. It starts from a nested Git repository at `<repo>/.claude`, indexes one file by relative path, and finds a word from it with `ctx_search`, so it fails if the dispatcher's root `cd` is removed.
+- `tests/test_context_mode_mcp_filter.py` covers the reduced `initialize`, the exact three tools with kit descriptions, no schema description at any depth, boolean-only annotations, the identity gate (including `tools/list` and `tools/call` refused before an accepted `initialize`), blocked and unknown calls never reaching upstream, files-only `ctx_index`, and the duplicate-id and racing-id leak cases. Three probe tests send `server/discover` with the 2026-07-28 `_meta` before and after an accepted `initialize`, read every reply in order, and use a `ping` reply as an ordering barrier before checking that nothing reached upstream.
+- `test_real_upstream_server_surface_is_filtered` is an opt-in real-binary test run with `CONTEXT_MODE_REAL=1 ... -k real_upstream`. It sends the `server/discover` probe first and expects `-32601`, starts from a nested Git repository at `<repo>/.claude`, indexes one file by relative path, and finds a word from it with `ctx_search`, so it fails if the dispatcher's root `cd` is removed.
 
 ## Related pages
 

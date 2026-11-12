@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:b5437f4933d4a1cb7418a5b51ec0f473c6abcf14c640e1fb68d0271ad0600d28",
+  "pageVersion": "sha256:ed775aff4657322c89889ac91d107ce15cc4022d020aec48fafaf106c9efed11",
   "claims": [
     {
       "id": "claim_577abfccd7214b578dafc049c57d3ba8",
@@ -403,8 +403,8 @@
       "statement": "A hook call from stale wiring reaches context-mode-dispatch.sh in a mode other than server, so the dispatcher reads its input, prints nothing, and exits 0 before any storage setup.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L326-L334",
-          "version": "repo-lines-v1:sha256:34edc6876562f4bf75ef8d41a7fa66c5305212902aee6594d85bc0cae316e079:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDIyYWJlM2RhYWRkYzU0MGI3Njg5OTk2ZDBhZGNhNzdkNGUxYzM5Njg2NTkyMTFjZDNkMTlmNWMxMjdlODhiMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmYwYzU5Zjk3ZTJlNDZjNGMxMmViNTMwMmEwM2UyYmE5MmMwZjNjMmFlYWQ0YTYxM2FiNWVjNTdlZTc1OGZkMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjY4MDc1ODZmNzllYmJkMTQ4YzYyOWY2YjQ5NGViMWQwOGFmYzlkMTBkNWE5MzRkMmM1Zjg3MzdiMmY2OTFhNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmM4ODE1YzIxMDZhYmNlMTIyM2EyMmIzM2E2OWNkYTA0ZTNhOTFjYjFjNTBkOGExNjE4NTU4ZDcwZTNmODQ1YyJ9"
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L331-L336",
+          "version": "repo-lines-v1:sha256:db75608b0c9853d465caada63a182a76e7b50525dabb4423b52a36b20b34a861:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZjIxZTdlNDRkNjBmZTk1NzcwMGY3MzIyNTQ5ZGE2YTcwYmFjYTIyZjdlODI0MzgxZDQ1MjYxYjYxODJlNTgzNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmYwYzU5Zjk3ZTJlNDZjNGMxMmViNTMwMmEwM2UyYmE5MmMwZjNjMmFlYWQ0YTYxM2FiNWVjNTdlZTc1OGZkMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2QyZDFiMjBkM2NiMmI4MzEyNWI5YmM3YzIzY2QzZDNlZWM4OTRlZGIwYjYxZjY2OTI0MzEwZjgwNjRiNTQ1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmM4ODE1YzIxMDZhYmNlMTIyM2EyMmIzM2E2OWNkYTA0ZTNhOTFjYjFjNTBkOGExNjE4NTU4ZDcwZTNmODQ1YyJ9"
         }
       ]
     },
@@ -421,6 +421,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-12T09:39:07.876Z"
+    "at": "2026-11-12T13:25:12.863Z"
   }
 }
