@@ -23,7 +23,6 @@ from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
-    CLAUDE_CONTEXT_MODE_MATCHER,
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
     OPENWIKI_BEGIN_MATCHER,
@@ -277,8 +276,9 @@ ALLOWED_DEVCONTAINER_ENV_KEYS = frozenset(
         "HUGGING_FACE_HUB_TOKEN",
     }
 )
-CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
+CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats")
 CONTEXT_MODE_BLOCKED_TOOLS = (
+    "ctx_doctor",
     "ctx_execute",
     "ctx_execute_file",
     "ctx_batch_execute",
@@ -456,9 +456,8 @@ EXECUTION_DEFAULTS_POLICY_FRAGMENTS = {
         "orchestrator -> [planner when needed] -> coder",
     ),
     "tool-routing.instructions.md": (
-        "contained real directory",
-        "one bounded directory index after direct pre-flight reads",
-        "no directory-policy override arguments",
+        "one contained regular file",
+        "Folders and URLs are not accepted",
         "never repository truth",
         "Git and filesystem state are authoritative over cached content",
     ),
@@ -1357,7 +1356,6 @@ CLAUDE_EXPECTED_EVENTS = {
     # guard's restore is wired to it so a failed openwiki_begin still gets
     # cleaned up.
     "PostToolUseFailure",
-    "PreCompact",
     "Stop",
     "UserPromptSubmit",
     "StopFailure",
@@ -1367,7 +1365,6 @@ COPILOT_EXPECTED_EVENTS = {
     "SessionStart",
     "PreToolUse",
     "PostToolUse",
-    "PreCompact",
     "Stop",
 }
 CLAUDE_LIFECYCLE_HOOKS = {
@@ -1409,7 +1406,6 @@ def reporting_reminder_hook_errors(hooks: object, target: str) -> list[str]:
         "matcher": "Bash",
         "hooks": [
             handler("record-branch-state.sh", target),
-            handler("context-mode-dispatch.sh", target, "posttooluse"),
             handler("reporting-reminder.sh", "late-report", target),
         ],
     }
@@ -1501,9 +1497,8 @@ def reporting_reminder_script_errors(text: str) -> list[str]:
 
 
 def pretool_routing_errors(hooks: object, target: str) -> list[str]:
-    """Return errors for the deterministic mutation/observer hook split."""
+    """Return errors for the deterministic PreToolUse routing groups."""
     native_matcher = "Edit|Write"
-    observer_matcher = CLAUDE_CONTEXT_MODE_MATCHER if target == "claude-code" else "*"
     errors: list[str] = []
     if not isinstance(hooks, dict) or not isinstance(hooks.get("PreToolUse"), list):
         return [f"{target} PreToolUse routing is missing"]
@@ -1511,7 +1506,6 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
     expected: dict[str, tuple[str, ...]] = {
         native_matcher: ("protect-files.sh",),
         "Bash": ("pretool-bash-guard.sh",),
-        observer_matcher: ("context-mode-dispatch.sh",),
         OPENWIKI_BEGIN_MATCHER: ("openwiki-guard.sh",),
     }
     if len(groups) != len(expected):
@@ -1522,7 +1516,6 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
     known_scripts = (
         *expected[native_matcher],
         "pretool-bash-guard.sh",
-        "context-mode-dispatch.sh",
         *expected[OPENWIKI_BEGIN_MATCHER],
     )
     for group in groups:
@@ -1553,12 +1546,6 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
                 f"{target} PreToolUse {matcher!r} must contain only {scripts}"
             )
     for matcher, scripts in found.items():
-        if matcher == observer_matcher and any(
-            script != "context-mode-dispatch.sh" for script in scripts
-        ):
-            errors.append(
-                f"{target} context-mode PreToolUse group must be observability only"
-            )
         if matcher != "Bash" and "pretool-bash-guard.sh" in scripts:
             errors.append(f"{target} Bash safety wrapper must not run for {matcher!r}")
     return errors
@@ -2951,6 +2938,33 @@ def mcp_server_parity_errors(
     return errors
 
 
+def antigravity_mcp_errors(
+    servers: dict[str, object], shared_mcp: dict[str, object]
+) -> list[str]:
+    """Return failures for Antigravity's MCP config: Semble and Context7 match
+    the shared source, and Context Mode is absent because Antigravity's bridge
+    denies every MCP call."""
+    errors = mcp_server_parity_errors(
+        servers, shared_mcp, "google-antigravity", ("semble", "context7")
+    )
+    if "context-mode" in servers:
+        errors.append(
+            "google-antigravity MCP config must not carry the context-mode server"
+        )
+    return errors
+
+
+def context_mode_hook_errors(hooks: object, label: str) -> list[str]:
+    """Return an error when any handler of any event runs the Context Mode
+    dispatcher: Context Mode is MCP-only, so no client wires a hook for it."""
+    if "context-mode-dispatch.sh" in json.dumps(hooks):
+        return [
+            f"{label} hooks must not run context-mode-dispatch.sh: "
+            "Context Mode is MCP-only"
+        ]
+    return []
+
+
 # Tracked root MCP adapters of this authoring repository, each read with its
 # own server key. All three must carry the shared guarded Context Mode route.
 ROOT_MCP_ADAPTERS = (
@@ -3007,11 +3021,6 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         )
     )
     check(
-        'openai-codex) CONTEXT_MODE_TARGET="codex"' in context_dispatcher,
-        "Context Mode dispatcher must map OpenAI Codex hooks to upstream target id 'codex'",
-        errors,
-    )
-    check(
         f'PINNED_CONTEXT_MODE_VERSION="{CONTEXT_MODE_PINNED_VERSION}"'
         in context_dispatcher,
         f"Context Mode dispatcher must pin version {CONTEXT_MODE_PINNED_VERSION}",
@@ -3025,9 +3034,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     for servers, label in (
         (github_mcp.get("servers", {}), "github"),
         (claude_mcp.get("mcpServers", {}), "claude"),
-        (antigravity_mcp.get("mcpServers", {}), "google-antigravity"),
     ):
         errors.extend(mcp_server_parity_errors(servers, shared_mcp, label))
+    errors.extend(
+        antigravity_mcp_errors(antigravity_mcp.get("mcpServers", {}), shared_mcp)
+    )
     check(
         "servers" not in claude_mcp,
         "Claude .mcp.json must use mcpServers, not servers",
@@ -3039,6 +3050,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
     errors.extend(antigravity_hook_errors(antigravity_hooks))
+    errors.extend(context_mode_hook_errors(antigravity_hooks, "google-antigravity"))
     check(
         not (TARGET_ROOT / "GEMINI.md").exists()
         and not (TARGET_ROOT / ".gemini").exists(),
@@ -3138,7 +3150,6 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "SessionStart",
         "PreToolUse",
         "PostToolUse",
-        "PreCompact",
         "Stop",
         "UserPromptSubmit",
         "SessionEnd",
@@ -3152,12 +3163,9 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             errors,
         )
         errors.extend(reporting_reminder_hook_errors(hooks_by_event, "openai-codex"))
-    # R-CODEX-01: PreCompact is a documented Codex event and must be wired.
-    check(
-        "PreCompact" in codex_hooks.get("hooks", {}),
-        "Codex hooks must wire the documented PreCompact event",
-        errors,
-    )
+    # R-CODEX-01's PreCompact check is gone: that event held only the Context
+    # Mode handler, and the 2.x Codex decoder rejects it.
+    errors.extend(context_mode_hook_errors(codex_hooks, "openai-codex"))
     for event_name, groups in codex_hooks.get("hooks", {}).items():
         check(
             isinstance(groups, list),
@@ -3393,6 +3401,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         )
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
+    errors.extend(context_mode_hook_errors(github_hooks, "github-copilot"))
     check(
         set(github_hooks.get("hooks", {})) == COPILOT_EXPECTED_EVENTS,
         "GitHub Copilot hooks must retain the exact supported event set",
@@ -3481,6 +3490,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
 
+    errors.extend(context_mode_hook_errors(claude_settings, "claude-code"))
     validate_claude_lifecycle_hooks(claude_settings.get("hooks"), errors)
     errors.extend(pretool_routing_errors(claude_settings.get("hooks"), "claude-code"))
 
@@ -3590,7 +3600,7 @@ CONTEXT_MODE_ROUTING_SURFACE_FILES = (
 
 def validate_context_mode_tool_surface(errors: list[str]) -> None:
     """Assert the advertised Context Mode tool surface is exactly the approved
-    four-tool allowlist and that no blocked tool name reaches any generated
+    three-tool allowlist and that no blocked tool name reaches any generated
     routing or permission surface (agent tool grants, MCP server configs,
     hook scripts)."""
     filter_text = read(
@@ -3599,12 +3609,7 @@ def validate_context_mode_tool_surface(errors: list[str]) -> None:
     allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
     check(
         f"new Set([{allowed}])" in filter_text,
-        "Context Mode MCP filter allowlist must be exactly the four approved tools",
-        errors,
-    )
-    check(
-        f'"{CONTEXT_MODE_PINNED_VERSION}"' in filter_text,
-        f"Context Mode MCP filter must pin version {CONTEXT_MODE_PINNED_VERSION}",
+        "Context Mode MCP filter allowlist must be exactly the three approved tools",
         errors,
     )
     check(
@@ -3613,19 +3618,19 @@ def validate_context_mode_tool_surface(errors: list[str]) -> None:
         errors,
     )
     check(
-        "Object.entries(tool.inputSchema.properties).filter(([name]) => INDEX_ARGS.has(name))"
+        "Object.entries(schema.properties).filter(([name]) => INDEX_ARGS.has(name))"
         in filter_text,
         "Context Mode MCP filter must expose only guarded ctx_index schema properties",
         errors,
     )
     check(
-        "if (!stat.isFile() && !stat.isDirectory())" in filter_text,
-        "Context Mode MCP filter must allow only contained regular files or real directories",
+        "if (!stat.isFile())" in filter_text,
+        "Context Mode MCP filter must allow only contained regular files",
         errors,
     )
     check(
-        "directory input is temporarily disabled" not in filter_text,
-        "Context Mode MCP filter must not claim guarded directory indexing is disabled",
+        "isDirectory" not in filter_text,
+        "Context Mode MCP filter must not accept directories (isDirectory)",
         errors,
     )
     surfaces = [
@@ -8283,7 +8288,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         and all(tool in tool_routing_text for tool in CONTEXT_MODE_ALLOWED_TOOLS)
         and "hook-only" not in tool_routing_text
         and "does not expose mcp tools" not in tool_routing_text,
-        "tool-routing instructions must name all four allowed Context Mode "
+        "tool-routing instructions must name all three allowed Context Mode "
         "tools and must not claim Context Mode is hook-only or exposes no "
         "MCP tools",
         errors,

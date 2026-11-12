@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 DEFAULT_CONTEXT_MODE_DIR="$REPO_ROOT/.claude/.cache/context-mode"
 PINNED_CONTEXT_MODE_VERSION="1.0.169"
-FILTER_CONTRACT="ctx-index-file-content-v1"
+FILTER_CONTRACT="ctx-index-files-only-v2"
 FILTER_SCRIPT="$SCRIPT_DIR/context-mode-mcp-filter.mjs"
 # Outside the ai-state working tree (.claude/) on purpose: state-sync.sh never
 # adds, commits, or restores anything at $REPO_ROOT other than under .claude/,
@@ -21,7 +21,7 @@ PROVENANCE_SECRET_FILE="$REPO_ROOT/.context-mode-provenance.secret"
 #
 # Context Mode 1.0.169 has no `--version`/`-v`/`version` flag (all three exit 0
 # printing nothing), and `doctor` is slow, ANSI-decorated, and performs a network
-# npm check, so neither is usable as a per-hook-event gate. The executable is an
+# npm check, so neither is usable as a per-start gate. The executable is an
 # npm bin symlink into the installed package directory, so resolve it and read
 # the owning package.json: offline, deterministic, and independent of the
 # bundle's internals. The name is checked too, so a nested dependency manifest
@@ -259,9 +259,9 @@ self_check() {
     fi
   else
     if [[ -n "$exe" ]]; then
-      warn "version-contract=FAIL; context-mode on PATH is ${observed:-undeterminable}, npx is unavailable, so hook events will be skipped"
+      warn "version-contract=FAIL; context-mode on PATH is ${observed:-undeterminable}, npx is unavailable, so the MCP server cannot start"
     else
-      warn "context-mode and npx are unavailable; hook events will be skipped"
+      warn "context-mode and npx are unavailable; the MCP server cannot start"
     fi
   fi
   printf 'PASS context-mode-dispatch: filter=%s\n' "$FILTER_SCRIPT"
@@ -286,73 +286,27 @@ if [[ "${1:-}" == "--self-check" ]]; then
 fi
 
 MODE="${1:-}"
-shift || true
+
+# Context Mode has no hook route any more. Stale hook wiring in an adapter that
+# the installer keeps on refresh must stay harmless: read the event payload,
+# print nothing, and exit 0 before any storage setup.
+[[ "$MODE" == "server" ]] || { cat > /dev/null || true; exit 0; }
 
 if ! configure_storage; then
-  if [[ "$MODE" == "server" ]]; then
-    printf 'ERROR context-mode-dispatch: guarded storage/provenance unavailable\n' >&2
-    exit 1
-  fi
-  warn "storage unavailable; skipping optional hook event"
-  exit 0
+  printf 'ERROR context-mode-dispatch: guarded storage/provenance unavailable\n' >&2
+  exit 1
 fi
 
 if ! command_path="$(resolve_context_mode)"; then
-  if [[ "$MODE" == "server" ]]; then
-    printf 'ERROR context-mode-dispatch: context-mode and npx are unavailable; MCP server cannot start\n' >&2
-    exit 127
-  fi
-  warn "context-mode and npx are unavailable; skipping optional hook event: $MODE $*"
-  exit 0
+  printf 'ERROR context-mode-dispatch: context-mode and npx are unavailable; MCP server cannot start\n' >&2
+  exit 127
 fi
-
-if [[ "$MODE" == "server" ]]; then
-  if [[ ! -f "$FILTER_SCRIPT" ]] || ! command -v node >/dev/null 2>&1; then
-    printf 'ERROR context-mode-dispatch: MCP filter or Node runtime unavailable\n' >&2
-    exit 127
-  fi
-  if [[ "$command_path" == "npx" ]]; then
-    exec node "$FILTER_SCRIPT" -- npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION"
-  fi
-  exec node "$FILTER_SCRIPT" -- "$command_path"
-fi
-
-case "$MODE" in
-  github-copilot) CONTEXT_MODE_TARGET="vscode-copilot" ;;
-  claude-code) CONTEXT_MODE_TARGET="claude-code" ;;
-  openai-codex) CONTEXT_MODE_TARGET="codex" ;;
-  *) CONTEXT_MODE_TARGET="$MODE" ;;
-esac
-
-run_upstream_hook() {
-  if [[ "$command_path" == "npx" ]]; then
-    npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION" hook "$CONTEXT_MODE_TARGET" "$@"
-  else
-    "$command_path" hook "$CONTEXT_MODE_TARGET" "$@"
-  fi
-}
-
-# The hook lane is advisory only: run upstream (its own side effects, such as
-# event capture and the compaction snapshot, are unchanged), keep only its
-# stdout, and forward just the filtered advice text. Upstream decisions, input
-# rewrites, and blocked-tool advice never reach the client, and hook modes
-# always exit 0. No timeout is added; the client's hook timeout still applies.
-upstream_status=0
-upstream_output="$(run_upstream_hook "$@")" || upstream_status=$?
-if ((upstream_status != 0)); then
-  warn "upstream hook $CONTEXT_MODE_TARGET exited with status $upstream_status; its output is still filtered"
-fi
-[[ -n "$upstream_output" ]] || exit 0
 
 if [[ ! -f "$FILTER_SCRIPT" ]] || ! command -v node >/dev/null 2>&1; then
-  warn "MCP filter or Node runtime unavailable; dropping hook output"
-  exit 0
+  printf 'ERROR context-mode-dispatch: MCP filter or Node runtime unavailable\n' >&2
+  exit 127
 fi
-# The filter output is captured first so a failed filter can never leave a
-# partial object on stdout.
-if ! filtered_output="$(printf '%s' "$upstream_output" | node "$FILTER_SCRIPT" --hook-output)"; then
-  warn "hook output filter failed; dropping hook output"
-  exit 0
+if [[ "$command_path" == "npx" ]]; then
+  exec node "$FILTER_SCRIPT" -- npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION"
 fi
-[[ -z "$filtered_output" ]] || printf '%s\n' "$filtered_output"
-exit 0
+exec node "$FILTER_SCRIPT" -- "$command_path"

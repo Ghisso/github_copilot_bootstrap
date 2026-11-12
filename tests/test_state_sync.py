@@ -12,6 +12,7 @@ import contextlib
 import fcntl
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -31,6 +32,7 @@ from runtime_ownership import render_restore_script  # noqa: E402
 SCRIPT_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "state-sync.sh"
 RESTORE_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "restore-root-adapters.sh"
 DISPATCH_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-dispatch.sh"
+FILTER_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-mcp-filter.mjs"
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -1323,7 +1325,35 @@ def _install_dispatcher(root: Path) -> Path:
     scripts.mkdir(parents=True, exist_ok=True)
     dispatcher = scripts / "context-mode-dispatch.sh"
     shutil.copy(DISPATCH_SRC, dispatcher)
+    # `server` mode refuses to start without the filter that ships beside it.
+    shutil.copy(FILTER_SRC, scripts / FILTER_SRC.name)
     return dispatcher
+
+
+def _dispatcher_constant(name: str) -> str:
+    """Read one quoted ``NAME="value"`` assignment from the dispatcher source."""
+    match = re.search(rf'^{name}="([^"]+)"', DISPATCH_SRC.read_text(), re.M)
+    assert match, f"{name} not found in the dispatcher"
+    return match.group(1)
+
+
+def _fake_launchers(tmp_path: Path) -> Path:
+    """A directory holding a fake ``node`` and ``npx`` for a ``server`` start.
+
+    ``node`` prints ``v24.15.0`` for ``--version`` and exits 0 otherwise, so no
+    real server starts and a later Node.js floor still passes.
+    """
+    bin_dir = tmp_path / "fake-launchers"
+    bin_dir.mkdir()
+    node = bin_dir / "node"
+    node.write_text(
+        '#!/usr/bin/env bash\n[ "${1:-}" != "--version" ] || echo v24.15.0\nexit 0\n'
+    )
+    npx = bin_dir / "npx"
+    npx.write_text("#!/usr/bin/env bash\nexit 0\n")
+    node.chmod(0o755)
+    npx.chmod(0o755)
+    return bin_dir
 
 
 def test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted(
@@ -1333,7 +1363,9 @@ def test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted(
     directory together with a forged plaintext provenance marker (correct,
     guessable repository/version/filter fields), but it can never learn the
     local-only secret the dispatcher also requires. The restored cache must
-    be quarantined, never trusted or searched live."""
+    be quarantined, never trusted or searched live. The forged marker reads the
+    pin and the filter contract from the dispatcher source, so only the secret
+    differs from a genuine one."""
     remote = _bare_remote(tmp_path)
     writer_a = _new_writer(script, tmp_path, remote, "hostile-cache-a")
     writer_b_root = tmp_path / "hostile-cache-b"
@@ -1348,8 +1380,8 @@ def test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted(
     marker = writer_a / ".claude" / marker_rel
     marker.write_text(
         f"repository={writer_b_root.resolve()}\n"
-        "context-mode=1.0.169\n"
-        "filter=ctx-index-file-content-v1\n"
+        f"context-mode={_dispatcher_constant('PINNED_CONTEXT_MODE_VERSION')}\n"
+        f"filter={_dispatcher_constant('FILTER_CONTRACT')}\n"
         "secret=guessed-by-attacker\n"
     )
     assert (
@@ -1371,11 +1403,14 @@ def test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted(
 
     dispatcher = _install_dispatcher(writer_b)
     result = subprocess.run(
-        ["bash", str(dispatcher), "claude-code", "sessionstart"],
+        ["bash", str(dispatcher), "server"],
         text=True,
         capture_output=True,
         check=False,
-        env={**os.environ, "PATH": "/usr/bin:/bin"},
+        env={
+            **os.environ,
+            "PATH": f"{_fake_launchers(tmp_path)}:/usr/bin:/bin",
+        },
     )
     assert result.returncode == 0, result.stderr
 

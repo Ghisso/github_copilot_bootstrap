@@ -291,18 +291,10 @@ and the hook error log locations.
 ### Target-native PreToolUse routing
 
 Claude and Codex use target-native matcher groups to keep the safety lane
-narrow: native edits to `protect-files.sh`, `Bash` to
-`pretool-bash-guard.sh`, and a third group to optional
-`context-mode-dispatch.sh` observability only. On Claude that group uses the
-anchored matcher `^(Bash|Read|Grep|WebFetch|mcp__.*)$`, which covers the tools
-Context Mode acts on before a call and leaves out `Agent`. Codex keeps the
-wildcard matcher. The Claude matcher is anchored because Claude Code reads it
-as an unanchored regular expression and also tries a tool's older names, so
-an unanchored pattern would fire for tools such as `TaskOutput`. `Agent` is
-left out because Context Mode's only `Agent` action rewrites the subagent
-prompt, and Claude Code's auto mode refuses a call whose input a hook
-changed. The dispatcher's output filter already drops that rewrite, so this
-is a second safeguard. `pretool-bash-guard.sh` runs one ordered lane —
+narrow: native edits to `protect-files.sh` and `Bash` to
+`pretool-bash-guard.sh`. No Context Mode hook runs on any client, so no
+group calls `context-mode-dispatch.sh`; the dispatcher serves only the MCP
+server. `pretool-bash-guard.sh` runs one ordered lane —
 protected files, dangerous Git, branch, commit, then PR — and fails closed
 on any guard error or malformed output. See [Hook dispatcher and guardrail
 scripts](../openwiki/architecture/hooks-and-guardrails.md) for the exact

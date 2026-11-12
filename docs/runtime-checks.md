@@ -91,26 +91,17 @@ regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
-  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. On Claude Code the `PreToolUse` hook runs only under the anchored matcher `^(Bash|Read|Grep|WebFetch|mcp__.*)$`. It is anchored because Claude Code reads such a matcher as an unanchored regular expression and also tries a tool's older names, so `TaskOutput` would otherwise match. `Agent` is left out because Context Mode's only `Agent` action rewrites the subagent prompt, and auto mode refuses a call whose input a hook changed. The filter already drops that rewrite, so leaving `Agent` out is a second safeguard. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
-
-  1. Run `uv run python tests/fixtures/context_mode_hook/capture.py [--out-root DIR]`. It records raw upstream output, not filtered output, by running the pinned `context-mode hook <target> <event>` directly with the `CONTEXT_MODE_DIR` and `CONTEXT_MODE_PROJECT_ROOT` the dispatcher passes, in a temporary Git repository with a temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and a private `TMPDIR` (upstream keeps once-per-session tip files in the OS temp directory). It copies the hook scripts there only to run `--self-check` first, which asserts the direct pinned launcher. It reads the pinned version and client-to-target mapping from `shared/hooks/scripts/context-mode-dispatch.sh`, so run it in this authoring repository. It uses one session id per client, redacts temporary paths as `<TMP>`, and writes `<out-root>/<PINNED_CONTEXT_MODE_VERSION>/<client-id>/<event>-<case>.json` (default out-root: the fixture directory).
-  2. Review the new outputs for decisions, input rewrites, and advice blocks. Update the filter if a new shape appears.
-  3. Compare `CLAUDE_CONTEXT_MODE_MATCHER` in `scripts/generate_targets.py` with the tool branches of `routePreToolUse` in the new version's `hooks/core/routing.mjs`. The recorded fixtures cover only a fixed set of tools, so they do not show a newly routed one. Add any newly routed Claude tool except `Agent`, and add it to `test_rendered_claude_context_mode_pretool_matcher_skips_agent` in `tests/test_lifecycle_hooks.py`.
-  4. Run the hook tests, including the real-binary test:
+- `context-mode` (optional filtered `ctx_index`/`ctx_search`/`ctx_stats` MCP server, routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The kit wires no Context Mode hooks on any client; a hook call from stale wiring reads its input, prints nothing, and exits 0. The filter accepts the server only when `serverInfo.name` is exactly `context-mode`. The dispatcher alone proves the version: it verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise the server warns and exits nonzero. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
+  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs. Context Mode 2.x folder indexing has no bound on files, depth, or size, and it follows symbolic links into sibling projects. When you bump `PINNED_CONTEXT_MODE_VERSION`, run the real-binary server test:
 
   ```bash
-  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
+  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q -k real_upstream
   ```
 
   Known limits:
 
-  - A restored-data block that mentions any non-allowlisted `ctx_` name is dropped whole (fail-closed).
-  - Unclosed, nested, or differently cased advice tags are not stripped. For such text only the name safety net applies: the whole field is dropped if it still names a plugin-prefixed or non-allowlisted `ctx_` tool, otherwise the leftover text is forwarded.
-  - The event name must be a plain word (letters only), or nothing is forwarded.
-  - Codex and Copilot restore shapes were not observed.
   - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
-  - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - Antigravity gets no Context Mode server entry, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
 - `openwiki` (the OpenWiki command-line tool and MCP server, installed globally and pinned in `shared/devcontainer/Dockerfile`; `OPENWIKI_PINNED_VERSION` in `scripts/validate_targets.py` names the same version). OpenWiki has no `openwiki --version`, so the Dockerfile reads the version from the installed package's own `package.json`, then runs `openwiki integrations list </dev/null`. `tests/test_openwiki_cli_smoke.py` requires the binary on `PATH` to report exactly the pinned version. It fails when the version differs or the binary is missing, and it never downloads anything. To move to a new pin:
 
@@ -206,7 +197,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `openwiki-guard.sh`
 - `pretool-bash-guard.sh`
 - `git-protection.sh`
-- `context-mode-dispatch.sh`
+- `context-mode-dispatch.sh` (MCP server mode only)
 - `session-log.sh`
 - `state-sync.sh`
 - `claude-stop.sh`
@@ -244,12 +235,11 @@ every-N-tool reminders, `Stop` rewriting, or
 Gemini CLI is out of scope.
 
 For the primary targets, generated `PreToolUse` routing must remain split into
-three groups: native file mutations (`Edit|Write` for both Claude and Codex)
-call `protect-files.sh`; `Bash` calls the single ordered
-`pretool-bash-guard.sh`; and a third group calls only best-effort
-`context-mode-dispatch.sh`. On Claude that group's matcher is
-`^(Bash|Read|Grep|WebFetch|mcp__.*)$`; on Codex it is `*`. `Read` and MCP
-tools must have no mutation handler.
+groups: native file mutations (`Edit|Write` for both Claude and Codex)
+call `protect-files.sh`, and `Bash` calls the single ordered
+`pretool-bash-guard.sh`. No group runs `context-mode-dispatch.sh`; the
+validator rejects any hook handler that does. `Read` and MCP tools must have
+no mutation handler.
 The Bash wrapper must preserve the guard order: protected files, dangerous Git,
 branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
 outside that lane and retain their existing sequencing.
@@ -930,8 +920,7 @@ Codex-specific runtime notes:
 - `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
 - `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
-- `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
-- `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
+- `.codex/hooks.json` uses the narrow native-edit and ordered-Bash matcher groups; it must not send every tool through the mutation guard.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define
   `name`, `description`, `model`, `model_reasoning_effort`, and
   `developer_instructions`; model and effort must match canonical `agent.yaml`

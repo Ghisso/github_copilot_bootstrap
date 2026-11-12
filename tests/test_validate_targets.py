@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -121,64 +122,37 @@ from validate_targets import (  # noqa: E402
 import validate_targets as target_validator  # noqa: E402
 
 
-def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
-    """Safety handlers are scoped while the wildcard remains observer-only."""
+def test_pretool_routing_accepts_three_groups_and_rejects_drift() -> None:
+    """Safety handlers stay scoped; Context Mode has no PreToolUse group."""
     hooks: dict[str, Any] = {
         "PreToolUse": [
             {"matcher": "Edit|Write", "hooks": [{"command": "protect-files.sh"}]},
             {"matcher": "Bash", "hooks": [{"command": "pretool-bash-guard.sh"}]},
-            {"matcher": "*", "hooks": [{"command": "context-mode-dispatch.sh"}]},
             {
                 "matcher": OPENWIKI_BEGIN_MATCHER,
                 "hooks": [{"command": "openwiki-guard.sh"}],
             },
         ]
     }
-    assert pretool_routing_errors(hooks, "openai-codex") == []
+    for target in ("claude-code", "openai-codex"):
+        assert pretool_routing_errors(hooks, target) == []
 
-    hooks["PreToolUse"][2]["hooks"].append({"command": "git-protection.sh"})
-    errors = pretool_routing_errors(hooks, "openai-codex")
-    assert any("context-mode PreToolUse group must be" in error for error in errors)
-    assert any("must contain only" in error for error in errors)
+    drift = deepcopy(hooks)
+    drift["PreToolUse"][1]["hooks"].append({"command": "git-protection.sh"})
+    assert any(
+        "must contain only" in error
+        for error in pretool_routing_errors(drift, "openai-codex")
+    )
 
-
-CLAUDE_CONTEXT_MODE_MATCHER_LITERAL = "^(Bash|Read|Grep|WebFetch|mcp__.*)$"
-
-
-@pytest.mark.parametrize(
-    ("target", "matcher", "error_text"),
-    (
-        ("claude-code", "*", CLAUDE_CONTEXT_MODE_MATCHER_LITERAL),
-        ("claude-code", CLAUDE_CONTEXT_MODE_MATCHER_LITERAL, None),
-        ("openai-codex", CLAUDE_CONTEXT_MODE_MATCHER_LITERAL, "'*'"),
-    ),
-    ids=("claude-wildcard", "claude-anchored", "codex-anchored"),
-)
-def test_pretool_routing_requires_target_specific_context_mode_matcher(
-    target: str, matcher: str, error_text: str | None
-) -> None:
-    """Claude Code requires the anchored Context Mode matcher; others keep `*`."""
-    hooks: dict[str, Any] = {
-        "PreToolUse": [
-            {"matcher": "Edit|Write", "hooks": [{"command": "protect-files.sh"}]},
-            {"matcher": "Bash", "hooks": [{"command": "pretool-bash-guard.sh"}]},
-            {
-                "matcher": matcher,
-                "hooks": [{"command": "context-mode-dispatch.sh"}],
-            },
-            {
-                "matcher": OPENWIKI_BEGIN_MATCHER,
-                "hooks": [{"command": "openwiki-guard.sh"}],
-            },
-        ]
-    }
-
-    errors = pretool_routing_errors(hooks, target)
-
-    if error_text is None:
-        assert errors == []
-    else:
-        assert any(error_text in error for error in errors), errors
+    observer = deepcopy(hooks)
+    observer["PreToolUse"].append(
+        {"matcher": "*", "hooks": [{"command": "context-mode-dispatch.sh"}]}
+    )
+    for target in ("claude-code", "openai-codex"):
+        assert any(
+            "exactly 3 routing groups" in error
+            for error in pretool_routing_errors(observer, target)
+        )
 
 
 @pytest.mark.parametrize(
@@ -744,11 +718,11 @@ def test_task_lane_contract_rejects_missing_requirement_and_stale_drift() -> Non
 
 
 def test_execution_defaults_policy_contract_rejects_missing_clauses() -> None:
-    """Conditional planning and bounded indexing remain explicit policy."""
+    """Conditional planning and files-only indexing remain explicit policy."""
     mutations = {
         "workflow.instructions.md": "implementation-ready plan normally skips new plan",
         "workspace.instructions.md": "approved implementation-ready plan follows",
-        "tool-routing.instructions.md": "contained real directory",
+        "tool-routing.instructions.md": "one contained regular file",
     }
     for name in target_validator.EXECUTION_DEFAULTS_POLICY_FRAGMENTS:
         policy = (REPO_ROOT / "shared" / "policies" / name).read_text(encoding="utf-8")
@@ -1154,8 +1128,13 @@ def test_antigravity_static_adapter_renders_canonical_mcp_skills_and_no_rules(
             assert "subagent: false" in rendered
         else:
             assert "subagent: true" in rendered
+    shared_servers = target_generator.shared_mcp_servers()
     assert json.loads((tmp_path / ".agents" / "mcp_config.json").read_text()) == {
-        "mcpServers": target_generator.shared_mcp_servers()
+        "mcpServers": {
+            name: server
+            for name, server in shared_servers.items()
+            if name != "context-mode"
+        }
     }
     assert not (tmp_path / ".agents" / "rules").exists()
     assert {
@@ -2465,6 +2444,186 @@ def test_hook_gate_regression_tests_reports_a_failing_smoke_test(
     assert errors == ["tests/test_hook_gates.py failed:\none hook test failed\n"]
 
 
+def _dispatcher_handler(client: str, event: str) -> dict[str, Any]:
+    return {
+        "type": "command",
+        "command": f"run-hook.sh context-mode-dispatch.sh {client} {event}",
+    }
+
+
+@pytest.mark.parametrize(
+    "hooks",
+    [
+        {"SessionStart": [{"hooks": [_dispatcher_handler("claude-code", "x")]}]},
+        {"PreCompact": [{"hooks": [_dispatcher_handler("openai-codex", "x")]}]},
+        {"PostToolUse": [_dispatcher_handler("github-copilot", "x")]},
+        {
+            "bootstrap-safety": {
+                "PreToolUse": [
+                    {"matcher": "*", "hooks": [_dispatcher_handler("antigravity", "x")]}
+                ]
+            }
+        },
+    ],
+    ids=["claude-code", "codex", "copilot", "antigravity"],
+)
+def test_validator_rejects_a_context_mode_dispatch_handler_in_any_target(
+    hooks: dict[str, Any],
+) -> None:
+    errors = target_validator.context_mode_hook_errors(hooks, "target")
+
+    assert len(errors) == 1
+    assert "context-mode-dispatch.sh" in errors[0]
+
+
+def test_validator_accepts_hooks_without_a_context_mode_handler() -> None:
+    hooks = {"Stop": [{"hooks": [{"type": "command", "command": "claude-stop.sh"}]}]}
+
+    assert target_validator.context_mode_hook_errors(hooks, "target") == []
+
+
+def test_rendered_antigravity_mcp_config_has_no_context_mode_server(
+    tmp_path: Path,
+) -> None:
+    """Antigravity's bridge denies every MCP call, so it gets no Context Mode entry."""
+    render_antigravity(tmp_path)
+
+    servers = json.loads(
+        (tmp_path / ".agents" / "mcp_config.json").read_text(encoding="utf-8")
+    )["mcpServers"]
+    shared_mcp = target_generator.shared_mcp_servers()
+
+    assert set(servers) == {"semble", "context7"}
+    assert target_validator.antigravity_mcp_errors(servers, shared_mcp) == []
+
+
+def test_validator_fails_when_antigravity_gets_context_mode_back() -> None:
+    shared_mcp = target_generator.shared_mcp_servers()
+    servers = {name: shared_mcp[name] for name in ("semble", "context7")}
+
+    errors = target_validator.antigravity_mcp_errors(
+        {**servers, "context-mode": shared_mcp["context-mode"]}, shared_mcp
+    )
+
+    assert len(errors) == 1
+    assert "context-mode" in errors[0]
+
+
+def test_antigravity_mcp_check_keeps_semble_and_context7_parity() -> None:
+    shared_mcp = target_generator.shared_mcp_servers()
+    servers = {name: shared_mcp[name] for name in ("semble", "context7")}
+
+    drifted = {**servers, "semble": {"command": "uvx", "args": ["WRONG"]}}
+    assert target_validator.antigravity_mcp_errors(drifted, shared_mcp) == [
+        "google-antigravity MCP server drifted from shared source: semble"
+    ]
+    missing = {name: server for name, server in servers.items() if name != "context7"}
+    assert target_validator.antigravity_mcp_errors(missing, shared_mcp) == [
+        "google-antigravity missing MCP server: context7"
+    ]
+
+
+def _validate_hooks_on_dist_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, edit: Callable[[Path], None]
+) -> list[str]:
+    """Run `validate_mcp_and_hooks` on an edited copy of the generated target."""
+    dist = REPO_ROOT / "dist" / "multi-agent"
+    if not dist.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    copy = tmp_path / "multi-agent"
+    shutil.copytree(dist, copy, symlinks=True)
+    edit(copy)
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", copy)
+    # The guardrail pass runs hundreds of hook subprocesses and is unrelated.
+    monkeypatch.setattr(target_validator, "validate_hook_guardrails", lambda _: None)
+    errors: list[str] = []
+    target_validator.validate_mcp_and_hooks(errors)
+    return errors
+
+
+def _edit_json(path: Path, change: Callable[[dict[str, Any]], None]) -> None:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    change(data)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_generated_target_hook_event_sets_have_no_pre_compact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Codex event set without `PreCompact` passes and one with it fails;
+    that event only ever held the Context Mode handler."""
+    event_error = "Codex hooks must use only the supported generated lifecycle events"
+
+    clean = _validate_hooks_on_dist_copy(
+        tmp_path / "clean", monkeypatch, lambda _: None
+    )
+    assert event_error not in clean
+    assert not any("PreCompact" in error for error in clean)
+
+    def add_pre_compact(root: Path) -> None:
+        _edit_json(
+            root / ".codex" / "hooks.json",
+            lambda data: data["hooks"].update(
+                {"PreCompact": [{"hooks": [{"type": "command", "command": "true"}]}]}
+            ),
+        )
+
+    drifted = _validate_hooks_on_dist_copy(
+        tmp_path / "drifted", monkeypatch, add_pre_compact
+    )
+    assert event_error in drifted
+
+
+@pytest.mark.parametrize(
+    ("relative", "label"),
+    [
+        (".claude/settings.json", "claude-code"),
+        (".codex/hooks.json", "openai-codex"),
+        (".github/hooks/hooks.json", "github-copilot"),
+        (".agents/hooks.json", "google-antigravity"),
+    ],
+)
+def test_validate_mcp_and_hooks_rejects_a_context_mode_handler_in_every_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, relative: str, label: str
+) -> None:
+    expected = f"{label} hooks must not run context-mode-dispatch.sh"
+
+    def add_handler(root: Path) -> None:
+        _edit_json(
+            root / relative,
+            lambda data: data.update(
+                {"ctx-extra": _dispatcher_handler("any-client", "event")}
+            ),
+        )
+
+    clean = _validate_hooks_on_dist_copy(
+        tmp_path / "clean", monkeypatch, lambda _: None
+    )
+    assert not any(expected in error for error in clean)
+    drifted = _validate_hooks_on_dist_copy(
+        tmp_path / "drifted", monkeypatch, add_handler
+    )
+    assert any(expected in error for error in drifted), drifted
+
+
+def test_validate_mcp_and_hooks_rejects_antigravity_context_mode_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def add_entry(root: Path) -> None:
+        _edit_json(
+            root / ".agents" / "mcp_config.json",
+            lambda data: data["mcpServers"].update(
+                {"context-mode": target_generator.shared_mcp_servers()["context-mode"]}
+            ),
+        )
+
+    errors = _validate_hooks_on_dist_copy(tmp_path, monkeypatch, add_entry)
+
+    assert any(
+        "google-antigravity" in error and "context-mode" in error for error in errors
+    )
+
+
 def test_mcp_server_parity_errors_fail_independently() -> None:
     """A single drifted/missing server must fail on its own, never bundled
     with, or masked by, an unrelated server's result."""
@@ -2588,17 +2747,13 @@ def test_validate_mcp_and_hooks_runs_the_root_adapter_check(
     )
 
 
-def test_context_mode_tool_surface_is_exactly_four_tools_everywhere() -> None:
-    """The approved allowlist is exact and closed: exactly four tools, pinned
-    to 1.0.169, and no blocked tool name reaches any generated routing or
-    permission surface (agent tool grants, MCP server configs, hook
-    scripts)."""
-    assert CONTEXT_MODE_ALLOWED_TOOLS == (
-        "ctx_index",
-        "ctx_search",
-        "ctx_stats",
-        "ctx_doctor",
-    )
+def test_context_mode_tool_surface_is_exactly_three_tools_everywhere() -> None:
+    """The approved allowlist is exact and closed: exactly three tools, pinned
+    to 1.0.169, and no blocked tool name (`ctx_doctor` included) reaches any
+    generated routing or permission surface (agent tool grants, MCP server
+    configs, hook scripts)."""
+    assert CONTEXT_MODE_ALLOWED_TOOLS == ("ctx_index", "ctx_search", "ctx_stats")
+    assert "ctx_doctor" in CONTEXT_MODE_BLOCKED_TOOLS
     assert CONTEXT_MODE_PINNED_VERSION == "1.0.169"
 
     target_root = REPO_ROOT / "dist" / "multi-agent"
@@ -2624,6 +2779,51 @@ def test_context_mode_tool_surface_is_exactly_four_tools_everywhere() -> None:
     ).read_text()
     allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
     assert f"new Set([{allowed}])" in filter_text
+
+
+FILTER_SOURCE = (
+    REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-mcp-filter.mjs"
+)
+
+
+def _tool_surface_errors(
+    monkeypatch: pytest.MonkeyPatch, edit: Callable[[str], str]
+) -> list[str]:
+    """Run the filter-surface check against an edited copy of the filter text."""
+    real_read = target_validator.read
+
+    def read(path: Path) -> str:
+        text = real_read(path)
+        return edit(text) if path == FILTER_SOURCE else text
+
+    monkeypatch.setattr(target_validator, "read", read)
+    errors: list[str] = []
+    target_validator.validate_context_mode_tool_surface(errors)
+    return errors
+
+
+def test_filter_surface_check_accepts_the_files_only_filter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _tool_surface_errors(monkeypatch, lambda text: text) == []
+
+
+def test_filter_surface_check_requires_the_regular_file_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    errors = _tool_surface_errors(
+        monkeypatch, lambda text: text.replace("if (!stat.isFile())", "if (false)")
+    )
+    assert any("regular file" in error for error in errors)
+
+
+def test_filter_surface_check_rejects_directory_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    errors = _tool_surface_errors(
+        monkeypatch, lambda text: text + "\nconst folder = stat.isDirectory();\n"
+    )
+    assert any("isDirectory" in error for error in errors)
 
 
 def test_reviewer_stays_read_search_only_without_execute() -> None:
