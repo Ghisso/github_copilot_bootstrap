@@ -93,34 +93,42 @@ function validateIndex(args) {
   return null;
 }
 
-function namesFilteredTool(text) {
-  return typeof text === "string" && (text.match(/ctx_[A-Za-z0-9_]+/g) ?? []).some((name) => !ALLOWED_TOOLS.has(name));
+// Upstream schema descriptions are advice text (1.0.169 still tells clients that
+// `path` takes a folder), so none reaches the client, at any depth. Only a string
+// is dropped: a parameter that is itself named `description` is a schema object.
+function withoutDescriptions(value) {
+  if (Array.isArray(value)) return value.map(withoutDescriptions);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key, entry]) => key !== "description" || typeof entry !== "string")
+      .map(([key, entry]) => [key, withoutDescriptions(entry)]),
+  );
 }
 
-// Rebuilds an allowed tool as { name, description, inputSchema }: the kit
-// description replaces upstream's, and title, annotations, and `_meta` are
-// dropped. The schema comes from upstream, with ctx_index limited to INDEX_ARGS
-// and any property description that names a filtered tool removed.
+// MCP's `title` annotation is a string that could carry advice, so only the
+// boolean hints (readOnlyHint and the like) pass, and only from a plain object.
+function booleanAnnotations(annotations) {
+  if (!annotations || typeof annotations !== "object" || Array.isArray(annotations)) return undefined;
+  return Object.fromEntries(Object.entries(annotations).filter(([, value]) => typeof value === "boolean"));
+}
+
+// Rebuilds an allowed tool as { name, description, inputSchema, annotations }:
+// the kit description replaces upstream's, and title and `_meta` are dropped.
+// The schema comes from upstream without descriptions, with ctx_index limited
+// to INDEX_ARGS.
 function kitTool(tool) {
-  let properties = tool.inputSchema?.properties;
-  if (properties && tool.name === "ctx_index") {
-    properties = Object.fromEntries(
-      Object.entries(tool.inputSchema.properties).filter(([name]) => INDEX_ARGS.has(name)),
-    );
-  }
-  if (properties) {
-    properties = Object.fromEntries(
-      Object.entries(properties).map(([name, schema]) => {
-        if (!namesFilteredTool(schema?.description)) return [name, schema];
-        const { description, ...rest } = schema;
-        return [name, rest];
-      }),
+  const schema = withoutDescriptions(tool.inputSchema);
+  if (tool.name === "ctx_index" && schema?.properties) {
+    schema.properties = Object.fromEntries(
+      Object.entries(schema.properties).filter(([name]) => INDEX_ARGS.has(name)),
     );
   }
   return {
     name: tool.name,
     description: TOOL_DESCRIPTIONS[tool.name],
-    inputSchema: properties ? { ...tool.inputSchema, properties } : tool.inputSchema,
+    inputSchema: schema,
+    annotations: booleanAnnotations(tool.annotations),
   };
 }
 
