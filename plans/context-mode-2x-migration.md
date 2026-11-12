@@ -355,7 +355,7 @@ Existing contracts this plan touches:
 
 - [x] `2026-11-12_phase-A-context-mode-mcp-only-surface` — on 1.0.169: no Context Mode hooks, three tools, filtered `initialize`, kit descriptions, files-only `ctx_index`, no Antigravity entry
 - [x] `2026-11-12_phase-B-context-mode-2x-switch` — Node.js 24 image, the 2.1.8 pin, one server identity started from the repository root, data root, Node.js floor, quarantine race, docs
-- [ ] `2026-11-12_phase-C-knowledge-refresh` — OpenWiki refresh and the stale-claims audit
+- [x] `2026-11-12_phase-C-knowledge-refresh` — OpenWiki refresh and the stale-claims audit
 
 ## Phase Summary
 

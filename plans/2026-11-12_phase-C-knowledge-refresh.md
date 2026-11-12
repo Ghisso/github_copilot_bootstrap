@@ -3,8 +3,8 @@ name: 2026-11-12_phase-C-knowledge-refresh
 type: small-plan
 parent_plan: context-mode-2x-migration
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-12_context-mode-2x-migration-phase-C.md
 ---
 
 # Small Plan: Knowledge Refresh and Stale-Claims Audit
@@ -22,7 +22,7 @@ Known stale statements to include in the refresh plan:
 
 ## Steps
 
-- [ ] **1. Refresh OpenWiki through its own tools.**
+- [x] **1. Refresh OpenWiki through its own tools.**
   - Owner: orchestrator (only the main session has the OpenWiki MCP tools).
   - Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
   - Call `openwiki_begin` with `mode: "update"`. In the planning step, include the pages above plus every page OpenWiki flags. Write each page, reconcile every flagged claim, and require `openwiki_finish` to return `complete`.
@@ -30,7 +30,7 @@ Known stale statements to include in the refresh plan:
   - On every page the run rewrites, map each cited range from the recorded base (`gitHead` in `openwiki/.last-update.json`) to the current file, and check the text there. Quote any page `description:` that holds a colon.
   - No other agent edits tracked files while the run is open. Never hand-edit a generated page, a `.claims` file, or the root snippet; a wrong page is fixed by another `update` run.
 
-- [ ] **2. Audit live advice for stale claims.**
+- [x] **2. Audit live advice for stale claims.**
   - Owner: orchestrator, after `openwiki_finish` returns `complete`; `documenter` for fixes in `README.md`, `docs/`, and `shared/` text. Required Skills: `.claude/skills/documentation/SKILL.md`.
   - This phase is the big plan's last entry, so it runs the standing final-phase documentation, memory, and LEARN audit.
   - Surfaces: `CLAUDE.md`, `AGENTS.md`, `README.md`, undated `docs/` pages, `shared/policies/`, `shared/skills/`, `shared/agents/`, `shared/templates/`, `shared/review-profiles/`, state READMEs, the self-install `.claude/` overlay, `.claude/instructions/project-context.instructions.md`, and `.claude/MEMORY.md`.
@@ -46,7 +46,7 @@ Known stale statements to include in the refresh plan:
   - The orchestrator also marks its own user-level memory note about the Context Mode Agent matcher as historical. It lives outside the repository.
   - Record each surface and its outcome under the exact heading `## Stale-claims surfaces checked` in this phase's closeout session log.
 
-- [ ] **3. Review.**
+- [x] **3. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus: the refreshed pages match the code they cite; the known statements are fixed; no root adapter carries an OpenWiki block; no `openwiki/.run.json` remains.
 
@@ -81,14 +81,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 
