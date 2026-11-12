@@ -1768,3 +1768,13 @@
   only a replayed fixture: the kit's Codex SessionStart matcher
   `startup|resume|clear` never delivered `compact`, so the replayed
   compaction output never reached Codex.
+- [LEARN:documentation] A wiki row without a Claim is invisible to OpenWiki's
+  flags and to Claim-based checks. When a plan names a removed artifact (for
+  example the Context Mode hook fixtures), grep the whole wiki for its path
+  form too (`fixtures/context_mode`), not only its prose form, and add that
+  grep to the phase's required items. The 2026-11-12 refresh fixed one cell
+  of the quickstart row and left the removed path in the next cell.
+- [LEARN:tooling] A second OpenWiki `update` run at the same `HEAD` still
+  starts a planning run, because each page keeps its own base window. Use it
+  to apply review fixes to generated pages instead of hand-editing them;
+  `openwiki_finish` then records the same `gitHead` with a newer time.

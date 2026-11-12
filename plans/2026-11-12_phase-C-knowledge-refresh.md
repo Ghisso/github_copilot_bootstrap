@@ -63,6 +63,7 @@ grep -r -l -F "$(sed -n 's/^PINNED_CONTEXT_MODE_VERSION="\(.*\)"$/\1/p' shared/h
 test "$(grep -r -l -F 'WebFetch|mcp__.*)$' openwiki --include=*.md | wc -l)" = "0"
 test "$(grep -r -l -E 'ctx_index.{0,40}ctx_search.{0,40}ctx_stats.{0,40}ctx_doctor' openwiki --include=*.md | wc -l)" = "0"
 test "$(grep -r -l -E 'context-mode-dispatch\.sh (claude-code|openai-codex|github-copilot)' openwiki --include=*.md | wc -l)" = "0"
+test "$(grep -r -l -F 'fixtures/context_mode' openwiki --include=*.md | wc -l)" = "0"
 test ! -e openwiki/.run.json
 test "$(cat AGENTS.md CLAUDE.md | grep -c -F '<!-- OPENWIKI:START -->')" = "0"
 uv run python scripts/validate_targets.py
