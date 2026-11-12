@@ -9,7 +9,7 @@ phases:
   - 2026-11-12_phase-A-context-mode-mcp-only-surface
   - 2026-11-12_phase-B-context-mode-2x-switch
   - 2026-11-12_phase-C-knowledge-refresh
-current_phase: 2026-11-12_phase-A-context-mode-mcp-only-surface
+current_phase: 2026-11-12_phase-B-context-mode-2x-switch
 ---
 
 # Big Plan: context-mode-2x-migration

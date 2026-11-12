@@ -3,7 +3,7 @@ name: 2026-11-12_phase-B-context-mode-2x-switch
 type: small-plan
 parent_plan: context-mode-2x-migration
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
