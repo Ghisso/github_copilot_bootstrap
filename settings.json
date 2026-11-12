@@ -25,11 +25,6 @@
             "type": "command",
             "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-start-state.sh claude-code",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh claude-code sessionstart",
-            "timeout": 10
           }
         ]
       }
@@ -56,16 +51,6 @@
         ]
       },
       {
-        "matcher": "^(Bash|Read|Grep|WebFetch|mcp__.*)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh claude-code pretooluse",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "mcp__openwiki__openwiki_begin",
         "hooks": [
           {
@@ -83,11 +68,6 @@
           {
             "type": "command",
             "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" record-branch-state.sh claude-code",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh claude-code posttooluse",
             "timeout": 10
           },
           {
@@ -115,17 +95,6 @@
           {
             "type": "command",
             "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh claude-code precompact",
             "timeout": 10
           }
         ]

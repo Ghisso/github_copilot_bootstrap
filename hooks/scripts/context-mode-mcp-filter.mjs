@@ -3,54 +3,23 @@ import { spawn } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-const PINNED_VERSION = "1.0.169";
-const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats", "ctx_doctor"]);
+// The server name 1.0.169 and 2.x both report. The identity gate cannot tell
+// the two apart; only the dispatcher proves the version.
+const EXPECTED_SERVER_NAME = "context-mode";
+const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats"]);
 const INDEX_ARGS = new Set(["content", "path", "source"]);
 const MAX_SOURCE_LENGTH = 200;
 const MAX_PENDING_LIST_IDS = 256;
-// Advice blocks observed in upstream 1.0.169 hook output. Restored session
-// data (the session_guide inside session_knowledge) is not advice and is kept.
-const ADVICE_TAGS = ["context_window_protection", "context_guidance", "session_search"];
-const ADVICE_BLOCKS = ADVICE_TAGS.map(
-  (tag) => new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?</${tag}\\s*>`, "g"),
-);
-const PLUGIN_PREFIX = "mcp__plugin_context-mode_";
-
-// Hook-output mode: reads one upstream hook stdout on stdin and prints a new
-// advisory-only hook object, or nothing. Only the event name and the filtered
-// additionalContext are ever copied; every decision, input rewrite, and other
-// field upstream returns is dropped by construction (GR-007).
-function sanitizeHookOutput(raw) {
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return "";
-  }
-  const specific = parsed?.hookSpecificOutput;
-  if (!specific || typeof specific !== "object") return "";
-  const { hookEventName, additionalContext } = specific;
-  // The event name is copied verbatim, so it gets the same fail-closed scrutiny
-  // as the text: a plain word, never a tool name or free text.
-  if (typeof hookEventName !== "string" || !/^[A-Za-z]+$/.test(hookEventName)) return "";
-  if (typeof additionalContext !== "string") return "";
-  const text = ADVICE_BLOCKS.reduce((rest, block) => rest.replace(block, ""), additionalContext);
-  const names = text.match(/ctx_[A-Za-z0-9_]+/g) ?? [];
-  if (text.includes(PLUGIN_PREFIX) || names.some((name) => !ALLOWED_TOOLS.has(name))) return "";
-  if (!text.trim()) return "";
-  return `${JSON.stringify({ hookSpecificOutput: { hookEventName, additionalContext: text } })}\n`;
-}
+// One sentence per tool, naming no other tool and giving no routing advice.
+// Clients see these instead of the upstream descriptions.
+const TOOL_DESCRIPTIONS = {
+  ctx_index:
+    "Index raw text, or one regular file inside this repository, into this repository's local Context Mode store; folders, links, and URLs are rejected.",
+  ctx_search: "Search content indexed with ctx_index in this repository's local Context Mode store.",
+  ctx_stats: "Report size and usage statistics for this repository's local Context Mode store.",
+};
 
 const argv = process.argv.slice(2);
-if (argv[0] === "--hook-output") {
-  let raw = "";
-  process.stdin.setEncoding("utf8");
-  for await (const chunk of process.stdin) raw += chunk;
-  const output = sanitizeHookOutput(raw);
-  // Exit here so the MCP proxy below never starts in this mode.
-  if (output) await new Promise((resolve) => process.stdout.write(output, resolve));
-  process.exit(0);
-}
 const separator = argv.indexOf("--");
 if (separator < 0 || separator === argv.length - 1) {
   process.stderr.write("context-mode-filter: missing upstream command\n");
@@ -62,8 +31,8 @@ const upstream = spawn(argv[separator + 1], argv.slice(separator + 2), {
   env: process.env,
   stdio: ["pipe", "pipe", "pipe"],
 });
-// A killed/exited upstream (e.g. after a pinned-version mismatch) leaves a
-// broken pipe. Any method not gated on `versionAccepted` still reaches
+// A killed/exited upstream (e.g. after an identity mismatch) leaves a
+// broken pipe. Any method not gated on `serverAccepted` still reaches
 // `upstream.stdin.write` below; without this handler the resulting EPIPE is
 // unhandled and crashes the filter instead of failing closed (MINOR 8).
 upstream.stdin.on("error", () => {});
@@ -72,7 +41,7 @@ const initializeIds = new Set();
 // filtered on their own matching response, or the second response would be
 // written through raw and leak the unfiltered tool list (MAJOR 3).
 const listIds = new Map();
-let versionAccepted = false;
+let serverAccepted = false;
 
 function idKey(id) {
   return JSON.stringify(id);
@@ -120,10 +89,39 @@ function validateIndex(args) {
   }
   if (stat.isSymbolicLink()) return "ctx_index path must not be a symbolic link";
   if (!isContained(canonical)) return "ctx_index path must remain inside the repository";
-  if (!stat.isFile() && !stat.isDirectory()) {
-    return "ctx_index path must be a regular file or directory";
-  }
+  if (!stat.isFile()) return "ctx_index path must be a regular file inside the repository";
   return null;
+}
+
+function namesFilteredTool(text) {
+  return typeof text === "string" && (text.match(/ctx_[A-Za-z0-9_]+/g) ?? []).some((name) => !ALLOWED_TOOLS.has(name));
+}
+
+// Rebuilds an allowed tool as { name, description, inputSchema }: the kit
+// description replaces upstream's, and title, annotations, and `_meta` are
+// dropped. The schema comes from upstream, with ctx_index limited to INDEX_ARGS
+// and any property description that names a filtered tool removed.
+function kitTool(tool) {
+  let properties = tool.inputSchema?.properties;
+  if (properties && tool.name === "ctx_index") {
+    properties = Object.fromEntries(
+      Object.entries(tool.inputSchema.properties).filter(([name]) => INDEX_ARGS.has(name)),
+    );
+  }
+  if (properties) {
+    properties = Object.fromEntries(
+      Object.entries(properties).map(([name, schema]) => {
+        if (!namesFilteredTool(schema?.description)) return [name, schema];
+        const { description, ...rest } = schema;
+        return [name, rest];
+      }),
+    );
+  }
+  return {
+    name: tool.name,
+    description: TOOL_DESCRIPTIONS[tool.name],
+    inputSchema: properties ? { ...tool.inputSchema, properties } : tool.inputSchema,
+  };
 }
 
 // Default-deny: only a single JSON-RPC object is ever a candidate for
@@ -139,7 +137,7 @@ function handleClient(message, raw) {
   if (message.method === "initialize" && hasId) {
     initializeIds.add(key);
   }
-  // The allowlist, version gate, and ctx_index validation below gate on
+  // The allowlist, identity gate, and ctx_index validation below gate on
   // `method` alone (CRITICAL 1a). A notification-shaped tools/list or
   // tools/call (no `id`) has nobody to answer, so it is dropped rather than
   // forwarded, instead of falling through unchecked to the upstream write.
@@ -148,8 +146,8 @@ function handleClient(message, raw) {
       process.stderr.write("context-mode-filter: dropped a tools/list notification\n");
       return;
     }
-    if (!versionAccepted) {
-      send(process.stdout, errorResponse(message.id, -32001, "pinned Context Mode runtime is not initialized"));
+    if (!serverAccepted) {
+      send(process.stdout, errorResponse(message.id, -32001, "Context Mode server is not initialized"));
       return;
     }
     // An id whose response is never list-shaped never decrements, so the map
@@ -168,8 +166,8 @@ function handleClient(message, raw) {
       process.stderr.write("context-mode-filter: dropped a tools/call notification\n");
       return;
     }
-    if (!versionAccepted) {
-      send(process.stdout, errorResponse(message.id, -32001, "pinned Context Mode runtime is not initialized"));
+    if (!serverAccepted) {
+      send(process.stdout, errorResponse(message.id, -32001, "Context Mode server is not initialized"));
       return;
     }
     const name = message.params?.name;
@@ -192,13 +190,25 @@ function handleUpstream(message, raw) {
   if (!message || typeof message !== "object") return;
   const key = idKey(message.id);
   if (initializeIds.delete(key)) {
-    const version = message.result?.serverInfo?.version;
-    if (version !== PINNED_VERSION) {
-      send(process.stdout, errorResponse(message.id, -32002, `Context Mode ${PINNED_VERSION} required`));
+    const { result } = message;
+    if (result?.serverInfo?.name !== EXPECTED_SERVER_NAME) {
+      send(process.stdout, errorResponse(message.id, -32002, "Context Mode server identity was not accepted"));
       upstream.kill();
       return;
     }
-    versionAccepted = true;
+    serverAccepted = true;
+    // Only these keys reach the client: upstream `instructions`, prompts,
+    // resources, and experimental capabilities are dropped by construction.
+    send(process.stdout, {
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        protocolVersion: result.protocolVersion,
+        capabilities: { tools: result.capabilities?.tools ?? {} },
+        serverInfo: { name: result.serverInfo.name, version: result.serverInfo.version },
+      },
+    });
+    return;
   }
   // Decrement/delete the pending count only once a response is structurally
   // confirmed to be the actual tools/list result. A client may reuse one id
@@ -218,18 +228,7 @@ function handleUpstream(message, raw) {
     }
     message.result.tools = message.result.tools
       .filter((tool) => ALLOWED_TOOLS.has(tool?.name))
-      .map((tool) => {
-        if (tool?.name !== "ctx_index" || !tool.inputSchema?.properties) return tool;
-        return {
-          ...tool,
-          inputSchema: {
-            ...tool.inputSchema,
-            properties: Object.fromEntries(
-              Object.entries(tool.inputSchema.properties).filter(([name]) => INDEX_ARGS.has(name)),
-            ),
-          },
-        };
-      });
+      .map(kitTool);
     send(process.stdout, message);
     return;
   }

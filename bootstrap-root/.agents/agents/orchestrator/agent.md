@@ -45,22 +45,19 @@ paragraph before delegating.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable. Git and the filesystem are authoritative over cached index content.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly three guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`); fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable. Git and the filesystem are authoritative over cached index content.
 
 When executing an approved existing plan, PRE-FLIGHT also reads `README.md`, the
 applicable workflow, tool-routing, and reporting instructions, the selected big
 plan and current small plan, and the current branch, Git status, diff, and
-relevant source state because plans can become stale. After those direct reads,
-when broader discovery is useful and guarded Context Mode is available, issue
-one `ctx_index` for the absolute repository root with source
-`project:<repository-name>` and no directory-policy override arguments. Use
-focused `ctx_search` only when useful, reuse the resulting facts in later
-evidence packets, and do not index again for every subagent. Indexing is
-optional and nonblocking: if it is unavailable, errors, or reaches its cap,
-continue with direct reads, `rg`, or Semble without raising the cap or asking
-the user. Re-index at a later phase boundary only when newly created or
-unindexed files make it materially useful. Read every file normally before
-editing it.
+relevant source state because plans can become stale. Discovery stays with
+direct reads, `rg`, and Semble. `ctx_index` takes text or one file, never a
+folder: use it for one large file or text that will be searched more than once,
+then `ctx_search` it instead of reading the content again. Reuse the resulting
+facts in later evidence packets, and do not index again for every subagent.
+Indexing is optional and nonblocking: if it is unavailable or errors, continue
+with direct reads, `rg`, or Semble without asking the user. Read every file
+normally before editing it.
 
 ## Core Workflow
 

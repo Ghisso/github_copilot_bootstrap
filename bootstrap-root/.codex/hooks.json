@@ -18,11 +18,6 @@
             "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-start-state.sh openai-codex",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex sessionstart",
-            "timeout": 10
           }
         ]
       }
@@ -49,16 +44,6 @@
         ]
       },
       {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex pretooluse",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "mcp__openwiki__openwiki_begin",
         "hooks": [
           {
@@ -80,11 +65,6 @@
           },
           {
             "type": "command",
-            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex posttooluse",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh late-report openai-codex",
             "timeout": 10
           }
@@ -96,17 +76,6 @@
           {
             "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex precompact",
             "timeout": 10
           }
         ]
