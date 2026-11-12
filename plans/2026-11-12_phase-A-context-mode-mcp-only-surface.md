@@ -3,8 +3,8 @@ name: 2026-11-12_phase-A-context-mode-mcp-only-surface
 type: small-plan
 parent_plan: context-mode-2x-migration
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-12_context-mode-2x-migration-phase-A.md
 ---
 
 # Small Plan: Context Mode MCP-Only Surface on 1.0.169
@@ -34,7 +34,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
 
 ## Steps
 
-- [ ] **1. Write the tests first.**
+- [x] **1. Write the tests first.**
   - Owner: `coder`. Files (modify): `tests/test_context_mode_mcp_filter.py`, `tests/test_context_mode_dispatch.py`, `tests/test_validate_targets.py`, `tests/test_lifecycle_hooks.py`, `tests/test_state_sync.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Filter tests:
@@ -75,7 +75,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
     - The forged marker reads the pin and `FILTER_CONTRACT` from the dispatcher source, so only the secret differs. Its quarantine assertions stay.
   - Negative control before Step 2: run the new tests on today's code, and record in the session log which ones fail and why.
 
-- [ ] **2. Filter.**
+- [x] **2. Filter.**
   - Owner: `coder`. File: `shared/hooks/scripts/context-mode-mcp-filter.mjs` (modify). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Set `ALLOWED_TOOLS` to `ctx_index`, `ctx_search`, `ctx_stats`.
   - Delete `PINNED_VERSION` and its comparison.
@@ -98,7 +98,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
     - do not use `isDirectory`; the validator checks for it (Step 5).
   - Must not change: the batch and notification handling, or the pending-list bound.
 
-- [ ] **3. Dispatcher.**
+- [x] **3. Dispatcher.**
   - Owner: `coder`. File: `shared/hooks/scripts/context-mode-dispatch.sh` (modify). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Delete hook mode: the client-to-target mapping, `run_upstream_hook`, and the output filtering (lines 320-358).
   - Any mode other than `server` and `--self-check` reads stdin to the end, prints nothing, and exits 0, before storage setup. One comment says why: stale hook wiring in an adapter that the installer keeps must stay harmless.
@@ -106,7 +106,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
   - Set `FILTER_CONTRACT="ctx-index-files-only-v2"`. Only the value changes. A cache indexed under the old folder rule no longer matches its marker, so it is moved aside on the first server start.
   - Must not change: storage selection, the override rule, the provenance secret, the quarantine, the marker format, or the version proof.
 
-- [ ] **4. Generator and Copilot hooks.**
+- [x] **4. Generator and Copilot hooks.**
   - Owner: `coder`. Files (modify): `scripts/generate_targets.py`, `shared/hooks/hooks.json`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - `render_claude_settings`: remove the Context Mode handler from the SessionStart and PostToolUse groups. Remove the Context Mode PreToolUse group and the whole `PreCompact` event. Delete `CLAUDE_CONTEXT_MODE_MATCHER` and its comment.
   - `render_codex_hooks`: remove the SessionStart handler, the `*` PreToolUse group, the PostToolUse handler, and the `PreCompact` event. The Codex SessionStart matcher stays `startup|resume|clear`.
@@ -115,7 +115,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
   - Text: the tool-map comment (near lines 89-92) says three tools. The root-guidance sentence (near line 1389) says three tools, drops "alongside its lifecycle hooks", and replaces "A guarded bounded project index is optional for broader discovery" with a short files-only clause. It keeps "never repository truth".
   - Must not change: group order, timeouts, other handlers, or the MCP entries for Claude, Codex, and Copilot.
 
-- [ ] **5. Validator.**
+- [x] **5. Validator.**
   - Owner: `coder`. File: `scripts/validate_targets.py` (modify). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - `CONTEXT_MODE_ALLOWED_TOOLS` becomes three tools. Add `ctx_doctor` to `CONTEXT_MODE_BLOCKED_TOOLS`.
   - `validate_context_mode_tool_surface` (near line 3622):
@@ -133,10 +133,10 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
   - Antigravity: require that `context-mode` is absent, and keep the `semble` and `context7` parity checks.
   - Keep the hook-script list entry for the dispatcher (line 241): the dispatcher still ships, for server mode.
 
-- [ ] **6. Delete the fixtures.**
+- [x] **6. Delete the fixtures.**
   - Owner: `coder`. Delete `tests/fixtures/context_mode_hook/` (32 fixtures, `capture.py`, and its `__pycache__`).
 
-- [ ] **7. Real-binary server test.**
+- [x] **7. Real-binary server test.**
   - Owner: `coder`. File: `tests/test_context_mode_mcp_filter.py` (modify).
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`, `.claude/skills/integration-gate-spike/SKILL.md`.
   - Add `test_real_upstream_server_surface_is_filtered`, skipped unless `CONTEXT_MODE_REAL=1`:
@@ -151,7 +151,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
     - `HOME/.context-mode` does not exist;
     - new files appear under `<repo>/.claude/.cache/context-mode/`.
 
-- [ ] **8. Live-advice text in shared sources.**
+- [x] **8. Live-advice text in shared sources.**
   - Owner: `coder`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Files: `shared/agents/{coder,documenter,orchestrator,planner,reviewer}/prompt.md` and `shared/skills/onboard/SKILL.md`: "exactly four guarded MCP tools (...) alongside its lifecycle hooks" becomes three tools, with no hooks.
   - File: `shared/policies/tool-routing.instructions.md`:
@@ -163,7 +163,7 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
   - File: `shared/agents/orchestrator/prompt.md` (near lines 30-41): remove the pre-flight `ctx_index` of the whole repository root and the re-index advice. `ctx_index` stays for one large file or text that will be searched more than once.
   - File: `shared/skills/onboard/SKILL.md` (near lines 57-61): `ctx_index` accepts content or one contained regular file; drop the two sentences about folders.
 
-- [ ] **9. Documentation and root guidance.**
+- [x] **9. Documentation and root guidance.**
   - Owner: `documenter`; the root guidance edits need the orchestrator's approval of the edit prompts. Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `CLAUDE.md` line 13 and `AGENTS.md` line 14: drop the session-continuity claims.
   - `README.md`:
@@ -179,11 +179,11 @@ Side effect, on this branch only: until Phase B, this branch's own sessions run 
   - Orchestrator: update `.claude/instructions/project-context.instructions.md` (AI state): the hook-lane and matcher design bullets, the fixture mention, four tools, the Antigravity entry, and any claim that `ctx_index` takes folders.
   - LEARN candidate: `[LEARN:security] Context Mode 2.x folder indexing has no bound, follows symlinks inside the repository's parent folder, and ignores a .gitignore above the folder; the kit's filter accepts only content or one regular file.`
 
-- [ ] **10. Regenerate and refresh the self-install.**
+- [x] **10. Regenerate and refresh the self-install.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`, after all edits, including the root guidance. Never hand-copy.
   - Reconnect the Context Mode MCP server in the running client (for example `/mcp` in Claude Code).
 
-- [ ] **11. Review.**
+- [x] **11. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `config`, `documentation`.
   - Focus:
     - nothing starts the filter except the dispatcher (check every caller of `context-mode-mcp-filter.mjs`);
@@ -241,14 +241,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

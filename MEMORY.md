@@ -23,6 +23,16 @@
   `~/.claude/context-mode/heal-partial-install.log` and start the Codex CLI.
   2.x is a rewrite that needs a planned migration, not a pin bump. Evidence:
   `.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`.
+- [LEARN:security] Context Mode 2.x folder indexing has no bound on files,
+  depth, or size, follows symlinks anywhere inside the repository's parent
+  folder (sibling projects), and ignores a `.gitignore` above the indexed
+  folder (2026-11-12 spike S3). The kit's filter therefore accepts only
+  `content` or one regular file inside the repository for `ctx_index`.
+- [LEARN:security] A filter that rebuilds MCP tool objects must carry the
+  boolean `annotations` hints (`readOnlyHint`, `destructiveHint`) through.
+  Context Mode's source notes that Codex cancelled an unannotated `ctx_stats`
+  (issue #846). Keep only boolean entries: the `title` annotation is free
+  text and could carry advice.
 
 ## Workflow
 
@@ -1565,7 +1575,9 @@
   `allow` with `updatedInput` that rewrites commands and subagent prompts.
   A wrapper that forwards it must build a new object from an allowlist of
   fields (`hookEventName`, filtered `additionalContext`), not strip known
-  decisions (gate-repair Phase B).
+  decisions (gate-repair Phase B). Since `context-mode-2x-migration` Phase A
+  (2026-11-12) the kit wires no Context Mode hook at all; a stale hook call
+  exits 0 silently.
 - [LEARN:tooling] Upstream Context Mode hooks throttle once-per-session tips
   with files in the OS temporary directory
   (`context-mode-guidance-s-<session>`). Captures and tests that reuse a
@@ -1725,3 +1737,13 @@
   input rewrites since `de5a2f8` (2026-10-17); an Agent call that fails while
   `curl` is still redirected points to an unfiltered hook (an old install or
   the user-level `context-mode@context-mode` plugin).
+- [LEARN:workflow] A subagent's Write tool refuses report files ("Subagents
+  should return findings as text"). An evidence spike therefore returns its
+  report as text and keeps raw outputs in its scratch folder; the
+  orchestrator saves the report under `.claude/explorations/`. Brief spike
+  agents that way up front.
+- [LEARN:testing] A refusal test that accepts "no reply" cannot fail when the
+  refusal is deleted. Make the forwarded path produce a `result` (a fake
+  upstream that answers), assert the exact error code and id, and prove the
+  test fails against a copy with the refusal removed (Context Mode filter
+  identity gate, 2026-11-12).
