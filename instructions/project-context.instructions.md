@@ -132,7 +132,7 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
   prints nothing, and exits 0. The filter exposes three tools, sends the
   client only `protocolVersion`, `capabilities.tools`, and `serverInfo`
   from `initialize`, replaces tool descriptions with kit text, and gates on
-  `serverInfo.name == "context-mode"` (1.0.169 and 2.x report the same
+  `serverInfo.name == "context-mode"` (Context Mode 1.x and 2.x report the same
   name, so the dispatcher's manifest or `npx` pin is the only version
   proof). `ctx_index` takes raw text or one regular file inside the
   repository, never a folder: 2.x folder indexing has no bound and follows
@@ -170,8 +170,9 @@ Pull requests merged into `dev` since the 2026-10-20 refresh:
   calls, no commit over an unfinished rebase or merge, and a root-adapter
   restore that refuses a symlinked `.claude` or `.claude/bootstrap-root`.
 - #52 `pre-receipt-phase-exemption`: the receipt-chain skip described above.
-- #53 `context-mode-agent-matcher`: the anchored Claude Code matcher
-  described above.
+- #53 `context-mode-agent-matcher`: an anchored Claude Code matcher for
+  the Context Mode PreToolUse hook (gone again since the 2.x migration's
+  Phase A removed every Context Mode hook).
 - #54 `readme-and-wiki-drift-fixes` (2026-11-12): README wording for Context
   Mode routing and the "Verification Defaults" scope, and an OpenWiki refresh
   for PRs #52 and #53.
@@ -184,7 +185,9 @@ the user's call. Every local implementation branch is already merged into
 On 2026-11-12 none of the four local full consumers (`~/work/RAG`,
 `~/work/git_projects/img-classification`, `industrial-inspection`, and
 `schema-bootstrap-llm-wiki`) had PR #53's matcher in `.claude/settings.json`.
-They need a refresh through `scripts/update_consumers.py`; that is the user's
+Once the 2.x migration merges, a refresh through `scripts/update_consumers.py`
+brings them MCP-only Context Mode 2.1.8 (no hooks; Node.js 24.15.0 or newer
+needed on the host or in a rebuilt devcontainer). Refreshing is the user's
 call.
 
 Pinned versions: Context Mode `2.1.8` (on the migration branch since Phase
@@ -211,7 +214,7 @@ pre-branch spike (`.claude/explorations/2026-11-12_context-mode-2x-recheck/REPOR
 chose pin 2.1.8, image `node:24.22.3-bookworm-slim`, and
 `context-mode server --agent codex` started from the outer repository root.
 The branch `context-mode-2x-migration_implementation` started on
-2026-11-12: Phase A (MCP-only surface on 1.0.169), then Phase B (2.1.8
+2026-11-12: Phase A (MCP-only surface on Context Mode 1.x), then Phase B (2.1.8
 switch), then Phase C (OpenWiki refresh).
 
 Before merging bootstrap changes, run:
