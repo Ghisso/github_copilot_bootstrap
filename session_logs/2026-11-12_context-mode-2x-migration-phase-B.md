@@ -22,15 +22,28 @@ Move the kit from Context Mode 1.0.169 to 2.1.8 and the devcontainer's Node.js i
 - Orchestrator (AI state): project-context pinned-versions paragraph and the dispatcher line now name 2.1.8, the Node floor, the image, `--agent codex`, and `CONTEXT_MODE_DATA_DIR`.
 - Review round 1 (seven profiles): gate FAIL on documentation only; all six plan focus items hold in the code. MAJOR: the new pin-bump procedure runs the real-binary test (step 2) before bumping the dispatcher pin (step 6), so the test's `version-contract=pinned-direct-binary` assertion fails when followed in order (the negative control showed exactly this). MINOR: the rollback note forgets that a fresh `context-mode/` folder exists after the first 2.x start (a rename would nest the old cache inside it) and that "newest `.untrusted.*`" is wrong after a later move-aside. MINOR: the last pin-bump step lists only the dispatcher, Dockerfile, and validator, but the pin is written literally in README, two docs, the routing policy, and project-context. Reviewer judgements on the coder's points: keep the floor check after storage setup (error order), the lost-race and inherited-`CLAUDE_PROJECT_DIR` choices are right, the pre-existing second-`mv` race is an old gap, and dropping the 1.x-only tool names from docs is consistent with the filter's default deny. Not run by anyone: a real `npx -y context-mode@2.1.8 server --agent codex` launch (this repository's next session after `/mcp` exercises it), live clients, a monorepo whose project root is not the Git root.
 - Fix loop: the three documentation findings sent back to the documenter.
+- Documenter fixes (`docs/runtime-checks.md`, `README.md` only): the pin-bump procedure is now seven steps and sets `PINNED_CONTEXT_MODE_VERSION` in the dispatcher before the real-binary test; both rollback notes say to move the current `.claude/.cache/context-mode` folder out of the way first, then rename the `.untrusted.*` folder that holds the 1.x index; the last step updates every doc that names the pin (`rg -F '<old pin>'`). Both `1.0.169` doc greps 0.
+- Review round 2 (same reviewer, seven profiles): gate PASS, 0 findings, no open requests. It confirmed the real-binary test runs the `shared/` dispatcher (`tests/test_context_mode_mcp_filter.py:20`, copied at line 798), so step 2 needs no regenerate first.
+- Required Verification block, orchestrator scratch runner (started before the documentation fixes; closeout reruns every item): 13 items, 0 failed; `verify.py phase` PASS (313 s).
+- Optional checks run by the orchestrator against the `shared/` dispatcher (scratch script `phaseB_optional.py`): with the host's global 1.x first on `PATH`, `--self-check` printed `required-version=2.1.8`, `observed-version=1.0.169` (the host's global), `version-contract=pinned-via-npx@2.1.8`, and the expected WARN; with a fake `node` printing `v22.22.0` first on `PATH`, it printed `observed-node=v22.22.0` and `WARN ... Node.js 24.15.0 or newer is required (observed v22.22.0); the MCP server cannot start`. A real server launch through real `npx` (global 1.x refused), started from `<repo>/.claude`: `initialize` keys `capabilities`, `protocolVersion`, `serverInfo` (`context-mode`/`dev`) in 1.4 s, tools `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_index(content)` then `ctx_search` found the word, `ctx_doctor` -32601. That first 2.x start moved this repository's 1.x cache aside as `.claude/.cache/context-mode.untrusted.20261112T091644Z.2354429` (kept, not deleted).
+- Closeout AI state: MEMORY.md's 1.x `[LEARN:domain]` entry corrected in place (now history plus the 2.1.8 pin), one 2.x tooling entry added under Domain-Specific, and testing, documentation, and workflow lessons appended.
 
 ## [LEARN] Entries
 
-- (filled at closeout)
+- [LEARN:tooling] Context Mode 2.x reports `serverInfo.version` `"dev"`, so prove its version from the package manifest or the `npx` pin, never over the wire. It ignores `CONTEXT_MODE_DIR` (`CONTEXT_MODE_DATA_DIR` sets its data root, and 1.x data is not imported). With `--agent codex` it keys its project to the working folder's Git repository: start it from the outer repository root, or the nested `.claude` repository becomes a separate project.
+- [LEARN:testing] A real-binary test guards a working-folder `cd` only when it starts from the folder the `cd` exists to escape. The Context Mode server test passed with the dispatcher's `cd` removed until it started from a nested `<repo>/.claude` Git repository.
+- [LEARN:documentation] A pin-bump procedure must change the pin before any test that runs the pinned launcher against the candidate; "test first, bump last" fails at the test.
+- [LEARN:workflow] Check a hook-lane claim against the generated matcher, not only a replayed fixture: the kit's Codex SessionStart matcher `startup|resume|clear` never delivered `compact`.
 
 ## Verification
 
-(filled at closeout)
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-B-context-mode-2x-switch.json` (0 findings after review round 2; gate PASS; seven profiles; round 1 had one MAJOR and two MINORs, all documentation, all fixed before round 2).
+- optional 2: NOT RUN — opening the devcontainer from VS Code with "Rebuild Container" needs the user's editor session.
+- optional 3: PASS — with the host's global 1.x `context-mode` first on `PATH`, `--self-check` reported `version-contract=pinned-via-npx@2.1.8`, and a real server launch through real `npx` listed exactly `ctx_index`, `ctx_search`, `ctx_stats` (probe client instead of `/mcp`, which needs the user; see the work log).
+- optional 4: NOT RUN — live Claude Code, Codex, and VS Code Copilot sessions need the user; the probe-client launch above covers the server side.
+- optional 5: PASS — with a fake `node` printing `v22.22.0` first on `PATH`, `--self-check` printed `observed-node=v22.22.0` and warned that Node.js 24.15.0 or newer is required.
 
 ## Open Questions / Next Steps
 
-- Coder Steps 2-5, documenter Step 7, orchestrator Step 6, reviewer Step 8.
+- Phase C: OpenWiki refresh and the standing stale-claims audit (the `openwiki/` pages still say 1.0.169 and four tools).
+- The user reconnects Context Mode with `/mcp` to move this session's server to 2.1.8.
