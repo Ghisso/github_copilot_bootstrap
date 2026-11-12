@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-12
 **Plan:** `.claude/plans/2026-11-12_phase-D-context-mode-discover-fallback.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -36,6 +36,24 @@ The filter answers `server/discover` itself with `-32601` and never forwards it,
 - [LEARN:testing] A "never forwarded" assertion on a fake upstream's trace file needs an ordering barrier (one more request whose reply is read first). Prove it with a mutation that answers AND forwards.
 
 ## Verification
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       87.3s  uv run pytest tests/test_context_mode_mcp_filter.py tests/test_context_mode_dispatch.py tests/test_validate_targets.py -q --tb=short
+PASS        0.8s  PATH="$HOME/.cache/context-mode-pin/bin:$PATH" CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q --tb=short -k real_upstream
+PASS        0.0s  grep -q -F 'server/discover' shared/hooks/scripts/context-mode-mcp-filter.mjs
+PASS        0.0s  grep -q -F 'server/discover' tests/test_context_mode_mcp_filter.py
+PASS        0.0s  grep -q -F 'FILTER_CONTRACT="ctx-index-files-only-v2"' shared/hooks/scripts/context-mode-dispatch.sh
+PASS        0.0s  grep -q -F '`server/discover`' README.md
+PASS        0.0s  grep -q -F '`server/discover`' docs/runtime-checks.md
+PASS        0.0s  git diff --quiet HEAD -- CLAUDE.md AGENTS.md .mcp.json .vscode/mcp.json .codex/config.toml openwiki
+PASS        0.0s  test "$(grep -c -F 'naming no other tool' shared/hooks/scripts/context-mode-mcp-filter.mjs)" = "0"
+PASS        0.0s  test "$(cat shared/hooks/scripts/context-mode-dispatch.sh README.md | grep -c -F -e 'or restores anything' -e 'can never read or overwrite' -e 'can never read or write' -e 'cannot learn or plant')" = "0"
+PASS       50.5s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      334.3s  uv run python .claude/scripts/verify.py phase --format text
+```
 
 - Findings: `.claude/quality_reports/findings-2026-11-12_phase-D-context-mode-discover-fallback.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had two MINORs, both fixed before round 2).
 - optional 1: PASS — Claude Code 2.1.226 with `MCP_PROTOCOL_NEGOTIATION=auto --debug` sent `server/discover`, got `-32601`, fell back to `initialize`, and logged `"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"` with no `Failed to fetch tools`; 2.1.322 did not probe (no `protocolEra` field; `initialize` first), recorded as evidence only, and wrote no new verdict entry.
