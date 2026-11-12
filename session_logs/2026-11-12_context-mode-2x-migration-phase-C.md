@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-12
 **Plan:** `.claude/plans/2026-11-12_phase-C-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -50,6 +50,20 @@ Refresh the OpenWiki layer through OpenWiki's own MCP tools so it matches Phases
 - [LEARN:tooling] A second OpenWiki `update` run at the same `HEAD` still starts a planning run, because each page keeps its own base window. Use it to apply review fixes to generated pages instead of hand-editing them.
 
 ## Verification
+
+```text
+PASS        0.0s  test "$(grep -r -l -I -F '1.0.169' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  grep -r -l -F "$(sed -n 's/^PINNED_CONTEXT_MODE_VERSION="\(.*\)"$/\1/p' shared/hooks/scripts/context-mode-dispatch.sh)" openwiki --include=*.md
+PASS        0.0s  test "$(grep -r -l -F 'WebFetch|mcp__.*)$' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -E 'ctx_index.{0,40}ctx_search.{0,40}ctx_stats.{0,40}ctx_doctor' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -E 'context-mode-dispatch\.sh (claude-code|openai-codex|github-copilot)' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test "$(grep -r -l -F 'fixtures/context_mode' openwiki --include=*.md | wc -l)" = "0"
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  test "$(cat AGENTS.md CLAUDE.md | grep -c -F '<!-- OPENWIKI:START -->')" = "0"
+PASS       50.3s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      332.4s  uv run python .claude/scripts/verify.py phase --format text
+```
 
 - Findings: `.claude/quality_reports/findings-2026-11-12_phase-C-knowledge-refresh.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had one MAJOR and three MINORs, all fixed by the second OpenWiki run).
 - optional 1: PASS — the reviewer read each refreshed page's prose against the code it cites (dispatcher, filter, generator, validator, `state-sync.sh`, `restore-root-adapters.sh`, tests) in two rounds; the four mismatches round 1 found were fixed by the second OpenWiki run and confirmed in round 2.
