@@ -3,8 +3,8 @@ import { spawn } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-// The server name 1.0.169 and 2.x both report. The identity gate cannot tell
-// the two apart; only the dispatcher proves the version.
+// The server name Context Mode 1.x and 2.x both report. The identity gate
+// cannot tell the two apart; only the dispatcher proves the version.
 const EXPECTED_SERVER_NAME = "context-mode";
 const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats"]);
 const INDEX_ARGS = new Set(["content", "path", "source"]);
@@ -93,9 +93,10 @@ function validateIndex(args) {
   return null;
 }
 
-// Upstream schema descriptions are advice text (1.0.169 still tells clients that
-// `path` takes a folder), so none reaches the client, at any depth. Only a string
-// is dropped: a parameter that is itself named `description` is a schema object.
+// Upstream schema descriptions are advice text (Context Mode 1.x still tells
+// clients that `path` takes a folder), so none reaches the client, at any depth.
+// Only a string is dropped: a parameter that is itself named `description` is a
+// schema object.
 function withoutDescriptions(value) {
   if (Array.isArray(value)) return value.map(withoutDescriptions);
   if (!value || typeof value !== "object") return value;
