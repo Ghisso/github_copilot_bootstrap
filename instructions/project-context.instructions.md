@@ -35,7 +35,8 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
   including `context-mode-dispatch.sh` (pins Context Mode `1.0.169`).
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
-  (Context Mode is filtered to exactly four guarded tools).
+  (Context Mode is filtered to exactly three tools: `ctx_index`,
+  `ctx_search`, `ctx_stats`; Antigravity gets no Context Mode entry).
 - `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader
   (pins OpenWiki `0.7.2`). Its `initializeCommand` creates `~/.openwiki` and
   `~/.cache/huggingface` on the host, because Docker refuses a bind mount
@@ -80,7 +81,7 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `scripts/check_native_clients.py`: optional native-client probes and
   evidence (Claude Code and Codex only).
 - `tests/`: pytest suite for hooks, gates, verifier, installer, sidecar,
-  state sync, and Context Mode dispatch (recorded hook fixtures).
+  state sync, and the Context Mode dispatcher and MCP filter.
 - `.github/workflows/validate.yml`: CI for generation and target validation
   on Ubuntu and macOS plus Python 3.9 hook compatibility. It runs the
   validator as `uv run --with pytest`, because the validator's hook-gate
@@ -124,15 +125,18 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
   receipt-chain check skips only a plan's leading run of phases dated before
   2026-08-29 that have no receipt file (`RECEIPT_CHAIN_SINCE` in
   `shared/scripts/verify.py`), because closeout receipts did not exist then.
-- The Context Mode hook lane is advisory only: the dispatcher forwards an
-  allowlist of advice fields and never forwards a decision or input rewrite.
-  On Claude Code the PreToolUse group uses the anchored matcher
-  `^(Bash|Read|Grep|WebFetch|mcp__.*)$` (`CLAUDE_CONTEXT_MODE_MATCHER` in
-  `scripts/generate_targets.py`), so it never fires on `Agent`: Context
-  Mode's only `Agent` action rewrites the subagent prompt, and Claude Code's
-  auto mode refuses a call whose input a hook changed. Other targets keep
-  `*`. A Context Mode pin bump must recheck this matcher (procedure in
-  `docs/runtime-checks.md`).
+- Context Mode is MCP-only (since the `context-mode-2x-migration` Phase A,
+  branch `context-mode-2x-migration_implementation`): no client wires a
+  Context Mode hook, and a hook call from stale wiring reads its input,
+  prints nothing, and exits 0. The filter exposes three tools, sends the
+  client only `protocolVersion`, `capabilities.tools`, and `serverInfo`
+  from `initialize`, replaces tool descriptions with kit text, and gates on
+  `serverInfo.name == "context-mode"` (1.0.169 and 2.x report the same
+  name, so the dispatcher's manifest or `npx` pin is the only version
+  proof). `ctx_index` takes raw text or one regular file inside the
+  repository, never a folder: 2.x folder indexing has no bound and follows
+  symlinks into sibling projects (2026-11-12 spike S3).
+  `FILTER_CONTRACT="ctx-index-files-only-v2"` moves older caches aside.
 - Consumer `.claude/` state is a nested `ai-state` Git repository so mutable
   plans, memory, logs, and bootstrap files have an auditable history.
   `state-sync.sh` lets one run work on a checkout at a time (an `flock` on
@@ -194,9 +198,14 @@ migration, not a pin bump (`.claude/explorations/2026-11-11_context-mode-2x-evid
 Until then the dispatcher refuses any other version, so `1.0.169` stays safe.
 The migration plan `.claude/plans/context-mode-2x-migration.md` was approved
 on 2026-11-12 with every recommended option (MCP-only, drop `ctx_doctor`,
-drop Antigravity's entry, one server identity). It waits for its settle
-check: 2.1.8 shipped on 2026-11-11, so nothing runs before 2026-11-26. On
-2026-11-12 npm `latest` was still 2.1.8.
+drop Antigravity's entry, one server identity). Later that day the user
+waived its 14-day settle check ("start now, bump it up later"). The
+pre-branch spike (`.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`)
+chose pin 2.1.8, image `node:24.22.3-bookworm-slim`, and
+`context-mode server --agent codex` started from the outer repository root.
+The branch `context-mode-2x-migration_implementation` started on
+2026-11-12: Phase A (MCP-only surface on 1.0.169), then Phase B (2.1.8
+switch), then Phase C (OpenWiki refresh).
 
 Before merging bootstrap changes, run:
 
