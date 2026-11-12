@@ -22,14 +22,26 @@ The filter answers `server/discover` itself with `-32601` and never forwards it,
 - Step 7: `generate_targets.py --all`, then `install_bootstrap.py . --allow-self --local-only`.
 - Review round 1 (six profiles): gate PASS, no CRITICAL or MAJOR; two MINORs, both fixed rather than disposed. (1) README line 1432 "no cache is ever searched or cited ... unless the dispatcher produced it" contradicted the new limit sentence; now scoped "short of a remote that replaces the synced scripts themselves". (2) `test_discover_probe_is_refused_before_initialize` had no ordering barrier before its trace check; it now sends a `ping` and reads its reply first. Orchestrator mutation check of that barrier: with the filter changed to answer AND forward the probe, the test failed at the ping read (`assert 0 == 2`); the filter was restored byte-identical (SHA-256). Filter test file after the fix: 38 passed, 1 skipped; ruff clean.
 
+- Review round 2 (same reviewer, six profiles): gate PASS, 0 findings, no open requests; both round-1 fixes confirmed.
+- Required Verification block, orchestrator scratch runner (before the two round-1 fixes; closeout reruns every item): 15 items, 0 failed; `verify.py phase` PASS (325 s).
+- Optional live checks after Step 7 (script `live_probe_check.sh`, saved in the live-check exploration; `MCP_PROTOCOL_NEGOTIATION=auto`, `--debug`, model haiku, capture shim on the filter's stdin):
+  - Claude Code 2.1.226 probed this time. The capture shows `server/discover` first, then `initialize`, `notifications/initialized`, `tools/list`, `tools/call`. Debug line: `MCP server "context-mode": Connection established with capabilities: {... "serverVersion":{"name":"context-mode","version":"dev"},"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"}`; no `Failed to fetch tools`; `ctx_stats` answered.
+  - Claude Code 2.1.322 (VS Code extension binary) did not probe: its debug line has no `protocolEra` field (`... "serverVersion":{"name":"context-mode","version":"dev"}}`) and the capture shows `initialize` first; `ctx_stats` answered. `~/.claude/state/mcp-discover-verdicts.json`: 2 entries before and after, none new (no probe, so none expected).
+  - Default path (2.1.226, no setting): exactly `mcp__context-mode__ctx_index`, `mcp__context-mode__ctx_search`, `mcp__context-mode__ctx_stats`; `ctx_index(content)` then `ctx_search` found the word.
+- Closeout AI state: small plan `status: complete`, boxes ticked, Phase D ticked in the big plan; `validate_plan_frontmatter.py` exit 0. MEMORY.md: the wrong pipelined-`tools/list` lesson was corrected in place at Step 1 to the `server/discover` lesson; a testing lesson about ordering barriers was appended.
+
 ## [LEARN] Entries
 
-- (filled at closeout)
+- [LEARN:mcp] MCP 2026-07-28 clients probe stdio servers with `server/discover` and skip `initialize` when the probe succeeds; a filter that gates on `initialize` must answer the probe itself (`-32601`) so they fall back. Context Mode 2.1.8 answers the probe only when it carries the 2026-07-28 `_meta`, so a probe without `_meta` proves nothing.
+- [LEARN:testing] A "never forwarded" assertion on a fake upstream's trace file needs an ordering barrier (one more request whose reply is read first). Prove it with a mutation that answers AND forwards.
 
 ## Verification
 
-(filled at closeout)
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-D-context-mode-discover-fallback.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had two MINORs, both fixed before round 2).
+- optional 1: PASS — Claude Code 2.1.226 with `MCP_PROTOCOL_NEGOTIATION=auto --debug` sent `server/discover`, got `-32601`, fell back to `initialize`, and logged `"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"` with no `Failed to fetch tools`; 2.1.322 did not probe (no `protocolEra` field; `initialize` first), recorded as evidence only, and wrote no new verdict entry.
+- optional 2: PASS — default-path session: exactly three Context Mode tools; `ctx_index` with `content` then `ctx_search` found the word (a regression check only; it cannot tell a fixed filter from an unfixed one).
 
 ## Open Questions / Next Steps
 
-- Coder Steps 2-4 and the Step 5 comments; documenter Step 5 README sentence and Step 6; orchestrator Step 6 AI state and Step 7; reviewer Step 8.
+- Phase E: OpenWiki refresh of the dispatcher page and the final audit.
+- Follow-ups (big plan Reopened note): refuse every method except `initialize` and `ping` before an accepted `initialize`; check whether VS Code Copilot or Codex send `server/discover`.

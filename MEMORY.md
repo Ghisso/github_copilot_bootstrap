@@ -1795,3 +1795,8 @@
   `readOnlyHint: true` as needing approval; `codex exec` with
   `approval_policy=never` cancels such a call ("user cancelled MCP tool
   call") before it reaches the server.
+- [LEARN:testing] A "never forwarded" assertion on a fake upstream's trace
+  file needs an ordering barrier: send one more request and read its reply
+  before checking the trace, because a forwarded message may be read after
+  the check. Prove it with a mutation that answers AND forwards (Context
+  Mode filter `server/discover` test, 2026-11-12).

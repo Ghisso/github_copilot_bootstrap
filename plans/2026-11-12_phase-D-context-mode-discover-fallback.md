@@ -3,8 +3,8 @@ name: 2026-11-12_phase-D-context-mode-discover-fallback
 type: small-plan
 parent_plan: context-mode-2x-migration
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-12_context-mode-2x-migration-phase-D.md
 ---
 
 # Small Plan: Answer the MCP 2026-07-28 Discovery Probe So Clients Use `initialize`
@@ -65,13 +65,13 @@ Decisive assumptions:
 
 ## Steps
 
-- [ ] **1. Start the phase and correct the record (AI state).**
+- [x] **1. Start the phase and correct the record (AI state).**
   - Owner: orchestrator. No outer-repository file.
   - Set this plan's `status` to `in-progress` by hand before any other step; no hook does this on an existing branch (reopen rule, step 7). Confirm that the nested `.claude` repository was checkpointed after these plans were saved (reopen rule, step 8).
   - Check that `era_probe.py`, `era_probe-output.txt`, `shim.sh`, `pipeline_probe.py`, and `discover_probe.py` are saved under `.claude/explorations/2026-11-12_context-mode-2x-live-checks/`.
   - Append a dated "Correction" section to the exploration's `REPORT.md` and to the quality report: Finding 1's cause is the forwarded `server/discover` probe, not a pipelined `tools/list`; 2.1.8 answers the probe when it carries `_meta`; the probe's answer carried upstream `instructions`; two independent plan reviews reproduced the failure and the `-32601` fix against the real 2.1.8, and review B read the fallback rule from both client binaries. Do not rewrite the original text.
 
-- [ ] **2. Write the tests first.**
+- [x] **2. Write the tests first.**
   - Owner: `coder`. File (modify): `tests/test_context_mode_mcp_filter.py`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Add one constant for the new revision's request `_meta`, with the keys `io.modelcontextprotocol/protocolVersion` (`"2026-07-28"`), `io.modelcontextprotocol/clientCapabilities`, and `io.modelcontextprotocol/clientInfo`. Fake and real tests send it.
@@ -88,7 +88,7 @@ Decisive assumptions:
   - Expected values come from this plan and the probe output, not from the filter source: `-32601`, `-32001`, `TOOL_NAMES`, and the kit descriptions.
   - Negative control before Step 3: run the new tests on today's filter, and record in the session log which fail and why. Expected: tests 1 and 3 fail because the probe's answer passes through; test 2 fails because the probe reaches the fake and the trace file appears; the parametrized case passes.
 
-- [ ] **3. Filter: answer the probe.**
+- [x] **3. Filter: answer the probe.**
   - Owner: `coder`. File (modify): `shared/hooks/scripts/context-mode-mcp-filter.mjs`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - In `handleClient`, after the non-object drop, add one branch for `server/discover`, the same before and after an accepted `initialize`:
     - without an `id`: drop it, with a short stderr note like the existing `tools/list` notification note;
@@ -101,14 +101,14 @@ Decisive assumptions:
     - name a blocked tool anywhere in the filter text, comments included. `validate_targets.py` and `tests/test_validate_targets.py` scan the whole file.
   - No validator change: `validate_context_mode_tool_surface` requires the allowlist `Set`, the `INDEX_ARGS` `Set`, the schema-property filter, and `if (!stat.isFile())`, and forbids `isDirectory`; none of them changes. `EXECUTION_DEFAULTS_POLICY_FRAGMENTS` holds no filter text.
 
-- [ ] **4. Real-binary test.**
+- [x] **4. Real-binary test.**
   - Owner: `coder`. File (modify): `tests/test_context_mode_mcp_filter.py`, `test_real_upstream_server_surface_is_filtered`.
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`, `.claude/skills/integration-gate-spike/SKILL.md`.
   - Before `initialize`, send the probe (id 0, with the shared `_meta`). Assert error code `-32601` and no `result`. All other steps and assertions stay.
   - Negative control: on today's filter, with the private prefix first on `PATH`, the real 2.1.8 answers the probe with a discover result that holds `instructions`, so the test fails. Record it in the session log.
   - Keep the test name. The pin-bump procedure and the Verification block select it with `-k real_upstream`.
 
-- [ ] **5. Finding 3 unit: comment and README fixes (separable).**
+- [x] **5. Finding 3 unit: comment and README fixes (separable).**
   - This step is outside "fix problem 1". The orchestrator drops it as a unit when the user says so: this step, its two Verification lines (marked "Finding 3 unit"), its review focus bullet, and the Finding 3 items in Phase E.
   - Owner: `coder` for the comments; `documenter` for the README sentence. Files (modify): `shared/hooks/scripts/context-mode-mcp-filter.mjs` (one comment), `shared/hooks/scripts/context-mode-dispatch.sh` (two comments), `README.md` (one sentence). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/documentation/SKILL.md`.
   - Filter, line 13: "naming no other tool" is false, because the `ctx_search` description names `ctx_index`. Say instead that each description names no tool outside the allowlist.
@@ -116,7 +116,7 @@ Decisive assumptions:
   - `README.md` near line 1432: replace "where `state-sync.sh` never adds, commits, or restores anything" with the same statement, including its limit.
   - The Verification lines check only that the known stale phrases are gone. The reviewer judges whether the new sentences are accurate.
 
-- [ ] **6. Documentation for the fix.**
+- [x] **6. Documentation for the fix.**
   - Owner: `documenter` for `README.md` and `docs/runtime-checks.md`; orchestrator for the AI-state file. Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `README.md`, Context Mode block (near line 1426): after the sentence on what the client sees from `initialize`, add one sentence that names `` `server/discover` ``. For example: "The filter answers `server/discover`, the probe of the 2026-07-28 MCP revision, itself with `-32601` and never forwards it, so a client that speaks both revisions falls back to `initialize` and never receives the upstream `instructions` that the probe's answer would carry."
   - `docs/runtime-checks.md` near line 101: the same sentence. Under "Known limits", add: "The filter speaks only the `initialize`-based MCP revisions (2025-11-25 and earlier). A client that speaks both revisions falls back to them; a client that only speaks 2026-07-28 gets no Context Mode tools."
@@ -124,11 +124,11 @@ Decisive assumptions:
   - Orchestrator: `.claude/instructions/project-context.instructions.md`, Context Mode bullet (near line 129). After the `serverInfo.name` gate, add: the filter answers the 2026-07-28 `server/discover` probe itself with `-32601`, so clients use `initialize`; the 2.1.8 answer to the probe carries upstream `instructions`, and a client that accepts it skips `initialize`, so the filter would refuse its `tools/list` and `tools/call`.
   - LEARN candidate: `[LEARN:mcp] MCP 2026-07-28 clients probe stdio servers with server/discover and skip initialize when the probe succeeds; a filter that gates on initialize must answer the probe itself (-32601) so they fall back. Context Mode 2.1.8 answers the probe only when it carries the 2026-07-28 _meta, so a probe without _meta proves nothing.`
 
-- [ ] **7. Regenerate and refresh the self-install.**
+- [x] **7. Regenerate and refresh the self-install.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`, after all edits. Never hand-copy.
   - Reconnect the Context Mode MCP server in the running client (for example `/mcp` in Claude Code). The live checks below use fresh sessions.
 
-- [ ] **8. Review.**
+- [x] **8. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus:
     - a `server/discover` request never reaches upstream, before or after an accepted `initialize`, and its notification form is dropped;
@@ -184,14 +184,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 
