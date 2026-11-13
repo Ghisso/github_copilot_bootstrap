@@ -44,7 +44,15 @@ Use this workflow when:
 5. In integration tests, set `GIT_TRACE2_EVENT` for the complete child-process
    tree and reject forbidden Git commands. Also assert that remote refs remain
    unchanged.
-6. Preserve the normal human-operated update-and-push behavior when
+6. Before refreshing a full consumer, list folders under `.claude/skills/`
+   that hold a `SKILL.md`, that the new source does not ship, that are not
+   listed in the consumer's `.claude/bootstrap-root/.agents/skills/`, and that
+   have no `.project-skill`. Mark or move each one first. A name in that
+   record was shipped before and is retired on purpose, so do not mark it,
+   unless the record's copy holds `.project-skill`: that folder is a project
+   skill that lost its marker, so restore the marker. The installer refuses
+   the same set.
+7. Preserve the normal human-operated update-and-push behavior when
    local-only mode is absent.
 
 ## Verification
