@@ -121,17 +121,12 @@ and must appear in the big plan's `phases` list. Fill:
   its own evidence path and does not complete or advance the phase.
 
 **The last phase in the big plan's `phases:` list must add a documentation,
-memory, and LEARN audit step**: sweep every live-advice surface (root
-guidance, `docs/`, shared policies/skills/templates/agents/review-profiles,
-state READMEs, and `.claude/MEMORY.md`) for claims this plan or earlier work
-invalidated, correct or supersede each one, leave dated records (archived
-plans, dated design narratives, closed session logs) unchanged unless an
-entry would actively mislead a reader and no receipt binds its log, and
-record the audited surfaces and each one's outcome under a `## Stale-claims
-surfaces checked` heading in that phase's closeout session log. Do not limit
-the sweep to that phase's own changes. Use that exact heading: `verify.py`'s
-closeout gate requires it, with non-empty content, whenever the phase it is
-closing out is this list's last entry.
+memory, and LEARN audit step**: the standing final-phase audit in
+`.claude/instructions/closeout.instructions.md`, which lists the surfaces to
+sweep. It records them under a `## Stale-claims surfaces checked` heading in
+that phase's closeout session log; `verify.py`'s closeout gate requires that
+exact heading, with non-empty content, whenever the phase it is closing out is
+this list's last entry.
 
 In a repository where `openwiki/INSTRUCTIONS.md` exists, that last phase may
 also need to be a dedicated knowledge-refresh phase: see the canonical
