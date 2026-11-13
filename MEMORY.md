@@ -1822,3 +1822,12 @@
   `.agents/skills/` only (`[[skills.config]]` adds none) and shortens each
   description more as the skill count grows (404 characters at 60 skills,
   570 at 5; at 42 it showed all 37 shipped descriptions whole). Evidence: `.claude/explorations/2026-11-12_skills-trim-client-spike/REPORT.md`.
+- [LEARN:workflow] In the final-phase stale-claims audit, read
+  `.claude/instructions/project-context.instructions.md` directly: it is
+  consumer state, so the self-refresh never rewrites it, and it held "55
+  reusable skills" and the old "refresh deletes everything" rule after the
+  skills trim. Search counts with any adjective (`\b55 (\w+ )?skills`) and
+  every surface that states a changed rule (the `shared/plans/README.md` seed
+  still said "Always: `plan-decomposition`"); an exact-phrase sweep missed
+  all three, and the Phase D review caught them.
+

@@ -308,7 +308,7 @@ Each probe runs at most twice. A failing command is recorded with its error, not
 - [x] `2026-11-12_phase-A-project-owned-skills` — project skill marker, safety refusals, and `.agents/skills/` mirror
 - [x] `2026-11-12_phase-B-instructions` — defects 2 to 6, workflow split, procedure pointers, root guidance and policy and prompt trims
 - [x] `2026-11-12_phase-C-skill-set` — 55 to 37 skills, 300-character cap, loading rules, spike result
-- [ ] `2026-11-12_phase-D-knowledge-refresh` — regenerate, OpenWiki refresh, and stale-claims audit
+- [x] `2026-11-12_phase-D-knowledge-refresh` — regenerate, OpenWiki refresh, and stale-claims audit
 
 ## Verification
 
