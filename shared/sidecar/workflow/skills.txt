@@ -5,12 +5,9 @@ safe-consumer-bootstrap-refresh: bootstrap-maintainer skill for refreshing anoth
 setup-project: scaffolds a brand-new project on the full bootstrap install
 deep-audit: audits this bootstrap repository's own instruction and skill consistency
 code-review: names the full install's persisted-findings script
-run-tests: names the full install's deterministic verifier script
 code-style: names the full install's deterministic verifier script
 plan-decomposition: names the full install's deterministic verifier script and the generated wiki knowledge layer
-refactor: names the full install's deterministic verifier script
 documentation: names the generated wiki knowledge layer and a full-install instructions path
 learn: names the generated wiki knowledge layer and a full-install instructions path
-deploy-service: names a full-install instructions path
 bentoml-service: names a full-install instructions path
 create-feature: names a full-install instructions path

@@ -2,14 +2,10 @@
 name: html-presentation
 visibility: public
 description: |
-  Convert documents, outlines, or freeform content into polished, self-contained
-  HTML slide presentations. Supports two navigation modes: horizontal (Reveal.js)
-  and vertical scroll (keyboard/scroll). Multiple visual themes. Use when:
-  - "create a presentation", "make slides", "build a deck"
-  - "convert to slides", "HTML presentation", "web-based slides"
-  - "reveal.js deck", "browser presentation"
-  - Converting a document, markdown, outline, or notes into presentable slides
-  Do NOT use for PowerPoint/PPTX output.
+  Make slides: "create a presentation", "build a deck", "convert to slides",
+  "reveal.js deck", "web-based slides". Turns documents, markdown, outlines, or
+  notes into self-contained HTML slides (Reveal.js or vertical scroll, several
+  themes). Not for PowerPoint/PPTX.
 ---
 
 # HTML Presentation

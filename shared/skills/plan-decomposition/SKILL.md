@@ -2,14 +2,10 @@
 name: plan-decomposition
 visibility: public
 description: |
-  Decompose a large implementation plan into a big plan plus one small-plan file
-  per phase, matching templates/plan-small.md and the lifecycle the hooks
-  enforce. Use when:
-  - Creating a multi-step implementation plan for a feature or migration
-  - User asks to "write a plan", "break this down into phases", or "plan this out"
-  - A plan touches multiple files, configs, and test suites across >1 logical stage
-  - Refactoring an existing monolithic plan into smaller, reviewable pieces
-  Do NOT use for single-file fixes or tasks completable in one step.
+  Write or split a plan: "write a plan", "break this down into phases", "plan
+  this out". Turns a multi-file, multi-stage feature or migration into a big
+  plan plus one small-plan file per phase, per templates/plan-small.md. Not for
+  single-file or one-step tasks.
 ---
 
 # Plan Decomposition

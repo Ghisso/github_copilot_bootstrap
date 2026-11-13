@@ -1,14 +1,3 @@
----
-name: docling-haystack
-visibility: background
-description: |
-  Integrate Docling with Haystack for PDF ingestion. Triggers:
-  - TypeError when passing pipeline_options= directly to DoclingConverter
-  - OCR performance issues (observed roughly 60s/PDF vs 2-5s without OCR; hardware- and document-dependent)
-  - Configuring Docling's DocumentConverter format options from Haystack
-user-invocable: false
----
-
 ## Problem
 
 Passing `pipeline_options=` directly to Haystack's `DoclingConverter` raises

@@ -118,6 +118,13 @@ run when any is violated:
 - public and background skills alike have a non-empty `description`;
 - no two skills share an identical `description` (a duplicate breaks
   description-match loading of background skills);
+- a skill's listing text stays within the cap: its stripped `description` plus
+  its stripped `when_to_use` (`skill_listing_length`, the one length
+  definition) is at most 300 characters (`SKILL_DESCRIPTION_MAX_CHARS`). Claude
+  Code lists both for every skill on every turn and drops descriptions when the
+  list passes its budget. `ponytail` and `ponytail-review` are exempt
+  (`SKILL_DESCRIPTION_CAP_EXEMPT`). A longer skill is reported as
+  `SKILL_DESCRIPTION_TOO_LONG` by `shared_skill_integrity_errors`;
 - every `shared/skills/*` directory has a root `SKILL.md`;
 - a backtick-quoted local reference that names a known repository root
   (`shared/`, `scripts/`, `docs/`, `tests/`, `.claude/`, `.github/`,

@@ -1,13 +1,3 @@
----
-name: haystack-conditional-router
-visibility: background
-description: |
-  Wire Haystack ConditionalRouter correctly for multi-branch pipelines (semantic,
-  SQL, hybrid). Triggers: output names causing silent skips, wrong route definitions
-  per retriever mode, DocumentJoiner merging branches, SQL source metadata tagging.
-user-invocable: false
----
-
 `ConditionalRouter` socket-naming and lazy-execution behavior below has not
 been re-verified against every `haystack-ai` release in this repository's
 environment (haystack is not installed here). Check the installed

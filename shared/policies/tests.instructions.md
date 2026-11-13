@@ -63,7 +63,7 @@ def mock_external_api() -> MagicMock:
 
 ## Mocking Rules
 
-**Mock external services:** HTTP clients, LLM APIs, embedding models, databases.
+**Mock external services:** HTTP clients, LLM APIs, embedding models, databases, time, randomness.
 **Use real objects for:** dataclasses, configs, pure functions, lightweight framework components.
 **Patch at the import boundary:** `@patch("src.module.ExternalAPI")`, not `@patch("external_lib.API")`.
 **Assert every mock:** every mock must have at least one assertion on call count/args.
@@ -79,6 +79,12 @@ with patch("src.retrieval.generator.OpenAIChatGenerator") as mock_gen:
 with patch("src.utils.helpers.clean_text") as mock:  # don't do this
     ...
 ```
+
+## Test Design Rules
+
+- **Files:** use `tmp_path` for file tests.
+- **Context managers:** test that `__exit__` calls its cleanup, also when the body raises: `with patch.object(obj, "close", wraps=obj.close) as mock_close, obj: pass`, then `mock_close.assert_called_once()`. A bare `with obj: pass` is a zero-assertion test.
+- **Test helpers:** call the narrowest public method that covers the behavior, never a chain of private methods (`_build_nodes()`, `_extract()`); that chain lets a bug in the public method (wrong step order, missing state update) pass. With no public method, assert observable behavior or use an existing seam; add a public method only if it is a useful abstraction on its own. Break the public method on purpose to confirm a test fails.
 
 ## Async Tests
 
@@ -115,7 +121,7 @@ asyncio_mode = auto
 - No `match=` parameter on `pytest.raises` — always verify error message
 - Unasserted mocks (mock exists but no `assert_called_*` check)
 - Abstract test data (`"test_value"`) instead of concrete data (`"S/RES/1234"`)
-- Duplicated test logic instead of `@pytest.mark.parametrize`
+- Duplicated test logic instead of `@pytest.mark.parametrize` with readable `ids`
 - `scope="session"` for mutable fixtures — use `function` scope to avoid state leakage
 - Treating a mock-heavy pass as proof — verify with at least one integration test
 - Ignoring deprecation warnings — fix them and note the cause in `.claude/MEMORY.md`

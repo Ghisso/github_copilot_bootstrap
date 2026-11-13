@@ -1265,9 +1265,9 @@ Authenticated VS Code loading remains separate native evidence.
 
 ## Most Important Skills
 
-Skills have machine-readable `visibility: public|background` frontmatter. **Public** skills are intended for direct use; **background** skills are hidden helpers loaded by description match or by agents.
+Skills have machine-readable `visibility: public|background` frontmatter. Both values are listed to the model with their descriptions. `visibility` marks only the intended use: **public** skills are meant for direct use, and **background** skills are meant to be loaded by description match or by agents.
 
-There are many skills; these are the high-leverage ones I rely on most:
+The bootstrap ships 37 skills. Each one's listing text (description plus `when_to_use`) is capped at 300 characters, with `ponytail` and `ponytail-review` exempt, to keep the list Claude Code loads each turn small. These are the high-leverage ones I rely on most:
 
 Core workflow:
 
@@ -1275,30 +1275,30 @@ Core workflow:
 - [ponytail-review](shared/skills/ponytail-review/SKILL.md)
 - [plan-decomposition](shared/skills/plan-decomposition/SKILL.md)
 - [create-feature](shared/skills/create-feature/SKILL.md)
-- [run-tests](shared/skills/run-tests/SKILL.md)
-- [refactor](shared/skills/refactor/SKILL.md)
 - [code-review](shared/skills/code-review/SKILL.md)
 
 Quality and architecture:
 
 - [code-style](shared/skills/code-style/SKILL.md)
 - [testing-patterns](shared/skills/testing-patterns/SKILL.md)
-- [review-api](shared/skills/review-api/SKILL.md)
 - [text-to-sql-safety](shared/skills/text-to-sql-safety/SKILL.md)
 - [debug-investigator](shared/skills/debug-investigator/SKILL.md)
 
-Communication and context control:
+Communication:
 
 - [caveman](shared/skills/caveman/SKILL.md)
-- [caveman-compress](shared/skills/caveman-compress/SKILL.md)
 
 Project acceleration:
 
 - [setup-project](shared/skills/setup-project/SKILL.md)
 - [add-dependency](shared/skills/add-dependency/SKILL.md)
-- [deploy-service](shared/skills/deploy-service/SKILL.md)
 - [hydra-config](shared/skills/hydra-config/SKILL.md)
-- [bentoml-service](shared/skills/bentoml-service/SKILL.md)
+- [bentoml-service](shared/skills/bentoml-service/SKILL.md) (service code and deployment)
+
+Domain skills (each one holds several topics, one reference file per topic):
+
+- [haystack](shared/skills/haystack/SKILL.md): pipelines, `ConditionalRouter`, Docling, `OllamaChatGenerator`
+- [data-and-graph-pitfalls](shared/skills/data-and-graph-pitfalls/SKILL.md): pandas NaN and bool, GraphML interop, pyvis XSS, CSV-driven tests
 
 These skills encode battle-tested workflows and reduce ad-hoc execution.
 

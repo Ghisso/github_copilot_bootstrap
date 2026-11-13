@@ -109,9 +109,12 @@ from validate_targets import (  # noqa: E402
     planner_supervision_contract_errors,
     reporting_policy_errors,
     reporting_prompt_errors,
+    SKILL_DESCRIPTION_CAP_EXEMPT,
+    SKILL_DESCRIPTION_MAX_CHARS,
     scope_matches,
     shared_skill_integrity_errors,
     skill_frontmatter_yaml_errors,
+    skill_listing_length,
     skill_local_reference_errors,
     skill_name_errors,
     task_lane_contract_errors,
@@ -3887,6 +3890,145 @@ def test_shared_skill_integrity_errors_rejects_duplicate_descriptions(
     assert any("duplicate skill description" in error for error in errors)
 
 
+def _write_listing_skill(
+    library: Path, name: str, description: str, when_to_use: str | None = None
+) -> Path:
+    """Write one skill whose frontmatter carries exactly the given listing text."""
+    skill_dir = library / name
+    skill_dir.mkdir(parents=True)
+    extra = f"when_to_use: {when_to_use}\n" if when_to_use is not None else ""
+    (skill_dir / "SKILL.md").write_text(
+        f"---\nname: {name}\nvisibility: public\n"
+        f"description: {description}\n{extra}---\n\nBody\n",
+        encoding="utf-8",
+    )
+    return skill_dir / "SKILL.md"
+
+
+def test_description_cap_accepts_exactly_the_limit(tmp_path: Path) -> None:
+    library = tmp_path / "skills"
+    _write_listing_skill(library, "example", "x" * SKILL_DESCRIPTION_MAX_CHARS)
+
+    assert SKILL_DESCRIPTION_MAX_CHARS == 300
+    assert shared_skill_integrity_errors(library) == []
+
+
+def test_description_cap_rejects_one_character_over(tmp_path: Path) -> None:
+    library = tmp_path / "skills"
+    skill_path = _write_listing_skill(
+        library, "example", "x" * (SKILL_DESCRIPTION_MAX_CHARS + 1)
+    )
+
+    errors = shared_skill_integrity_errors(library)
+
+    assert len(errors) == 1
+    assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
+    assert str(skill_path) in errors[0]
+    assert "301" in errors[0]
+
+
+@pytest.mark.parametrize("name", sorted(SKILL_DESCRIPTION_CAP_EXEMPT))
+def test_description_cap_exempts_only_the_two_pinned_skills(
+    tmp_path: Path, name: str
+) -> None:
+    library = tmp_path / "skills"
+    _write_listing_skill(library, name, "x" * 500)
+    # An exempt name is not a prefix match: a sibling name still fails.
+    _write_listing_skill(library, f"{name}-extra", "y" * 500)
+
+    errors = shared_skill_integrity_errors(library)
+
+    assert SKILL_DESCRIPTION_CAP_EXEMPT == {"ponytail", "ponytail-review"}
+    assert len(errors) == 1
+    assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
+    assert f"{name}-extra" in errors[0]
+
+
+@pytest.mark.parametrize(
+    ("frontmatter", "expected"),
+    (
+        pytest.param("name: a\ndescription: abc\n", 3, id="inline-description"),
+        pytest.param('name: a\ndescription: "abc"\n', 3, id="quoted-description"),
+        pytest.param(
+            "name: a\ndescription: |\n  abc\n  de\nvisibility: public\n",
+            6,
+            id="block-description-joins-lines",
+        ),
+        pytest.param(
+            "name: a\ndescription: abc\nwhen_to_use: de\n", 5, id="when_to_use-adds"
+        ),
+        pytest.param(
+            "name: a\ndescription: abc\nwhen_to_use: >\n  de\n  f\n",
+            7,
+            id="block-when_to_use-adds",
+        ),
+        pytest.param("name: a\n", 0, id="no-listing-text"),
+    ),
+)
+def test_description_cap_listing_length_definition(
+    frontmatter: str, expected: int
+) -> None:
+    assert skill_listing_length(frontmatter) == expected
+
+
+def test_description_cap_counts_when_to_use_toward_the_limit(tmp_path: Path) -> None:
+    library = tmp_path / "skills"
+    _write_listing_skill(library, "at-limit", "a" * 200, "b" * 100)
+    over = _write_listing_skill(library, "over-limit", "c" * 200, "d" * 101)
+
+    errors = shared_skill_integrity_errors(library)
+
+    assert len(errors) == 1
+    assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
+    assert str(over) in errors[0]
+    assert "301" in errors[0]
+
+
+MERGED_SKILL_REFERENCES = (
+    pytest.param(
+        "haystack",
+        {"pipelines", "conditional-router", "docling", "ollama-chat"},
+        id="haystack",
+    ),
+    pytest.param(
+        "data-and-graph-pitfalls",
+        {
+            "pandas-nan-bool",
+            "graphml-interop",
+            "pyvis-xss",
+            "csv-driven-tests",
+            "csv-case-study",
+        },
+        id="data-and-graph-pitfalls",
+    ),
+)
+
+
+@pytest.mark.parametrize(("skill", "reference_stems"), MERGED_SKILL_REFERENCES)
+def test_merged_skills_have_their_references(
+    skill: str, reference_stems: set[str]
+) -> None:
+    """Each merged skill exists, ships its reference files, and every
+    `references/` file its SKILL.md names resolves. Absence of the retired
+    skill names is checked in the plan's Verification block, not here."""
+    skill_dir = REPO_ROOT / "shared" / "skills" / skill
+    skill_md = skill_dir / "SKILL.md"
+    assert skill_md.is_file()
+
+    named = set(re.findall(r"references/[\w.-]+\.md", skill_md.read_text("utf-8")))
+
+    assert named, f"{skill}/SKILL.md names no references/ file"
+    assert sorted(p for p in named if not (skill_dir / p).is_file()) == []
+    assert (
+        sorted(
+            stem
+            for stem in reference_stems
+            if not (skill_dir / f"references/{stem}.md").is_file()
+        )
+        == []
+    )
+
+
 @pytest.mark.parametrize(
     ("reference", "make_target_exist", "expect_error"),
     (
@@ -4033,38 +4175,18 @@ def test_pandas_nan_bool_coercion_documents_the_corrected_isinstance_claim() -> 
     explicit note accepting this limitation.
     """
     text = (
-        REPO_ROOT / "shared" / "skills" / "pandas-nan-bool-coercion" / "SKILL.md"
+        REPO_ROOT
+        / "shared"
+        / "skills"
+        / "data-and-graph-pitfalls"
+        / "references"
+        / "pandas-nan-bool.md"
     ).read_text(encoding="utf-8")
     assert "isinstance(np.bool_(True), bool)  # False" in text
     assert "isinstance(np.bool_(True), bool)  # True" not in text
 
 
-def test_run_tests_e2e_step_propagates_failure_instead_of_masking_it() -> None:
-    """Phase A correction: a failing example command under `examples/run_*.py`
-    must surface as a failure, never be reported as though no scripts existed.
-
-    Structural/textual assertion on the embedded shell snippet, not an
-    execution test: `run-tests/SKILL.md` is prose with an illustrative code
-    fence, and this repository only executes a skill's shell logic where a
-    real standalone helper script exists (as it does for
-    `caveman-compress/scripts/detect.py`, covered by
-    tests/test_caveman_compress_detect.py).
-    """
-    text = (REPO_ROOT / "shared" / "skills" / "run-tests" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-    assert "status=0" in text
-    assert "status=1" in text
-    assert '"E2E scripts FAILED"' in text
-    assert re.search(r"exit 1\b", text)
-    # The "no scripts" message must stay distinct from the failure message -
-    # a real failure must never be reported as an absent script.
-    assert "No E2E scripts" in text
-    assert '"No E2E scripts FAILED"' not in text
-
-
 DEPRECATION_CHECK_STEPS = (
-    pytest.param("run-tests", "## Step 5: Deprecation Check", id="run-tests"),
     pytest.param("add-dependency", "## Step 5: Check for Issues", id="add-dependency"),
 )
 DEPRECATION_LINE = "DeprecationWarning: old_call is deprecated"
@@ -4290,7 +4412,12 @@ def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
 def test_pyvis_xss_skill_assigns_html_escaping_to_the_application() -> None:
     """Textual assertion only: the skill must not claim pyvis escapes HTML."""
     text = (
-        REPO_ROOT / "shared" / "skills" / "pyvis-xss-testing" / "SKILL.md"
+        REPO_ROOT
+        / "shared"
+        / "skills"
+        / "data-and-graph-pitfalls"
+        / "references"
+        / "pyvis-xss.md"
     ).read_text(encoding="utf-8")
     normalized = " ".join(
         line.lstrip().removeprefix("# ").strip() for line in text.splitlines()
@@ -4324,11 +4451,13 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
 # shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
 # changes this hash and needs the same re-capture, as does the vendored
 # Ponytail LICENSE (copied into both shipped ponytail skills); the last one
-# was the backlog-followups Phase E merging Ponytail v5.3.2 into both shipped
-# Ponytail skills (the earlier one, Phase A step 8, restored that LICENSE
-# verbatim from upstream: `DietrichGebert`, one trailing newline).
+# was Phase C of skills-and-instructions-trim, which shortened the
+# `debug-investigator` description to fit the 300-character listing cap. Before
+# it came the backlog-followups Phase E merging Ponytail v5.3.2 into both
+# shipped Ponytail skills (the earlier one, Phase A step 8, restored that
+# LICENSE verbatim from upstream: `DietrichGebert`, one trailing newline).
 SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
-    "1cb7a738bd4e3b7c331949134b91a5f37b11dfa0efb204cffb6de4fc763979c7"
+    "a486e1983e85d55eb948cc2da2124ff2f6358966f7df4c6f565b37b329d4b1c6"
 )
 
 
@@ -5181,6 +5310,97 @@ def test_planning_guidance_check_fails_when_text_is_removed_or_moved() -> None:
         f"planner {PLANNER_PHASE_1!r} lacks {phrase!r}",
         f"learn '## Phase 1: Evaluate' lacks {removed!r}",
     ]
+
+
+SKILLS_FIRST_RULE = "## Mandatory Skills-First Rule"
+PLANNER_MICRO_PLAN_MODE = "### Micro-Plan Mode (`--mode micro-plan`)"
+PLANNER_FULL_PLAN_MODE = "### Full-Plan Mode (`--mode full-plan`)"
+
+
+def test_loading_rules_planner_micro_plan_reads_templates_not_plan_decomposition() -> (
+    None
+):
+    """Phase C: a micro-plan has one phase, so it reads the two plan templates
+    and does not load the multi-phase `plan-decomposition` skill."""
+    planner = _read_shared({"planner": "agents/planner/prompt.md"})["planner"]
+    micro_plan = _collapsed(_section(planner, PLANNER_MICRO_PLAN_MODE))
+
+    assert micro_plan, "the micro-plan section is missing"
+    assert ".claude/templates/plan-big.md" in micro_plan
+    assert ".claude/templates/plan-small.md" in micro_plan
+    assert "plan-decomposition/SKILL.md" not in micro_plan
+
+
+def _list_entries(text: str) -> list[str]:
+    """One whitespace-collapsed entry per list item or paragraph, so a wrapped
+    sentence stays whole."""
+    return [
+        _collapsed(entry)
+        for entry in re.split(r"\n(?=\s*(?:\d+\.|[-*])\s)|\n\s*\n", text)
+    ]
+
+
+def _plan_decomposition_scope_errors(planner: str) -> list[str]:
+    """List how the planner prompt fails to limit `plan-decomposition` to
+    full-plan mode: not named on the full-plan path, or named in the skills-first
+    rule by an entry that does not say `--mode full-plan`."""
+    skill = "plan-decomposition/SKILL.md"
+    named = [
+        entry
+        for entry in _list_entries(_section(planner, SKILLS_FIRST_RULE))
+        if skill in entry
+    ]
+    if not named and skill not in _section(planner, PLANNER_FULL_PLAN_MODE):
+        return [f"{skill} is named on neither the skills-first nor the full-plan path"]
+    return [
+        f"entry names {skill} without --mode full-plan: {entry!r}"
+        for entry in named
+        if "--mode full-plan" not in entry
+    ]
+
+
+def test_loading_rules_planner_reads_plan_decomposition_in_full_plan_mode_only() -> (
+    None
+):
+    planner = _read_shared({"planner": "agents/planner/prompt.md"})["planner"]
+
+    assert _plan_decomposition_scope_errors(planner) == []
+
+
+def test_loading_rules_planner_scope_check_rejects_an_unconditional_read() -> None:
+    """Negative control: dropping the mode condition from the skills-first
+    item is reported, so the check above does fail when the scope is lost."""
+    planner = _read_shared({"planner": "agents/planner/prompt.md"})["planner"]
+    unconditional = _drop(planner, "In `--mode full-plan` only,")
+
+    assert unconditional != planner, "the negative-control anchor moved"
+    errors = _plan_decomposition_scope_errors(unconditional)
+    assert len(errors) == 1
+    assert "without --mode full-plan" in errors[0]
+
+
+def test_loading_rules_coder_tier_one_is_ponytail_and_a_conditional_tests_read() -> (
+    None
+):
+    """Phase C: only Ponytail loads on every task; the tests policy is read
+    when the task adds or changes a test file."""
+    coder = _read_shared({"coder": "agents/coder/prompt.md"})["coder"]
+    tier_one = re.search(
+        r"\*\*Tier 1[^\n]*\n(.*?)\*\*Tier 2",
+        _section(coder, SKILLS_FIRST_RULE),
+        re.DOTALL,
+    )
+
+    assert tier_one is not None, "the coder's Tier 1 block is missing"
+    assert re.findall(r"[\w-]+/SKILL\.md", tier_one.group(1)) == ["ponytail/SKILL.md"]
+    tests_reads = [
+        entry
+        for entry in _list_entries(tier_one.group(1))
+        if "tests.instructions.md" in entry
+    ]
+    assert len(tests_reads) == 1
+    assert ".claude/instructions/tests.instructions.md" in tests_reads[0]
+    assert re.search(r"\b(when|if)\b", tests_reads[0], re.IGNORECASE)
 
 
 @pytest.mark.parametrize("surface", ["claude", "codex"])

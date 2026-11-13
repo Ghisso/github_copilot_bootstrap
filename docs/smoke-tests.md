@@ -45,7 +45,7 @@ Expected:
   role-supplement delimiter, and the transformed specialist supplement. Missing
   or duplicate supplements, copied complete bases, recursive or multi-level
   composition, cycles, and delimiter drift fail validation.
-- `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
+- `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides, so they use the trusted project's `.codex/config.toml` MCP registrations and the repository skills Codex lists from `.agents/skills/`.
 - Structural checks record actual instruction sizes for all seven Codex roles.
   These values are observability, not an official Codex size limit or a static
   delivery claim. Native probes are the only delivery evidence.
@@ -274,7 +274,7 @@ tier proof, bounded Flash-only task, skill discovery or use, specialist MCP,
 or PreToolUse hard-deny execution was completed. This remains an external
 acceptance gap/blocker.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms. Creating an implementation branch also runs the plan-frontmatter validator on the big plan and its listed phase files, and denies with the first errors; an unrelated draft plan does not block.
-- The `run-tests` and `add-dependency` deprecation checks keep pytest's exit status, and `scripts/validate_targets.py` rejects shipped `pytest`, `mypy`, `ruff`, or `verify.py` lines that end in `|| true`, `|| :`, or `|| echo`.
+- The `add-dependency` deprecation check keeps pytest's exit status, and `scripts/validate_targets.py` rejects shipped `pytest`, `mypy`, `ruff`, or `verify.py` lines that end in `|| true`, `|| :`, or `|| echo`.
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh findings report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Native `post-commit` closeout derives state from the created `HEAD`, advances only one eligible completed phase, and runs before AI-state synchronization.
 - PR creation uses `--base dev`. The orchestrator attempts one normal non-force outer-repository push after every successful commit, using the branch upstream or `origin`; missing remote configuration and authentication/network failures warn and preserve the local commit. PRs and merges remain user-requested.

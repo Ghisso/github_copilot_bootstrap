@@ -631,9 +631,14 @@ CODEX_POLICY_SKILL_FALLBACKS = {
     "api-service-standards.instructions.md": "bentoml-service",
     "code-standards.instructions.md": "code-style",
     "config-first-design.instructions.md": "hydra-config",
-    "deployment.instructions.md": "deploy-service",
+    "deployment.instructions.md": "bentoml-service",
     "tests.instructions.md": "testing-patterns",
 }
+# Claude Code lists every skill's description (plus `when_to_use`) each turn and
+# truncates the list past its budget (big plan skills-and-instructions-trim,
+# Decision 1). The two exempt skills are the always-on coding rules.
+SKILL_DESCRIPTION_MAX_CHARS = 300
+SKILL_DESCRIPTION_CAP_EXEMPT = frozenset({"ponytail", "ponytail-review"})
 
 
 def text_files(root: Path) -> list[Path]:
@@ -8544,11 +8549,15 @@ def extract_frontmatter(text: str) -> str:
 
 
 def extract_frontmatter_description(frontmatter: str) -> str:
+    return extract_frontmatter_scalar(frontmatter, "description")
+
+
+def extract_frontmatter_scalar(frontmatter: str, key: str) -> str:
     lines = frontmatter.splitlines()
     for index, line in enumerate(lines):
-        if not line.startswith("description:"):
+        if not line.startswith(f"{key}:"):
             continue
-        rest = line[len("description:") :].strip()
+        rest = line[len(key) + 1 :].strip()
         if rest in ("|", ">", "|-", ">-", ""):
             # A blank line does NOT end a YAML block scalar - only a
             # less-indented (or EOF) line does. Treating an empty `follow`
@@ -8563,6 +8572,15 @@ def extract_frontmatter_description(frontmatter: str) -> str:
             return " ".join(block_lines).strip()
         return rest.strip("\"'")
     return ""
+
+
+def skill_listing_length(frontmatter: str) -> int:
+    """Return the characters Claude Code lists for a skill: the stripped
+    `description` plus the stripped `when_to_use`. The one length definition,
+    shared by the cap check and the library total."""
+    return len(extract_frontmatter_description(frontmatter).strip()) + len(
+        extract_frontmatter_scalar(frontmatter, "when_to_use").strip()
+    )
 
 
 def normalize_frontmatter_scalar(value: str) -> str:
@@ -8771,7 +8789,8 @@ def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
     `skill_library_root` (normally `REPO_ROOT / "shared" / "skills"`): valid
     YAML frontmatter shape, `name` matching the directory, visibility +
     non-empty, non-duplicate description (duplicate descriptions break
-    description-match loading of background skills), a required root
+    description-match loading of background skills) within the listing-length
+    cap (`skill_listing_length`), a required root
     `SKILL.md` per directory, and local relative references that name a
     repository path. See "Skill Library Validation Contract" in
     docs/architecture.md for the hard/advisory split this function enforces;
@@ -8813,6 +8832,16 @@ def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
         )
         if not description:
             continue
+        listing_length = skill_listing_length(frontmatter)
+        if (
+            listing_length > SKILL_DESCRIPTION_MAX_CHARS
+            and skill_path.parent.name not in SKILL_DESCRIPTION_CAP_EXEMPT
+        ):
+            errors.append(
+                f"{skill_path}: SKILL_DESCRIPTION_TOO_LONG - listing text "
+                f"(description plus when_to_use) is {listing_length} "
+                f"characters; the cap is {SKILL_DESCRIPTION_MAX_CHARS}"
+            )
         duplicate = descriptions.get(description)
         if duplicate is not None:
             errors.append(
@@ -9591,8 +9620,8 @@ def _sidecar_workflow_profile_cases(good_root: Path, errors: list[str]) -> None:
     (skills included), ships the four templates from
     `shared/sidecar/workflow/templates/`, and because
     `runtime_ownership.sidecar_source_violations()` allows a shipped skill's
-    files beyond `SKILL.md`/`LICENSE` (`caveman-compress`, `draw-io`,
-    `md-to-pdf`, and `csv-driven-integration-tests` carry such files).
+    files beyond `SKILL.md`/`LICENSE` (`draw-io`, `md-to-pdf`, `haystack`,
+    and `data-and-graph-pitfalls` carry such files).
     """
     check(
         not sidecar_target_errors(good_root, "workflow"),

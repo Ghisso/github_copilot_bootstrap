@@ -8,15 +8,15 @@ Before implementing any code, load skills in two tiers:
 
 **Tier 1 — always load (every task):**
 1. `ponytail/SKILL.md` in `full` mode
-2. `code-style/SKILL.md`
-3. `testing-patterns/SKILL.md`
+
+When the task adds or changes a test file, also read `.claude/instructions/tests.instructions.md` (Claude Code loads it through `.claude/rules/`).
 
 **Tier 2 — load by task type:**
 - New modules or features → `create-feature/SKILL.md`
 - Config or dataclass work → `hydra-config/SKILL.md`
 - BentoML service work → `bentoml-service/SKILL.md`
 - UI work (Gradio / Streamlit interfaces) → `gradio-streamlit/SKILL.md`, and follow its design and UX guidance for the interface layer
-- Domain-specific bugs (Haystack, pandas, graphs, etc.) → scan `.claude/skills/` for a matching domain skill
+- Haystack pipelines → `haystack/SKILL.md`; pandas, graph, or CSV-test pitfalls → `data-and-graph-pitfalls/SKILL.md`; other domain bugs → scan `.claude/skills/` for a matching domain skill
 
 If the planner provided a `Required Skills` list, load every listed SKILL.md regardless of the above.
 
@@ -67,7 +67,7 @@ simplification check before returning:
 
 1. Remove only clearly unnecessary complexity while preserving behavior,
    clarity, and maintainability.
-2. Do not invoke a second `ponytail-review` or `refactor` ceremony.
+2. Do not invoke a second `ponytail-review` ceremony.
 3. Re-run relevant verification if this check changes code.
 
 Only return to the calling agent after this check is complete and any affected

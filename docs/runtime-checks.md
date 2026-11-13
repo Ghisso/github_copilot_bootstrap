@@ -949,7 +949,7 @@ Codex-specific runtime notes:
 - `.codex/config.toml` leaves the interactive session model and reasoning effort unpinned; generated custom agents carry their explicit model intent.
 - `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
 - `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
-- `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
+- `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`). Codex lists repository skills from `.agents/skills/`; these entries add no skill of their own (2026-11-13 client spike, codex-cli 0.147.0).
 - `.codex/hooks.json` uses the narrow native-edit and ordered-Bash matcher groups; it must not send every tool through the mutation guard.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define
   `name`, `description`, `model`, `model_reasoning_effort`, and
@@ -976,11 +976,11 @@ Codex-specific runtime notes:
   implementation-attributable Terra failure advances automatically to Sol.
   Environment and baseline failures stop escalation; indeterminate evidence
   returns to orchestrator judgment.
-- `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
+- `.claude/skills/*/SKILL.md` stores the shared skills. Claude Code reads them there; Codex reads the generated copy in `.agents/skills/`, and Copilot lists one copy per name, preferring the `.agents/skills/` copy.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
-- Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.
+- Codex project trust is required before `.codex/config.toml` and hooks are loaded. Repository skills in `.agents/skills/` are listed with or without trust (2026-11-13 client spike).
 - Because Codex `PreToolUse` cannot request approval, hook-config mutations are denied instead of downgraded to an approval prompt. Claude asks for approval. Both allow a read-only inspection of a protected configuration when the command classifier can prove it has no mutation target; redirects, in-place edits, and ambiguous commands fail closed.
 
 The generated consumer `.codex/config.toml` is carried in

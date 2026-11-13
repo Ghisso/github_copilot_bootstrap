@@ -1,15 +1,3 @@
----
-name: ollama-chat-generator
-visibility: background
-description: |
-  Fix common Ollama integration issues in Haystack pipelines. Triggers:
-  - System prompt is silently ignored
-  - format="json" has no effect on output
-  - 30-60s startup timeouts
-  - warm_up() method missing in newer versions
-user-invocable: false
----
-
 ## Problem
 
 `OllamaGenerator` is the text-completion interface — it does NOT support

@@ -146,33 +146,30 @@ SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
 # and state only; no ``.github/agents`` or ``.codex/agents`` unit ships.
 SIDECAR_PROFILES = ("skills", "workflow")
 SIDECAR_DEFAULT_PROFILE = "skills"
-# The 25 public skills whose text names nothing the profile does not ship;
+# The 22 public skills whose text names nothing the profile does not ship;
 # shared/sidecar/workflow/skills.txt records why the others are denied.
 SIDECAR_WORKFLOW_SKILLS = (
     "add-dependency",
     "caveman",
-    "caveman-compress",
     "concept-to-image",
-    "csv-driven-integration-tests",
     "data-analysis",
+    "data-and-graph-pitfalls",
     "debug-investigator",
     "devils-advocate",
     "draw-io",
     "gradio-streamlit",
+    "haystack",
     "html-presentation",
     "humanize",
     "hydra-config",
     "literature-review",
     "md-to-pdf",
     "onboard",
-    "pdf",
-    "pipeline-patterns",
     "ponytail",
     "ponytail-review",
     "prompt-lab",
     "rag-auditor",
     "research-critique",
-    "review-api",
     "text-to-sql-safety",
 )
 SIDECAR_PROFILE_SKILLS: dict[str, tuple[str, ...]] = {

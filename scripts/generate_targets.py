@@ -1027,7 +1027,14 @@ def render_claude_mcp_json(path: Path) -> None:
 def render_codex_config(path: Path) -> None:
     lines = [
         "# Generated from shared/mcp/servers.json.",
-        "# Skills are sourced from the shared .claude basis; project trust is required.",
+        "# Codex lists this repository's skills from .agents/skills/. The [[skills.config]]",
+        "# entries below add no skill of their own. Codex documents them as per-skill on/off",
+        "# switches; the spike did not test that.",
+        "# Observed 2026-11-13 (codex-cli 0.147.0): every shipped skill was listed once from",
+        "# .agents/skills/; without that folder these entries alone listed none; project trust",
+        "# did not change the listing. Evidence: the client spike report",
+        "# .claude/explorations/2026-11-12_skills-trim-client-spike/REPORT.md in the bootstrap's",
+        "# AI state.",
         "# Semble and Context Mode are optional; missing binaries should warn, not block.",
         "# Hooks are enabled by default in current Codex, so no flat features block is emitted.",
         "# Preserve the MultiAgent V2 routing shim until trusted native probes prove removal.",

@@ -2,12 +2,10 @@
 name: knowledge-refresh
 visibility: public
 description: |
-  Refresh, enable, or rebaseline this repository's generated OpenWiki
-  knowledge layer (`openwiki/**`) by calling OpenWiki's own MCP tools,
-  guarded by this repository's hook. Not for README/docs writing, general
-  documentation review, or any other wiki or knowledge-base tool. Load
-  OpenWiki's own `openwiki` skill for the MCP tool sequence itself; this
-  skill covers the lifecycle policy around it.
+  Refresh, enable, or rebaseline this repository's generated OpenWiki knowledge
+  layer (`openwiki/**`) through OpenWiki's own MCP tools, under this
+  repository's hook guard. Not for README or docs writing. The `openwiki` skill
+  has the tool sequence; this skill has the lifecycle policy.
 ---
 
 # Knowledge Refresh

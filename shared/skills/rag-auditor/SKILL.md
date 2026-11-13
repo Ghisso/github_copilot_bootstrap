@@ -2,15 +2,10 @@
 name: rag-auditor
 visibility: public
 description: |
-  Evaluates RAG (Retrieval-Augmented Generation) pipeline quality across
-  retrieval and generation stages. Measures precision, recall, MRR for
-  retrieval; groundedness, completeness, and hallucination rate for generation.
-  Diagnoses failure root causes and recommends improvements. Use when:
-  - "audit RAG pipeline", "RAG quality", "evaluate RAG retrieval"
-  - "hallucination detection", "retrieval precision", "why is RAG failing"
-  - "RAG diagnosis", "retrieval quality", "RAG evaluation"
-  - "chunk quality", "RAG pipeline review", "grounding check"
-  For general architecture audits, use `reviewer` with the `architecture` profile.
+  Audit a RAG pipeline: "RAG quality", "why is RAG failing", "hallucination
+  detection", "retrieval precision", "grounding check", "chunk quality".
+  Measures retrieval precision, recall, MRR, groundedness, and hallucination
+  rate, then diagnoses causes. For architecture audits use `reviewer`.
 ---
 
 # RAG Auditor

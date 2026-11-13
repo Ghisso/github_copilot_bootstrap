@@ -46,14 +46,13 @@ folder — not a fixed bootstrap command list; every project names its own
 commands differently.
 
 When a step needs a specific skill, name only a skill actually shipped in
-this profile: `add-dependency`, `caveman`, `caveman-compress`,
-`concept-to-image`, `csv-driven-integration-tests`, `data-analysis`,
-`debug-investigator`, `devils-advocate`, `draw-io`, `gradio-streamlit`,
+this profile: `add-dependency`, `caveman`, `concept-to-image`,
+`data-analysis`, `data-and-graph-pitfalls`, `debug-investigator`,
+`devils-advocate`, `draw-io`, `gradio-streamlit`, `haystack`,
 `html-presentation`, `humanize`, `hydra-config`, `literature-review`,
-`md-to-pdf`, `onboard`, `pdf`, `pipeline-patterns`, `ponytail`, `ponytail-review`,
-`prompt-lab`, `rag-auditor`, `research-critique`, `review-api`, or
-`text-to-sql-safety`. Load `ponytail` in full mode for any step that
-writes code.
+`md-to-pdf`, `onboard`, `ponytail`, `ponytail-review`, `prompt-lab`,
+`rag-auditor`, `research-critique`, or `text-to-sql-safety`. Load
+`ponytail` in full mode for any step that writes code.
 
 Recommend a review only for a diff that is more than a one-line fix, and
 name the profile it needs from `.claude/review-profiles/` by the surface
