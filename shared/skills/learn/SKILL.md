@@ -64,8 +64,20 @@ ls .claude/skills/ && grep -r -i "KEYWORD" .claude/skills/
 Create the skill in the canonical location for the repository you are in:
 `shared/skills/[skill-name]/SKILL.md` in this bootstrap's authoring
 repository, so it regenerates into every target; `.claude/skills/[skill-name]/SKILL.md`
-in an installed consumer project, which has no `shared/skills/`. A skill left
-only in the generated overlay is deleted by the next refresh.
+in an installed consumer project, which has no `shared/skills/`.
+
+In a consumer project, also create an empty `.project-skill` file in the
+skill folder (`.claude/skills/[skill-name]/.project-skill`). Without it, the
+next refresh refuses to run until you mark or remove the folder. Rules:
+
+- Use a lowercase kebab-case name equal to `name:`, and one no bootstrap or
+  third-party skill uses.
+- Put no symlinks in the folder.
+- Codex, Antigravity, and Copilot read `.agents/skills/`, so they see the
+  skill only after the next refresh copies it to
+  `.agents/skills/[skill-name]/`. Never create or edit that folder by hand.
+- Create or edit the skill no later than CLOSEOUT step 2, because receipts
+  bind `.claude/` runtime files.
 
 `name` must match the skill's directory name, and `visibility` is required
 under `shared/skills/`; `scripts/validate_targets.py` fails the run otherwise.
@@ -119,4 +131,5 @@ Skill created: <shared/skills or .claude/skills>/[name]/SKILL.md
   Trigger: [when to use]
   Problem: [what it solves]
   .claude/MEMORY.md: Updated
+  Marker (consumer project): .claude/skills/[name]/.project-skill
 ```

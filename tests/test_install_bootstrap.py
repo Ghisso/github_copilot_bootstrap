@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -1470,6 +1471,714 @@ def test_refresh_preserves_third_party_openwiki_skill_bundle(tmp_path: Path) -> 
         assert (
             target / surface / "skills/openwiki" / ".openwiki-install.json"
         ).is_file()
+
+
+# ---------------------------------------------------------------------------
+# Project-owned skills (Phase A of `skills-and-instructions-trim`).
+#
+# A real folder `.claude/skills/<name>/` holding a regular file named
+# `.project-skill` belongs to the project: a full install never deletes or
+# overwrites it, mirrors it (marker included) to `.agents/skills/<name>/`,
+# and refuses before any write when it cannot do that safely. The marker name
+# is spelled out as a literal in these tests so they pin it.
+# ---------------------------------------------------------------------------
+
+
+def _write_project_skill(
+    root: Path,
+    name: str,
+    *,
+    marked: bool,
+    declared: str | None = None,
+    extra: dict[str, str] | None = None,
+) -> Path:
+    """Write ``root/.claude/skills/<name>/`` with a valid ``SKILL.md``."""
+    folder = root / ".claude" / "skills" / name
+    folder.mkdir(parents=True)
+    (folder / "SKILL.md").write_text(
+        f"---\nname: {declared or name}\ndescription: demo\n---\nBody of {name}\n",
+        encoding="utf-8",
+    )
+    if marked:
+        (folder / ".project-skill").write_bytes(b"")
+    for relative, content in (extra or {}).items():
+        (folder / relative).parent.mkdir(parents=True, exist_ok=True)
+        (folder / relative).write_text(content, encoding="utf-8")
+    return folder
+
+
+def _exact_snapshot(root: Path) -> dict[str, tuple[str, bytes | str | None]]:
+    """Return every entry under ``root`` without following any link: file
+    bytes, symlink target, or a bare directory marker. The outer ``.git`` is
+    skipped because Git itself may refresh its index on a read."""
+    snapshot: dict[str, tuple[str, bytes | str | None]] = {}
+    for directory, names, files in os.walk(root, topdown=True, followlinks=False):
+        if Path(directory) == root and ".git" in names:
+            names.remove(".git")
+        for name in (*names, *files):
+            path = Path(directory) / name
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                snapshot[relative] = ("link", os.readlink(path))
+            elif path.is_dir():
+                snapshot[relative] = ("dir", None)
+            elif path.is_file():
+                snapshot[relative] = ("file", path.read_bytes())
+            else:
+                snapshot[relative] = ("other", None)
+    return snapshot
+
+
+def _make_outside(tmp_path: Path) -> Path:
+    """Create a folder outside the target with a sentinel that a refusal or a
+    skipped mirror must leave alone. The sentinel declares `name: demo`, so a
+    check that followed a link to it would accept a folder named `demo`."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "sentinel.txt").write_text(
+        "---\nname: demo\n---\nOUTSIDE-SENTINEL\n", encoding="utf-8"
+    )
+    return outside
+
+
+def _project_skill_world(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Return ``(source, target, outside)``: a source and a target that both
+    hold the shipped skill ``shipped``, and the outside sentinel folder."""
+    source = tmp_path / "source"
+    target = tmp_path / "consumer"
+    _write_project_skill(source, "shipped", marked=False)
+    _write_project_skill(target, "shipped", marked=False)
+    return source, target, _make_outside(tmp_path)
+
+
+def test_is_project_skill_dir_requires_a_real_marked_folder_under_claude_skills(
+    tmp_path: Path,
+) -> None:
+    from runtime_ownership import is_project_skill_dir
+
+    marked = _write_project_skill(tmp_path / "ok", "demo", marked=True)
+    assert is_project_skill_dir(marked)
+    assert not is_project_skill_dir(
+        _write_project_skill(tmp_path / "bare", "demo", marked=False)
+    )
+
+    wrong_parent = tmp_path / "wrong-parent" / ".claude" / "other" / "demo"
+    wrong_parent.mkdir(parents=True)
+    (wrong_parent / ".project-skill").write_bytes(b"")
+    assert not is_project_skill_dir(wrong_parent)
+
+    not_claude = tmp_path / "not-claude" / "skills" / "demo"
+    not_claude.mkdir(parents=True)
+    (not_claude / ".project-skill").write_bytes(b"")
+    assert not is_project_skill_dir(not_claude)
+
+    nested = marked / "nested"
+    nested.mkdir()
+    (nested / ".project-skill").write_bytes(b"")
+    assert not is_project_skill_dir(nested)
+
+    marker_dir = _write_project_skill(tmp_path / "dir-marker", "demo", marked=False)
+    (marker_dir / ".project-skill").mkdir()
+    assert not is_project_skill_dir(marker_dir)
+
+    marker_link = _write_project_skill(tmp_path / "link-marker", "demo", marked=False)
+    (marker_link / ".project-skill").symlink_to(marked / ".project-skill")
+    assert not is_project_skill_dir(marker_link)
+
+    folder_link = tmp_path / "link-folder" / ".claude" / "skills" / "demo"
+    folder_link.parent.mkdir(parents=True)
+    folder_link.symlink_to(marked, target_is_directory=True)
+    assert not is_project_skill_dir(folder_link)
+
+    skills_link = tmp_path / "link-skills" / ".claude"
+    skills_link.mkdir(parents=True)
+    (skills_link / "skills").symlink_to(marked.parent, target_is_directory=True)
+    assert not is_project_skill_dir(skills_link / "skills" / "demo")
+
+    claude_link = tmp_path / "link-claude"
+    claude_link.mkdir()
+    (claude_link / ".claude").symlink_to(marked.parent.parent, target_is_directory=True)
+    assert not is_project_skill_dir(claude_link / ".claude" / "skills" / "demo")
+
+
+def test_refresh_preserves_marked_project_skill_bytes_across_two_refreshes(
+    tmp_path: Path,
+) -> None:
+    """The source lacks `demo`, so an unmarked `demo` would be pruned as an
+    obsolete generated file. The marker keeps every byte, the marker itself
+    included; an unmarked sibling and a stale `.agents` copy of `demo` are
+    still ordinary generated content and are pruned."""
+    source = tmp_path / "generated"
+    target = tmp_path / "consumer"
+    (source / ".claude/hooks").mkdir(parents=True)
+    (source / ".claude/hooks/generated.txt").write_text("generated\n")
+    demo = _write_project_skill(
+        target,
+        "demo",
+        marked=True,
+        extra={"references/guide.md": "guide\n", "scripts/run.sh": "echo run\n"},
+    )
+    _write_project_skill(target, "retired", marked=False)
+    mirror = target / ".agents/skills/demo/SKILL.md"
+    mirror.parent.mkdir(parents=True)
+    mirror.write_text("stale mirror\n", encoding="utf-8")
+    before = _exact_snapshot(demo)
+    assert ".project-skill" in before
+
+    copy_generated_tree(source, target, dry_run=False)
+    copy_generated_tree(source, target, dry_run=False)
+
+    assert _exact_snapshot(demo) == before
+    assert not (target / ".claude/skills/retired").exists()
+    assert not (target / ".agents/skills/demo").exists()
+
+
+def _refuse_marker_in_shipped_folder(target: Path, outside: Path) -> tuple[str, ...]:
+    (target / ".claude/skills/shipped/.project-skill").write_bytes(b"")
+    return ("shipped",)
+
+
+def _refuse_declared_name_differs(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(target, "demo", marked=True, declared="other-name")
+    return ("demo",)
+
+
+def _refuse_declared_name_missing(target: Path, outside: Path) -> tuple[str, ...]:
+    folder = _write_project_skill(target, "demo", marked=True)
+    (folder / "SKILL.md").write_text("no frontmatter\n", encoding="utf-8")
+    return ("demo",)
+
+
+def _refuse_not_kebab_case(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(target, "Demo_Skill", marked=True)
+    return ("Demo_Skill",)
+
+
+def _refuse_third_party_destination(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(target, "openwiki", marked=True)
+    claimed = target / ".agents/skills/openwiki"
+    claimed.mkdir(parents=True)
+    (claimed / ".openwiki-install.json").write_text("{}", encoding="utf-8")
+    return ("openwiki",)
+
+
+def _refuse_third_party_shape(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(target, "openwiki", marked=True)
+    return ("openwiki",)
+
+
+def _refuse_openwiki_marker_inside(target: Path, outside: Path) -> tuple[str, ...]:
+    folder = _write_project_skill(target, "demo", marked=True)
+    (folder / ".openwiki-install.json").write_text("{}", encoding="utf-8")
+    return ("demo",)
+
+
+def _refuse_symlink_entry(target: Path, outside: Path) -> tuple[str, ...]:
+    foreign = _write_project_skill(outside, "foreign", marked=True)
+    (target / ".claude/skills/linked").symlink_to(foreign, target_is_directory=True)
+    return ("linked",)
+
+
+def _refuse_skills_directory_symlink(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(outside, "foreign", marked=True)
+    shutil.rmtree(target / ".claude/skills")
+    (target / ".claude/skills").symlink_to(
+        outside / ".claude/skills", target_is_directory=True
+    )
+    return (".claude/skills",)
+
+
+def _refuse_marked_folder_under_a_symlinked_claude(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """`is_project_skill_dir` needs a real `.claude`, so the refresh would not
+    prune-protect this marked folder; validation must agree and refuse."""
+    _write_project_skill(target, "demo", marked=True)
+    (target / ".claude").rename(outside / "real-claude")
+    (target / ".claude").symlink_to(outside / "real-claude", target_is_directory=True)
+    return (".claude/skills/demo", "not protected")
+
+
+def _refuse_symlinked_marker(target: Path, outside: Path) -> tuple[str, ...]:
+    folder = _write_project_skill(target, "demo", marked=False)
+    (folder / ".project-skill").symlink_to(outside / "sentinel.txt")
+    return ("demo",)
+
+
+def _refuse_symlinked_skill_md(target: Path, outside: Path) -> tuple[str, ...]:
+    folder = target / ".claude/skills/demo"
+    folder.mkdir(parents=True)
+    (folder / "SKILL.md").symlink_to(outside / "sentinel.txt")
+    (folder / ".project-skill").write_bytes(b"")
+    return ("demo",)
+
+
+def _refuse_marked_without_skill_md(target: Path, outside: Path) -> tuple[str, ...]:
+    folder = target / ".claude/skills/demo"
+    folder.mkdir(parents=True)
+    (folder / ".project-skill").write_bytes(b"")
+    return ("demo",)
+
+
+def _refuse_unmarked_never_shipped(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(target, "stray", marked=False)
+    return ("stray", ".claude/skills/stray/.project-skill")
+
+
+def _refuse_live_record_when_copy_exists(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """The live `.agents/skills/` is only a fallback: a `bootstrap-root` copy
+    that exists but does not list `old` is the record, and `old` is unknown."""
+    _write_project_skill(target, "old", marked=False)
+    (target / ".agents/skills/old").mkdir(parents=True)
+    (target / ".agents/skills/old/SKILL.md").write_text("old\n", encoding="utf-8")
+    (target / ".claude/bootstrap-root/.agents/skills/other").mkdir(parents=True)
+    return ("old",)
+
+
+def _write_former_project_skill_record(target: Path, name: str, *, live: bool) -> None:
+    """Record ``name`` as an earlier refresh left it: a mirror of a project
+    skill, marker included, in the ``bootstrap-root`` copy of ``.agents/skills``
+    (or, with ``live``, only in the live ``.agents/skills``)."""
+    root = target / (".agents" if live else ".claude/bootstrap-root/.agents")
+    record = root / "skills" / name
+    record.mkdir(parents=True)
+    (record / "SKILL.md").write_text("old mirror\n", encoding="utf-8")
+    (record / ".project-skill").write_bytes(b"")
+
+
+def _refuse_marker_lost_former_project_skill(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """The marker file is gone, but the record copy still holds it: the folder
+    was a project skill, so a refresh must not delete it as a retired one."""
+    _write_project_skill(target, "demo", marked=False)
+    _write_former_project_skill_record(target, "demo", live=False)
+    return ("demo", ".claude/skills/demo/.project-skill")
+
+
+def _refuse_marker_lost_former_project_skill_in_live_agents_only(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    _write_project_skill(target, "demo", marked=False)
+    _write_former_project_skill_record(target, "demo", live=True)
+    return ("demo", ".claude/skills/demo/.project-skill")
+
+
+def _refuse_marker_lost_former_project_skill_the_source_now_ships(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """Same, and the new source ships the name: still refused, because the
+    refresh would overwrite the project's edits with the bootstrap version."""
+    _write_project_skill(target.parent / "source", "demo", marked=False)
+    _write_project_skill(target, "demo", marked=False)
+    _write_former_project_skill_record(target, "demo", live=False)
+    return ("demo", ".claude/skills/demo/.project-skill")
+
+
+PROJECT_SKILL_REFUSALS = {
+    "marker-in-shipped-folder": _refuse_marker_in_shipped_folder,
+    "declared-name-differs": _refuse_declared_name_differs,
+    "declared-name-missing": _refuse_declared_name_missing,
+    "not-kebab-case": _refuse_not_kebab_case,
+    "third-party-destination": _refuse_third_party_destination,
+    "third-party-shape": _refuse_third_party_shape,
+    "openwiki-marker-inside": _refuse_openwiki_marker_inside,
+    "symlink-entry": _refuse_symlink_entry,
+    "skills-directory-symlink": _refuse_skills_directory_symlink,
+    "marked-folder-under-symlinked-claude": (
+        _refuse_marked_folder_under_a_symlinked_claude
+    ),
+    "symlinked-marker": _refuse_symlinked_marker,
+    "symlinked-skill-md": _refuse_symlinked_skill_md,
+    "marked-without-skill-md": _refuse_marked_without_skill_md,
+    "unmarked-never-shipped": _refuse_unmarked_never_shipped,
+    "live-record-ignored-when-copy-exists": _refuse_live_record_when_copy_exists,
+    "marker-lost-former-project-skill": _refuse_marker_lost_former_project_skill,
+    "marker-lost-former-project-skill-in-live-agents-only": (
+        _refuse_marker_lost_former_project_skill_in_live_agents_only
+    ),
+    "marker-lost-former-project-skill-the-source-now-ships": (
+        _refuse_marker_lost_former_project_skill_the_source_now_ships
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "scenario", PROJECT_SKILL_REFUSALS.values(), ids=PROJECT_SKILL_REFUSALS.keys()
+)
+def test_validate_project_skills_refuses_before_any_write(
+    tmp_path: Path, scenario: Callable[[Path, Path], tuple[str, ...]]
+) -> None:
+    source, target, outside = _project_skill_world(tmp_path)
+    expected = scenario(target, outside)
+    target_before = _exact_snapshot(target)
+    outside_before = _exact_snapshot(outside)
+
+    with pytest.raises(SystemExit) as refused:
+        install_bootstrap.validate_project_skills(source, target)
+
+    assert refused.value.code not in (0, None)
+    for fragment in expected:
+        assert fragment in str(refused.value.code)
+    assert _exact_snapshot(target) == target_before
+    assert _exact_snapshot(outside) == outside_before
+
+
+def test_validate_project_skills_lists_every_problem_in_one_refusal(
+    tmp_path: Path,
+) -> None:
+    source, target, _ = _project_skill_world(tmp_path)
+    _write_project_skill(target, "stray-one", marked=False)
+    _write_project_skill(target, "stray-two", marked=False)
+    _write_project_skill(target, "mismatch", marked=True, declared="other")
+
+    with pytest.raises(SystemExit) as refused:
+        install_bootstrap.validate_project_skills(source, target)
+
+    for name in ("stray-one", "stray-two", "mismatch"):
+        assert name in str(refused.value.code)
+
+
+def _pass_retired_skill_in_bootstrap_root_record(target: Path) -> None:
+    _write_project_skill(target, "old", marked=False)
+    record = target / ".claude/bootstrap-root/.agents/skills/old"
+    record.mkdir(parents=True)
+    (record / "SKILL.md").write_text("old\n", encoding="utf-8")
+
+
+def _pass_retired_skill_in_live_agents_only(target: Path) -> None:
+    _write_project_skill(target, "old", marked=False)
+    live = target / ".agents/skills/old"
+    live.mkdir(parents=True)
+    (live / "SKILL.md").write_text("old\n", encoding="utf-8")
+
+
+def _pass_unmarked_folder_without_skill_md(target: Path) -> None:
+    scratch = target / ".claude/skills/scratch"
+    scratch.mkdir(parents=True)
+    (scratch / "notes.txt").write_text("notes\n", encoding="utf-8")
+
+
+def _pass_valid_marked_skill(target: Path) -> None:
+    _write_project_skill(target, "demo", marked=True)
+
+
+def _pass_openwiki_claimed_bundle(target: Path) -> None:
+    bundle = _write_project_skill(target, "openwiki", marked=False)
+    (bundle / ".openwiki-install.json").write_text("{}", encoding="utf-8")
+
+
+PROJECT_SKILL_PASSES = {
+    "retired-skill-in-bootstrap-root-record": (
+        _pass_retired_skill_in_bootstrap_root_record
+    ),
+    "retired-skill-in-live-agents-only": _pass_retired_skill_in_live_agents_only,
+    "unmarked-folder-without-skill-md": _pass_unmarked_folder_without_skill_md,
+    "valid-marked-skill": _pass_valid_marked_skill,
+    "openwiki-claimed-bundle": _pass_openwiki_claimed_bundle,
+}
+
+
+@pytest.mark.parametrize(
+    "scenario", PROJECT_SKILL_PASSES.values(), ids=PROJECT_SKILL_PASSES.keys()
+)
+def test_validate_project_skills_accepts_and_writes_nothing(
+    tmp_path: Path, scenario: Callable[[Path], None]
+) -> None:
+    source, target, _ = _project_skill_world(tmp_path)
+    scenario(target)
+    before = _exact_snapshot(target)
+
+    install_bootstrap.validate_project_skills(source, target)
+
+    assert _exact_snapshot(target) == before
+
+
+def test_mirror_project_skills_copies_each_marked_folder_exactly_marker_included(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    demo = _write_project_skill(
+        target,
+        "demo",
+        marked=True,
+        extra={"references/guide.md": "guide\n", "scripts/run.sh": "echo run\n"},
+    )
+    _write_project_skill(target, "unmarked", marked=False)
+
+    install_bootstrap.mirror_project_skills(target, dry_run=False)
+
+    # The marker travels with the mirror: it is what lets a later refresh tell
+    # a project skill that lost its marker from a retired bootstrap skill, and
+    # it has no ownership effect under `.agents/skills/`.
+    expected = _exact_snapshot(demo)
+    assert expected[".project-skill"] == ("file", b"")
+    assert _exact_snapshot(target / ".agents/skills/demo") == expected
+    assert not (target / ".agents/skills/unmarked").exists()
+
+
+def test_mirror_project_skills_dry_run_writes_nothing(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _write_project_skill(target, "demo", marked=True)
+    before = _exact_snapshot(target)
+
+    install_bootstrap.mirror_project_skills(target, dry_run=True)
+
+    assert _exact_snapshot(target) == before
+
+
+@pytest.mark.parametrize("kind", ["file-link", "directory-link", "fifo"])
+def test_mirror_project_skills_skips_a_folder_holding_a_link_or_special_file(
+    tmp_path: Path, kind: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
+    bad = _write_project_skill(target, "demo", marked=True)
+    (bad / "references").mkdir()
+    if kind == "file-link":
+        (bad / "references/leak.txt").symlink_to(outside / "sentinel.txt")
+    elif kind == "directory-link":
+        (bad / "references/leak").symlink_to(outside, target_is_directory=True)
+    else:
+        os.mkfifo(bad / "references/pipe")
+    _write_project_skill(target, "fine", marked=True)
+    bad_before = _exact_snapshot(bad)
+    outside_before = _exact_snapshot(outside)
+
+    install_bootstrap.mirror_project_skills(target, dry_run=False)
+
+    assert "demo" in capsys.readouterr().err
+    assert not (target / ".agents/skills/demo").exists()
+    assert (target / ".agents/skills/fine/SKILL.md").is_file()
+    assert _exact_snapshot(bad) == bad_before
+    assert _exact_snapshot(outside) == outside_before
+
+
+def test_mirror_project_skills_refuses_a_symlinked_agents_skills_folder(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
+    _write_project_skill(target, "demo", marked=True)
+    (target / ".agents").mkdir()
+    (target / ".agents/skills").symlink_to(outside, target_is_directory=True)
+    outside_before = _exact_snapshot(outside)
+
+    with pytest.raises(SystemExit) as refused:
+        install_bootstrap.mirror_project_skills(target, dry_run=False)
+
+    assert refused.value.code not in (0, None)
+    assert ".agents/skills" in str(refused.value.code)
+    assert _exact_snapshot(outside) == outside_before
+
+
+def test_mirror_project_skills_never_overwrites_an_existing_destination(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
+    _write_project_skill(target, "demo", marked=True)
+    _write_project_skill(target, "fine", marked=True)
+    kept = target / ".agents/skills/demo/keep.txt"
+    kept.parent.mkdir(parents=True)
+    kept.write_bytes(b"KEEP\x00BYTES")
+    kept_before = _exact_snapshot(target / ".agents/skills/demo")
+    outside_before = _exact_snapshot(outside)
+
+    install_bootstrap.mirror_project_skills(target, dry_run=False)
+
+    err = capsys.readouterr().err
+    assert "demo" in err and "already exists" in err
+    assert _exact_snapshot(target / ".agents/skills/demo") == kept_before
+    assert _exact_snapshot(target / ".agents/skills/fine") == _exact_snapshot(
+        target / ".claude/skills/fine"
+    )
+    assert _exact_snapshot(outside) == outside_before
+
+
+def test_mirror_project_skills_refuses_a_file_where_agents_should_be(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _write_project_skill(target, "demo", marked=True)
+    (target / ".agents").write_text("not a directory\n", encoding="utf-8")
+    before = _exact_snapshot(target)
+
+    with pytest.raises(SystemExit) as refused:
+        install_bootstrap.mirror_project_skills(target, dry_run=False)
+
+    assert refused.value.code not in (0, None)
+    assert ".agents is not a real directory" in str(refused.value.code)
+    assert _exact_snapshot(target) == before
+
+
+def _run_installer(target: Path, source: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(source),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _generated_copy(destination: Path, *, drop: str | None = None) -> Path:
+    """Copy ``GENERATED`` and optionally drop one shipped skill from both
+    skill surfaces; ``dist`` itself is never edited."""
+    shutil.copytree(GENERATED, destination, symlinks=True)
+    if drop is not None:
+        for surface in (".claude", ".agents"):
+            shutil.rmtree(destination / surface / "skills" / drop)
+    return destination
+
+
+def _add_shipped_skill(source: Path, name: str, body: str) -> None:
+    for surface in (".claude", ".agents"):
+        skill = source / surface / "skills" / name / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(
+            f"---\nname: {name}\ndescription: bootstrap {name}\n---\n{body}\n",
+            encoding="utf-8",
+        )
+
+
+def _assert_run_refused(
+    result: subprocess.CompletedProcess[str],
+    before: tuple[dict[str, tuple[str, bytes | str | None]], ...],
+    after: tuple[dict[str, tuple[str, bytes | str | None]], ...],
+    *names: str,
+) -> None:
+    assert result.returncode != 0, result.stdout + result.stderr
+    for name in names:
+        assert name in result.stderr
+    assert after == before
+
+
+def test_real_install_keeps_a_project_skill_mirrors_it_and_refuses_a_stray_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "shared" / "scripts"))
+    from verify import bootstrap_root_fingerprint_diagnostics
+
+    target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
+    _init_repo(target)
+    # The legacy path: `.claude/` already holds project content before the
+    # first full install, so `migrate_pre_existing_state` runs.
+    demo = _write_project_skill(
+        target, "demo", marked=True, extra={"references/guide.md": "guide\n"}
+    )
+    demo_before = _exact_snapshot(demo)
+
+    # Run 1: the project skill survives, is mirrored exactly (marker
+    # included), and the root-adapter fingerprint sees the same tree in both
+    # copies.
+    first = _run_installer(target, GENERATED)
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert _exact_snapshot(demo) == demo_before
+    for mirror in (
+        target / ".agents/skills/demo",
+        target / ".claude/bootstrap-root/.agents/skills/demo",
+    ):
+        assert (mirror / ".project-skill").is_file()
+        assert _exact_snapshot(mirror) == demo_before
+    assert bootstrap_root_fingerprint_diagnostics(target)[1] == ()
+
+    # Run 2: an unmarked folder the bootstrap never shipped is refused.
+    stray = _write_project_skill(target, "stray", marked=False)
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+    second = _run_installer(target, GENERATED)
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(second, before, after, "stray")
+
+    # Run 3: once `stray` is gone, a skill the bootstrap stops shipping is
+    # retired as before. The record lists it, so nothing is refused.
+    shutil.rmtree(stray)
+    # Any shipped skill will do; the first by name survives later skill trims.
+    retired = min(path.name for path in (GENERATED / ".claude/skills").iterdir())
+    assert (target / ".claude/skills" / retired).is_dir()
+    dropped = _generated_copy(tmp_path / "generated-drop", drop=retired)
+    third = _run_installer(target, dropped)
+    assert third.returncode == 0, third.stdout + third.stderr
+    assert not (target / ".claude/skills" / retired).exists()
+    assert not (target / ".agents/skills" / retired).exists()
+    assert _exact_snapshot(demo) == demo_before
+    assert bootstrap_root_fingerprint_diagnostics(target)[1] == ()
+
+    # Run 3b, the original symptom: the project loses `demo`'s marker. The
+    # record copy still holds it, so the refresh refuses instead of deleting
+    # the folder as a retired skill.
+    (demo / ".project-skill").unlink()
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+    after_marker_loss = _run_installer(target, GENERATED)
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(after_marker_loss, before, after, "demo")
+    assert (demo / "SKILL.md").is_file()
+
+
+def test_real_install_refuses_a_shipped_name_clash_until_the_project_skill_is_gone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "shared" / "scripts"))
+    from verify import bootstrap_root_fingerprint_diagnostics
+
+    target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
+    _init_repo(target)
+    demo = _write_project_skill(target, "demo", marked=True)
+    first = _run_installer(target, GENERATED)
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert (target / ".agents/skills/demo/SKILL.md").is_file()
+    assert (target / ".agents/skills/demo/.project-skill").is_file()
+    assert (
+        target / ".claude/bootstrap-root/.agents/skills/demo/.project-skill"
+    ).is_file()
+
+    # Run 4: the new source ships `demo` while the marked project `demo` is
+    # still there.
+    adds_demo = tmp_path / "generated-adds-demo"
+    shutil.copytree(GENERATED, adds_demo, symlinks=True)
+    _add_shipped_skill(adds_demo, "demo", "BOOTSTRAP-DEMO")
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+    fourth = _run_installer(target, adds_demo)
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(fourth, before, after, "demo")
+
+    # Run 5: the project deletes its skill. The next normal refresh prunes the
+    # stale mirror and its `bootstrap-root` copy.
+    shutil.rmtree(demo)
+    fifth = _run_installer(target, GENERATED)
+    assert fifth.returncode == 0, fifth.stdout + fifth.stderr
+    assert not (target / ".agents/skills/demo").exists()
+    assert not (target / ".claude/bootstrap-root/.agents/skills/demo").exists()
+
+    # Run 6: the source that ships `demo` now installs the bootstrap version.
+    sixth = _run_installer(target, adds_demo)
+    assert sixth.returncode == 0, sixth.stdout + sixth.stderr
+    shipped = (adds_demo / ".agents/skills/demo/SKILL.md").read_bytes()
+    for copy in (
+        target / ".claude/skills/demo/SKILL.md",
+        target / ".agents/skills/demo/SKILL.md",
+        target / ".claude/bootstrap-root/.agents/skills/demo/SKILL.md",
+    ):
+        assert copy.read_bytes() == shipped
+    for marker in (
+        target / ".claude/skills/demo/.project-skill",
+        target / ".agents/skills/demo/.project-skill",
+        target / ".claude/bootstrap-root/.agents/skills/demo/.project-skill",
+    ):
+        assert not marker.exists()
+    assert bootstrap_root_fingerprint_diagnostics(target)[1] == ()
 
 
 def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> None:

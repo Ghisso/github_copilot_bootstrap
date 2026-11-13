@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import stat
@@ -28,23 +29,29 @@ from runtime_ownership import (
     COPILOT_SURFACE_PATHS,
     FULL_INSTALL_ROOT_PATHS,
     GIT_REPO_LOCAL_ENV_VARS,
+    PROJECT_SKILL_MARKER,
     RESTORABLE_ROOT_PATHS,
     SIDECAR_DEFAULT_PROFILE,
     SIDECAR_PRESERVED_NAME,
     SIDECAR_PROFILES,
     STATE_DIR_OWNED_README_PATHS,
+    THIRD_PARTY_SKILL_MARKER,
     active_ignore_patterns,
     bootstrap_root_paths,
     install_mode_from_manifest,
     is_consumer_state_path,
+    is_project_skill_dir,
     is_root_adapter_path,
     is_third_party_skill_dir,
+    is_third_party_skill_path,
     restore_manifest,
 )
 from sidecar_overlay import (
     _EXCLUDE_MARKER_REMEDY,
+    _FRONTMATTER_MAX_BYTES,
     ExcludeMarkerError,
     _c_locale_env,
+    _parse_frontmatter_name,
     _read_index_entries,
     _report_preserved_folder_if_nonempty,
     backup_sidecar_state,
@@ -514,6 +521,137 @@ def validate_agents_takeover(source: Path, target: Path) -> None:
     )
 
 
+_PROJECT_SKILL_NAME = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+
+
+def _real_dir(path: Path) -> bool:
+    return path.is_dir() and not path.is_symlink()
+
+
+def _regular_file(path: Path) -> bool:
+    return path.is_file() and not path.is_symlink()
+
+
+def _real_subdirectory_names(directory: Path) -> set[str]:
+    """Names of the real directories directly inside ``directory``; empty
+    when ``directory`` is not itself a real directory. Follows no link."""
+    if not _real_dir(directory):
+        return set()
+    return {entry.name for entry in directory.iterdir() if _real_dir(entry)}
+
+
+def _shipped_before_record(target: Path) -> Path:
+    """The folder recording what an earlier install gave this target: the
+    ``bootstrap-root`` copy of ``.agents/skills``, or the live
+    ``.agents/skills`` only when that copy is absent. It also holds the mirror
+    of every project skill, marker included."""
+    record = target / ".claude" / "bootstrap-root" / ".agents" / "skills"
+    return record if os.path.lexists(record) else target / ".agents" / "skills"
+
+
+def _declared_skill_name(skill_md: Path) -> str | None:
+    try:
+        with skill_md.open("rb") as handle:
+            return _parse_frontmatter_name(handle.read(_FRONTMATTER_MAX_BYTES))
+    except OSError:
+        return None
+
+
+def _skill_folder_problems(
+    entry: Path, shipped: set[str], record: Path, shipped_before: set[str]
+) -> list[str]:
+    """Problems with one entry directly under ``.claude/skills``. Every check
+    is link-aware; a file is read only after it is proven a regular file
+    inside a real folder."""
+    name = entry.name
+    label = f".claude/skills/{name}"
+    if entry.is_symlink():
+        return [f"{label} is a symlink"]
+    if not entry.is_dir():
+        return []
+    # A folder with an entry named `.project-skill` is meant to be the
+    # project's, so a link or a directory there is a problem, not "unmarked".
+    if not os.path.lexists(entry / PROJECT_SKILL_MARKER):
+        if not os.path.lexists(entry / "SKILL.md") or is_third_party_skill_path(
+            f"skills/{name}"
+        ):
+            return []
+        # The record holds the mirror of a project skill, marker included. A
+        # folder whose mirror still has the marker lost it; a refresh would
+        # delete it as a retired skill (or overwrite it), so refuse instead.
+        if name in shipped_before and os.path.lexists(
+            record / name / PROJECT_SKILL_MARKER
+        ):
+            return [
+                f"{label} was a project skill and its marker is missing; "
+                f"restore {label}/{PROJECT_SKILL_MARKER} to keep it, or "
+                "remove the folder"
+            ]
+        if name not in shipped and name not in shipped_before:
+            return [
+                f"{label} is an unmarked skill the bootstrap never shipped; "
+                f"add {label}/{PROJECT_SKILL_MARKER} to keep it, or remove the "
+                "folder"
+            ]
+        return []
+    problems: list[str] = []
+    if not _regular_file(entry / PROJECT_SKILL_MARKER):
+        problems.append(f"{label}/{PROJECT_SKILL_MARKER} is not a regular file")
+    elif not is_project_skill_dir(entry):
+        # The refresh prunes only what `is_project_skill_dir` accepts; a
+        # marked folder it rejects (a symlinked `.claude`) would be deleted.
+        problems.append(
+            f"{label} is marked but not protected: .claude and "
+            ".claude/skills must be real directories"
+        )
+    if not _PROJECT_SKILL_NAME.fullmatch(name):
+        problems.append(f"{label} is not a lowercase kebab-case name")
+    skill_md = entry / "SKILL.md"
+    if not _regular_file(skill_md):
+        problems.append(f"{label}/SKILL.md is missing or not a regular file")
+    elif _declared_skill_name(skill_md) != name:
+        problems.append(f"{label}/SKILL.md has no `name: {name}` in its frontmatter")
+    if name in shipped:
+        problems.append(f"{label} clashes with a skill the bootstrap ships")
+    # The shape check also covers a marker-claimed bundle at
+    # `.agents/skills/<name>`, which has this shape by definition.
+    if is_third_party_skill_path(f"skills/{name}") or os.path.lexists(
+        entry / THIRD_PARTY_SKILL_MARKER
+    ):
+        problems.append(f"{label} is a third-party skill bundle, not a project skill")
+    return problems
+
+
+def validate_project_skills(source: Path, target: Path) -> None:
+    """Fail before any write unless every project-owned skill is safe to keep
+    and to mirror, and no unmarked skill would be deleted by surprise.
+
+    A refresh deletes every ``.claude/`` file it does not generate, so an
+    unmarked skill the bootstrap never shipped (not in ``source``, not in the
+    shipped-before record) is refused until the operator marks or removes it.
+    So is an unmarked skill whose record copy still holds the marker: it was a
+    project skill that lost its marker. Folder names, never frontmatter
+    values, drive every comparison.
+    """
+    skills_dir = target / ".claude" / "skills"
+    problems: list[str] = []
+    if skills_dir.is_symlink():
+        problems.append(".claude/skills is a symlink")
+    elif skills_dir.is_dir():
+        shipped = _real_subdirectory_names(source / ".claude" / "skills")
+        record = _shipped_before_record(target)
+        shipped_before = _real_subdirectory_names(record)
+        for entry in sorted(skills_dir.iterdir()):
+            problems.extend(
+                _skill_folder_problems(entry, shipped, record, shipped_before)
+            )
+    if problems:
+        raise SystemExit(
+            "Refusing project skills; fix each listed item, then rerun:\n  "
+            + "\n  ".join(problems)
+        )
+
+
 def _third_party_skill_owner(surface_root: Path, relative_path: Path) -> bool:
     """Return whether ``relative_path`` (relative to ``surface_root``, e.g.
     ``.claude`` or ``.agents``) sits inside a marker-claimed third-party
@@ -583,6 +721,10 @@ def copy_generated_tree(
                     and not is_consumer_state_path(relative_directory / name)
                     and not _third_party_skill_owner(
                         claude_root, relative_directory / name
+                    )
+                    # A project-owned skill is the project's, not generated.
+                    and not is_project_skill_dir(
+                        claude_root / relative_directory / name
                     )
                     and not (
                         relative_directory == Path(".") and name == "bootstrap-root"
@@ -924,6 +1066,76 @@ def substitute_python_version(target: Path, dry_run: bool) -> None:
             updated = updated.replace(old, new)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
+
+
+def _mirrorable_files(folder: Path) -> list[Path] | None:
+    """Relative regular files under a project skill folder; ``None`` when any
+    entry is a symlink or not a regular file. Follows no link."""
+    files: list[Path] = []
+    for directory, names, filenames in os.walk(folder, followlinks=False):
+        relative_directory = Path(directory).relative_to(folder)
+        for name in names:
+            if not stat.S_ISDIR((Path(directory) / name).lstat().st_mode):
+                return None
+        for name in filenames:
+            if not stat.S_ISREG((Path(directory) / name).lstat().st_mode):
+                return None
+            files.append(relative_directory / name)
+    return files
+
+
+def mirror_project_skills(target: Path, dry_run: bool) -> None:
+    """Copy each project-owned skill, exactly, to ``.agents/skills/<name>/``:
+    the folder Codex, Antigravity, and Copilot read. The marker travels with
+    it so a later refresh can tell a project skill that lost its marker from
+    a retired bootstrap skill (``validate_project_skills``). Under
+    ``.agents/skills`` the marker has no ownership effect
+    (``is_project_skill_dir`` needs a ``.claude/skills`` parent), so the next
+    refresh prunes the mirror and writes it again. A folder holding a symlink
+    or non-regular entry is skipped whole with a warning; nothing in it is
+    followed."""
+    skills_dir = target / ".claude" / "skills"
+    folders = (
+        sorted(path for path in skills_dir.iterdir() if is_project_skill_dir(path))
+        if skills_dir.is_dir()
+        else []
+    )
+    mirrorable: list[tuple[Path, list[Path]]] = []
+    for folder in folders:
+        files = _mirrorable_files(folder)
+        if files is None:
+            warn(
+                f"skip project skill {folder.name}: it holds a symlink or a "
+                "non-regular entry, so it is not mirrored to "
+                f".agents/skills/{folder.name}"
+            )
+            continue
+        info(f"mirror project skill {folder.name} -> .agents/skills/{folder.name}")
+        mirrorable.append((folder, files))
+    if dry_run or not mirrorable:
+        return
+
+    agents_skills = target / ".agents" / "skills"
+    for directory in (target / ".agents", agents_skills):
+        if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+            raise SystemExit(
+                "Refusing to mirror project skills: "
+                f"{directory.relative_to(target).as_posix()} is not a real "
+                "directory. Move it aside, then rerun."
+            )
+    agents_skills.mkdir(parents=True, exist_ok=True)
+    for folder, files in mirrorable:
+        destination = agents_skills / folder.name
+        if os.path.lexists(destination):
+            warn(
+                f"skip project skill {folder.name}: "
+                f".agents/skills/{folder.name} already exists"
+            )
+            continue
+        for relative in files:
+            (destination / relative).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(folder / relative, destination / relative)
+        strip_quarantine(destination)
 
 
 def merge_gitignore(
@@ -1813,6 +2025,7 @@ def main() -> int:
     state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     validate_install_roots(source, target, args.allow_self)
     validate_agents_takeover(source, target)
+    validate_project_skills(source, target)
     require_full_source_complete(source)
     persisted_mode = persisted_install_mode(target)
     commit_copilot_surface = (
@@ -1851,6 +2064,7 @@ def main() -> int:
     )
     substitute_project_name(target, args.dry_run)
     substitute_python_version(target, args.dry_run)
+    mirror_project_skills(target, args.dry_run)
     populate_bootstrap_root(
         target,
         args.dry_run,

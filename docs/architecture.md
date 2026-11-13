@@ -321,7 +321,20 @@ The generator creates the Antigravity workspace surface from the same
 canonical metadata and assets as the other adapters, and the installer
 treats `.agents/` as a single bootstrap-owned root adapter, like `.codex/`,
 with a pre-write takeover check that never silently adopts or deletes
-consumer content. See [Agent roster, prompts, and the skill
+consumer content. A skill folder under `.claude/skills/` that holds an empty `.project-skill`
+file is project-owned, a second ownership rule beside the OpenWiki marker
+(`THIRD_PARTY_SKILL_MARKER`, `.openwiki-install.json`). The marker comes from
+`PROJECT_SKILL_MARKER` and `is_project_skill_dir()` in
+`scripts/runtime_ownership.py`. A full install never deletes or overwrites a
+marked folder, refuses name clashes and symlinks before any write, and mirrors
+the folder, marker included, to `.agents/skills/<name>/`. The mirrored marker
+grants no ownership; it lets a later refresh refuse a project skill whose
+`.claude` marker went missing instead of deleting it as retired. A folder
+holding a symlink or other non-regular entry is not mirrored; the installer
+warns and skips it. See
+[README.md's Project-owned skills](../README.md#project-owned-skills).
+
+See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for the roster
 Antigravity renders and [Runtime
 Checks](runtime-checks.md#google-antigravity-evidence-boundary) for the

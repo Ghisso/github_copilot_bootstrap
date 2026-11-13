@@ -237,6 +237,16 @@ uv run python scripts/update_consumers.py \
   /path/to/repo3
 ```
 
+Before you refresh a full consumer, list its project-written skills. List the
+folders under `.claude/skills/` that hold a `SKILL.md`, that the new
+`dist/multi-agent/.claude/skills/` does not ship, that are not in the
+consumer's `.claude/bootstrap-root/.agents/skills/`, and that have no
+`.project-skill` file. Mark or move each one first; the installer refuses the
+same set. A name in that record was shipped before and is retired on purpose,
+so do not mark it, unless the record's copy holds `.project-skill`: that
+folder is a project skill that lost its marker, so restore the marker. See
+[Project-owned skills](#project-owned-skills).
+
 The script regenerates `dist/` automatically, then delegates each consumer to
 `install_bootstrap.py`. The installer owns legacy migration: when `.claude/`
 predates git-backed state, it first creates `migrate: import pre-git state`
@@ -949,6 +959,33 @@ this project's existing Copilot claim.
   but that proof does not stop the team from changing their own ignore rules
   later.
 
+### Project-owned skills
+
+A full refresh deletes every file under `.claude/` it does not generate. To
+keep a skill your project wrote, create an empty file
+`.claude/skills/<name>/.project-skill` in a real folder. A refresh then never
+deletes or overwrites that folder. It copies the folder, marker included, to
+`.agents/skills/<name>/`. The marker there grants no ownership; it records
+that the name is a project skill, so a later refresh refuses, instead of
+deleting, a folder whose `.claude` marker went missing. A symlink or other
+non-regular entry inside the folder makes the refresh skip the mirror for
+that folder with a warning; Claude Code still sees the skill.
+
+| Client | Sees a project skill | Notes |
+| --- | --- | --- |
+| Claude Code | Directly from `.claude/skills/` | Sees edits at once |
+| Codex | Through `.agents/skills/` | Sees edits after the next refresh; Codex 0.147.0 lists it once |
+| Google Antigravity | Through `.agents/skills/` | Sees edits after the next refresh; documented, not observed |
+| Copilot in VS Code | Through `.agents/skills/` | Sees edits after the next refresh |
+
+Never create or edit `.agents/skills/<name>/` by hand: the next refresh refuses
+through the `.agents` takeover check, and the receipt fingerprint breaks. A
+name that a shipped or third-party skill uses blocks that refresh until you
+rename the project skill. Create or edit a project skill no later than
+CLOSEOUT step 2, because receipts bind `.claude/` runtime files. This covers
+the full install only. In a sidecar repository, team skills are never touched,
+the marker has no effect, and nothing is mirrored.
+
 ### What a full install changes in a team repository
 
 The full installer is a takeover, and its protection is narrower than it
@@ -961,7 +998,13 @@ gentler full install. Checked against `scripts/install_bootstrap.py`:
   turned into a nested Git repository.
 - Under `.claude/`, it overwrites every file it generates and deletes every
   other file that is not consumer state, tracked or not; a copy survives
-  only in the new nested repository's history.
+  only in the new nested repository's history. The exceptions are consumer
+  state, third-party bundles such as `openwiki`, and a skill folder marked
+  with `.project-skill` (see [Project-owned skills](#project-owned-skills)).
+- Before it writes anything, it refuses a project skill that clashes with a
+  shipped skill, a third-party name, an invalid or mismatched name, any
+  symlink at the skill-folder level, an unmarked skill folder it never
+  shipped, and a project skill whose marker went missing.
 - Inside the root adapter paths, it deletes every untracked file it does not
   generate as an "obsolete generated file". Tracked root adapter files such
   as `CLAUDE.md` and `AGENTS.md` are preserved, except the Copilot surface

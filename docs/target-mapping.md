@@ -69,7 +69,7 @@ Google Antigravity:
 
 - `AGENTS.md` — provider-neutral root guidance shared with Codex.
 - `.agents/agents/` — six static Markdown custom-agent adapters (the five universal agents plus `antigravity_flash_coder`; Codex-only `luna_coder`/`sol_coder` are not emitted here).
-- `.agents/skills/` — the shared skill tree.
+- `.agents/skills/` — the shared skill tree. A full install also mirrors each project-owned skill (a `.claude/skills/<name>/` folder with a `.project-skill` marker) here, marker included, so Codex, Antigravity, and Copilot see it after the next refresh.
 - `.agents/mcp_config.json` — the shared MCP servers under Antigravity's `mcpServers` schema.
 - `.agents/hooks.json` — the named `bootstrap-safety` configuration.
 

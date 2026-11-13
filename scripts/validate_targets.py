@@ -7795,7 +7795,7 @@ def validate_generated_scripts(errors: list[str]) -> None:
 
 
 def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
-    """Return narrow lifecycle and installer drift errors for four shared skills."""
+    """Return narrow lifecycle and installer drift errors for five shared skills."""
     required: dict[str, tuple[str, ...]] = {
         "commit": (
             "status: complete",
@@ -7836,6 +7836,7 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
             "git init",
             "git add pyproject.toml .gitignore .env.example",
         ),
+        "learn": ("`.project-skill`", "`.agents/skills/`"),
     }
     forbidden: dict[str, tuple[str, ...]] = {
         "commit": ("commit exactly one completed small plan, after all gates pass",),
@@ -7847,6 +7848,7 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
             "copy `dist/multi-agent/` into the new project root",
             "git add .claude/ .github/ .codex/ agents.md claude.md",
         ),
+        "learn": (),
     }
     errors: list[str] = []
     for name, fragments in required.items():
