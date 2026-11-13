@@ -6,8 +6,8 @@ phase_index: 3
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-13_skills-trim-phase-C.md
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -55,7 +55,7 @@ Risk notes:
 
 ## Steps
 
-- [ ] **1. Change the validator first.**
+- [x] **1. Change the validator first.**
   - Owner: `coder`. File (modify): `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Add `SKILL_DESCRIPTION_MAX_CHARS = 300` and `SKILL_DESCRIPTION_CAP_EXEMPT = frozenset({"ponytail", "ponytail-review"})`.
   - Add `def skill_listing_length(frontmatter: str) -> int`. It returns the stripped length of `description` plus the stripped length of `when_to_use`, reusing the block-scalar logic of `extract_frontmatter_description`. It is the only length definition, used by the cap check and by the total in Verification.
@@ -64,7 +64,7 @@ Risk notes:
   - Update the comment near line 9371 that names the retired skills.
   - Failing-first evidence: run `uv run python scripts/validate_targets.py` against the unchanged 55-skill library, and record the 24 `SKILL_DESCRIPTION_TOO_LONG` errors. After Step 2, record the 14 that remain among kept skills.
 
-- [ ] **2. Remove, merge, and fold the skill folders.**
+- [x] **2. Remove, merge, and fold the skill folders.**
   - Owner: `coder`. Files:
     - delete the nine removed skills, the eight merged sources, `deploy-service`, `context-manager-testing`, and `test-helper-public-api`;
     - create `shared/skills/haystack/SKILL.md` with `references/{pipelines,conditional-router,docling,ollama-chat}.md`;
@@ -79,7 +79,7 @@ Risk notes:
   - `bentoml-service`: add the deploy body as `## Deploy`, and drop its two `deploy-service` mentions (lines 30 and 104).
   - `create-feature`: Phase 1A becomes one line that points to `.claude/skills/hydra-config/SKILL.md`.
 
-- [ ] **3. Rewrite the long descriptions and the two pointer skills.**
+- [x] **3. Rewrite the long descriptions and the two pointer skills.**
   - Owner: `coder`. Files (modify): the `SKILL.md` of `caveman`, `concept-to-image`, `debug-investigator`, `draw-io`, `html-presentation`, `integration-gate-spike`, `knowledge-refresh`, `literature-review`, `md-to-pdf`, `onboard`, `plan-decomposition`, `prompt-lab`, `rag-auditor`, `research-critique`, `code-style`, and `testing-patterns`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Change only the 14 descriptions. Each puts the trigger words a user would say first and stays unique.
   - `code-style` and `testing-patterns`:
@@ -87,12 +87,12 @@ Risk notes:
     - each description keeps the Codex trigger words, because Codex reaches those policies only through these skills;
     - list any rule their old bodies held that the policy lacks; Step 4 moves it.
 
-- [ ] **4. Add the moved rules to the policies.**
+- [x] **4. Add the moved rules to the policies.**
   - Owner: `coder`. Files (modify): `shared/policies/tests.instructions.md`, `shared/policies/code-standards.instructions.md`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Tests policy: one rule line for the context-manager lesson, one for the test-helper public-API lesson, and any Step 3 rule from `testing-patterns`.
   - Code standards: any Step 3 rule from `code-style`.
 
-- [ ] **5. Update the lists, prompts, docs, and Codex comment.**
+- [x] **5. Update the lists, prompts, docs, and Codex comment.**
   - Owner: `coder` (`documenter` for `README.md` and `docs/`). Files (modify):
     - `scripts/runtime_ownership.py`: `SIDECAR_WORKFLOW_SKILLS` drops `caveman-compress`, `pdf`, `review-api`, `pipeline-patterns`, and `csv-driven-integration-tests`, and adds `haystack` and `data-and-graph-pitfalls`; keep it sorted, and fix the "25" comment;
     - `shared/sidecar/workflow/skills.txt`: remove the `run-tests`, `refactor`, and `deploy-service` lines;
@@ -110,7 +110,7 @@ Risk notes:
   - Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/integration-gate-spike/SKILL.md` (Codex comment), `.claude/skills/documentation/SKILL.md`.
   - Leave `docs/evidence/` unchanged.
 
-- [ ] **6. Update the tests.**
+- [x] **6. Update the tests.**
   - Owner: `coder`. Files: `tests/test_validate_targets.py` (modify); `tests/test_caveman_compress_detect.py` (delete). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Point the pandas test (about line 3350) and the pyvis test (about line 3607) at `shared/skills/data-and-graph-pitfalls/references/pandas-nan-bool.md` and `.../pyvis-xss.md`.
   - Delete `test_run_tests_e2e_step_propagates_failure_instead_of_masking_it` and the `run-tests` entry in `DEPRECATION_CHECK_STEPS`.
@@ -127,13 +127,13 @@ Risk notes:
   - Capture `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` again, with its comment naming this phase.
   - Confirm `_unmatched_sidecar_anchors` is still empty.
 
-- [ ] **7. Regenerate and refresh this repository.**
+- [x] **7. Regenerate and refresh this repository.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
   - Acceptance:
     - the installer does not refuse;
     - `.claude/skills/` then has 38 folders (37 plus the third-party `openwiki`).
 
-- [ ] **8. Review.**
+- [x] **8. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus:
     - moved content matches the sources;
@@ -187,8 +187,8 @@ uv run python .claude/scripts/verify.py phase --format text
 
 Run the numbered CLOSEOUT sequence in `.claude/instructions/closeout.instructions.md` in order. Tick both boxes at its step 2. Later steps bind this file's bytes, so do not edit this file after step 2.
 
-- [ ] Step 1: documentation updated, or skipped as pure-internal with a reason
-- [ ] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
+- [x] Step 1: documentation updated, or skipped as pure-internal with a reason
+- [x] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
 
 ## Pause Checkpoint
 
