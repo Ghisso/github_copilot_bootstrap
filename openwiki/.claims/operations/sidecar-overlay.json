@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:bf4b788e586f69bd5524c4b40d641392d2c67895834af965ecf8936bbe49957d",
+  "pageVersion": "sha256:a82d4d79a6ea8a2138c91645cc200e31ab419b1adc3dd98073d34ce5f0b8bcaf",
   "claims": [
     {
       "id": "claim_b0158374af164219ad80eee5f9baed11",
       "statement": "The sidecar writes the four SIDECAR_SKILLS skills under both .claude/skills and .agents/skills and two bridges, .claude/rules/ai-bootstrap-sidecar.md with no frontmatter and .github/instructions/ai-bootstrap-sidecar.instructions.md with applyTo \"**\"; it keeps its manifest ai-bootstrap-sidecar.json, the pending record ai-bootstrap-sidecar.json.next, its staging folder, its preserved-copy folder ai-bootstrap-sidecar-preserved, the lock file ai-bootstrap-sidecar.lock, and its marked info/exclude block in the Git directory.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L101-L129",
+          "resource": "repo://scripts/runtime_ownership.py#L109-L137",
           "version": "repo-lines-v1:sha256:2fc6a2efef98a7e7de823eb20f5a254536bc0b6c9c7d4e6e0b2ff0ea5c9ade7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUwMGU5Y2Q2YTA0NDVlOTMwZTZkYjZjMjkzOGNmYzQ0YTA1YjBlZTE5MTRhNjU2OGM0ZGNkZGRiZGMzOWIzNzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlYmI2YzA5OTE0NmU3MGI5MTViNDU5N2I1OTYxMTZhMzA0MGI0ZTgzNjUwZGU3MWU3MzEwMDNmNjA3ZjRiZTEifQ"
         },
         {
@@ -204,7 +204,7 @@
         },
         {
           "resource": "repo://tests/test_sidecar_install.py",
-          "version": "repo-file-v1:sha256:14c1a690e4e12ec013c2bde29e48614d2e8348ca460fef316543ed0cf791bdf8"
+          "version": "repo-file-v1:sha256:e6c2532075353ade3042ac805b38db89633b982a688d0cce9ec363b02e5fa851"
         },
         {
           "resource": "repo://tests/test_sidecar_uninstall.py",
@@ -221,8 +221,8 @@
       "statement": "Sidecar mode supports only the main worktree; the main worktree's info/exclude lines also hide sidecar paths in linked worktrees, background-session worktrees get no sidecar files unless listed in git.worktreeIncludeFiles or .worktreeinclude, and info/exclude is not a security boundary.",
       "evidence": [
         {
-          "resource": "repo://README.md#L927-L946",
-          "version": "repo-lines-v1:sha256:e1a01674b4fb99a67a16feb0fa27a7fc836b53fff4e8df1bb4671769651b9d8f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxMWE1OWQyNGM5YjFlZWZjZTgzNjA0MGUzYmFiNzM3NWE1MzQxOGRiNDM1ODliYTRjYjg0YThjN2MzYzc2YmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTZkNDcwZDE2ZTdkOGMwNTc1MDdiMTMyZGRkOTkzZTQzODExMDk0MmNiMTA5NzAwNTVhMGU4YjYzMmMwMWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxNmMxZjkxMmI3MmRlYzk5MzdjYmFhMmY2MTFjNTVlMDA5MmYyZTJkN2EzMjEwNDgxNjYyYzljZDQyN2Y2MGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlNmI2OWUxZDA5ODJlZGU1YzRiMGUxMjc2YWFmNGEwMzE4MDk4ZTI1MDBlYzcyNWJjMTVlN2FjODI5ZjI2ODUifQ"
+          "resource": "repo://README.md#L916-L935",
+          "version": "repo-lines-v1:sha256:2af2563d11b0b73179335027f1092cdb4ee1253c6bc82d96c86a48f8044d367e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzNzFmMTYxYjcwNDIzNmYyZTUyOGJiYWRkYjBjMzQzMWYyNDg0OGE4NDNlOTg5ZmM3ZWMxNzI4OTQ4M2YzMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyMzA2ZjRlYzFjYWJjZGFhZWE0OWRjNWFlZjBlYmZkZWY4MjRhYTNlNGUwNWIzZTJkODY4ZWEzY2UzYWY5NmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhkYjA4ODhkZTA1ZjY0ZjI5MjZhODA4OTljNzZmYmE3YTMyYTcyM2Q0YzljMzU1NTUyZThhZTE0MDg2NTA0ZjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4M2NmMzM4ZDQwODAxMmE1NDczNWI5MTFkNThiMDI2ODU0YmU3YTgwMzM3NTk4NDkyNzlkYTBiOTM3YjU2Y2MifQ"
         },
         {
           "resource": "repo://scripts/sidecar_overlay.py#L4098-L4104",
@@ -333,7 +333,7 @@
           "version": "repo-lines-v1:sha256:3d0e75bcf050a211039ae942f72b8d446ccaa47d5ccc2b87c59eb9fd68ddcec1:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDA4MjY4OWY3YjJlNjMwYTBkYTc0ODE1MjIwMGU0ZGIzMWRlZGMxMGJiZWVmMjZmMTk1ZTlkZDdiZWIyNzcxZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ4YTllOWMzMjUyODIwYzY1YTgxNjUyMGI4ZGI0OTMyMjgwODQ5ZWM4YzdkMmViNjI3MmFmZGZlYmUwNTljMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2JhZDllN2RmYzJlYmU5YTIxNzRhYmQzODNkMWMyNjdiYWM1NWNhYjk4NzhlZjhiNjZiYjRiZGMzMTAxOWEzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWQyNjdiZmUxMWEwYzgwOGZhMjZmMzllYThkN2YwMjNmZTJmNmExYzIwMjczMjVhMzM1ZjI5MTFiZTA4YTZlOCJ9"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3049-L3112",
+          "resource": "repo://tests/test_sidecar_install.py#L3078-L3141",
           "version": "repo-lines-v1:sha256:a5b9a2fb08ee034c015e196ff2f52ff9bbb164eea69fbdfd70ec7c3ef1187a08:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4ZDYzM2I2MGM3Y2FlMGQxM2Y4ZDdhMjc4OGY2Y2E0NmVkODIyM2Y4OWU3ZDFlNzBlMjFjMWM3YWJmZTQ5NTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZGI4YmY0MjRiNTMyMjBiNWYwMjBhMGI0ZGExYTMxODQyZDJjMjE1MmU4Y2Y3YjJlMGE5YzRjMGYwY2Q5ZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExOGJjZjQ2OWE5ZjI5MWM1OGI5NmQ5OTgyNGJiYjEyYjAyMDk1YjdiYmM0Yjk3Mjk3YzJhODBhMDM0ZDA0NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZjhjMTUwOGQ0YTU5YzM2NmUxMzAwN2UyN2FhMWM1YWYzYWM5OGRiNDIxMWU1YjU5MGQ3YmMwZDcxODc3YWUifQ"
         }
       ]
@@ -355,7 +355,7 @@
           "version": "repo-lines-v1:sha256:586ed37345de2677f561f5f0d576c1dc7151dd3f7bc5d4a6ae1693f3684bb7d4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkzNjYyM2NiMTI2ZGYyNmIxNzYxN2NiMWUxYzhlNTU4YjFmNmMwNzA2MWFlYzMyNzRmZGYwNmUwNjg2ZGY1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ4YTllOWMzMjUyODIwYzY1YTgxNjUyMGI4ZGI0OTMyMjgwODQ5ZWM4YzdkMmViNjI3MmFmZGZlYmUwNTljMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDVkMGFiMTQ4NDQ5ZWJkNDBkMzI3Y2Q0ZDc1OGZmMjQ2ODM0ZTkyYTdmY2IxZDI0OGIyOWEwMWNhNmI4ODQ3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzEwY2YwOWM0OWQ5MWFlYmZiYTFlODg0MjUzMmRlN2E5ZWRkNDQyYmE1YzczODYwYjdlYWFhMGM3YWEwZGNhNiJ9"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3017-L3046",
+          "resource": "repo://tests/test_sidecar_install.py#L3046-L3075",
           "version": "repo-lines-v1:sha256:7417cee99d961c6c82515d3c1a778956919d34d012211506938d5eb0e9bb3935:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ3MDU2ZWIyNDA4ZjAzZWQzMDljMjhiZTI1MDJkOWY2YjUxNDRkYmRkMWM5YWNhMWFkYjM0NTA3NDk1MDY4Y2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NTBiMzNlN2FlMGYzMjY0MTlhYmQwYjcxMDY4M2VjNmFlZDUyNTliYmQxMjFmMTRkMjQ2NGZlMGJlNDkxOTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzMjU2MzY3YzZiYjQ4MWI2YTI2OGQyMTFlYmE4MTE2N2JhOWU5NDY3NmRhNGNkMzJlZDdiMTY2YWE5ZGQyYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYxNzhjNTgzYWFjYzJlNDkxZWMxYTQ4MjU2NzEzNjc5YzYyZGZiMDdiNTg3MTY2MTk4MjE1YTU3YjQwMTUyZDUifQ"
         }
       ]
@@ -369,7 +369,7 @@
           "version": "repo-lines-v1:sha256:897bdd69d2135fad3cde276f0d899b1f8a74a17f62b6f6e3e19af3c8c2c09ded:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGVmNzljZDMyNWNhMGE1YTIyNDIwM2RkMWY2NTM4OTBjZGI4MmM2ZTAwMWE1NDU0YWMxMWI3YTg0YmU4MzZlZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjZhZDA1MmM0NGI5NTNmMGQ4MzI4NmEyZGRkZWMyMTg1ZTdmMTg5ZGIwZTRmNTAyYzZmMDZmMzQ3NTg0NTRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2QyMzRmMDI5NWVmOWJjNjU0ODMyNDU5M2MyOTliNWE5MzA4OWY1ZGJiZDBkOWMwOWJkNmVjNWZiOTlhMzA0OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2QyOWM0Zjk0YzZmZWRkZTYwNGE1YzQ2YTNhZDFkYjJkYTVkOGY4MWFlZmY0MTRhZjE4NmY4NmY1ZjI3YTE4YyJ9"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3181-L3244",
+          "resource": "repo://tests/test_sidecar_install.py#L3210-L3273",
           "version": "repo-lines-v1:sha256:5766b2fc90ffb176860552645ad7e4835a6e17a635162fe606a57f11a4699659:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMjFmOGVkYTE0YzBmYjQ0MDRlMzM3NzliN2JlODE0ODYxMTBjMmZmZWIwMTYyMWQxODVmNWRlNjIwNDczYTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkODVmZjA4NjM1NjI2ZGU0N2I3MzAxMjIwNDQ2ZjQzMTdhYjc5ZTc4NDdlYTc0MzdkZTdkNTE2NjI5NzFiZWQifQ"
         }
       ]
@@ -387,11 +387,11 @@
           "version": "repo-lines-v1:sha256:50501a660b7145b578851993e321d317e45ebf74d9d972f12bf884acb00e22bd:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNlZjA5ZmFhNDBjYzYzNjk4ZWQ2ZDJkOGIzZDdlN2RhNTY2YTM3MjIzOTVlYzhhYTBiYTVlN2NlYTdjNTU5MGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3YTVlYmM1NWQwYTU4ODI2OGIxNzM3NzFhYmZlZWZlOTEzYzdjOWY4MzhjMmEwOWI1MDYzZTFjZTUwNjk2YzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkZWNhNzM4NjYxOTQ2MzhjZDRkOTllMzkyYmYzODQ1MDRhNjdhZDg5YTAwOGIxZWNkNDhiZjE1ODQyODM3MTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdkYThmMTExMjRmM2U5Y2YyZDJmMmU5YTAyZDQxY2M1ZWE3NTdkZjIzYzNkNmYzMDFhNmVkZDVmOWQ5M2JmNDcifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3294-L3321",
+          "resource": "repo://tests/test_sidecar_install.py#L3323-L3350",
           "version": "repo-lines-v1:sha256:d61fd2a375f193e400922a37e861579987419b6fe564e56a55bb5aab3d5a151d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzNWNhNzQ4NTRjZWZlYzBlYmQxNDNiMzBiZWJhZDk4NjJiZmIzYzAyMGZhMGE3ZDVhYWE4ODg0ZWUwOWQzMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMzRjNjc3ZDAwNDZjODU0MWM0YjM5NDQ3ZTE1MGQ4YTlkMDlkMzVmYjcwYjIwNTQ1ZTkyYjQ3YTA1MTU4YzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5YmM3OTFkYjFjNmI4ZmUwZTI5N2UwODNiZDg1Y2ZjYTEwNGUyZDdjMDM2Y2M4ZDUzNjI5MTBmZjRmYjM2NWIifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3398-L3414",
+          "resource": "repo://tests/test_sidecar_install.py#L3427-L3443",
           "version": "repo-lines-v1:sha256:a396b1ed3a1abc2cd25767c2570b95501b3a57f32da91c0387c0fdb074971926:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiNDMwOGJmNDVlYWQxNmU4OTMxNjBlOTAwZDU5NDk2ZjZjMTk0ZDMwMGNlZmU0Mjc4NTU4MTI3ZjVmMGFmNzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxYjhmMTgzNDQ3ZGMxYTc3M2MxZThlOGM4NWExODgyYjAzOWRmMmI2ZDQzM2JhZjI2ZDdhNWY1OTg0YTJhMzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkMDEyOGEyM2JlYTI3NDE4MGVmN2JlM2M1ZmQxZmU4ZDMzM2VlNzI5NDUxOWZiMTIwZDFkZjExN2Y2ODgzMGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMyNjJmYzgwZmVmMmI3ZjNjZGZkYzNkNzM3NWE4MjJkZTM3NzA4NTUyYjgxYmQzNjI2NmU0NjFkYTU4Mzk4ZWEifQ"
         }
       ]
@@ -417,11 +417,11 @@
           "version": "repo-lines-v1:sha256:65c8c94ca8b55da01be792fd739cf6ec55ed2e8a5a003aedf5c3cc9f912de137:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmMzM3MTA4ZTQ4Y2FjZDU2YWI2MGNhYTk4YTcyYTc2N2Q2NmQzMTRlN2Y1NzE3MGU2MjAxNTU2YTJmMmE2Y2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwZGZhOWMxOWU5NzhhNGE4YjY0MDUyZDg5OTdjYTdiMjgyZDZhZTI1N2RhZWJhZTM2YjVlY2IyYzBkMzM0N2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA0YzBlODYyNDA2ZDczODY0YzBkOWQ0NjI0ODdjYzRkMmZmMmI3NWNmMTAxZGM5YmEwMDM5NWZlY2U3MDc4ZmUifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L1714-L1759",
+          "resource": "repo://tests/test_sidecar_install.py#L1743-L1788",
           "version": "repo-lines-v1:sha256:8b930904fa0449dfc0dff256f6667b7206a6dc70f787a0191c8284b9a01e4281:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxYmI1MjI3NWNhOWUzNDlkOTcxOWY3NzA1MDEyNzFhOGU3MTEwOTI0YjY4MGJjZjY3MGQ5YzI1ODMyYmFmOTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1MTk1NTZkNjMxOWE2OTg3N2U1NTI0NzFjOGFmYzFiZDE0NTFkYzA3MGQxMmNiYWNlODAwZDJiNzM4OTcyMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhN2JmOTcyZmJjMTg0OWIwZWRiMjNhYzA3ZDc3NGNmZTg5ZDdiNDhkMjhkNWNjNjNhMzg5NTA5YzIzYzc2YzEifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L1806-L1833",
+          "resource": "repo://tests/test_sidecar_install.py#L1835-L1862",
           "version": "repo-lines-v1:sha256:ce99db949d6dacfd196fec8a019ad8823876be41cf2dac65416650dc9c9505f5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5YzMwNTVmMmQ3NDRmNGFjZDEwYWEzZDE0MjQzNWNlN2YyNWM5N2QyZmZiMzlkMTljOTc5MzczMzQ0NjYyMzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzOWQ4YWM0ZGI0ZDgwOGYyYWY2NWQ5MGNiYjk2OTFmODljN2MzYTM2ZTVmZDk4ZmI2YWMyYTUyMzdlNTFkNDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
         }
       ]
@@ -435,7 +435,7 @@
           "version": "repo-lines-v1:sha256:ab137f8025446782040b0b38be0fe2592c145710472550c36a7fcf17aeb5a777:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxZmQwZmY4YWNjYWFhZDE4YWQ4ZTBkM2UzZTQzZjFlMDU0NDU4YzliY2NjODRmODk0ZWJjOTVlNjNlMmFhYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjMGIzNmFmZGU0Y2NlNDQxNDYxYzZiNzQwMTFiZmFkNjI5NGUyZDZkZjcyZTM3ZDJiNmI1ZmE3MzRhNTFjMDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1MmY3NmMzZjJmNTgzZjZhMDZmMTgyNWZlNmIxYTBlZmU4ODM2ZGFmZTZhZTU0MmU0YzE5ZDNmNTI4MWNlZjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0MjRkNTc4ZDY1ZWJlOWE3MDIwM2M4ZWJhOWRhZWNhYjY1Yzc3MjMzZmZiNzY2N2VlODY4NzkwZDI1YmZhOTUifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L2723-L2758",
+          "resource": "repo://tests/test_sidecar_install.py#L2752-L2787",
           "version": "repo-lines-v1:sha256:93d10eaf1b9fd41fc7ab7490270e3348b4609955aae7d9ce714eb0240de512cb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3MDkwNTc1OGFkNTIxYTcxYzAzMTk1ZTk4YWY5YmM0MjZlMjk5ZWRhNWFhZDcyZTcwZGE5NjE0ZWI0ZmY3MTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4MTljMTAwY2NmMWVlNDQxYTMxZTczNjgxMWZjY2VkOGM2MTZkMWMyNjkyMzY2ZjAzMGIzZmRmNjY1MDgxZGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5NDQwNDFiYzgyYmIyNTZlYWJkYTM2YjE3ZDA4ZmRjNTkxNzUxYmFjNGYxN2UwYWRiZjcxOTQ0NDIzZWU4ZjQifQ"
         }
       ]
@@ -449,7 +449,7 @@
           "version": "repo-lines-v1:sha256:c4da026f004cd82ebb74ad778fa4759d5557862477e6c3be86504923c0e5e3fa:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MTQzM2ZmNTMxZTcwZmMwYWIwYmI5YzA4MzA4MDE1NzE4YTkxNjkwZDA1Zjg5MmJmNjhlNjYwZGVhYWUzMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlYTEzOTU2ZjFhYTE4M2NhZWY0OTc2NmRmZTYzNjE0ZGNlOWY1OWNjZGNmNjQ3ZjQyNWEzN2E4MDNlMGNmZTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5MDZiZWIzMDc1NzQyODY5ZTFmYTlkMDgzMDZhNTUwNWU3MWMxZmU0YjU3NzBlZmJkOWYzYTk1NzM5NTMxZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3492-L3540",
+          "resource": "repo://tests/test_sidecar_install.py#L3521-L3569",
           "version": "repo-lines-v1:sha256:c87bbc2ac644733d42d1c34605dfa6541ca2d07815a0ed5305e465ee3667a8af:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5NmRlMTRmNjVkYjgwZjE4NmU4ZmVmODc0NDJiZGE0ZmJjOWZjOGQ1ODJhODRjMjNlM2FjZmZiMTA4YTNiNWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjYWY3YmZiZTVlM2RiNWMyYjQxNDdkZTgwOGIwNTU5NjRiYjA4Mzc5Nzg5ZTQ1YTBhMmMzMmYyYTlkNjdlZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
         }
       ]
@@ -471,7 +471,7 @@
           "version": "repo-lines-v1:sha256:e13296c280afacc8e721a317c4c870ec09049d78fdcc96b03d3e64894f8e0314:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWRhNWM2NmUxN2IxNDUzOTc4MzRiOGM4NTRkYzQxOTNlMjEyNTE4MGE4OTk2YTE0YzMxODgzMzI2YjJlZmJjZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmQ0NzAzOThhYTE0NmM4MTM3YjVlNzkxZmQxMzJiZDg3YzMyOGU3M2Y1ODc1NWUxMDY5ZTI5MTlkNjIwOWY5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDRiNzA2MmJiYWQ3YmFmMTQzNDMxZTQwOTllNmU4MTY1NzhhY2Y4ZGVkYmY2NTNjZTVmNzE0NDcyYjU2OTM4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGViZDI5ZmViZGYyMzkzNGY2ZTBjZDM5OWFhMDczMDg4N2RhM2ZhYmFiOTk0ZTQ0Mjc1MmMwZjVmN2QzNWNlYyJ9"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3247-L3273",
+          "resource": "repo://tests/test_sidecar_install.py#L3276-L3302",
           "version": "repo-lines-v1:sha256:fbc9d8a3f4c878455257a6b2967e2a6a2d26a4d446967cf976842fc9b7f50cd7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3ZWVkNjkzOGY5ZjU0NTc3MjllNmM5NmUxOGZkMDIyMWVhYTU4YmQ2MjAwNGM0NzQxZjEwMmE5M2IzMDg0ZTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiMjFkNzhhNzE2MjAwZTIzNzllMGIxMzViYWY4OTMzOWNmODliMjgzMTU0NDExNDBjOGFkMDVjZTVhNzNlOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YmE0YzhjZjM1ZGU3NzI2OTA2Mzg0NGU5YThmNGEwYTkzZGUwYTc3NzRlY2UwMThhZTdhODk4Mzc3NmYzYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0M2FjNGZhYjkwM2Q1N2Q5MWJhZWRlN2JhYjc1NjJjN2QyNmZkMWFkYzZjNDNlNGUwODk3MzRjNzYwMDAwMjYifQ"
         }
       ]
@@ -489,7 +489,7 @@
           "version": "repo-lines-v1:sha256:7fee62dbc027ab1ab8d23fc50e902f545b87c4be987e13d19e4c4741740a4842:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5M2FlNTdlZWM5YjI1NDcwOTNiNzY1N2ExNjU2OTNhZDA2ZTRmNjgwYzY0NjU0MmY1ZTdmODMyZDkwMjMzMDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwZTEzOGVkOGQ5MmFiOTliMzhmMGZkMTViNmFmY2UyMmE3NGE5ZGQ0Y2Q3MzdiMzE2YTljMDIyYzc3OTZkYTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0NmIxYjEyNzU4ZWEyNTgyZWU3ODFkZDIxMWU1NjRkNDJmMGI1YTU0NjZlMmY1MzFlNWE4NDkzNmZhNTlmOGEifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3696-L3734",
+          "resource": "repo://tests/test_sidecar_install.py#L3725-L3763",
           "version": "repo-lines-v1:sha256:ba088043a3d0890061539fc356ec441feff7e9970e1609bd77ad21355075910f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMzFmMTdjYTFkNDg2ZWJkODJhNGI4N2Q3ZGZmZmI2MWIzZmM5MWU5NGExZTNiYzBhOWRmODEyNWMxYTY4OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjN2ZhOTg1ODU5YjJlOWFjNWM4NTA3YWM5ZGQ1MzgwMDhjZGU4Mjc2OWU1YzllZWQwY2Q3NmI5NGYxNzc3MTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3MzdhMDQ3ZTM5Zjc4Y2UxOWJhYTc3NmFiMDg3MjM5Y2NhMDM1MTJlMTQ4ODJlY2M3NDU5NjdiNTEyODdkNmMifQ"
         }
       ]
@@ -507,7 +507,7 @@
           "version": "repo-lines-v1:sha256:ba6b8a0c3c4d282d36a431b09a9f9e65c1e956d442715a109519528b190dfabc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiZDY2MmQwNjIzYTFiNTczOThiMzkzYmIwMGZiM2ZjZDY0ZTNhMTgyZWEwODc0MzliYjQzODU5YmY5MGI2N2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhMTY4MDljMDc1ZGIzMDllMDliYmM5YWI3ZWZlZTY5ZWZiNWY0MTliZDRkODkzMGQwMzgwNjYwMmRkMDJmZDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNlOTYzNThkMDc5ODEzODk0NjA2MDcwM2YzMmZhOWQzZDY4ZDllNGQ0YmI2NzVkMGIyNWYxZjllZDgxMzA4NGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVjNGU4NjYwZDFjMzA4MWQ2NDVmMzZlMDUyMDFlNjAyZDBiN2I4ZTc0MDZlZmY1ZTM5ZTk5MWVlOGJmZWQwMzYifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L3737-L3760",
+          "resource": "repo://tests/test_sidecar_install.py#L3766-L3789",
           "version": "repo-lines-v1:sha256:77db1a50d3fc31bc99da0be5ccec280adca2aa97c9b29e9844cc79a4e7873ea2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMDZhODZmZDY2ZTgxMGE5ZDk0OGEzMjMwMzBmODQ4NTlmMzNjMGI1YjMxYjg2M2NjMWQzYTQ4NmI1ZWYzMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ZmM5YmFjYmY5YjM0OWU4ZjcyZmQzZjY5ODJjNWQ2MjZkOTdkYzY2YTQxYTk0MjBiMTcwNGJjYThhNzBjNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlZGZmNjc3OGZjMjg0YjQwOTc2OWU3ZGQ2MThhMTljM2M5NDczMzgwNjY4OTg2M2I2N2U4N2Q3MGJkZGE1NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzNzU5NDM5ZjJhMTk2ZTM5MDI1Y2NjMjk2MjFhMGQ4ODUwNWU2M2M5MGJmZDQ1MjM5YmE3MmEwZTUwN2QwYjkifQ"
         }
       ]
@@ -644,15 +644,15 @@
     },
     {
       "id": "claim_85e08cf52b7f4079b0e5b273a81be9ce",
-      "statement": "load_desired_units reads each profile's skills at both roots and its file units from dist/sidecar; the skills profile has four skills and two bridges, while workflow has 25 skills including its own onboard, five agents, three rules, a Copilot instructions file, review profiles, templates, and an .ai-bootstrap state folder.",
+      "statement": "load_desired_units reads each profile's skills at both roots and its file units from dist/sidecar; the skills profile has four skills and two bridges, while workflow has 22 public skills including haystack, data-and-graph-pitfalls, and its own onboard, five agents, three rules, a Copilot instructions file, review profiles, templates, and an .ai-bootstrap state folder.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L101-L116",
+          "resource": "repo://scripts/runtime_ownership.py#L109-L124",
           "version": "repo-lines-v1:sha256:893666155dd43055ea040917b44512f0233b160d585c7da28099d21712d0d371:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1ZDBmMWY2NzFkNjllY2NlZGFmZTUwYmIyYzc3YzcwMzYwMDgzYTU1ZWEzOGFlMzZiYzAyODc0OThmMGFlZGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjOWNkY2E3ZjVhOWY3MjVhMDRlYzAxZTE2MTI5NTAwNmQzYWQyYzIzMDI3YzMzZmExYTkyMzUwZjg5MTE3NTIifQ"
         },
         {
-          "resource": "repo://scripts/runtime_ownership.py#L139-L233",
-          "version": "repo-lines-v1:sha256:2cf3fc18c5e04f20236a6dc2fb629f26dc9e837fc893c238f349620d4c1ec342:eyJzZWxlY3RlZExpbmVDb3VudCI6OTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MTFmYTJhZDBiMDdhNzY0NTRlZmJhY2Y2M2I1NWMzZTYxMTE1YzYwMDZjYjNkNjBiYjkwMDZlM2ExMWRhMGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwNmQ1ODUyY2ViMWRmYzFmNzg1MWYwYjg1YmE3NzhjMmE2MzI4Yjk5ZTdjMWFhNTZlZTJiNDU1OTAxM2NkYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1Zjc1NjE0MDg0ZTQ5YTBkODllOTFjMTVmYmI0MjdkMDk3M2U0MjU4OTNiYjA3Zjk4ZjI3ZGFlMjQ4NDNkY2YifQ"
+          "resource": "repo://scripts/runtime_ownership.py#L147-L250",
+          "version": "repo-lines-v1:sha256:7ecdb94e34ecc24066343a8ddcbcc1ebb49219f81ec6cdad9368cdd167e328dc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTA0LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJhODExZmEyYWQwYjA3YTc2NDU0ZWZiYWNmNjNiNTVjM2U2MTExNWM2MDA2Y2IzZDYwYmI5MDA2ZTNhMTFkYTBkIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI5MTg2NjRhMTAzNjE5NDE5ZDU2MjNmM2JlNmM3NTU2YzgyY2VhZGVjMmViOWJmNjdhMjE4OTUyNmI2YmQ3NDNlIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI0MDZkNTg1MmNlYjFkZmMxZjc4NTFmMGI4NWJhNzc4YzJhNjMyOGI5OWU3YzFhYTU2ZWUyYjQ1NTkwMTNjZGEyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5YTYzNmZkZWIzNGUyNmJiZjZhN2ZlNjQ1Njg2ZGE0MzUxODNmOTc0MzliOGU1MTcwYzMxNzkxNDNhMTJhYzEzIn0"
         },
         {
           "resource": "repo://scripts/sidecar_overlay.py#L540-L719",
@@ -665,7 +665,7 @@
       "statement": "Switching profiles is an ordinary update: --profile skills on a workflow install removes the workflow-only units through the remove-and-preserve rules and keeps the state folder hidden in place, --profile workflow on a skills install adds the missing units and seeds the state folder (migrating a retained, owned legacy .claude/ai-bootstrap first), a rerun without --profile keeps the manifest's profile, and the end-of-install empty-folder cleanup leaves no empty .claude/templates or similar root behind.",
       "evidence": [
         {
-          "resource": "repo://README.md#L691-L716",
+          "resource": "repo://README.md#L683-L708",
           "version": "repo-lines-v1:sha256:fa9e65457651843b1d10b804f49bab5e21c7399e0f9871eeda101d83150ee161:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NDZlOWQyMDQ4OTM4OTZkN2YwODZlM2QzZGM3MmFmOWMyYmY1M2U5NDRkZWQ0ZTRmYjU3NjkyNzg4YTcwZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY3YWE2YjRiMDFiMTIwODNiYjJjNzU0NWU4MWFlMDZhYTNlYWQyMzFjMWNmYmYxZDBiNjgwN2UyZjc4NWM5MTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNjQ5YmFhMmU2Y2QyMDMwYmI0MDcwOGI5NmM2ZjlmOTY5MWQ0ZWZhYzg5MThlZmRmZTVmNjFjODAyM2VkYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliZGM0YTc3NTBiZjI3MmY2MWY3MzI4NGU4MDViMGZhZTc0MTBhMDZiMzUyN2YwM2FkZjMzYzE5NDNmMmY4NTMifQ"
         },
         {
@@ -683,7 +683,7 @@
       "statement": "A workflow install or update migrates a legacy .claude/ai-bootstrap state folder to .ai-bootstrap only when the sidecar's own exclude block lists the legacy root and .ai-bootstrap is absent: under the install lock it adds and proves the new exclude line (restoring info/exclude on failure), refuses a cross-filesystem move before any backup, makes a full backup, rechecks the destination, renames without merging, and then reconciles normally; it refuses before any write when both roots exist or the legacy folder is not listed.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L208-L222",
+          "resource": "repo://scripts/runtime_ownership.py#L213-L227",
           "version": "repo-lines-v1:sha256:c3e4f4ba5fd18143c1d6f1d0a766ac6ba117bf563bc6bad7d92f731229bf010a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyYzlhMjQ5NzJiMjEwMjExN2FlYzE4ZGM3NmIyZDZmNTIzOTc5N2ZmNmI2OGEwMGU0ZjllNWU5YTE3N2ZhN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4YjU5NmE5OGRhNjlkNTIxY2QyMjZkNWFkOGFmNjg5ZGZjNWMxMDJjOTdhOGIzZWFhYTQwMjhhNTY3MzIwNTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NzA2YjExNTExZTMxYWMwZTg5ZmNjMjY1NWI5MzJjMzZmOGMwMWMwMDFlM2E2MTgyNmQxNDlmZWY2ZmFlNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiMmFmOGExOGVlMGIyNTFhYWJmYTVlYTE2YmZiMjJhMmE1MTQyNTU1MzU0NGE1ZjJjMzY1NzYxMmMxNGViYmIifQ"
         },
         {
@@ -701,7 +701,7 @@
       "statement": "The workflow-only onboard skill checks private destinations before writing project context and a memory pointer; its team conventions distinguish explicit rules from patterns inferred from repeated repository examples.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1929-L1942",
+          "resource": "repo://scripts/generate_targets.py#L1900-L1913",
           "version": "repo-lines-v1:sha256:b91e918bb2643539a2466d5f1f909a4bb90d53403ea566c8a468bfd3cf73a9a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMWNmZmFiZTBhNzBjZTdkYmNiNmM4ZmQ2M2EyODdkYjI3ZDdjZTU2MzBjN2FmY2JhNTRkYjNlMmE1MGI5ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhOTk1MmZlZDlkOTJiNDFmYWMyMTZmNjZhNTg0ZjdjNmQwMjJhZTYyMTRkNWM5MjUzNzJiNDUzNGZmNmYzMjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkZTUzNzlhNzEzYjAyOWVmYzVlNjA0YzM2ZDc3NWFmNzljZDlhNTViOTExZGI0MWQwODU1NDkzMDVmODg3NzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdhNDA1YWIzMTg1MWE1OTIzZjIxOTk2OGVmYmE5ZTZjMDY5NjEyNzI2OGU0ZWMxMGZkNzllNjFlODllMTE3ZmEifQ"
         },
         {
@@ -709,10 +709,24 @@
           "version": "repo-lines-v1:sha256:f7902be5b339994b2fa658fefd6b11791e03bfe1338defc771cb907c00e65939:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkYmRhM2E1Yzc4NjJmMGNkNGRjM2U5ODdlZDc3ZDc5ODlhZjI0YWRjOWU4NTdjODQ2ZmZjYzc4YjkxNjY4Y2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1MmJiOTdlNDgyYTJjMGQ4NjczODQ2Y2E2Yzk3MjZiMjFiYzQ3ZjQyY2U1OTJjZDJkNDkwNTcwODYyYjYzZDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImViNmFjYWUyNjA2NmNiN2NjNGY2MmMxNzVjNjY1YjRmNDFkZTkxNzJjODAwMzFmNWI1YmU1NmRiOTZjN2I3N2YifQ"
         }
       ]
+    },
+    {
+      "id": "claim_d3637bbdfaf9498f9f096141fb0fcb3f",
+      "statement": "In sidecar mode the full install's .project-skill marker changes nothing: a team skill folder carrying it stays byte-identical through install and refresh, and a locally modified sidecar skill given the marker gets the same outcome as without it.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L653-L690",
+          "version": "repo-lines-v1:sha256:d55d2f6db266d70afd7ef957525ecc5bde9a42b6295fb51ea56953ceeda9ce8e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmNDM5YjkzNjJkNTA5YzQ5MDMyZDczOWI5Mzc1NDE1NmNiZDllNWQwNjQ5NDdlMDEyZTFkN2ZiNGQwNTgxNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5M2JjYTlkZjk2MmJmODZjMmU1ODIwNDMwMTkzZjBiYzUwMGQ4YzJkZDA1NDJiMGYxZmU5YTEyY2MwZjVkZDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU3NzEzOGM4MGY5NTVmNTExMWMxNTAzYWU5NjZhZWEyNmU3NjlkODI0YTYzNDg1M2FmZmY5OGQ3ZDAxNzI0NzUifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_update.py#L289-L330",
+          "version": "repo-lines-v1:sha256:52dbe7a488298e49ecbb31f35b7994ee2946d67ee5f8abc4145222ffaf6cb113:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5ZGU5MjU4NDEyOTAxZTU3NjQyZWM2MjIzMWE5ODYxZGU1MjNjOWI3ZDlhZTFiNGMyNjVmOTlmZWU0NWYwYTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4OWJhMThmMGJkYWM5YzU0M2Y2ZGQ2ZWNiZjM3ZmY2MWMzZDFlODkzMmY5NjlkODI3ZjVkMDZiN2VjOTVmM2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZmYjQ1ZjVjYzY4ODcxMTFlMmE1ZTZlZmE3MjM3ZGQ3NzYwMTQ5YjQ3ODllOGM5MjY5OWYwNmY3NTUxZmQ2M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVlZDZiYzZkZDNhZGNlNDg2MzhjZjk1ZDA1ZDk2MmU3ZjcyNGIxMjNiNDVkNDNiNTgxYmRkNTg0ZWI4NDM3NDYifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-22T18:10:39.614Z"
+    "at": "2026-11-13T15:20:28.565Z"
   }
 }

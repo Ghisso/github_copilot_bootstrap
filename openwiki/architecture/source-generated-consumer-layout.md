@@ -22,14 +22,20 @@ sources:
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-2b53bea07579a982c3a0a847
     resource: repo://shared/mcp/servers.json
+  - id: openwiki-source-9fd0a35cebe588e6f39e1d28
+    resource: repo://shared/policies/closeout.instructions.md
+  - id: openwiki-source-d7818695b5f298cbcabc4568
+    resource: repo://shared/policies/plan-lifecycle.instructions.md
+  - id: openwiki-source-66b9be26404846b939fba828
+    resource: repo://shared/policies/workspace.instructions.md
   - id: openwiki-source-1c38db574c5e411bfd8c36ea
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
+generated: { by: "claude-code", at: "2026-11-13T15:20:28.565Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-22T17:57:02.699Z
+    at: 2026-11-13T15:20:28.565Z
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -73,7 +79,7 @@ Two facts about this repository do not carry over to consumers:
 
 ## What `shared/` contains
 
-- `shared/policies/*.instructions.md`: workflow, workspace, quality and testing, code standards, config-first design, tool routing, agent reporting, API and deployment guidance. Each has frontmatter declaring `applicability: always` or a list of path patterns.
+- `shared/policies/*.instructions.md`: workflow, closeout, plan lifecycle, workspace, quality and testing, code standards, config-first design, tool routing, agent reporting, API and deployment guidance. Each has frontmatter declaring `applicability: always` or a list of path patterns. The workflow core stays small: the CLOSEOUT steps live in `closeout.instructions.md`, and phase statuses, pausing, cancelling, reopening, and the knowledge-refresh rule live in `plan-lifecycle.instructions.md`.
 - `shared/agents/<id>/`: JSON metadata in `agent.yaml` plus prompt bodies. See [Agent roster, prompts, and the skill library](agents-and-skills.md).
 - `shared/skills/<name>/SKILL.md`: the skill library, with `visibility: public|background`.
 - `shared/hooks/`: `hooks.json` for Copilot, the `scripts/` guardrails, and `git-hooks/`.
@@ -92,8 +98,8 @@ Two facts about this repository do not carry over to consumers:
 3. Root `AGENTS.md` comes from `render_root_guidance("multi-agent")`.
 4. `render_github` writes `.github/copilot-instructions.md`, one instruction adapter per policy, the copied `hooks.json`, `.vscode/mcp.json`, `.vscode/tasks.json`, and one `.github/agents/<id>.agent.md` per eligible agent.
 5. `render_claude` writes `CLAUDE.md`, `.mcp.json`, and `.claude/settings.json` with the hook wiring.
-6. `render_codex` writes `.codex/config.toml` (MCP servers plus one `[[skills.config]]` entry per skill), `.codex/hooks.json`, and one `.codex/agents/<id>.toml` per eligible agent.
-7. `render_antigravity` writes a copy of the skill tree under `.agents/skills/`, `.agents/mcp_config.json`, `.agents/hooks.json`, and one `.agents/agents/<id>/agent.md` per eligible agent.
+6. `render_codex` writes `.codex/config.toml` (MCP servers plus one `[[skills.config]]` entry per skill), `.codex/hooks.json`, and one `.codex/agents/<id>.toml` per eligible agent. Codex itself lists repository skills from `.agents/skills/`; the config's own comment records that a codex-cli 0.147.0 probe found the `[[skills.config]]` entries add no skill of their own.
+7. `render_antigravity` writes a copy of the skill tree under `.agents/skills/`, `.agents/mcp_config.json`, `.agents/hooks.json`, and one `.agents/agents/<id>/agent.md` per eligible agent. In a consumer, the installer later adds a mirror of each project-owned skill to `.agents/skills/` (see [install ownership](../operations/install-ownership-and-runtime-checks.md)).
 
 Text copied into a target passes through `transform_target_paths`, a table of literal replacements per provider. For Claude Code, `.github/copilot-instructions.md` becomes `CLAUDE.md` and `.github/hooks` becomes `.claude/hooks`; for Codex they become `AGENTS.md` and `.codex/hooks`. One canonical policy text can therefore name the root guidance file correctly on every host.
 
@@ -109,7 +115,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 
 `scripts/validate_targets.py` is the structural gate over `dist/`. Its `main` runs a fixed sequence of checks and prints `FAIL ...` lines and exits 1 on any error, or `PASS generated target is structurally valid`. The checks, in order:
 
-- the task-lane contract and the Codex model contract;
+- the task-lane contract, the workflow policy's 16 KiB byte budget, the closeout procedure pin on the generated `closeout.instructions.md` (eight numbered steps with a reason each, the learn skill in step 2, both hard rules, and both stale-receipt messages), and the Codex model contract;
 - agents, MCP and hook wiring, the Antigravity manifest and skills, the Context Mode tool surface;
 - skills and paths;
 - both sidecar profile trees, `sidecar_target_errors(root, profile)`, and their adversarial cases per profile: only paths the profile installs (a shipped skill folder may hold any file, since a skill is copied whole; everything else must match the exact set); the exact source set, with nothing missing and nothing extra; no forbidden text token for that profile; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; for `skills`, each bridge with its client's frontmatter; for `workflow`, each single-file unit with exactly its client's frontmatter, every agent's frontmatter equal to what `sidecar_agent_frontmatter` builds, and both `onboard` copies checked for private output and destination safety instructions;

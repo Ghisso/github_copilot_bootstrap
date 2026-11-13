@@ -12,6 +12,8 @@ sources:
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-f11e4ce184d9addc83c16d26
     resource: repo://shared/hooks/scripts/_lib-frontmatter.sh
+  - id: openwiki-source-9fd0a35cebe588e6f39e1d28
+    resource: repo://shared/policies/closeout.instructions.md
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-ac6151a0e717fb82e280dbaf
@@ -22,10 +24,10 @@ sources:
     resource: repo://tests/test_validate_targets.py
   - id: openwiki-source-7c9c9eb3a89efa00dd8df426
     resource: repo://tests/test_verify.py
-generated: { by: "claude-code", at: "2026-11-11T14:51:38.121Z" }
+generated: { by: "claude-code", at: "2026-11-13T15:20:28.565Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-11T15:10:30.745Z
+    at: 2026-11-13T15:20:28.565Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -140,6 +142,8 @@ Any violation fails `VFY-GEN-001` and, through the same function, the commit gat
 
 In every relation the gate requires a passing `closeout` receipt for `base_ref` `dev`, the same branch and phase, and a matching `merge_base_sha`. It also requires `counts.critical == 0` and `counts.major == 0` in the findings report and a `disposition` with a non-empty `reason` on every surviving MINOR.
 
+The written form of these rules lives in `.claude/instructions/closeout.instructions.md`: its `## Completion-commit gate` section lists what a normal completion commit needs, and its `## Closeout session log` section lists the log fields and the optional-item grammar. The Verification Evidence Contract (the required `## Verification` block and the `## Optional Verification` section) stays in the workflow core, `.claude/instructions/workflow.instructions.md`.
+
 Two more rules come from the review evidence itself:
 
 - **Gate result.** At phase completion the report's `gate_result` must be `PASS` and `open_requests` empty. A report without `gate_result` is refused with a message to re-record it with `--gate-result` before closeout.
@@ -157,6 +161,15 @@ With the `exact` relation the gate also enforces the verification-items contract
 For pushes and pull requests, `historical_chain_errors` additionally walks the earlier completed phases: each receipt's `head_sha` must resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches `tree_sha`, and the recorded receipt, findings, and closeout-log hashes must still match the files. Closed session logs are therefore immutable; corrections go in a sibling `<log-name>.errata.md`.
 
 The walk skips only a plan's leading run of phases that predate closeout receipts, which exist only since 2026-08-29 (`RECEIPT_CHAIN_SINCE` in `shared/scripts/verify.py`). `leading_pre_receipt_count` puts a phase in that run when it is cancelled, or when it is complete, its slug and its `closeout_session_log` file name are both dated before 2026-08-29, and nothing exists at its closeout receipt path. The run ends at the first phase that does not qualify, so deleting a receipt cannot exempt a later phase, and a receipt file on disk is always validated.
+
+## Static checks on the guidance itself
+
+`scripts/validate_targets.py` also checks the guidance the gates depend on, so the written procedure cannot drift from what the gates expect:
+
+- `closeout_procedure_errors` requires the generated `closeout.instructions.md` to hold exactly one `## CLOSEOUT procedure` heading, steps 1 to 8 in order, a `*Why` reason inside every step, `.claude/skills/learn/SKILL.md` inside step 2, both hard rules, and both stale-receipt messages verbatim.
+- `closeout_pointer_errors` requires the workflow core, the orchestrator prompt, the `commit` skill, and the plan-small template to name `closeout.instructions.md` and not to restate where the sequence lives.
+- `POLICY_BYTE_BUDGETS` keeps the workflow core at or below 16 KiB, and `ROOT_GUIDANCE_BUDGETS` keeps the generated `CLAUDE.md` at or below 200 lines and 5 KiB and `AGENTS.md` at or below 5 KiB.
+- `SKILL_DESCRIPTION_TOO_LONG` caps each skill's listing text at 300 characters (see the [skill library](../architecture/agents-and-skills.md)).
 
 ## Representative tests
 

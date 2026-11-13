@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:0d7ee92ed57891df4b0867ce6ccf56328f4f36ac3c80b3817a3e1ea19defc32a",
+  "pageVersion": "sha256:744e99aa6d4d74e202a18e04f6db760a8af1dafc94d7ae69795442f7488ef08c",
   "claims": [
     {
       "id": "claim_f49518af7629414a92868ab695c5bf80",
@@ -38,7 +38,7 @@
       "evidence": [
         {
           "resource": "repo://scripts/validate_plan_frontmatter.py#L24-L61",
-          "version": "repo-lines-v1:sha256:f6470ba3490135afbbc76edae1e7ed58edc09ec552530de7f461cc5be972c007:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NzMwZmMzMGViYzI4NGRjMTExMTMzNjEzM2IzMjM2YjAxMmVkY2ZjZDc2NzYwY2NjYzI3MmZhYzUwNmZmYTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhZWU4YTBjYmE1MTIzMWE1MGFlZTljNGM0OGVjMjI2ZDY0MWVkNjQ5NzlkNDk5NDRhZGU0MDZmMWE5NzA1YzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjOWNmNzhjZjEyYWQ5ZDQ5NzQ2OThlNDAxNGFlZWRjMjNiOTA3NmFkYWVkODViMTVhYmUzZGI1ZjgxZDk5Y2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE3ZTQ3YTY4ZGQ4ZjU2YmEyMzIxOTM4ZmViNjE0NjRlNTFjOWZiMzQwNThmNjJiMjJiYTI2MDMzOGM3ODM5NmMifQ"
+          "version": "repo-lines-v1:sha256:cd4c37eac9ce58008564f6f96de663063bef570e17a003a19c05709a0065b6a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NzMwZmMzMGViYzI4NGRjMTExMTMzNjEzM2IzMjM2YjAxMmVkY2ZjZDc2NzYwY2NjYzI3MmZhYzUwNmZmYTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhZWU4YTBjYmE1MTIzMWE1MGFlZTljNGM0OGVjMjI2ZDY0MWVkNjQ5NzlkNDk5NDRhZGU0MDZmMWE5NzA1YzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjOWNmNzhjZjEyYWQ5ZDQ5NzQ2OThlNDAxNGFlZWRjMjNiOTA3NmFkYWVkODViMTVhYmUzZGI1ZjgxZDk5Y2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE3ZTQ3YTY4ZGQ4ZjU2YmEyMzIxOTM4ZmViNjE0NjRlNTFjOWZiMzQwNThmNjJiMjJiYTI2MDMzOGM3ODM5NmMifQ"
         },
         {
           "resource": "repo://scripts/validate_plan_frontmatter.py#L290-L368",
@@ -56,11 +56,11 @@
     },
     {
       "id": "claim_d9f9ce593cab4eb989ad823fecc2d14e",
-      "statement": "The canonical orchestrator loop is PLAN when needed, IMPLEMENT with ponytail applied once, VERIFY, REVIEW returning JSON findings, CLOSEOUT, a FIX LOOP back to IMPLEMENT, COMMIT, and one non-force PUSH with GIT_TERMINAL_PROMPT=0 where a missing remote or auth failure is only a warning.",
+      "statement": "The canonical orchestrator loop is PLAN when needed, IMPLEMENT with ponytail applied once, VERIFY, REVIEW returning JSON findings, CLOSEOUT read and followed from closeout.instructions.md, a FIX LOOP back to IMPLEMENT, COMMIT, and one non-force PUSH where a missing remote or auth failure is only a warning.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L157-L173",
-          "version": "repo-lines-v1:sha256:64b596318b04431621bd0b36dce2da908442d8582967bcea9984fc2bc89522d5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxYTYwODM2OWZkMzFhMDJjODM3YTBjMGUxMjM0ZWY0NzFkNjQ3M2E1ZjQ3YzkyNzkzZjg4NmI1MmI4Zjc2OTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE2ZGQ0NzU1OGFlYTUyMTg1OGU0ZTU1NmIxYjAyMmVlY2NhZDhmZmUzMGE0ZjEyMzc1MmI0ZDMwYTdlY2QyNjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMyZTZjZTQ4ZGIxYjQ0NTQ3ZTNiZDMyMWRjOWQ2MTQzZTg5YzJmZTcwODI5OTlkYmQxMjFhMzUzZWEwN2EyMzYifQ"
+          "resource": "repo://shared/policies/workflow.instructions.md#L71-L90",
+          "version": "repo-lines-v1:sha256:c1d62f4295661ccb1070c944f73319f7da987c806d2f0c67d4786ba243980e04:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxYTYwODM2OWZkMzFhMDJjODM3YTBjMGUxMjM0ZWY0NzFkNjQ3M2E1ZjQ3YzkyNzkzZjg4NmI1MmI4Zjc2OTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1MmQ3MTExMDNkNTBhNDM3ODMwYzZmYmNkMDRmYjRiYWI0OWEwZjgyZjZkMjZkMWM3OTFjNmU4NDg4ZGQwOTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlNmNlMzgzOGNhYTRhZWFhZTg5OWNjNTAzOGNhNjRmZmEwNGIzMTVlNmI2NWI1YWNmNjIxNDU2NTE1YWEwODEifQ"
         }
       ]
     },
@@ -73,8 +73,8 @@
           "version": "repo-lines-v1:sha256:9dc0d2d879bba52007ad83da86460ddff18a432cb1907a2eb91e0468262a899e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2YwMDRlNjkwNDFiYmY5OGI2MmMyNjgzZmY1YzYyOGQ3N2FjMzJlZjM2ZjYyYWU0NmIwZDFiMjNmNGNlNDk4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGE3Mzc2MWNkZTg4ZWQ0ZTRjNDkyN2MxM2FkMjhmYjg3NGVhMzEyN2Y4NTU3Zjg3NzdiYzFjZjM2ODVjMjVjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWFmYjIyMzdhZDQ1NTNmMTg4OTgxMDU0YWFmMTQ2ODI4NmQ0OWM1ODU5MTE1YzZmOWViM2YwYTUwODIwZjYzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzc1OWQxOGVmMDA3NzlmMmI5MTc5NDc3NjMxMTc0MDBmYzZkZjIxYmMyNTFkZTYzYjQ1Y2ZiOGNkMzBhYTEwNCJ9"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L171-L181",
-          "version": "repo-lines-v1:sha256:0693e413a5a1e48aa9e01691f56afd803935b6c25328e79ccc8d107b0fb4d131:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1ZDk3NGE4Zjg4YTdhMzM0MDY1N2VkOWRmYTdlOTc5NTlkNGNlMDM0OGIyMDI2Y2M5MTJlNzQ1YjhkY2QzODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhNTcwNDI2ZWZiZmI2NDQ3Y2MwMzRiMGRkZTA5MTUyYTk4YTM4YTI4ZjE0MmFlZTlmNDU4YTJiM2M0YmQxZjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5NjNiYjQxOWZiMjM2ODI4MWVmZmQzMGM0ZmVmYjNhZDgyNjM2ZWNmYmZlMWQ3NWU4MDA5NjA0ODg2YjJlZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+          "resource": "repo://shared/policies/closeout.instructions.md#L41-L81",
+          "version": "repo-lines-v1:sha256:1a41ded32cb8250aa4fce7e766cbe84550c4301420f5c60542aaa1e4fcdc694b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiMzQzOGNiZDUzZWExNTA0ZjA5OTg1M2U0MzM5N2QzZDg4ZDQxNGQ0NDI0YjJiYmU4M2Y3ZDViOWJiNDNlMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4YmIzOGI5NWJkZWU4ZmUxYjk1YzFlZGRiMzM5NmMxNTg2ZWRiNGIzNjk4MDNkOWY2Yjg0MWQ2M2UyYzdlYWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNmZTY1OGI2NTg1Y2Y3Y2RiOGVjYTM1ZDdmMDI2MTA3NDVmNjQ0NjFjZDdlMDliZDYyOWNmZTRmODVkOWFhOGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxMzZlNzliOGJiYTE1YjkyYzA5ZTllYTdiMjcyOTEwMjdjMTA1ZDFhODA0NDgxNTNmOWFmNThkZGE2OTBhMjIifQ"
         },
         {
           "resource": "repo://shared/scripts/verify.py#L1788-L1820",
@@ -88,11 +88,11 @@
     },
     {
       "id": "claim_69dd9ab7aff8475eb5b8d3adecaa564f",
-      "statement": "The closeout sequence has eight ordered steps and two hard rules the hooks enforce: never chain git commit with the findings or receipt steps, and never touch nested state between the receipt and the commit.",
+      "statement": "The closeout sequence has eight ordered steps, each with a stated reason, and two hard rules the hooks enforce: never chain git commit with the findings or receipt steps, and never touch nested state between the receipt and the commit.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L185-L205",
-          "version": "repo-lines-v1:sha256:4f79601b3edb225759c2e7cf7bba2e0f7b4979b470c04dc4372e154fd5161c17:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjNTlkMzQ1YTA0MjU1MWE4M2JhYTc3ZGFhNzM5M2MyNWZmYmZiYTViMTUzMjk3OTljYmNkNWIyODhiMGEwYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzNmIwMjgxZDJlZWI1NzBlYmM5NDZiZGJmYmQ0ZjY5YWM3YTc4YzM3YjcwMWI0Y2I5NjU5OGZmMjIzYzZlYjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU4MTAwNzIyOWNlZDYyMmFlYTY3MzM0YzU4MzliMzc1MmIyYmNjNmUzM2ZmNmY4YjA2MDE5Njk0NzhjNGM2NGQifQ"
+          "resource": "repo://shared/policies/closeout.instructions.md#L14-L39",
+          "version": "repo-lines-v1:sha256:c566f62d1b1eb769e42eddfd9d14f22b723bd7cf8ac1de8a41f705724e106a5f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0ZWEwODM0NWNiYjQ5YzNiNDgwMjFlNjdhNzVlZDUyYjk0ZWNlZmZlOGQyY2QzOWE2ZjQyMDk3MjU1NjEyMDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyOTAzMDlhOTUyNmIxM2M2NGJhZTA2ZmI5OThiZmRlZDRlYWYwNDA5N2QwMWJmNjRjY2ZhMjg5ZTdiNzE1YWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI0MjkzOTEwOTc2YTBlNGIzOGFjODUxNDY4YzA0NjQzMjBjODNjYzgwNzQ0NWExOTRjMTM1ODFkMWJlZGY3M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhmMzc0ZDgzOGM4YmY3NDVjZmY0ZjNkMTEyNjQ3MTk2NDI1OGE2MzE4MzA0YzQyODk2YWFhNjYwZTc1ZWVlMGIifQ"
         }
       ]
     },
@@ -115,8 +115,8 @@
       "statement": "planned is a small-plan-only status; branch creation activates the first phase and a completed-phase commit activates the next non-cancelled phase by flipping exactly one phase to in-progress, an unexpected next-phase status is never overwritten, and planned blocks the same gates as in-progress.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L61-L74",
-          "version": "repo-lines-v1:sha256:e36f7165b59dd59607d36563762455bcf0771ba89865f75acb89ce6a0d4a1a7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliNzFmODUyZDUxNDRkYTIxNzA4NTI4MjRhOTExMmI1YzY1YjY3MzdjNmRjZTI4ZDk5OTE4Y2I1ZDUxNGMzY2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZGUzNGEzMzBlNjllNmQzYzAxNmY4ZjhhOTE2YjNhZWE0MjBlMmM0YzEwMmM2Y2I0MTg5YWI5ZGRiNWQzMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM4Yzk3NDc0MGYwZTYwNGM3YzkyMjVhMzEwMDQ3MzA1YWQ3ZGNiZGE0MDczZWZiMWFjMTQ4ZGQ4ODUxY2I3YjEifQ"
+          "resource": "repo://shared/policies/plan-lifecycle.instructions.md#L16-L29",
+          "version": "repo-lines-v1:sha256:89662c1cf776fc4208b1aa76ee6e090e07657927c45f7ae476de3054673d3fe7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiMDJlOTg5ZjRiNDIzNDQ4Y2Y5NTA5N2Q0YjZiNmVmOGQ4OWMzYzk5YTdjNTRmMGM4ODliOTQ1MzAxMDk0YTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVkNWFkYzMwMGM2YWZjYjA0ZjNiZDMwY2M5ZDM0MjUxNzg5YmM3NzRiYmJjZWFiZDM1NmUyZWY5MDk4NGE1NGYifQ"
         }
       ]
     },
@@ -129,8 +129,8 @@
           "version": "repo-lines-v1:sha256:1b87286caf5f53cc442bd347772502ae99a587e8d9584ba50a29856f5cebeff0:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMTBhZDY0ZGY3OWUyMzQyODRhMWYzNzhjNDgxZTYzYzYwYzVhMmVlZGIwY2YxN2FjMjc0NDQ2NGJjNGNmYzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBiNTk1Yjk5ZTlkMWI5NDIxNTRhY2Q0YzExMDE0Y2JmOGU5MzdjZWZkNzdlNzU3YTg1OTAwY2U2ODZjZDljNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY1NjJhZTY3ZjQ2MDU3ZjYwOTk4M2M5NDI1N2U0YWUxMGQxYzZiYjAzZjg4MzNiYjAzNTZjOGY5YzEyMzJkODAifQ"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L75-L103",
-          "version": "repo-lines-v1:sha256:7cb6ebbf80f3ed7e7a8e9ac02f535fc1a12eae277519a2d3fbce41855094a525:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkMmRiMTk2YzZmYzg0NTcwZWQ5YTllYzYyNGYyNTc0OWYxNjQ3YTM1NWRmNjYzZjdhNjJhMGNiN2ZmYjhjNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkN2ViMjhlNjBjODBkMzA0NTZjZmI4YTEyZDViNTA2NGM3ZTY0OGIwZmU3NmZiMTFlN2U4Y2UxZTI4MTNkNWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE5NTUyZjFkN2QyMWE5NWM0MWMzNDcyYjRkZDJhZTlkNTQ4MzU1MGVhZmU5NThmZjc2NjM2N2Q5MWFhM2YyODcifQ"
+          "resource": "repo://shared/policies/plan-lifecycle.instructions.md#L30-L58",
+          "version": "repo-lines-v1:sha256:b8549713900bccfb3901390a4772779afe50d572409d684468ba4ce4c41d5887:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4NGE3YjM4OWM4NjFkODZlZjE2YmE2ZGFmMWFhNjdjMzg0ODNmMjQ0ZmVmZjZkYTA4MzI4YWY0ZjIxOGU3NjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkN2ViMjhlNjBjODBkMzA0NTZjZmI4YTEyZDViNTA2NGM3ZTY0OGIwZmU3NmZiMTFlN2U4Y2UxZTI4MTNkNWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFkY2EzYTdmYzUxNTI5NTU3NjIxOWUxYWRjMjQ0YWUxNzAzNzIxYWFkYzY2MmM2ZWZhNTkyZTBiMDQ5OWQ0YmQifQ"
         }
       ]
     },
@@ -143,8 +143,8 @@
           "version": "repo-lines-v1:sha256:7a3d1ffcc3b93c35e5dea276b78b91be963dc3fdc93334f20fd8e7cb7c6fc92f:eyJzZWxlY3RlZExpbmVDb3VudCI6NzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxZGJjYzg2MDRjNzNkMTE5MDZiYWU3ZGNkNWMwN2IyNzk1NTExYWZkNTgzZTgxNjBjODZlYzU4N2Y2MTE4OWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY0NGE3ODFjZTA4MTZkMDYxZjNkMDNkYmY0MjE3ZjczZWYyZmZlYzIwZGNhMDEzODNjZjNkNmNkODFlYWRlNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4ZDYzYTc1NmJlNzYzOTBkNzRmOTc2YjE3Y2M4NjIzNmRkNWE4NTBmZjkyOTYxZGYzZDRkMjM4MmExMjM5OTcifQ"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L104-L123",
-          "version": "repo-lines-v1:sha256:879cd2661f15208016df9610f6fd4ff8066f2cd31b5a1c34c2b75a8d33a8cec7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhNjNlYjQxZmI5MjJlMTEwMjZmOTgxNTAxNzkyMTI3NzY0ZGViNjExYmNhZjMzNjIwMzFhNWM5ZDk2MWNjZTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxMDIwYWJjN2NmOWEyYTViYTZmZWIwNTIxMGQyNWE0M2UzMDk2MDlhODVjNGJjMmYyZWMxZjdmYzU4ZjdlOTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI5MzA3NzA0ZGRkZDQ0YzE3YmZlNDA2YjJhZWZkZWEwNGEyZWJiMWVkNWViNWRhZjU5NmI2YzRlY2M4ZmY3NTEifQ"
+          "resource": "repo://shared/policies/plan-lifecycle.instructions.md#L67-L86",
+          "version": "repo-lines-v1:sha256:2af80ba0472821b5f74c186f45c5f9e12361756ee9907ff9d3def54631bd6617:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5OGQwMjljMDFlMmU3ZWJkMDNjZTU3MTg2NzFhMGU1ZDE5YjhiODRiZmMwZjk2MjJhNDUwMGYzYjRmMTZkYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwMDgxZTU5ODRkNjI1MWI5N2YwNjA1ZjdhYjdkZjI5MzM1MDJmMTllOGM3Nzk4YTI5OWQwNTdlMjI5OGQ5ZGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ1OTllZTE3MTMyOWU4OTUzMmMzNWVkNWNlZDViNjgxMzQzMmRkZTA5OWNiOTExOTU5YTNjOGRkYzkxOGYzNGUifQ"
         }
       ]
     },
@@ -157,28 +157,28 @@
           "version": "repo-lines-v1:sha256:a2a7bd8d1c3386353e0a51425b28e6ed51b7dc4f67891b1194476063fcd4cb4b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkOWRjODNkOTMyNTcwMGM0MjgxYjZjMDI5MTUxNTcxZDNjODZjZWViNmRkZWM2NjBmZjY2NWY0MzUzYjFjYWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhOWZjYWNiMjdjMzk3OTYyYzJmNGVlM2MyYzliNzgwNjdjZjQzYjQxZjk4MWUzOGY2ZDAxZjE0ZjNiNDhlYzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc4MDRlNDE1ZDllNDRlNmE0YTkyOThkNWZhMjQ4M2JkN2Q2ZTZkYjlkNDU5NGJlOTZiZDNiYTk3ODE2M2VmOTEifQ"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L385-L406",
-          "version": "repo-lines-v1:sha256:6f654b6a13638ae6fd2d41009dc80d7e6fbd4f36413d5ba30bc6d5d93d5f9690:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzNWI5YThiYWVjOGYyNTc1OWNkMjYxMTA0OWRmYTIzZjRjZmM1MzY1M2FkMzAyNjhiM2ExNzg0MWJiNGE1NmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzYWQ1OTgwNjc0M2Q1MzFmNzBlYjAwMTY4ZDBlYzBiYjkzNTY0YmRjMTU3OTFmMzZiZmZhMmE0NDVhNmU1ZTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU3YjYyZjU2MjNjZTJkMGQwYTBlMWVlNjVmNzM0NDNhYWEwZWUwODIxMjdmN2JjZDkxYzNlODY3NTAyMWRjM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1MTAyY2IxMjU1ZWQxZDNhYWNiNWVjZGU1OTY2ZDBkMjdkMTY0MTFlNzg5ZmFkOTQyODcwYzA0ZWM0YzBlOTYifQ"
+          "resource": "repo://shared/policies/workflow.instructions.md#L153-L168",
+          "version": "repo-lines-v1:sha256:685ac38c2e331619948e26e9450de63b93dfcf689cc15dd2006e26c377d5433e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1NWNhYWE0MTdlY2NkMDljYWY5YTg4YWNkMmVhODg3NjU3ZDE0ZjAwOTMyYjY4ZGQwMzAxZjYxNmQwYjlhOWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4YzE4ZDE5MjE2NTFkMzQ0NTRjYjk3NTgxZDM3YWU3MjgxODVmNjZhNzhiNDZiNDNiOTI4YjQ5ZmM2NzVlYjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU0ZDZlNTc3NzRjNzk0YWEzNDc2NDQ1YWZlYWJlMDc1MDYyMDJmYjlkOTkxZmRiOGIwY2JiNTU1YTg3MzYwYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
         }
       ]
     },
     {
       "id": "claim_10052977a14e46c4af5a5cb4b741eeee",
-      "statement": "Plan-first protocol: check MEMORY.md for LEARN entries, clarify user preferences on ambiguous work and settle decisive technical assumptions with evidence in planner Phase 1, draft into .claude/plans/ or .claude/explorations/, obtain approval, and before each new phase invoke one planner only when new evidence materially affects remaining work.",
+      "statement": "Plan-first protocol: search MEMORY.md for the task's area tags and keywords and read only the matching entries, clarify user preferences on ambiguous work and settle decisive technical assumptions with evidence in planner Phase 1, draft into .claude/plans/ or .claude/explorations/, obtain approval, and before each new phase invoke one planner only when new evidence materially affects remaining work.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L29-L47",
-          "version": "repo-lines-v1:sha256:0beaf06a77fac064acd99b8499f462e286360dd59aff119f75a6752858947db2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMWU0MmMwZjI3YTYwOTJiZDM5MzE5ZjY3NjA4Y2NkMmU5N2IzNTZiMDZiOWQyM2JmMjVjZGJlODM2MjI1NmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyODFmY2U1YzZkZGVmYWMyZDdiOGI1MThkODIwOTdhNmQ4YmJjMmVkZWM3NWU2ZTI1YWM0MjQ4Mzk2MjdkZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2Mjg4ZmEwNjJjOWMyYTlmM2ZlNGM5NWUzMmYxMTk0MDRkMTRmOWU3ZWI0NWFiNTQzZmNlNDgxOTc0YTM0Y2EifQ"
+          "version": "repo-lines-v1:sha256:09aa403d6e51148f1bd1e1dc3e27f666a15e73a3bcdff0a073224f1ac3aeaae4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMWU0MmMwZjI3YTYwOTJiZDM5MzE5ZjY3NjA4Y2NkMmU5N2IzNTZiMDZiOWQyM2JmMjVjZGJlODM2MjI1NmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyODFmY2U1YzZkZGVmYWMyZDdiOGI1MThkODIwOTdhNmQ4YmJjMmVkZWM3NWU2ZTI1YWM0MjQ4Mzk2MjdkZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2Mjg4ZmEwNjJjOWMyYTlmM2ZlNGM5NWUzMmYxMTk0MDRkMTRmOWU3ZWI0NWFiNTQzZmNlNDgxOTc0YTM0Y2EifQ"
         }
       ]
     },
     {
       "id": "claim_4b07a067a7ca4ce5b27dca32675dd741",
-      "statement": "The workflow policy defines a numbered procedure for reopening a completed big plan while its implementation branch is unmerged: draft the new phases as planned, append one new -knowledge-refresh phase when the plan already has one, set the big plan in-progress with current_phase on the first new phase, never edit or re-persist a completed phase's plan, log, findings, or receipts, and meet the same strict terminal gates in the new final phase.",
+      "statement": "The plan-lifecycle policy defines a numbered procedure for reopening a completed big plan while its implementation branch is unmerged: draft the new phases as planned, append one new -knowledge-refresh phase when the plan already has one, set the big plan in-progress with current_phase on the first new phase, never edit or re-persist a completed phase's plan, log, findings, or receipts, and meet the same strict terminal gates in the new final phase.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L124-L154",
-          "version": "repo-lines-v1:sha256:f8a029869d52a0ae2cdf3fcd5c880ce5e84bcd36d97349bf2624eb360aa4ef3b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2ODJiOGRkOGY0ZGZlZWQ5YzgxYTQ4ZTMyM2NmNjcyZTQwOWJhZmYyNmU5NjZiZDk4ZjkyOGY2MTZjM2U4YzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTYxM2MxNGEyYmI3MGRhZjI3ZWM3N2ExNWQzM2RhMzc3YjMxNTRlNTNiMTUwMzVlZWE0NjBmNzdiNWZmNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhYTE5ODdhNGU3ZjRiNTk4ZDYwNjAxNTY4OTUyZjAxMmM4ZDU1MjExMzYxNjkyOWE5NDk1Yjk2MDBiNmY0ZTMifQ"
+          "resource": "repo://shared/policies/plan-lifecycle.instructions.md#L87-L120",
+          "version": "repo-lines-v1:sha256:36023ee078ee07f7887bd077470c656566f444054ce5fcf3978776be7309f29b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0M2VmYmEyNDQxYWQ4YmYwYmNhNGNhNmMxYzRmMTI5ZTgzNzU0N2Y3MmQzZjAzMTg3MmI0M2UyNGUzNWJmODkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTYxM2MxNGEyYmI3MGRhZjI3ZWM3N2ExNWQzM2RhMzc3YjMxNTRlNTNiMTUwMzVlZWE0NjBmNzdiNWZmNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIxYTQ0ODY1ODhkNTY3OTE4MWU4MDBhYmU2NzQ1Nzg4ZjNjY2QyMzBmNWQ0MDQ4ZTAyNmRmODdlZmJlY2U1ZjgifQ"
         }
       ]
     },
@@ -211,14 +211,38 @@
       "statement": "When the findings text names a protected path, the closeout sequence writes the findings JSON with the Write tool to a scratch file and passes it as --findings-json <file>, because the protect-files guard denies heredoc text that names a protected path.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L194-L194",
-          "version": "repo-lines-v1:sha256:e8d4130b2da2d754d7bae3d876443b2af1c68f132378deeb7bb0a0e87633aada:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZThkNDEzMGIyZGEyZDc1NGQ3YmFlM2Q4NzY0NDNiMmFmMWM2OGYxMzIzNzhkZWViN2JiMGEwZTg3NjMzYWFkYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZThkNDEzMGIyZGEyZDc1NGQ3YmFlM2Q4NzY0NDNiMmFmMWM2OGYxMzIzNzhkZWViN2JiMGEwZTg3NjMzYWFkYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDQwY2U5ZTU2NDQ3MGYwMTVlZGMyMjgyNjU5N2Y2YzY3MzNmOWNjMmNjNzc1NzAzMTQzMTg2NTNkOTdiOWJhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTU4Nzc5MTdiODQ1NDllMTVlMzE0ZWY2ZmIwNmMyMDY0NzM2YTU4NGUxNDIwNmJkZTE3MzQ5MmZmNjA0OTY4YiJ9"
+          "resource": "repo://shared/policies/closeout.instructions.md#L26-L26",
+          "version": "repo-lines-v1:sha256:86602bf24fb0fdb0523ced9f97b7b9297530622e6fe99cc4d1e1b37b19c9b9d7:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODY2MDJiZjI0ZmIwZmRiMDUyM2NlZDlmOTdiN2I5Mjk3NTMwNjIyZTZmZTk5Y2M0ZDFlMWIzN2IxOWM5YjlkNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODY2MDJiZjI0ZmIwZmRiMDUyM2NlZDlmOTdiN2I5Mjk3NTMwNjIyZTZmZTk5Y2M0ZDFlMWIzN2IxOWM5YjlkNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTdkYTg5MjVlYjUyMTBkMjAxNzdjZDhmOGQxYTVhMTZiNDgwZTIyOGYyZTYxNDhlNDQ4MTNiZDhmZjg2ODRlOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTU4Nzc5MTdiODQ1NDllMTVlMzE0ZWY2ZmIwNmMyMDY0NzM2YTU4NGUxNDIwNmJkZTE3MzQ5MmZmNjA0OTY4YiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e1606e49c2754f10b3b13d06c8954cb5",
+      "statement": "closeout.instructions.md is the only place that lists the CLOSEOUT order; its step 2 reads the learn skill and routes each lesson to a project skill, a MEMORY.md entry, or none, and validate_targets.py pins the eight steps, a reason in each, the learn-skill read, both hard rules, and both stale-receipt messages in the generated file.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L966-L1005",
+          "version": "repo-lines-v1:sha256:ce515705044240d2c24873c3b06d6787ac246585d915518f8ea535ed4be28fc9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4NmFjZDM5MGM0ZjVhMzE1ODIwM2YxMDg1ZGViYjVhYWQzNDJlMjczYjg1ZmI0NTE2MTIwMWZmZTM5Y2M2MTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmZTM2MGZkYmM1MmI1NDk2YzFkZGI4ZmE2ZGIzMTM1NThkNjA1NDQwZDFkNTEwYWI0ZWExMjI5MTUxMjliZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAzZTVlODRhMDg2MDI3NWE3NzBkZjY0ODhiNjkxNWIyMzg1YzY2MTg5NDFlY2RmMWE4ZDJlYTU4ZjFlYmJjMzIifQ"
+        },
+        {
+          "resource": "repo://shared/policies/closeout.instructions.md#L8-L22",
+          "version": "repo-lines-v1:sha256:7a2e438b26855a5835865501fecfdf24c74762178e0ed73bcf7814e81f04467d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0YmJlYWU5NDlkM2Q5N2E1NzI3YTZkNzZjZWFmNTBhZWYwYTg5YmE0ZmM3NDIyM2RhNTdkZTZjZTQ1NmM3OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjExNGYxN2ZkNTQzZjgxYTdjNzNmNTllNGY0OGNkZWQ0ZjAzMzk1ZmM5NmM1ODM0MjU2YTZlOTA2MGEzNTMxMjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNjA0Nzk1YjkwM2YwODE2OTVjZTFkMWMzZTljM2U4NTVmZDZiOWY0YmJiMDNjMjk0ODgwOTczZGI0OTZlZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3ZGE4OTI1ZWI1MjEwZDIwMTc3Y2Q4ZjhkMWE1YTE2YjQ4MGUyMjhmMmU2MTQ4ZTQ0ODEzYmQ4ZmY4Njg0ZTkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ff3a7060f2f84017aefc613564b696d2",
+      "statement": "After 'closeout receipt final tracked state is stale', the closeout file says to restage and repeat step 6 alone for a documentation-only change, or return to the fix loop and repeat steps 4 to 6 otherwise; after the provenance error it says to make the change final and repeat steps 3 to 6.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/closeout.instructions.md#L131-L146",
+          "version": "repo-lines-v1:sha256:1fc7deed350f958fa640723791641ac07c151ebdd296832810693efb1c5de597:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0NmU2ODIxMjMyNDg4M2YyYzY4MWE0MTNmMjQ5ZDQwMDhkZjQ4OGY0MzgxM2UzNjYwYjU1NTI0ZGYzNDFmOTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE0Nzk1YmFjNDEzZTUzODNjNzZjNDZjMWJjMmM4MTI3NGFhNzcyODRjMzY0NjMyNDNiMmY5ZWQ4OGQwMmY3NTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBiM2M2YTMxNzU3OWMzZTM2NTgyN2I3NTU3MjhlOTUwZTM5NDc0Njg5ZTdkMzM1YTMyYmUxZjJmYzNhNTFkNDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoxLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5OTRkYzJiZmY5OGIyZmRhZDA2ODg2NDQxMzMyZDE3MjczNWYxMWYxNjFmZWQ0MmM0YzVlMWIyOGM1YTFhYzMifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-11T14:51:38.121Z"
+    "at": "2026-11-13T15:30:24.556Z"
   }
 }

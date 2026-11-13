@@ -1192,8 +1192,8 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
   - Pre-flight, branch, plan, implementation, verification, review, documentation, learn, session-log, commit protocol (the CLOSEOUT sequence itself lives in `closeout.instructions.md`); coder-time Ponytail discipline and conditional review routing are defined here
-  - Branch lifecycle and commit/PR gates
-  - Session logging and recovery reminders
+  - Branch lifecycle and bypass policy (the commit and PR gates are in `closeout.instructions.md`)
+  - Session logging and context management
 - [closeout.instructions.md](shared/policies/closeout.instructions.md)
   - The numbered CLOSEOUT sequence, the completion-commit gate, the final-phase audit, and stale-receipt recovery
 - [plan-lifecycle.instructions.md](shared/policies/plan-lifecycle.instructions.md)
