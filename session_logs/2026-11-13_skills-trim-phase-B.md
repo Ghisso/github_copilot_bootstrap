@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-13
 **Plan:** `.claude/plans/2026-11-12_phase-B-instructions.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -36,6 +36,61 @@ Fix exploration section 7 defects 2 to 6, move CLOSEOUT into `closeout.instructi
 
 ## Verification
 
+```text
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS      246.5s  uv run pytest tests/test_validate_targets.py tests/test_validate_plan_frontmatter.py tests/test_verify.py tests/test_install_bootstrap.py -q --tb=short
+PASS        0.2s  uv run pytest tests/test_validate_targets.py -q --tb=short -k "closeout_procedure or root_guidance_budget"
+PASS        0.0s  wc -c dist/multi-agent/CLAUDE.md dist/multi-agent/AGENTS.md shared/policies/workflow.instructions.md shared/policies/closeout.instructions.md shared/policies/plan-lifecycle.instructions.md shared/policies/workspace.instructions.md shared/policies/quality-and-testing.instructions.md shared/policies/tool-routing.instructions.md shared/agents/orchestrator/prompt.md shared/agents/documenter/prompt.md
+PASS        0.0s  test "$(wc -c < dist/multi-agent/CLAUDE.md)" -le 4500
+PASS        0.0s  test "$(wc -c < dist/multi-agent/AGENTS.md)" -le 4800
+PASS        0.0s  test "$(wc -c < shared/policies/workflow.instructions.md)" -le 16000
+PASS        0.0s  test "$(wc -c < shared/policies/workspace.instructions.md)" -le 7500
+PASS        0.0s  test "$(wc -c < shared/policies/quality-and-testing.instructions.md)" -le 3000
+PASS        0.0s  test "$(wc -c < shared/policies/tool-routing.instructions.md)" -le 3000
+PASS        0.0s  test "$(wc -c < shared/agents/orchestrator/prompt.md)" -le 12500
+PASS        0.0s  test "$(wc -c < shared/agents/documenter/prompt.md)" -le 6500
+PASS        0.0s  test -f dist/multi-agent/.claude/instructions/closeout.instructions.md
+PASS        0.0s  test -f dist/multi-agent/.claude/instructions/plan-lifecycle.instructions.md
+PASS        0.0s  test "$(grep -c -F '### CLOSEOUT sequence' shared/policies/workflow.instructions.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '## Recovery Checklist' shared/policies/workflow.instructions.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '## File Protection Rules' shared/policies/workflow.instructions.md)" = "0"
+PASS        0.0s  grep -q -F 'closeout receipt final tracked state is stale' shared/policies/closeout.instructions.md
+PASS        0.0s  grep -q -F 'closeout receipt governing control-plane provenance is stale' shared/policies/closeout.instructions.md
+PASS        0.0s  grep -q -F '.claude/skills/learn/SKILL.md' shared/policies/closeout.instructions.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' shared/agents/orchestrator/prompt.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' shared/skills/commit/SKILL.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' shared/templates/plan-small.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' dist/multi-agent/CLAUDE.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' dist/multi-agent/AGENTS.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' dist/multi-agent/.github/copilot-instructions.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' CLAUDE.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' README.md
+PASS        0.0s  grep -q -F 'plan-lifecycle.instructions.md' shared/agents/planner/prompt.md
+PASS        0.0s  test "$(grep -c -F 'Completion Protocol' shared/agents/orchestrator/prompt.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'mirrors it' shared/templates/plan-small.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Never checkpoint after step 5' README.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Never checkpoint after the receipts are persisted' shared/skills/commit/SKILL.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'persists findings, records learning' CLAUDE.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'read `.claude/MEMORY.md`' dist/multi-agent/CLAUDE.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'read `.claude/MEMORY.md`' CLAUDE.md)" = "0"
+PASS        0.0s  uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.exists()] + [str(p) for r in roots if r.exists() for p in ([r] if r.is_file() else sorted(r.rglob("*"))) if p.is_file() and "__pycache__" not in p.parts and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'loaded into every session|hidden helpers' shared
+PASS        0.0s  grep -q -F '`.agents/`' dist/multi-agent/CLAUDE.md
+PASS        0.0s  grep -q -F '`.claude/settings.json`' dist/multi-agent/AGENTS.md
+PASS        0.0s  grep -q -F '.agents/agents/orchestrator/agent.md' dist/multi-agent/AGENTS.md
+PASS        0.0s  grep -q -F '.claude/instructions/agent-reporting.instructions.md' dist/multi-agent/.github/copilot-instructions.md
+PASS        0.0s  grep -q -F 'PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH' dist/multi-agent/.github/copilot-instructions.md
+PASS        0.0s  test "$(grep -c -F 'especially `workflow.instructions.md`' dist/multi-agent/.github/copilot-instructions.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'record_findings.py src/' shared/policies/quality-and-testing.instructions.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Bootstrap Hooks Runtime Contract' shared/policies/workspace.instructions.md)" = "0"
+PASS        0.0s  grep -q -F 'Minimum Python version' .claude/instructions/project-context.instructions.md
+PASS       48.0s  uv run python scripts/validate_targets.py
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      319.8s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-B-instructions.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had one MAJOR and two MINORs, all fixed before round 2).
+- Phase receipt: `verify.py phase --persist` PASS (pytest completed (5092 passed, 1 skipped in 321.77s (0:05:21)); mypy 0 errors; Ruff 0 violations).
 - optional 1: PASS — this phase's closeout was walked with `.claude/instructions/closeout.instructions.md` alone. Every step's action and order came from that file. Two details came from elsewhere: the script path and runner for the findings recorder (the file names `record_findings.py`; the real call is `uv run python .claude/scripts/record_findings.py`), and the checkpoint/commit facts were confirmed against `verify.py` by the reviewer. Recorded for the Phase D audit.
 - optional 2: NOT RUN — needs an interactive VS Code Copilot Chat session to view its loaded-instructions list; this agent cannot drive that UI. The generated `.github/copilot-instructions.md` carries the reporting pointer and the plain-language rule (required items and the new `copilot_guidance_errors` pin).
 - optional 3: NOT RUN — a fresh interactive Codex chat in this repository was not started (it would run this repository's trusted Codex hooks, including nested state sync, mid-closeout). Substitute check: `codex debug prompt-input` with an isolated, untrusted Codex home (no hooks) showed that this authoring repository loads its own hand-maintained 2,099-byte `AGENTS.md`, not the generated one, and it names neither the control-plane list nor the closeout file; it routes Codex to the workspace policy, which carries both. Unchanged by this phase; listed for the Phase D audit.
