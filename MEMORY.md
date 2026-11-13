@@ -1651,7 +1651,12 @@
   most one of them may run `generate_targets.py` and `validate_targets.py`,
   and only after the other has stopped editing `shared/`: the validator's
   determinism check regenerates and fails with "generated dist is not
-  deterministic" when a source file changes between the two renders.
+  deterministic" when a source file changes between the two renders. For a
+  large guidance phase, split content by file ownership, have no content
+  agent run the generator or validators, have each grep
+  `scripts/validate_targets.py` and `tests/` before cutting a sentence, and
+  let the validator owner integrate once all edits settle (skills trim
+  Phase B: five agents, one overlay failure, no lost pin).
 - [LEARN:quality] In shell guards, `git check-ignore -q` needs `--no-index`
   to judge the ignore rules for a file that is still tracked, and it exits
   1 for "not ignored" but 128 when git itself fails (unsafe or broken

@@ -6,8 +6,8 @@ phase_index: 2
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-13_skills-trim-phase-B.md
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -85,13 +85,13 @@ Risk notes:
 
 ## Steps
 
-- [ ] **1. Add the validator pins and tests first.**
+- [x] **1. Add the validator pins and tests first.**
   - Owner: `coder`. Files (modify): `scripts/validate_targets.py`, `tests/test_validate_targets.py`, `tests/test_validate_plan_frontmatter.py` (only where a test reads moved text). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Copilot guidance check, next to the Ponytail check (about line 8217):
     - require `REPORTING_POLICY_POINTER` and `closeout.instructions.md`;
     - require exactly one canonical lifecycle equal to `ROOT_GUIDANCE_WORKFLOW` (reuse `ROOT_LIFECYCLE_PATTERN`);
     - reject "especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`".
-  - Template test: the `## Closeout Checklist` of `shared/templates/plan-small.md` has exactly two `- [ ]` boxes, names `closeout.instructions.md`, and contains neither "mirrors it" nor "`**Status:** COMPLETED`".
+  - Template test: the `## Closeout Checklist` of `shared/templates/plan-small.md` has exactly two `- [x]` boxes, names `closeout.instructions.md`, and contains neither "mirrors it" nor "`**Status:** COMPLETED`".
   - Orchestrator tests:
     - replace the `## Completion Protocol (Mandatory)` row (about line 4343) with a `## Phase-Boundary Summary` row that still requires `agent-reporting.instructions.md`;
     - add a test that the `## Core Workflow` numbered items run from 1 to the last number with no heading between them.
@@ -123,7 +123,7 @@ Risk notes:
   - Tests for the closeout pin carry `closeout_procedure` in their names: one positive case, and one negative case per rule.
   - Acceptance: the new tests fail before Step 2.
 
-- [ ] **2. Split the workflow policy.**
+- [x] **2. Split the workflow policy.**
   - Owner: `coder`. Files: create `shared/policies/closeout.instructions.md` and `shared/policies/plan-lifecycle.instructions.md` (both `applicability: always`); modify `shared/policies/workflow.instructions.md` and `shared/skills/knowledge-refresh/SKILL.md`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/humanize/SKILL.md` (`edit` mode).
   - Closeout file:
     - steps 1 to 8 from workflow 185-207, adding the missing reasons for steps 2, 6, 7, and 8;
@@ -142,7 +142,7 @@ Risk notes:
     - delete Recovery Checklist and File Protection Rules.
   - knowledge-refresh skill: add any OpenWiki Refresh fact the skill lacks, then delete that section from the workflow. Point its line 175 reference at the right file.
 
-- [ ] **3. Change the root guidance and the Copilot file.**
+- [x] **3. Change the root guidance and the Copilot file.**
   - Owner: `coder`. Files (modify): `scripts/generate_targets.py`, and the authoring `CLAUDE.md`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/humanize/SKILL.md` (`edit` mode).
   - Authoring `CLAUDE.md`:
     - change line 30 (MEMORY) and line 67 (control plane);
@@ -164,7 +164,7 @@ Risk notes:
     - keep the `.claude/` state sentence;
     - the reporting pointer, with the root guidance's plain-language sentence.
 
-- [ ] **4. Trim the workspace policy and move the hooks contract.**
+- [x] **4. Trim the workspace policy and move the hooks contract.**
   - Owner: `coder`. Files (modify): `shared/policies/workspace.instructions.md`, and `.claude/instructions/project-context.instructions.md` (this repository's AI state, checkpointed in the nested repository). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Control plane: the inventory text, plus "The commit gate is wider: it treats every tracked path under `.claude/`, `.codex/`, `.agents/`, `.github/`, and `.devcontainer/` as control plane."
   - Merge the three `uv` sections into one. Cut the Workflow restatement to its pinned fragments.
@@ -175,7 +175,7 @@ Risk notes:
   - Move "Bootstrap Hooks Runtime Contract" to the project context.
   - Keep the Knowledge Ownership and Review Profiles tables.
 
-- [ ] **5. Trim the other policies.**
+- [x] **5. Trim the other policies.**
   - Owner: `coder`. Files (modify): `shared/policies/quality-and-testing.instructions.md`, `shared/policies/tests.instructions.md`, `shared/policies/tool-routing.instructions.md`, `docs/runtime-checks.md`, `shared/policies/config-first-design.instructions.md`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - quality-and-testing:
     - keep the commands, the consumer scope, the Verification Detail table, the severity tiering, and the metadata-matrix sentence;
@@ -184,7 +184,7 @@ Risk notes:
   - tool-routing: move the Context Mode server paragraph (line 29) to `docs/runtime-checks.md`. Before moving it, grep the validators and tests for its sentences (for example `2.1.8`, `CONTEXT_MODE_DATA_DIR`, `--agent codex`) and keep any pinned sentence in the policy.
   - config-first-design: remove the code examples that `hydra-config` repeats, and keep the rules.
 
-- [ ] **6. Fix and trim the agent prompts.**
+- [x] **6. Fix and trim the agent prompts.**
   - Owner: `coder`. Files (modify): `shared/agents/orchestrator/prompt.md`, `shared/agents/coder/prompt.md`, `shared/agents/documenter/prompt.md`, `shared/agents/planner/prompt.md`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/humanize/SKILL.md` (`edit` mode).
   - Orchestrator:
     - line 3: "the memory/session-log writes in the Completion Protocol" becomes "the CLOSEOUT steps";
@@ -201,7 +201,7 @@ Risk notes:
     - keep the domain routing lines, because Phase C repoints the pipeline one.
   - Planner: line 101 points the KR rule at `plan-lifecycle.instructions.md`. Line 121 (the contract) stays.
 
-- [ ] **7. Replace the competing procedures and point everything at the new files.**
+- [x] **7. Replace the competing procedures and point everything at the new files.**
   - Owner: `coder` (`documenter` for `README.md` and `docs/`). Files (modify):
     - `shared/templates/plan-small.md`, `shared/templates/plan-big.md` (line 77), `shared/templates/session-log.md` (line 40);
     - `shared/skills/plan-decomposition/SKILL.md`, `shared/skills/commit/SKILL.md`, `shared/skills/code-review/SKILL.md` (lines 26 and 38);
@@ -221,10 +221,10 @@ Risk notes:
     - keep the upgrade-specific paragraphs before and after it (the pre-2026-08-29 rule, the evidence-only checkpoint rule, and the findings re-record rule);
     - update line 358 and add the two new files to "Most Important Instructions".
 
-- [ ] **8. Regenerate and refresh this repository.**
+- [x] **8. Regenerate and refresh this repository.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. Read the installed closeout file before this phase's closeout, and record the before and after sizes in the session log.
 
-- [ ] **9. Review.**
+- [x] **9. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus:
     - no moved text was lost (diff the old sections against the new files);
@@ -311,8 +311,8 @@ uv run python .claude/scripts/verify.py phase --format text
 
 Run the numbered CLOSEOUT sequence in `.claude/instructions/closeout.instructions.md` in order. Tick both boxes at its step 2. Later steps bind this file's bytes, so do not edit this file after step 2.
 
-- [ ] Step 1: documentation updated, or skipped as pure-internal with a reason
-- [ ] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
+- [x] Step 1: documentation updated, or skipped as pure-internal with a reason
+- [x] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
 
 ## Pause Checkpoint
 
