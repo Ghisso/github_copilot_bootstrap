@@ -2,16 +2,16 @@
 name: skills-and-instructions-trim
 type: big-plan
 # status must occur exactly once: planning | in-progress | complete | cancelled
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: skills-and-instructions-trim_implementation
-started_at:
+started_at: 2026-11-13T11:54:23Z
 phases:
   - 2026-11-12_phase-A-project-owned-skills
   - 2026-11-12_phase-B-instructions
   - 2026-11-12_phase-C-skill-set
   - 2026-11-12_phase-D-knowledge-refresh
-current_phase:
+current_phase: 2026-11-12_phase-A-project-owned-skills
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
