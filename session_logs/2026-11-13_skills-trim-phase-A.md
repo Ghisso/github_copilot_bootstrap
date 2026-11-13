@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-13
 **Plan:** `.claude/plans/2026-11-12_phase-A-project-owned-skills.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -37,6 +37,24 @@ Let a consumer project keep its own skills across full-install refreshes: a `.cl
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS        5.9s  uv run pytest tests/test_install_bootstrap.py tests/test_sidecar_install.py tests/test_sidecar_update.py -q --tb=short -k project_skill
+PASS       92.4s  uv run pytest tests/test_install_bootstrap.py tests/test_check_runtime.py tests/test_verify.py tests/test_sidecar_install.py tests/test_sidecar_update.py -q --tb=short
+PASS        0.0s  cmp scripts/runtime_ownership.py dist/multi-agent/.claude/scripts/runtime_ownership.py
+PASS        0.0s  grep -q -F '.project-skill' dist/multi-agent/.claude/skills/learn/SKILL.md
+PASS        0.0s  grep -q -F '.project-skill' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
+PASS        0.0s  grep -q -F 'bootstrap-root/.agents/skills' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
+PASS        0.0s  grep -q -F '.project-skill' README.md
+PASS        0.0s  test -f .claude/skills/openwiki/.openwiki-install.json
+PASS       48.0s  uv run python scripts/validate_targets.py
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      322.5s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-A-project-owned-skills.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had five MINORs, all fixed before round 2).
+- Phase receipt: `verify.py phase --persist` PASS (pytest 5031 passed, 1 skipped; mypy 0 errors; Ruff 0 violations).
 - optional 1: PASS — scratch Git repository, real `--local-only` install, marked `.claude/skills/demo/` added, second install (both exit 0); isolated `codex debug prompt-input` listed `demo` once from `r1` = `<tree>/.agents/skills` (61 entries, 61 unique).
 
 ## Open Questions / Next Steps
