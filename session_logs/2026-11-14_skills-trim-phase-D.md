@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-14
 **Plan:** `.claude/plans/2026-11-12_phase-D-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -27,6 +27,25 @@ Refresh the OpenWiki pages that describe skills, installer ownership, and the li
 
 ## Verification
 
+```text
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS        0.0s  uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.is_dir()] + [str(p) for r in roots if r.is_dir() for p in sorted(r.rglob("*.md")) if p.is_file() and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'skills/(review-api|run-tests|refactor|pdf|caveman-compress|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing|pipeline-patterns|haystack-conditional-router|docling-haystack|ollama-chat-generator|pandas-nan-bool-coercion|networkx-igraph-graphml-interop|pyvis-xss-testing|csv-driven-integration-tests|deploy-service|context-manager-testing|test-helper-public-api)/|(?i:there are 55)' openwiki
+PASS        0.0s  grep -q -F 'data-and-graph-pitfalls' openwiki/architecture/agents-and-skills.md
+PASS        0.0s  grep -q -E '\b37\b' openwiki/architecture/agents-and-skills.md
+PASS        0.0s  grep -q -F '.project-skill' openwiki/operations/install-ownership-and-runtime-checks.md
+PASS        0.0s  grep -q -F 'closeout.instructions.md' openwiki/workflows/lifecycle-and-task-lanes.md
+PASS        0.0s  uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.exists()] + [str(p) for r in roots if r.exists() for p in ([r] if r.is_file() else sorted(r.rglob("*"))) if p.is_file() and "__pycache__" not in p.parts and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'loaded into every session|Never checkpoint after the receipts are persisted' shared README.md docs/architecture.md docs/target-mapping.md
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"
+PASS       45.0s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      314.5s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-D-knowledge-refresh.json` (1 MINOR, disposition `fixed`; gate PASS; six profiles; round 1 had three MAJORs, all fixed before round 2).
+- Phase receipt: `verify.py phase --persist` PASS (pytest completed (5084 passed, 1 skipped in 309.23s (0:05:09)); mypy 0 errors; Ruff 0 violations).
 - optional 1: PASS — each refreshed page's prose was written against the cited code during the run, and the Phase D reviewer read all seven pages against `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/validate_targets.py`, `scripts/generate_targets.py`, and `shared/policies/*` in two rounds; no prose mismatch, only the three cosmetic follow-ups listed above.
 
 ## Stale-claims surfaces checked
