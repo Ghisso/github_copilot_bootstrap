@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-11-13T12:43:44Z",
+  "branch": "skills-and-instructions-trim_implementation",
+  "head_sha": "cfde28062954a5ef07309ad21f18f52ff9b2cd96",
+  "base_ref": "dev",
+  "merge_base_sha": "cfde28062954a5ef07309ad21f18f52ff9b2cd96",
+  "phase": "2026-11-12_phase-A-project-owned-skills",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "f32d54545589f5634ea4537725396e8c8a35d09e",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/target-mapping.md",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "shared/skills/learn/SKILL.md",
+    "shared/skills/safe-consumer-bootstrap-refresh/SKILL.md",
+    "tests/test_install_bootstrap.py",
+    "tests/test_sidecar_install.py",
+    "tests/test_sidecar_update.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
