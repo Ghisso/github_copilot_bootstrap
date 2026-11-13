@@ -27,9 +27,9 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   backlog-followups parity tables, and the recorded follow-ups list).
 - `openwiki/`: generated OpenWiki knowledge layer (descriptive, never
   authority; refresh only through the `knowledge-refresh` skill).
-- `shared/policies/`: source instruction files (workflow, quality,
-  tool-routing, workspace, agent reporting).
-- `shared/skills/`: 55 reusable skills; `onboard` is one of them.
+- `shared/policies/`: source instruction files (workflow, closeout,
+  plan-lifecycle, quality, tool-routing, workspace, agent reporting).
+- `shared/skills/`: 37 reusable skills; `onboard` is one of them.
 - `shared/agents/`: canonical agent metadata and target-neutral prompts.
 - `shared/review-profiles/`: profile checklists used by the unified reviewer.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
@@ -70,7 +70,10 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   workspace instructions) with the target directory name.
 - `scripts/runtime_ownership.py`: which installed paths the bootstrap owns and
   which are consumer state (`CONSUMER_STATE_PATHS`); anything else under
-  `.claude/` that the target lacks is deleted on refresh.
+  `.claude/` that the target lacks is deleted on refresh, except a
+  marker-claimed third-party bundle and a `.claude/skills/<name>/` folder
+  marked with `.project-skill`. An unmarked skill folder the bootstrap never
+  shipped makes the refresh refuse before any write (`validate_project_skills`).
 - `scripts/sidecar_overlay.py`: sidecar install, update, and uninstall engine.
 - `scripts/update_consumers.py`: batch regenerate/update of mixed full and
   sidecar consumers; it finishes every target even when one fails.
@@ -265,7 +268,10 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
 - Consumer-specific state belongs in the consumer's nested `.claude` repo, not
   in shared source templates or generated output.
 - A new file under `.claude/` survives a self-refresh only inside a
-  `CONSUMER_STATE_PATHS` entry; elsewhere the installer deletes it.
+  `CONSUMER_STATE_PATHS` entry, a marker-claimed third-party bundle, or a
+  `.claude/skills/<name>/` folder marked with `.project-skill`; elsewhere the
+  installer deletes it, and an unmarked never-shipped skill folder makes it
+  refuse instead.
 
 ## Known documentation/status caveats
 
