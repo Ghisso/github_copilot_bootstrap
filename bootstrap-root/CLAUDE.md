@@ -10,28 +10,25 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 - Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
-- Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode (`ctx_index`, `ctx_search`) to index and search large text or one large file at a time. Missing optional retrieval helpers are warnings, not hard failures.
-- An optional OpenWiki knowledge layer, enabled when `openwiki/INSTRUCTIONS.md` exists, is derived context, never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
+- Choose retrieval tools by `.claude/instructions/tool-routing.instructions.md`; missing optional helpers are warnings, not failures.
+- OpenWiki pages are derived context, never authority over source, tests, or policy. Refresh them only per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 - For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Compact internal agent handoffs may still use `caveman full`. See `.claude/instructions/agent-reporting.instructions.md` for the complete policy.
 
 ## Task Lanes
 
 - Read the authoritative Task Lanes decision table in `.claude/instructions/workflow.instructions.md` before acting; it is the sole normative classifier.
-- Read-only/reporting stays with the main agent and produces evidence only. Diagnose stays read-only until a fix is requested.
-- Only an explicit, one-file, low-risk edit with no high-risk impact and no requested commit or PR is lightweight; it stays with the main agent and needs focused verification, not lifecycle artifacts.
-- Standard implementation and control-plane/high-risk work use `orchestrator -> [planner when needed] -> coder -> reviewer -> closeout`; PLAN is conditional, while VERIFY and CLOSEOUT are lifecycle stages run by the orchestrator and canonical scripts. All commit/PR work is standard or higher.
-- Control-plane/high-risk includes control-plane, security, dependency/lockfile, migration, multi-file, user-data, generators, and scripts. It always uses a full plan and the required high-risk review profiles.
+- Read-only/reporting work and an explicit one-file low-risk edit with no commit or PR stay with the main agent. Standard and control-plane/high-risk work, including all commit/PR work, use `orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout`.
 - Audited typo commit bypasses are recovery exceptions, never lane classification.
 
 ## Required Lifecycle
 
 `PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH`
 
-- Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
+- Before non-trivial work, search `.claude/MEMORY.md` for the task's area tags (for example `[LEARN:installer]`) and keywords and read the matching entries. Save the approved plan under `.claude/plans/` and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
-- Run VERIFY with the canonical checks, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings, records learning and the completed session log, then runs the closeout checks.
-- Commit each completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the recorded review gate result is `PASS` with no open request, every review profile the changed paths require is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
-- After every successful outer-repository commit, the orchestrator attempts one normal non-force push: use the branch upstream when configured, otherwise `origin`; set `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning that preserves the local commit. This does not apply to nested `.claude` AI-state sync, PR creation, or merges. The user owns PR and merge decisions.
+- CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings; follow `.claude/instructions/closeout.instructions.md` step by step.
+- Commit a completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the review gate is `PASS` with no open request, and the closeout session log is complete.
+- After every successful outer-repository commit, the orchestrator attempts one normal non-force push to the branch upstream when configured, otherwise `origin`, with `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning. This does not apply to nested `.claude` AI-state sync, PR creation, or merges; the user owns PR and merge decisions.
 
 ## Exact Commands
 
@@ -59,20 +56,18 @@ uv run python .claude/scripts/verify.py fast --format text     # during IMPLEMEN
 uv run python .claude/scripts/verify.py phase --format text    # before REVIEW
 ```
 
-Use `uv run` for project Python entrypoints and tooling; never substitute bare `python`, `pip`, `pytest`, `mypy`, or `ruff` in the normal workflow.
+Use `uv run` for all Python tooling; never bare `python`, `pip`, `pytest`, `mypy`, or `ruff`.
 
 ## Safety And Control Plane
 
 - Keep hook guardrails enabled. Never hand-edit `.env*`, private keys, credentials, secret-bearing files, or `uv.lock`; never run destructive Git commands such as force-push, hard reset, or cleaning untracked files without explicit safe authorization.
-- Control-plane files include root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
+- Control-plane files include root guidance (`CLAUDE.md`, `AGENTS.md`), `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.agents/`, `.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
 - Keep `.claude/` as the canonical runtime basis. Bootstrap maintainers own authoring and regeneration; consumers should customize only their project context and consumer-owned state.
 
 ## Map
 
-- Policies: `.claude/instructions/workspace.instructions.md`, `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
-- Skills: `.claude/skills/<name>/SKILL.md`; apply Ponytail to all coding and use task-matched skills when relevant.
-- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, review, and documentation. Verification runs through canonical scripts.
-- Hooks: target-native configuration dispatches to `.claude/hooks/scripts/`; runtime errors are recorded under `.claude/session_logs/`.
+- Policies: `.claude/instructions/<name>.instructions.md` for `workspace`, `workflow`, `closeout`, `quality-and-testing`, and `tool-routing` (choose retrieval tools by it).
+- Skills: `.claude/skills/<name>/SKILL.md`. Agents: `.claude/agents/`. Hook scripts: `.claude/hooks/scripts/`; runtime errors are recorded under `.claude/session_logs/`.
 
 ## Target Runtime
 

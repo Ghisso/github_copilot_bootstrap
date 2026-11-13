@@ -40,7 +40,7 @@ Before implementing any code, load skills in two tiers:
 
 If the planner provided a `Required Skills` list, load every listed SKILL.md regardless of the above.
 
-**Control-plane route:** If any target file is a bootstrap control-plane file — `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, or `.devcontainer/` — treat it as high-risk and follow the approved full-plan route. An explicit user request or approved plan is sufficient authority; pause only when targets, authority, or material scope are unclear. These files affect every session in this project.
+**Control-plane route:** If any target file is on the control-plane list in `.claude/instructions/workspace.instructions.md`, treat it as high-risk and follow the approved full-plan route. An explicit user request or approved plan is sufficient authority; pause only when targets, authority, or material scope are unclear. These files affect every session in this project.
 
 Never implement first and check skills later.
 

@@ -100,8 +100,11 @@ asyncio_mode = auto
 ## Coverage Requirements
 
 - 80%+ coverage on critical paths (`src/` for an installed consumer, or
-  `shared`/`scripts` in the bootstrap authoring repository)
-- Every bug fix includes a regression test
+  `shared`/`scripts` in the bootstrap authoring repository). Consumers run
+  `uv run pytest tests/ --cov=src --cov-report=term-missing` (or their
+  configured source root); the authoring repository runs
+  `uv run pytest tests/ --cov=shared --cov=scripts --cov-report=term-missing`
+- Every bug fix MUST include a regression test
 - Edge cases: empty input, None, boundary values, error paths
 
 ## Anti-Patterns
@@ -114,3 +117,5 @@ asyncio_mode = auto
 - Abstract test data (`"test_value"`) instead of concrete data (`"S/RES/1234"`)
 - Duplicated test logic instead of `@pytest.mark.parametrize`
 - `scope="session"` for mutable fixtures — use `function` scope to avoid state leakage
+- Treating a mock-heavy pass as proof — verify with at least one integration test
+- Ignoring deprecation warnings — fix them and note the cause in `.claude/MEMORY.md`

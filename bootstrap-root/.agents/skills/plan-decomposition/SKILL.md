@@ -114,9 +114,11 @@ and must appear in the big plan's `phases` list. Fill:
   conditional prose in the required section. See the Verification Evidence
   Contract in `.claude/instructions/workflow.instructions.md` for the full
   parsing and hedge rules.
-- **Closeout Checklist** — leave the template's checklist; it gates the normal
-  completion commit. An explicitly requested paused checkpoint uses its own
-  evidence path and does not complete or advance the phase.
+- **Closeout Checklist** — keep the template's two boxes and tick them at
+  CLOSEOUT step 2. The CLOSEOUT sequence in
+  `.claude/instructions/closeout.instructions.md`, not this checklist, gates
+  the normal completion commit. An explicitly requested paused checkpoint uses
+  its own evidence path and does not complete or advance the phase.
 
 **The last phase in the big plan's `phases:` list must add a documentation,
 memory, and LEARN audit step**: sweep every live-advice surface (root
@@ -133,7 +135,7 @@ closing out is this list's last entry.
 
 In a repository where `openwiki/INSTRUCTIONS.md` exists, that last phase may
 also need to be a dedicated knowledge-refresh phase: see the canonical
-Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
+Knowledge-Refresh Final Phase rule in `.claude/instructions/plan-lifecycle.instructions.md`
 for exactly when and how, including its required `-knowledge-refresh` slug
 suffix and its recursion guard. Do not restate that rule here.
 

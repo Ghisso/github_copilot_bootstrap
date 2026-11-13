@@ -67,9 +67,12 @@ marker, remove it, then re-run the install command.
 ## Running a refresh
 
 Call OpenWiki's own MCP tools directly — there is no bootstrap runner or
-child process. Start with `openwiki_begin`, always with `mode: "update"`.
-Never pass `mode: "init"`: a hook guard, `openwiki-guard.sh`, denies it,
-and every other mode except `update`, before the tool runs. It also denies
+child process, so no deterministic check (a hook or `verify.py`) runs the
+refresh. OpenWiki's server writes `openwiki/**` and, at `openwiki_begin`
+only, a managed block into root `AGENTS.md` and `CLAUDE.md`. Start with
+`openwiki_begin`, always with `mode: "update"`. Never pass `mode: "init"`: a
+hook guard, `openwiki-guard.sh`, denies it, every other mode except
+`update`, and a call with no `mode`, before the tool runs. It also denies
 an unenabled repository (no `openwiki/INSTRUCTIONS.md`) or a resolved root
 outside this repository.
 
@@ -172,4 +175,4 @@ generation the same way it performs an incremental one.
 
 - `.claude/hooks/scripts/openwiki-guard.sh`
 - `.claude/instructions/workspace.instructions.md`
-- `.claude/instructions/workflow.instructions.md`
+- `.claude/instructions/plan-lifecycle.instructions.md` (the knowledge-refresh final phase)
