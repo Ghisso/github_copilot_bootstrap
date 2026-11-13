@@ -26,7 +26,7 @@ A full-install refresh deletes every file under `.claude/` that the bootstrap do
 
 This phase lets a project keep its own skills. A real folder `.claude/skills/<name>/` that holds a regular file named `.project-skill` belongs to the project:
 - a refresh never deletes or overwrites it;
-- a refresh copies it, without the marker, to `.agents/skills/<name>/`, the folder Codex, Antigravity, and Copilot read;
+- a refresh copies it, marker included (scope change recorded in the big plan's Design Overview), to `.agents/skills/<name>/`, the folder Codex, Antigravity, and Copilot read;
 - before any write, a full install or refresh refuses:
   - a project skill whose name clashes with a shipped skill;
   - a third-party destination;
@@ -75,7 +75,7 @@ Risk notes:
     - the mirror equals the folder minus `.project-skill`;
     - a valid marked folder that holds a symlink deeper inside is skipped whole, a warning names it, nothing is written under `.agents/skills/<name>/`, and the sentinel is unchanged.
   - Real-run cases. Run `INSTALLER` with `subprocess`, `--local-only`, and `_actor_env()`, like `test_fresh_install_gitignore_excludes_provenance_secret` (line 1475). Split across two tests if one runs long.
-    - Run 1: a target whose `.claude/` already holds a marked `demo` before the first full install (the legacy path in `migrate_pre_existing_state`). Exit 0. `demo` keeps its bytes. `.agents/skills/demo/SKILL.md` and `.claude/bootstrap-root/.agents/skills/demo/SKILL.md` match, with no marker. `bootstrap_root_fingerprint_diagnostics(target)` from `shared/scripts/verify.py` returns no diagnostics.
+    - Run 1: a target whose `.claude/` already holds a marked `demo` before the first full install (the legacy path in `migrate_pre_existing_state`). Exit 0. `demo` keeps its bytes. `.agents/skills/demo/SKILL.md` and `.claude/bootstrap-root/.agents/skills/demo/SKILL.md` match, marker included. `bootstrap_root_fingerprint_diagnostics(target)` from `shared/scripts/verify.py` returns no diagnostics.
     - Then add an unmarked `stray` holding a `SKILL.md`.
     - Run 2: refused; the message names `stray`.
     - Then remove `stray`.
@@ -122,7 +122,7 @@ Risk notes:
     - `CONSUMER_STATE_PATHS` or the OpenWiki marker logic;
     - `shared/scripts/verify.py`, `scripts/check_runtime.py`, or `scripts/sidecar_overlay.py`.
   - Record in the session log why no other importer of `runtime_ownership` needs the rule. The importers are `scripts/install_bootstrap.py`, `scripts/generate_targets.py` (line 16; it copies the module into `dist`), `scripts/check_runtime.py`, `scripts/validate_targets.py`, `scripts/sidecar_overlay.py`, `shared/scripts/verify.py`, and the tests. The reasons:
-    - `verify.py`'s root-adapter comparison sees only the unmarked mirror, which `populate_bootstrap_root` records; its nested-runtime fingerprint binds the project skill under `.claude/`;
+    - `verify.py`'s root-adapter comparison sees only the mirror, which `populate_bootstrap_root` records; its nested-runtime fingerprint binds the project skill under `.claude/`;
     - `check_runtime.py` covers this authoring repository, which keeps its skills in `shared/skills/`;
     - the generator only copies the module.
   - Acceptance: the Step 1 tests and all of `tests/test_install_bootstrap.py` pass.
