@@ -2,13 +2,10 @@
 name: onboard
 visibility: public
 description: |
-  Build or refresh this session's understanding of the project: read the
-  README, index docs/ and retrieve targeted content from it, cross-check
-  claims against the real code with direct reads, exact search, and Semble,
-  then persist the findings so future agents don't have to redo the
-  discovery. Use when asked to "get oriented", "understand this project",
-  "refresh project context", or after README/docs/architecture changed
-  significantly.
+  Get oriented in a project: "understand this project", "refresh project
+  context", or after the README, docs, or architecture changed. Reads the
+  README, indexes docs, checks claims against the real code, and persists the
+  findings so later agents skip the discovery.
 ---
 
 # onboard — Project Understanding + Persistence

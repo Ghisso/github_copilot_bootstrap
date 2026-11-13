@@ -15,7 +15,7 @@ You generate actionable plans for implementation. The orchestrator decides which
 
 Before producing any plan, you MUST read:
 
-1. Always read `plan-decomposition/SKILL.md`.
+1. In `--mode full-plan` only, read `plan-decomposition/SKILL.md`.
 2. If the task creates or expands features, read `create-feature/SKILL.md`.
 3. For every step that writes code, require `ponytail/SKILL.md` in `full` mode.
    Add the `ponytail` review profile only for control-plane/high-risk or
@@ -38,7 +38,7 @@ Control-plane/high-risk work always arrives as `--mode full-plan`.
 
 For single-phase, obviously scoped tasks (e.g., rename a field, add a config key, fix a bug in one file).
 
-1. Load mandatory planning skills (see above).
+1. Read `.claude/templates/plan-big.md` and `.claude/templates/plan-small.md`, then any other skill the Mandatory Skills-First Rule requires for this task.
 2. Draft the plan directly — one phase, ordered steps, owner + files + verification per step.
 3. If the change touches any architecture decision: run one devil's advocate round via `.claude/skills/devils-advocate/SKILL.md`.
 4. Output the plan. No interview loop.

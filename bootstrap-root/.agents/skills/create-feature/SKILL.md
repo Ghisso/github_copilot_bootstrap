@@ -28,30 +28,7 @@ rg -l "ConfigStore|@hydra.main" src/ 2>/dev/null | head -5
 
 ## Phase 1A: Config Dataclass (Hydra)
 
-Create `src/configs/[feature]_config.py`:
-```python
-from dataclasses import dataclass
-from hydra.core.config_store import ConfigStore
-
-
-@dataclass
-class FeatureConfig:
-    """Configuration for [feature].
-
-    Attributes:
-        param: Description of parameter.
-    """
-    param: str = "default"
-
-    def __post_init__(self) -> None:
-        if not self.param:
-            raise ValueError("param cannot be empty")
-
-
-# Module-level registration — triggered on import
-cs = ConfigStore.instance()
-cs.store(group="feature", name="default", node=FeatureConfig)
-```
+Create `src/configs/[feature]_config.py` as `.claude/skills/hydra-config/SKILL.md` describes.
 
 ## Phase 1B: Config Dataclass (plain, no Hydra)
 

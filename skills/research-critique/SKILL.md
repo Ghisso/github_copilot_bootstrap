@@ -2,17 +2,10 @@
 name: research-critique
 visibility: public
 description: |
-  Critical analysis of research papers, academic manuscripts, preprints,
-  and technical studies. Evaluates methodology, claims-evidence alignment,
-  contribution significance, and intellectual honesty. Produces coherent
-  analytical responses (not checklists) that distinguish genuine weaknesses
-  from standard field limitations. Use when:
-  - "critique this paper", "review this research", "what do you think of this paper"
-  - "analyze this study", "evaluate the methodology", "is this paper sound"
-  - "assess this research", "strengths and weaknesses of this paper"
-  - "does the evidence support the claims"
-  For formatting/citation/submission readiness, use documentation skill instead.
-  For surveying multiple papers, use literature-review skill instead.
+  Critique a paper: "critique this paper", "is this paper sound", "evaluate the
+  methodology", "does the evidence support the claims", "strengths and
+  weaknesses". Weighs methodology, claims versus evidence, and significance in
+  prose. For formatting use documentation; for surveys use literature-review.
 ---
 
 # Research Paper Critique

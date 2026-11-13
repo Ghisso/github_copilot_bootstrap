@@ -2,13 +2,10 @@
 name: draw-io
 visibility: public
 description: |
-  Create, edit, and polish draw.io or diagrams.net diagrams with a `.drawio`-first
-  workflow. Use when:
-  - "draw.io", "drawio", or "diagrams.net" diagrams are requested
-  - The user wants a new `.drawio` file in `docs/drawio/`
-  - A diagram needs cleaner layout, spacing, alignment, or export preparation
-  - The task mentions diagram layout adjustment, a pre-export diagram checklist, or SVG/PNG export
-  - The user wants a consistent architecture or flow diagram style across the repo
+  draw.io or diagrams.net work: a new or edited `.drawio` file (in
+  `docs/drawio/`), cleaner layout, spacing, or alignment, a pre-export
+  checklist, SVG/PNG export, or one consistent architecture or flow diagram
+  style across the repo. Edits the `.drawio` source first.
 ---
 
 # Draw.io Diagram Skill

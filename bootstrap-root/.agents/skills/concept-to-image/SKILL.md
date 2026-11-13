@@ -2,17 +2,10 @@
 name: concept-to-image
 visibility: public
 description: |
-  Turn any concept, idea, or description into a polished static HTML visual,
-  then export it as a PNG or SVG image file. Use when:
-  - "create an image of", "concept to image", "turn this into an image"
-  - "design a graphic", "make a diagram", "infographic"
-  - "export as PNG", "save as SVG", "screenshot this HTML"
-  - Creating concept diagrams, flowcharts, comparison charts, process visuals,
-    educational diagrams, social media graphics, data visualizations, posters,
-    cards, badges, icons, or any "make me an image of X" request achievable
-    with HTML/CSS/SVG rather than photographic AI generation.
-  For interactive HTML visuals viewed in a browser, consider building directly.
-  For slide decks, use html-presentation instead.
+  Make an image from a concept: "create an image of", "turn this into an image",
+  "design a graphic", "infographic", "export as PNG or SVG". Builds a static
+  HTML/CSS/SVG visual (diagram, chart, poster, card, icon) and exports it. For
+  slide decks use html-presentation.
 ---
 
 # Concept to Image

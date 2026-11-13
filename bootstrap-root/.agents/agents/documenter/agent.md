@@ -28,7 +28,7 @@ Before touching any doc, read:
 2. Any other skill whose description matches the changed surface:
    - API changes → `.claude/instructions/api-service-standards.instructions.md` (if present)
    - Config changes → `.claude/skills/hydra-config/SKILL.md` (if present)
-   - Pipeline changes → `.claude/skills/pipeline-patterns/SKILL.md` (if present)
+   - Haystack pipeline changes → `.claude/skills/haystack/SKILL.md` (if present)
 
 If a referenced skill file does not exist, skip it and continue.
 

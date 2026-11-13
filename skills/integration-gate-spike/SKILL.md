@@ -2,23 +2,10 @@
 name: integration-gate-spike
 visibility: background
 description: |
-  Minimal evidence spike for an external contract (API, service, third-party
-  system) that is unknown or underspecified, run before writing adapter code.
-  Verifies only the specific unknowns that materially change the
-  implementation — it does not prescribe feature flags, multi-provider
-  abstraction, retries, or caching by default.
-
-  Triggers:
-  - "We need to integrate with API X, but don't know the exact contract yet"
-  - "Unknown response schema from external service"
-  - "Rate limits and timeout behavior not documented"
-  - "Plan mentions external service but can't verify the endpoint exists"
-  - Planning adapter code where contract uncertainty blocks an
-    implementation decision
-  - Invocation contract — flags, exit codes, TTY needs, stdio protocol,
-    config-file side effects — is unknown
-  - Any third-party binary, CLI, MCP server, or SDK whose real behavior has
-    not been observed in this repository
+  Unknown external contract before adapter code: API response schema, rate
+  limits, timeouts, or endpoint existence; a third-party CLI, MCP server, or SDK
+  whose flags, exit codes, or stdio behavior were never observed here. Runs a
+  minimal evidence spike on only the unknowns that change the design.
 user-invocable: false
 ---
 

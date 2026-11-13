@@ -1,7 +1,7 @@
 ---
 name: bentoml-service
 visibility: public
-description: Create production-ready ML API services with BentoML. Use when deploying ML models, RAG systems, embedding services, or classification APIs. Covers service definition, lifecycle management, endpoint creation, Pydantic validation, and deployment configuration.
+description: Create production-ready ML API services with BentoML and deploy them. Use when deploying ML models, RAG systems, embedding services, or classification APIs, or when asked to build a Docker image. Covers service definition, lifecycle, Pydantic validation, bento build, containerize, health check.
 ---
 
 # BentoML API Service Development
@@ -26,8 +26,8 @@ grep -n "bentoml" pyproject.toml
   LLM call needs a longer timeout than a fast embedding lookup; do not copy
   a fixed `120`/`50` without checking.
 - **`workers`** — typically one worker per GPU for GPU-bound models;
-  CPU-bound services may want more. Check what the target deployment (see
-  `deploy-service`) actually provisions.
+  CPU-bound services may want more. Check what the target deployment
+  actually provisions.
 - **CORS `access_control_allow_origins`** — a wildcard (`["*"]`) is a
   local-dev convenience only. A production service must list its actual
   allowed origins; this is a security control, not a style choice, so don't
@@ -101,5 +101,77 @@ bentoml serve service.py:MLService --reload  # Local dev
 uv run bentoml build                          # Build bento
 ```
 
-See `deploy-service` for containerization, health checks, and the full
+See Deploy below for containerization, health checks, and the full
 deployment workflow.
+
+## Deploy
+
+The required checklist (tests, types, lint, health check, secrets in env,
+`.env.example`) is canonical policy in
+`.claude/instructions/deployment.instructions.md`. This section is the
+step-by-step sequence for running that checklist plus the surrounding
+build/containerize/rollback commands.
+
+### Step 0: Confirm the Actual Service Details
+
+Do not assume a fixed service name or port — read them from this project:
+
+```bash
+cat bentofile.yaml   # service entrypoint name
+grep -n "port" service.py bentofile.yaml 2>/dev/null  # actual bound port, if overridden from the BentoML default
+```
+
+### Pre-Checks
+```bash
+uv run python -c "import service; print('Service imports OK')"
+uv run pytest tests/ -q --tb=short
+```
+
+### Step 1: Local Serve
+```bash
+bentoml serve service.py:ServiceName --reload
+# Health: curl http://localhost:${PORT:-3000}/healthz
+# Test:   curl -X POST http://localhost:${PORT:-3000}/predict \
+#           -H "Content-Type: application/json" \
+#           -d '{"text": "test"}'
+```
+
+### Step 2: Build Bento
+```bash
+uv run bentoml build
+uv run bentoml list
+```
+
+### Step 3: Containerize
+```bash
+uv run bentoml containerize service_name:latest
+docker images | grep service_name
+```
+
+### Step 4: Test Container
+
+Use the port this project's `bentofile.yaml`/service actually binds
+(confirmed in Step 0), not a hardcoded assumption:
+
+```bash
+docker run -p ${PORT:-3000}:${PORT:-3000} service_name:latest &
+sleep 5
+curl http://localhost:${PORT:-3000}/healthz
+# Repeat endpoint tests
+```
+
+### Step 5: Report
+```
+Deployment Status:
+  Service: [name]
+  Local test: PASS/FAIL
+  Build: PASS/FAIL
+  Container: PASS/FAIL
+  Health check: PASS/FAIL
+```
+
+### Rollback
+```bash
+uv run bentoml list           # Find previous version
+bentoml serve service_name:previous_tag
+```
