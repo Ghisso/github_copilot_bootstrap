@@ -227,6 +227,15 @@ about 30 KB; the orchestrator path without MEMORY from about 85 KB to about 51 K
 - Do not loosen the root-guidance validator.
 - Add a project-owned skills folder that refreshes never touch, first.
 - Run a short Codex check before counting on Codex savings.
+- 2026-11-13: the user asked for fewer phases; the plan now has four (A
+  project-owned skills, B instructions, C skill set, D knowledge refresh) plus
+  an evidence check before the branch. Two independent devil's-advocate
+  reviews of that plan, one by Codex (`gpt-5.6-sol`) and one by Claude (Opus),
+  are saved beside this file as
+  `2026-11-13_skills-and-instructions-plan-review-codex.md` and
+  `2026-11-13_skills-and-instructions-plan-review-claude.md`. The planner
+  re-checked and folded both into the plan, which awaits the user's approval;
+  the open choices are in the big plan's "Decisions for the user" section.
 - Opik skills: still open, and outside this plan because they are personal
   setup. The user asked whether they come from the Opik MCP server; they come
   from the separate `comet-ml/opik-skills` pack (section 2). One option is to

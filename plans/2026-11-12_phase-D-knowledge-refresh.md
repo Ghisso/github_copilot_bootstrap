@@ -22,12 +22,13 @@ closeout_session_log:
 
 ## Scope
 
-This is the final knowledge-refresh phase that the Knowledge-Refresh Final Phase rule requires (now in `.claude/instructions/plan-lifecycle.instructions.md`). It does three things:
+This is the final knowledge-refresh phase that the Knowledge-Refresh Final Phase rule requires (now in `.claude/instructions/plan-lifecycle.instructions.md`). It does four things:
 - refreshes the OpenWiki pages that describe skills, installer ownership, and the lifecycle, through OpenWiki's own tools;
 - runs the standing final-phase documentation, memory, and LEARN audit across every live-advice surface;
-- records that audit under `## Stale-claims surfaces checked`.
+- regenerates `dist/` and refreshes this repository, so that any audit fix to `shared/` reaches the generated and installed copies;
+- records the audit under `## Stale-claims surfaces checked`.
 
-Covers REQ-010.
+Covers REQ-010. The phase owns the files its steps list; a file may be revisited after a review finding.
 
 Risk notes:
 - OpenWiki can time out right after the host boots. Reconnect with `/mcp` and retry.
@@ -36,10 +37,10 @@ Risk notes:
 ## Steps
 
 - [ ] **1. Refresh OpenWiki through its own tools.**
-  - Owner: orchestrator (only the main session has the OpenWiki MCP tools). Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
+  - Owner: orchestrator, in the main session, where the earlier knowledge-refresh phases ran it. Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
   - Call `openwiki_begin` with `mode: "update"`. Plan these pages plus every page OpenWiki flags:
     - `architecture/agents-and-skills.md`: 37 skills, the merges, the cap, project skills;
-    - `operations/install-ownership-and-runtime-checks.md`: the marker, the clash refusal, the mirror;
+    - `operations/install-ownership-and-runtime-checks.md`: the marker, the refusals, the shipped-before record, the mirror;
     - `workflows/lifecycle-and-task-lanes.md` and `operations/deterministic-verification.md`: the closeout and plan-lifecycle files;
     - `architecture/source-generated-consumer-layout.md`: the instruction files;
     - `operations/sidecar-overlay.md`: the workflow-profile skills.
@@ -64,19 +65,24 @@ Risk notes:
     - "read `.claude/MEMORY.md`" as a full read;
     - the CLOSEOUT sequence placed in `workflow.instructions.md`;
     - the Completion Protocol;
+    - "Never checkpoint after the receipts are persisted";
     - the July 2026 "keep niche skills" decision presented as current;
     - Codex skills "sourced from the shared .claude basis";
-    - a refresh "deletes every other file" with no project-skill exception.
-  - Correct each live claim in place. MEMORY entries are corrected, not appended to.
+    - a refresh "deletes every other file" with no project-skill exception or refusal.
+  - Correct each live claim in place. MEMORY entries are corrected, not appended to. A fix whose statement a generated page repeats goes through another OpenWiki `update`.
   - Leave dated records unchanged: archived plans, explorations, `docs/evidence/`, and closed session logs.
   - The orchestrator also updates its user-level memory notes about this work.
   - Record each surface and its outcome under the exact heading `## Stale-claims surfaces checked`.
 
-- [ ] **3. Review.**
+- [ ] **3. Regenerate and refresh this repository.**
+  - Owner: orchestrator. This always runs, even when Step 2 changed nothing in `shared/`. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
+
+- [ ] **4. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`.
   - Focus:
     - the refreshed pages match the code they cite;
     - every audit fix that a page repeats went through another OpenWiki `update`;
+    - the generated and installed copies match `shared/`;
     - no root adapter carries an OpenWiki block, and no `openwiki/.run.json` remains.
 
 ## Verification
@@ -90,14 +96,18 @@ Risk notes:
      `.claude/instructions/workflow.instructions.md`. -->
 
 ```bash
-test "$(grep -r -l -E 'skills/(review-api|run-tests|refactor|pdf|caveman-compress|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing|pipeline-patterns|haystack-conditional-router|docling-haystack|ollama-chat-generator|pandas-nan-bool-coercion|networkx-igraph-graphml-interop|pyvis-xss-testing|csv-driven-integration-tests|deploy-service|context-manager-testing|test-helper-public-api)/' openwiki --include=*.md | wc -l)" = "0"
-test "$(grep -r -l -F 'there are 55' openwiki --include=*.md | wc -l)" = "0"
-grep -r -q -F '.project-skill' openwiki --include=*.md
-grep -r -q -F 'closeout.instructions.md' openwiki --include=*.md
-test "$(grep -r -l -F 'loaded into every session' shared README.md docs/architecture.md docs/target-mapping.md | wc -l)" = "0"
+uv run python scripts/generate_targets.py --all
+uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.is_dir()] + [str(p) for r in roots if r.is_dir() for p in sorted(r.rglob("*.md")) if p.is_file() and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'skills/(review-api|run-tests|refactor|pdf|caveman-compress|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing|pipeline-patterns|haystack-conditional-router|docling-haystack|ollama-chat-generator|pandas-nan-bool-coercion|networkx-igraph-graphml-interop|pyvis-xss-testing|csv-driven-integration-tests|deploy-service|context-manager-testing|test-helper-public-api)/|(?i:there are 55)' openwiki
+grep -q -F 'data-and-graph-pitfalls' openwiki/architecture/agents-and-skills.md
+grep -q -E '\b37\b' openwiki/architecture/agents-and-skills.md
+grep -q -F '.project-skill' openwiki/operations/install-ownership-and-runtime-checks.md
+grep -q -F 'closeout.instructions.md' openwiki/workflows/lifecycle-and-task-lanes.md
+uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.exists()] + [str(p) for r in roots if r.exists() for p in ([r] if r.is_file() else sorted(r.rglob("*"))) if p.is_file() and "__pycache__" not in p.parts and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'loaded into every session|Never checkpoint after the receipts are persisted' shared README.md docs/architecture.md docs/target-mapping.md
 test ! -e openwiki/.run.json
-test "$(cat AGENTS.md CLAUDE.md | grep -c -F '<!-- OPENWIKI:START -->')" = "0"
+test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
+test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"
 uv run python scripts/validate_targets.py
+uv run python scripts/check_runtime.py
 uv run python scripts/validate_plan_frontmatter.py
 uv run python .claude/scripts/verify.py phase --format text
 ```
