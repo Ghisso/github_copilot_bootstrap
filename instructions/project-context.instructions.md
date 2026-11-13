@@ -155,6 +155,24 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
   unavailable or blocked, direct reads and `rg` are the supported fallback.
 - Tests, hooks, and `verify.py` make no model call.
 
+## Bootstrap hooks runtime contract
+
+Moved here from `shared/policies/workspace.instructions.md` on 2026-11-13
+(skills-and-instructions-trim, Phase B): it binds only the authors of this
+repository's hooks, and consumers have no hook sources or `tests/test_hook_gates.py`
+to apply it to.
+
+Standalone bootstrap hooks execute with bare system `python3` (not `uv run` or a project-managed environment) to function before project infrastructure initializes.
+
+**Minimum Python version:** 3.9
+
+Hook Python code is limited to:
+- Standard library modules available in Python 3.9 (`json`, `re`, `sys`, `pathlib`, `datetime`, `stat`)
+- No external packages or project dependencies
+- Must not runtime-evaluate syntax or stdlib features that require Python newer than 3.9. Use `from __future__ import annotations` when newer annotation syntax (e.g. `X | Y`) is otherwise safe to parse on Python 3.9
+
+When adding new hook Python code, verify it compiles under Python 3.9 with `python3 -m py_compile` and add regression coverage to the test suite (see `tests/test_hook_gates.py`).
+
 ## Current status and verification
 
 Onboarding was refreshed on `dev` at `9be6955` on 2026-11-12. `dev` matched
