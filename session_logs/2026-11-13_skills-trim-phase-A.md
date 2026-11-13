@@ -24,9 +24,22 @@ Let a consumer project keep its own skills across full-install refreshes: a `.cl
 - Required Verification block, orchestrator scratch runner: 13 items, 0 failed (`verify.py phase` PASS, 321.5 s).
 - Optional 1 run: scratch Git repository, real `--local-only` install, marked `.claude/skills/demo/` added, second install (both exit 0). `.agents/skills/demo/` and its `bootstrap-root` copy hold `SKILL.md` and `.project-skill`. Isolated `codex debug prompt-input`: 61 entries, 61 unique; `demo` listed once from `r1` = `<tree>/.agents/skills`.
 - Coder issue B: the learn skill lacked the standalone backticked tokens the new validator pin reads; the orchestrator reworded the paragraph to name `.project-skill` and `.agents/skills/` on their own.
+- Review round 1 (six profiles: code, architecture, security, tests, ponytail, documentation): gate PASS, no CRITICAL or MAJOR, five MINORs, all fixed rather than disposed: (1) a marked folder under a symlinked `.claude` passed validation but `is_project_skill_dir` would not protect it, so the validator now refuses it ("marked but not protected"); (2) the mirror's destination-exists skip and `.agents`-not-a-directory refusal gained direct tests; (3) two stale test comments; (4) README and `docs/architecture.md` now say a folder holding a symlink or non-regular entry is not mirrored; (5) `_remove_tree` replaced by `shutil.rmtree`. Failing-first for (1): 1 failed (`DID NOT RAISE SystemExit`); mutations for (1) and (2) each fail their tests and were reverted byte-identical. After: `-k project_skill` 36 passed; the five installer/sidecar/runtime/verify test files 802 passed; ruff, format, mypy clean; regenerate + self-refresh 0; `validate_targets.py` PASS; `check_runtime.py` 0. Plan wording aligned to the scope change.
+- Review round 2 (same reviewer, six profiles): gate PASS, 0 findings, no open requests.
+- CLOSEOUT step 1: README (listing step, Project-owned skills section, full-install exceptions and refusals), `docs/architecture.md`, `docs/target-mapping.md`, learn and refresh skills. Not the big plan's last phase, so no standing audit here.
+- CLOSEOUT step 2: small plan `status: complete`, boxes ticked; Phase A ticked in the big plan; one MEMORY entry (skill-listing probes).
 
 ## [LEARN] Entries
 
+- [LEARN:tooling] Skill listings can be probed with no model call: `codex debug prompt-input` with an isolated `HOME`/`CODEX_HOME`, and `claude -p --setting-sources project --debug-file` (`--bare` reads no OAuth). The Claude overflow signal is `Skill listing over budget`, forced with `SLASH_COMMAND_TOOL_CHAR_BUDGET=1000`. Saved to `.claude/MEMORY.md`.
+- [LEARN:installer] A record used to decide what a refresh may delete must not absorb copies the installer makes for the project. The unmarked mirror landed in the shipped-before record, so losing one marker file would have deleted a project skill as retired. Enforced by the marker-lost refusal tests, so no MEMORY entry.
+- [LEARN:installer] A pre-write validator must use the same predicate as the pruner it protects (`is_project_skill_dir`); otherwise it accepts a layout (a symlinked `.claude`) that the pruner then deletes. Enforced by the `marked-folder-under-symlinked-claude` test, so no MEMORY entry.
+
 ## Verification
 
+- optional 1: PASS — scratch Git repository, real `--local-only` install, marked `.claude/skills/demo/` added, second install (both exit 0); isolated `codex debug prompt-input` listed `demo` once from `r1` = `<tree>/.agents/skills` (61 entries, 61 unique).
+
 ## Open Questions / Next Steps
+
+- Next: Phase B (instructions split and trims).
+- User follow-up from spike S1: the 55 `[[skills.config]]` entries in the generated Codex config add no skills; removing them is the user's call.

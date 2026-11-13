@@ -1805,3 +1805,14 @@
   that index; stage and review both. Give a reviewer of generated wiki pages
   a scoped `git diff -- openwiki/` file: it shows OpenWiki-only changes
   (timestamps, key reordering in `.page-manifest.json`) apart from real edits.
+- [LEARN:tooling] Probe skill listings without a model call through
+  `codex debug prompt-input` (isolated `HOME`/`CODEX_HOME`; skills appear as
+  `- name: desc (file: rN/...)` under a root table) and through
+  `claude -p --setting-sources project --debug-file <log>`. `--bare` never
+  reads OAuth, so it fails with "Not logged in" unless `ANTHROPIC_API_KEY` is
+  set. Claude's overflow signal is the debug line `Skill listing over
+  budget`; force it with `SLASH_COMMAND_TOOL_CHAR_BUDGET=1000` as the
+  positive control. Codex 0.147.0 lists repository skills from
+  `.agents/skills/` only (`[[skills.config]]` adds none) and shortens each
+  description more as the skill count grows (404 characters at 60 skills,
+  570 at 5). Evidence: `.claude/explorations/2026-11-12_skills-trim-client-spike/REPORT.md`.
