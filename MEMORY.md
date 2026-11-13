@@ -116,8 +116,8 @@
   checklist item in that file before calling it done.
 - [LEARN:architecture] Progressive disclosure changes what protection rules
   cover. Moving normative content out of a skill root into `references/`
-  silently removed it from `caveman-compress`'s protected set, which matched
-  `SKILL.md` only. When content moves, re-check every rule that matched its old
+  silently removed it from a compression skill's protected set (since
+  retired), which matched `SKILL.md` only. When content moves, re-check every rule that matched its old
   location.
 - [LEARN:review] Across two consecutive phases the orchestrator's own
   remediation introduced the next finding (an undefined `ALLOWED_ORIGINS` name,
@@ -265,8 +265,8 @@
   as well as checklist prose. Set `status: complete` in CLOSEOUT step 2,
   after verification, review, and documentation and together with the
   `[LEARN]` entries, but before the findings report and the receipts
-  (steps 4 to 6), which bind that final plan state. The CLOSEOUT sequence in
-  `workflow.instructions.md` is the authority.
+  (steps 4 to 6), which bind that final plan state. The CLOSEOUT procedure in
+  `closeout.instructions.md` is the authority.
 - [LEARN:workflow] After an atomic phase commit lands, reconcile the phase
   checklist, session log, and big-plan checklist from the actual commit SHAs;
   don't infer completion from a clean outer worktree alone.
