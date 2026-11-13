@@ -149,8 +149,9 @@ Expected:
 - Codex generates no `.codex/rules/` and no nested `AGENTS.md` for the current
   mixed/glob/file-specific policy scopes. Their non-widening fallback is the
   corresponding enabled `.claude/skills/` workflow.
-- The root `AGENTS.md` remains below Codex's default 32 KiB combined project
-  guidance limit, and `CLAUDE.md` remains at or below 200 lines.
+- The root `AGENTS.md` stays at or below 5 KiB, well under Codex's default
+  32 KiB combined project guidance limit, and `CLAUDE.md` stays at or below
+  200 lines and 5 KiB. The workflow policy stays at or below 16 KiB.
 - These are structural generation checks. Real Claude, Codex, and Copilot
   adapter-loading probes are covered by `scripts/check_native_clients.py`.
 - In particular, these checks do not prove current native Codex routing for all

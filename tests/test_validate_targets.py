@@ -25,7 +25,10 @@ import generate_targets as target_generator  # noqa: E402
 
 from generate_targets import (  # noqa: E402
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    CONTROL_PLANE_INVENTORY,
     OPENWIKI_BEGIN_MATCHER,
+    PLAIN_LANGUAGE_RULE,
+    ROOT_GUIDANCE_WORKFLOW,
     claude_agent_frontmatter,
     sidecar_agent_frontmatter,
     load_shared_agents,
@@ -458,8 +461,14 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     assert root_guidance_errors("AGENTS.md", codex) == []
     assert root_guidance_errors("AGENTS.md", multi_agent) == []
     assert antigravity_default_agent_contract_errors(multi_agent) == []
-    assert render_antigravity_default_agent_contract() in multi_agent
-    assert render_antigravity_default_agent_contract() not in codex
+    contract = render_antigravity_default_agent_contract()
+    assert contract in multi_agent
+    assert contract not in codex
+    # The contract is a pointer; the orchestrator's supplement stays in its adapter.
+    assert ".agents/agents/orchestrator/agent.md" in contract
+    assert ".agents/agents/orchestrator/agent.md" not in codex
+    supplement_delimiter = target_generator.ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER
+    assert supplement_delimiter.format(agent_id="orchestrator") not in multi_agent
     assert "`.claude/hooks/`" in claude
     assert "`.github/hooks/`" in claude
     assert "`.codex/`" in codex
@@ -475,14 +484,81 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     ):
         assert fragment in multi_agent
     assert len(claude.splitlines()) <= 200
-    assert len(codex.encode()) <= 16 * 1024
-    assert len(multi_agent.encode()) <= 16 * 1024
+    assert len(claude.encode()) <= 5 * 1024
+    assert len(codex.encode()) <= 5 * 1024
+    assert len(multi_agent.encode()) <= 5 * 1024
     missing_reporting_pointer = claude.replace(
         ".claude/instructions/agent-reporting.instructions.md", "reporting.md", 1
     )
     assert any(
         "agent-reporting.instructions.md" in error
         for error in root_guidance_errors("CLAUDE.md", missing_reporting_pointer)
+    )
+
+
+def test_root_guidance_budget_limits_are_pinned() -> None:
+    """The validator only gains checks or lowers limits: CLAUDE.md keeps its
+    200-line limit and adds 5 KiB; AGENTS.md drops from 16 KiB to 5 KiB."""
+    assert target_validator.ROOT_GUIDANCE_BUDGETS == {
+        "CLAUDE.md": (("lines", 200), ("bytes", 5 * 1024)),
+        "AGENTS.md": (("bytes", 5 * 1024),),
+    }
+    assert target_validator.POLICY_BYTE_BUDGETS == {
+        "workflow.instructions.md": 16 * 1024
+    }
+
+
+def test_root_guidance_budget_rejects_a_valid_claude_file_over_200_lines() -> None:
+    """A structurally valid CLAUDE.md under 5 KiB still fails on line count."""
+    guidance = render_root_guidance("claude-code")
+    at_limit = guidance + "\n" * (200 - len(guidance.splitlines()))
+    assert len(at_limit.splitlines()) == 200
+    assert len(at_limit.encode()) < 5 * 1024
+    assert root_guidance_errors("CLAUDE.md", at_limit) == []
+
+    errors = root_guidance_errors("CLAUDE.md", f"{at_limit}\n")
+
+    assert errors == ["CLAUDE.md exceeds its lines budget of 200"]
+
+
+@pytest.mark.parametrize(
+    ("name", "target"),
+    (
+        ("CLAUDE.md", "claude-code"),
+        ("AGENTS.md", "openai-codex"),
+        ("AGENTS.md", "multi-agent"),
+    ),
+)
+def test_root_guidance_budget_rejects_a_valid_file_over_5_kib(
+    name: str, target: str
+) -> None:
+    """A structurally valid root file passes at exactly 5 KiB and fails one
+    byte over, whatever its line count."""
+    guidance = render_root_guidance(target)
+    at_limit = guidance + " " * (5 * 1024 - len(guidance.encode()))
+    assert len(at_limit.encode()) == 5 * 1024
+    assert root_guidance_errors(name, at_limit) == []
+
+    errors = root_guidance_errors(name, f"{at_limit} ")
+
+    assert errors == [f"{name} exceeds its bytes budget of {5 * 1024}"]
+
+
+def test_root_guidance_budget_workflow_policy_stays_within_16_kib() -> None:
+    """The workflow core passes at exactly 16 KiB and fails one byte over. Other
+    policies have no byte budget."""
+    name = "workflow.instructions.md"
+    workflow = _shared_text(f"policies/{name}")
+    at_limit = workflow + " " * (16 * 1024 - len(workflow.encode()))
+    assert len(at_limit.encode()) == 16 * 1024
+    assert target_validator.policy_budget_errors(name, at_limit) == []
+
+    errors = target_validator.policy_budget_errors(name, f"{at_limit} ")
+
+    assert errors == [f"{name} exceeds its bytes budget of {16 * 1024}"]
+    assert (
+        target_validator.policy_budget_errors("tests.instructions.md", "x" * 10**6)
+        == []
     )
 
 
@@ -599,6 +675,596 @@ def test_workspace_guidance_preserves_shared_git_hook_inventory() -> None:
     )
 
 
+def _shared_text(relative_path: str) -> str:
+    """Read one file under `shared/`."""
+    return (REPO_ROOT / "shared" / relative_path).read_text(encoding="utf-8")
+
+
+def test_task_lane_control_plane_lists_name_every_inventory_path() -> None:
+    """The Task Lanes lists hold exactly the paths of the shared inventory, so no
+    lane list is narrower than the root guidance."""
+    inventory_paths = set(re.findall(r"`([^`]+)`", CONTROL_PLANE_INVENTORY))
+    lane_paths = set(target_validator.TASK_LANE_CONTROL_PLANE_PATHS) | set(
+        target_validator.TASK_LANE_CONTROL_PLANE_FILES
+    )
+
+    assert lane_paths == inventory_paths
+    assert {".agents/", ".vscode/mcp.json"} <= lane_paths
+
+
+@pytest.mark.parametrize("target", ("claude-code", "openai-codex", "multi-agent"))
+def test_root_guidance_carries_the_shared_control_plane_inventory(target: str) -> None:
+    """Every root file names the same inventory. Each keeps exactly one
+    `.github/hooks/` mention, which is all the Copilot-leak exemption allows."""
+    guidance = render_root_guidance(target)
+
+    assert CONTROL_PLANE_INVENTORY in guidance
+    assert guidance.count(".github/hooks/") == 1
+
+
+def test_workspace_policy_carries_the_shared_control_plane_inventory() -> None:
+    """The generated workspace policy holds the same inventory text."""
+    workspace = _shared_text("policies/workspace.instructions.md")
+    for target in ("claude-code", "openai-codex"):
+        rendered = transform_target_paths(
+            workspace, target, preserve_shared_git_hooks=True
+        )
+        assert _collapsed(CONTROL_PLANE_INVENTORY) in _collapsed(rendered)
+        assert workspace_guidance_errors(rendered) == []
+
+
+def test_control_plane_inventory_check_rejects_a_narrower_list() -> None:
+    """Dropping one path from the root or workspace inventory is reported."""
+    guidance = render_root_guidance("claude-code")
+    narrower_root = guidance.replace("`.agents/`, ", "", 1)
+    assert narrower_root != guidance
+    assert any(
+        "shared control-plane inventory" in error
+        for error in root_guidance_errors("CLAUDE.md", narrower_root)
+    )
+
+    workspace = _shared_text("policies/workspace.instructions.md")
+    narrower_workspace = re.sub(r"`\.vscode/mcp\.json`,\s+", "", workspace, count=1)
+    assert narrower_workspace != workspace
+    assert any(
+        "shared control-plane inventory" in error
+        for error in workspace_guidance_errors(narrower_workspace)
+    )
+
+
+# A policy of the shape the closeout pin accepts. The steps carry numbered
+# `*Why N:*` markers so one test can drop a single reason.
+CLOSEOUT_FIXTURE_STEPS = (
+    "1. **Documentation.** Update the docs. *Why 1:* findings bind the final docs.",
+    "2. **Final AI state.** Read `.claude/skills/learn/SKILL.md`, then write the "
+    "lessons. *Why 2:* later steps hash this state.",
+    "3. **First nested checkpoint.** Commit nested state. *Why 3:* closeout needs "
+    "the plan bytes in nested Git.",
+    "4. **Stage, findings, receipts.** In one Bash command with no `git commit`:\n"
+    "   - Stage the files. *Why 4:* receipts bind the index.\n"
+    "   - Record the findings.",
+    "5. **Second nested checkpoint.** *Why 5:* the receipt hashes the log.",
+    "6. **Closeout receipt.** Persist it. *Why 6:* the commit gate reads it.",
+    "7. **Commit.** Run `git commit` alone. *Why 7:* the gate judges command text.",
+    "8. **Push.** One normal push. *Why 8:* only a commit is worth publishing.",
+)
+CLOSEOUT_FIXTURE_TAIL = (
+    "Two hard rules:\n\n"
+    "- **Never put `git commit` in the same Bash command as steps 4 or 6.**\n"
+    "- **Never checkpoint, publish, or push nested state between step 6 and "
+    "step 7.**\n\n"
+    "## Recovering from a stale receipt\n\n"
+    "**`closeout receipt final tracked state is stale`**\n\n"
+    "**`closeout receipt governing control-plane provenance is stale`**\n"
+)
+
+
+def _closeout_fixture(
+    steps: tuple[str, ...] = CLOSEOUT_FIXTURE_STEPS,
+    heading: str = "## CLOSEOUT procedure",
+    separator: str = "\n",
+) -> str:
+    return (
+        f"# Closeout\n\n{heading}\n\nDo these steps in this order.\n\n"
+        f"{separator.join(steps)}\n\n{CLOSEOUT_FIXTURE_TAIL}"
+    )
+
+
+def _closeout_without_learn_path_in_step_2() -> str:
+    text = _closeout_fixture()
+    return text.replace(
+        "Read `.claude/skills/learn/SKILL.md`, then write", "Write", 1
+    ).replace(
+        "3. **First nested checkpoint.** Commit",
+        "3. **First nested checkpoint.** Read `.claude/skills/learn/SKILL.md`. Commit",
+        1,
+    )
+
+
+def test_closeout_procedure_pin_accepts_a_complete_policy() -> None:
+    """One positive case: the fixture satisfies every rule, tight or loose list."""
+    assert target_validator.closeout_procedure_errors(_closeout_fixture()) == []
+    loose = _closeout_fixture(separator="\n\n")
+    assert target_validator.closeout_procedure_errors(loose) == []
+
+
+def test_closeout_procedure_pin_accepts_the_shared_closeout_policy() -> None:
+    """The real policy passes, after the generator's path rewrite."""
+    text = transform_target_paths(
+        _shared_text("policies/closeout.instructions.md"), "claude-code"
+    )
+
+    assert target_validator.closeout_procedure_errors(text) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    (
+        pytest.param(
+            _closeout_fixture(heading="## Steps"),
+            "exactly one CLOSEOUT procedure heading, found 0",
+            id="missing-heading",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "## Recovering", "## CLOSEOUT procedure\n\n## Recovering", 1
+            ),
+            "exactly one CLOSEOUT procedure heading, found 2",
+            id="duplicate-heading",
+        ),
+        pytest.param(
+            _closeout_fixture(
+                steps=(
+                    *CLOSEOUT_FIXTURE_STEPS[:4],
+                    CLOSEOUT_FIXTURE_STEPS[4].replace("5.", "4.", 1),
+                    *CLOSEOUT_FIXTURE_STEPS[5:],
+                )
+            ),
+            "must number its steps 1 to 8 in order",
+            id="steps-out-of-order",
+        ),
+        pytest.param(
+            _closeout_fixture(steps=CLOSEOUT_FIXTURE_STEPS[:7]),
+            "must number its steps 1 to 8 in order",
+            id="missing-step-8",
+        ),
+        pytest.param(
+            _closeout_fixture(
+                steps=(*CLOSEOUT_FIXTURE_STEPS, "9. **Extra.** *Why 9:*")
+            ),
+            "must number its steps 1 to 8 in order",
+            id="extra-step-9",
+        ),
+        *(
+            pytest.param(
+                _closeout_fixture().replace(f"*Why {number}:*", "Reason:", 1),
+                f"closeout step {number} must state its reason",
+                id=f"step-{number}-without-why",
+            )
+            for number in range(1, 9)
+        ),
+        pytest.param(
+            _closeout_without_learn_path_in_step_2(),
+            "closeout step 2 must read .claude/skills/learn/SKILL.md",
+            id="learn-path-outside-step-2",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "Never put `git commit` in the same Bash command", "Avoid chaining", 1
+            ),
+            "missing hard rule: Never put `git commit` in the same Bash command",
+            id="hard-rule-commit-chain",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "Never checkpoint, publish, or push nested state between step 6 and "
+                "step 7",
+                "Avoid checkpoints",
+                1,
+            ),
+            "missing hard rule: Never checkpoint, publish, or push nested state "
+            "between step 6 and step 7",
+            id="hard-rule-nested-state",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "closeout receipt final tracked state is stale", "receipt is stale", 1
+            ),
+            "missing stale-receipt message: "
+            "closeout receipt final tracked state is stale",
+            id="stale-message-final-state",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "closeout receipt governing control-plane provenance is stale",
+                "receipt is stale",
+                1,
+            ),
+            "missing stale-receipt message: "
+            "closeout receipt governing control-plane provenance is stale",
+            id="stale-message-provenance",
+        ),
+    ),
+)
+def test_closeout_procedure_pin_rejects_each_broken_rule(
+    text: str, expected: str
+) -> None:
+    """One negative case per rule: each mutation of the valid fixture is named."""
+    assert text != _closeout_fixture()
+    errors = target_validator.closeout_procedure_errors(text)
+
+    assert any(expected in error for error in errors), errors
+
+
+def test_closeout_procedure_pin_does_not_credit_a_reason_written_after_step_8() -> None:
+    """A `*Why` in the paragraph after the list does not belong to step 8."""
+    text = (
+        _closeout_fixture()
+        .replace("*Why 8:*", "Reason:", 1)
+        .replace("Two hard rules:", "*Why 8:* two hard rules:", 1)
+    )
+
+    errors = target_validator.closeout_procedure_errors(text)
+
+    assert any("closeout step 8 must state its reason" in error for error in errors)
+
+
+def test_closeout_procedure_pin_matches_the_messages_the_verifier_prints() -> None:
+    """The pinned strings are the verifier's own, word for word."""
+    assert target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES == (
+        "closeout receipt final tracked state is stale",
+        "closeout receipt governing control-plane provenance is stale",
+    )
+    assert target_validator.CLOSEOUT_HARD_RULE_FRAGMENTS == (
+        "Never put `git commit` in the same Bash command",
+        "Never checkpoint, publish, or push nested state between step 6 and step 7",
+    )
+    verifier = _shared_text("scripts/verify.py")
+    for message in target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES:
+        assert f'"{message}"' in verifier
+
+
+CLOSEOUT_POINTER_SURFACES = {
+    "workflow policy": "policies/workflow.instructions.md",
+    "orchestrator prompt": "agents/orchestrator/prompt.md",
+    "commit skill": "skills/commit/SKILL.md",
+    "plan-small template": "templates/plan-small.md",
+}
+
+
+def test_closeout_procedure_pointers_hold_in_the_shared_surfaces() -> None:
+    """The workflow core, orchestrator prompt, commit skill, and plan-small
+    template name the closeout policy and no longer call the procedure a section
+    of the workflow policy."""
+    surfaces = {
+        label: _shared_text(path) for label, path in CLOSEOUT_POINTER_SURFACES.items()
+    }
+
+    assert target_validator.closeout_pointer_errors(surfaces) == []
+
+
+def test_closeout_procedure_pointers_reject_a_missing_or_stale_reference() -> None:
+    """A surface without the pointer, or with the old wording (even rewrapped),
+    is named in the error."""
+    pointer = "Follow `.claude/instructions/closeout.instructions.md`."
+    check = target_validator.closeout_pointer_errors
+
+    assert check({"surface": pointer}) == []
+    no_pointer = check({"surface": "Follow the numbered steps."})
+    assert no_pointer == ["surface must point to closeout.instructions.md"]
+    below = check({"surface": f"{pointer} See the CLOSEOUT sequence below."})
+    assert len(below) == 1 and "CLOSEOUT sequence below" in below[0]
+    rewrapped = check({"surface": f"{pointer} See the CLOSEOUT\nsequence below."})
+    assert len(rewrapped) == 1 and "CLOSEOUT sequence below" in rewrapped[0]
+    workflow_section = check(
+        {
+            "surface": f"{pointer} The CLOSEOUT sequence in "
+            "`.claude/instructions/workflow.instructions.md` lists them."
+        }
+    )
+    assert len(workflow_section) == 1
+    assert "workflow.instructions.md" in workflow_section[0]
+
+
+@pytest.mark.parametrize(
+    ("name", "target"),
+    (
+        ("CLAUDE.md", "claude-code"),
+        ("AGENTS.md", "openai-codex"),
+        ("AGENTS.md", "multi-agent"),
+    ),
+)
+def test_closeout_procedure_pointer_is_required_in_root_guidance(
+    name: str, target: str
+) -> None:
+    """Every root file names the closeout policy, and the validator requires it."""
+    guidance = render_root_guidance(target)
+
+    assert "closeout.instructions.md" in guidance
+    errors = root_guidance_errors(
+        name, guidance.replace("closeout.instructions.md", "closeout.md")
+    )
+    assert any(
+        "missing mandatory root-guidance invariant: closeout.instructions.md" in error
+        for error in errors
+    )
+
+
+def test_record_findings_out_pattern_clears_the_canonical_invocations() -> None:
+    """R-AGENTS-08: the gap bound reaches `--out` in the command that the
+    closeout and quality-and-testing policies both document."""
+    prefix = "record_findings.py . --findings-json - --phase"
+    quality = _shared_text("policies/quality-and-testing.instructions.md")
+    closeout = _shared_text("policies/closeout.instructions.md")
+
+    assert quality.count(prefix) == 1
+    assert prefix in closeout
+    for text in (quality, closeout):
+        invocation = text[text.index(prefix) :]
+        assert target_validator.RECORD_FINDINGS_OUT_PATTERN.match(invocation)
+
+
+COPILOT_GUIDANCE_FIXTURE = (
+    "# GitHub Copilot Workspace Adapter\n\n"
+    "Load `.claude/skills/ponytail/SKILL.md` in `full` mode before coding.\n\n"
+    f"Lifecycle: `{ROOT_GUIDANCE_WORKFLOW}`. Follow "
+    "`.claude/instructions/closeout.instructions.md` before commit.\n\n"
+    "Report with `.claude/instructions/agent-reporting.instructions.md`. "
+    f"{PLAIN_LANGUAGE_RULE}\n"
+)
+
+
+def test_copilot_guidance_accepts_the_generated_adapter() -> None:
+    """The generated adapter and the fixture both satisfy the Copilot check. The
+    plain-language rule is the root guidance's sentence, and a rewrap passes."""
+    generated = target_generator.render_copilot_instructions()
+
+    assert (
+        target_validator.ROOT_GUIDANCE_USER_FACING_FRAGMENTS[0] in PLAIN_LANGUAGE_RULE
+    )
+    assert target_validator.copilot_guidance_errors(generated) == []
+    assert target_validator.copilot_guidance_errors(COPILOT_GUIDANCE_FIXTURE) == []
+    rewrapped = COPILOT_GUIDANCE_FIXTURE.replace("idioms. Define", "idioms.\nDefine")
+    assert rewrapped != COPILOT_GUIDANCE_FIXTURE
+    assert target_validator.copilot_guidance_errors(rewrapped) == []
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"),
+    (
+        pytest.param(
+            ".claude/skills/ponytail/SKILL.md",
+            "the skill",
+            "canonical Ponytail skill",
+            id="ponytail-skill",
+        ),
+        pytest.param(
+            ".claude/instructions/agent-reporting.instructions.md",
+            ".claude/instructions/reporting.md",
+            "canonical reporting policy",
+            id="reporting-pointer",
+        ),
+        pytest.param(
+            "closeout.instructions.md",
+            "closeout.md",
+            "closeout procedure",
+            id="closeout-pointer",
+        ),
+        pytest.param(
+            f" {PLAIN_LANGUAGE_RULE}",
+            "",
+            "plain-language rule",
+            id="plain-language-missing",
+        ),
+        pytest.param(
+            "Avoid unnecessary jargon, buzzwords, and idioms. ",
+            "",
+            "plain-language rule",
+            id="plain-language-weakened",
+        ),
+        pytest.param(
+            ROOT_GUIDANCE_WORKFLOW,
+            "pre-flight -> branch -> plan -> implement -> verify -> review -> "
+            "document -> learn -> session-log -> commit",
+            "exactly one canonical lifecycle",
+            id="old-lifecycle",
+        ),
+        pytest.param(
+            ROOT_GUIDANCE_WORKFLOW,
+            ROOT_GUIDANCE_WORKFLOW.replace(
+                "BRANCH -> PLAN WHEN NEEDED", "PLAN WHEN NEEDED -> BRANCH"
+            ),
+            "exactly one canonical lifecycle",
+            id="reordered-lifecycle",
+        ),
+        pytest.param(
+            "before commit.\n",
+            "before commit.\n\nLoad files, especially `workflow.instructions.md`,\n"
+            "`quality-and-testing.instructions.md`, and "
+            "`tool-routing.instructions.md`.\n",
+            "stale preload list",
+            id="preload-list-rewrapped",
+        ),
+        pytest.param(
+            "before commit.\n",
+            f"before commit.\n\nAgain: {ROOT_GUIDANCE_WORKFLOW}.\n",
+            "exactly one canonical lifecycle",
+            id="duplicate-lifecycle",
+        ),
+    ),
+)
+def test_copilot_guidance_rejects_each_broken_rule(
+    old: str, new: str, expected: str
+) -> None:
+    """Each mutation of the valid fixture is named in the error."""
+    mutated = COPILOT_GUIDANCE_FIXTURE.replace(old, new, 1)
+
+    assert mutated != COPILOT_GUIDANCE_FIXTURE
+    errors = target_validator.copilot_guidance_errors(mutated)
+    assert any(expected in error for error in errors), errors
+
+
+def _closeout_checklist_errors(template: str) -> list[str]:
+    """List the ways a plan-small Closeout Checklist breaks the new contract."""
+    section = _section(template, "## Closeout Checklist")
+    errors: list[str] = []
+    boxes = re.findall(r"^- \[ \]", section, re.MULTILINE)
+    if len(boxes) != 2:
+        errors.append(f"expected exactly two boxes, found {len(boxes)}")
+    if "closeout.instructions.md" not in section:
+        errors.append("does not name closeout.instructions.md")
+    errors.extend(
+        f"still contains {stale!r}"
+        for stale in ("mirrors it", "**Status:** COMPLETED")
+        if stale in section
+    )
+    return errors
+
+
+def test_plan_small_closeout_checklist_has_two_boxes_and_a_pointer() -> None:
+    """The plan-small checklist stops short of the later CLOSEOUT steps: two
+    boxes, a pointer, and none of the old mirrored list."""
+    template = _shared_text("templates/plan-small.md")
+
+    assert _closeout_checklist_errors(template) == []
+
+    extra_box = template.replace(
+        "## Closeout Checklist\n", "## Closeout Checklist\n\n- [ ] Extra\n", 1
+    )
+    assert _closeout_checklist_errors(extra_box) == [
+        "expected exactly two boxes, found 3"
+    ]
+    old_style = template.replace(
+        "closeout.instructions.md",
+        "workflow.instructions.md; the order below mirrors it",
+    ).replace(
+        "- [ ] Step 2:", "- [ ] Closeout log has `**Status:** COMPLETED`; step 2:"
+    )
+    assert _closeout_checklist_errors(old_style) == [
+        "does not name closeout.instructions.md",
+        "still contains 'mirrors it'",
+        "still contains '**Status:** COMPLETED'",
+    ]
+
+
+def _core_workflow_errors(orchestrator: str) -> list[str]:
+    """List numbering faults in the orchestrator's `## Core Workflow` list."""
+    lines = _section(orchestrator, "## Core Workflow").splitlines()
+    items = [
+        (index, int(item[1]))
+        for index, line in enumerate(lines)
+        if (item := re.match(r"(\d+)\. ", line))
+    ]
+    if not items:
+        return ["Core Workflow has no numbered items"]
+    errors = [
+        f"heading inside the numbered list: {line}"
+        for line in lines[items[0][0] : items[-1][0]]
+        if re.match(r"#{1,6} ", line)
+    ]
+    numbers = [number for _index, number in items]
+    if numbers != list(range(1, numbers[-1] + 1)):
+        errors.append(f"items must run from 1 to the last number, found {numbers}")
+    return errors
+
+
+def test_orchestrator_core_workflow_numbering_has_no_headings_between_items() -> None:
+    """Defect 2: subsections inside the numbered list broke its numbering. The
+    items run from 1 to the last number with no heading between them."""
+    orchestrator = _planning_source_texts()["orchestrator"]
+
+    assert _core_workflow_errors(orchestrator) == []
+
+    body = _section(orchestrator, "## Core Workflow")
+    item_five = next(line for line in body.splitlines() if line.startswith("5. "))
+    item_six = next(line for line in body.splitlines() if line.startswith("6. "))
+    with_heading = orchestrator.replace(item_five, f"### Aside\n\n{item_five}", 1)
+    assert [e for e in _core_workflow_errors(with_heading) if "heading" in e]
+    without_six = orchestrator.replace(f"{item_six}\n", "", 1)
+    assert without_six != orchestrator
+    assert any("1 to the last number" in e for e in _core_workflow_errors(without_six))
+
+
+def test_antigravity_default_agent_contract_requires_the_orchestrator_pointer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The AGENTS.md bridge points to the generated orchestrator adapter. The
+    pointer rule holds even when the rendered contract text drops it."""
+    contract = render_antigravity_default_agent_contract()
+    assert ".agents/agents/orchestrator/agent.md" in contract
+    assert antigravity_default_agent_contract_errors(contract) == []
+
+    monkeypatch.setattr(
+        target_validator,
+        "render_antigravity_default_agent_contract",
+        lambda: "## Contract\n\nNo pointer here.\n",
+    )
+    errors = antigravity_default_agent_contract_errors(
+        "## Contract\n\nNo pointer here.\n"
+    )
+    assert len(errors) == 1
+    assert ".agents/agents/orchestrator/agent.md" in errors[0]
+
+
+def test_antigravity_supplement_lives_in_the_orchestrator_adapter_only() -> None:
+    """AGENTS.md only points to the orchestrator adapter; the supplement text is
+    carried by `.agents/agents/orchestrator/agent.md` alone."""
+    orchestrator, _dir = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }["orchestrator"]
+    delimiter = target_generator.ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(
+        agent_id="orchestrator"
+    )
+    body = target_generator.provider_agent_prompt_body(
+        orchestrator, "google-antigravity"
+    )
+    _base, separator, supplement = body.partition(f"\n\n{delimiter}\n\n")
+    assert separator and supplement.strip()
+
+    multi_agent = render_root_guidance("multi-agent")
+    assert delimiter not in multi_agent
+    assert supplement.strip() not in multi_agent
+    assert supplement.strip().splitlines()[0] not in multi_agent
+    adapter = render_antigravity_agent_adapter(orchestrator)
+    assert delimiter in adapter
+    assert supplement.strip() in adapter
+
+
+def test_antigravity_orchestrator_adapter_validation_requires_the_role_supplement(
+    tmp_path: Path,
+) -> None:
+    """The generated orchestrator adapter must keep its supplement delimiter."""
+    orchestrator, _dir = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }["orchestrator"]
+    delimiter = target_generator.ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(
+        agent_id="orchestrator"
+    )
+    rendered = render_antigravity_agent_adapter(orchestrator)
+    path = tmp_path / "agent.md"
+
+    path.write_text(rendered)
+    assert antigravity_agent_adapter_errors(path, orchestrator) == []
+
+    path.write_text(rendered.replace(delimiter, "--- removed ---"))
+    errors = antigravity_agent_adapter_errors(path, orchestrator)
+    assert len(errors) == 1
+    assert "orchestrator must carry its role supplement" in errors[0]
+
+
+@pytest.mark.parametrize("profile", ("skills", "workflow"))
+@pytest.mark.parametrize("policy", ("closeout", "plan-lifecycle"))
+def test_sidecar_text_rejects_the_closeout_and_plan_lifecycle_policy_paths(
+    profile: str, policy: str
+) -> None:
+    """No sidecar unit may name either new full-install policy file."""
+    text = f"Read `.claude/instructions/{policy}.instructions.md` first.\n"
+
+    errors = sidecar_text_errors(PurePosixPath("unit.md"), text, profile)
+
+    assert any(".claude/instructions/" in error for error in errors)
+
+
 @pytest.mark.parametrize(
     ("case", "inputs", "expected"),
     (
@@ -652,6 +1318,26 @@ def test_workspace_guidance_preserves_shared_git_hook_inventory() -> None:
                 "change_requested": True,
                 "explicit": True,
                 "affected_paths": (".codex/config.toml",),
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "Antigravity skill mirror change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".agents/skills/learn/SKILL.md",),
+                "low_risk": True,
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "VS Code MCP config change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".vscode/mcp.json",),
+                "low_risk": True,
             },
             "control-plane/high-risk",
         ),
@@ -4340,7 +5026,7 @@ FULL_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     (
         "orchestrator",
-        "## Completion Protocol (Mandatory)",
+        "## Phase-Boundary Summary",
         ("agent-reporting.instructions.md",),
     ),
     (

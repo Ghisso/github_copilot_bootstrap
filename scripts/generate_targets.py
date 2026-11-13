@@ -225,6 +225,19 @@ ROOT_GUIDANCE_WORKFLOW = (
     "PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> "
     "CLOSEOUT -> COMMIT -> PUSH"
 )
+# The one control-plane list. Every root-guidance target and the workspace policy
+# name this inventory; validate_targets.py checks them against it.
+CONTROL_PLANE_INVENTORY = (
+    "root guidance (`CLAUDE.md`, `AGENTS.md`), `.claude/hooks/`, "
+    "`.claude/settings.json`, `.github/hooks/`, `.codex/`, `.agents/`, "
+    "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
+)
+PLAIN_LANGUAGE_RULE = (
+    "For every user-facing message, use clear, direct language with short sentences "
+    "and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. "
+    "Define uncommon terms when needed, retain precise technical terms, and do not "
+    "use `caveman full` with the user."
+)
 CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
 CODEX_ROLE_SUPPLEMENT_DELIMITER = "--- Codex role supplement: {agent_id} ---"
 ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER = (
@@ -967,24 +980,17 @@ def provider_agent_prompt_body(agent: dict[str, Any], target: str) -> str:
 
 
 def render_antigravity_default_agent_contract() -> str:
-    """Render the native default-agent bridge from canonical role sources."""
-    orchestrator = next(
-        agent
-        for agent, _agent_dir in shared_agents("google-antigravity")
-        if agent["id"] == "orchestrator"
-    )
-    rendered = provider_agent_prompt_body(orchestrator, "google-antigravity")
-    delimiter = ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(agent_id="orchestrator")
-    _base, separator, supplement = rendered.partition(f"\n\n{delimiter}\n\n")
-    if not separator:
-        raise ValueError("Antigravity orchestrator routing supplement is required")
+    """Render the native default-agent bridge as a pointer to the orchestrator.
+
+    The generated orchestrator agent file already carries the Antigravity routing
+    supplement, so AGENTS.md only points at it.
+    """
     return (
         "## Google Antigravity Default-Agent Contract\n\n"
         "Google Antigravity's native default agent is the main-thread orchestrator. "
-        "Before complex work, read and follow the canonical workflow in "
-        "`.claude/agents/orchestrator.md`; delegate only to the eligible custom "
-        "specialists in `.agents/agents/`.\n\n"
-        f"{delimiter}\n\n{supplement}"
+        "Before complex work, read and follow "
+        "`.agents/agents/orchestrator/agent.md`; delegate only to the custom "
+        "specialists in `.agents/agents/`."
     )
 
 
@@ -1301,32 +1307,19 @@ def render_antigravity_hooks(path: Path) -> None:
 def render_root_guidance(target: str) -> str:
     if target == "multi-agent":
         title = "AI Coding Agent Project Guidance"
-        control_plane_paths = (
-            "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, `.agents/`, "
-            "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
-        )
         runtime_note = (
             "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and `.codex/agents/*.toml` "
             "as native adapters. Google Antigravity uses `.agents/agents/`, `.agents/skills/`, "
-            "and `.agents/mcp_config.json`. Keep provider-specific runtime details in those "
-            "directories and preserve the canonical `.claude/` basis."
+            "and `.agents/mcp_config.json`."
         )
     elif target == "claude-code":
         title = "Claude Code Project Guidance"
-        control_plane_paths = (
-            "root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, "
-            "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
-        )
         runtime_note = (
             "Claude Code uses `.claude/settings.json`, `.claude/agents/`, and "
             "`.claude/skills/` natively. Keep the configured hooks enabled."
         )
     elif target == "openai-codex":
         title = "OpenAI Codex Project Guidance"
-        control_plane_paths = (
-            "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, "
-            "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
-        )
         runtime_note = (
             "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and "
             "`.codex/agents/*.toml` as native adapters to the canonical `.claude/` basis. "
@@ -1339,7 +1332,7 @@ def render_root_guidance(target: str) -> str:
 
     guidance = f"""# {title}
 
-This is the repository entrypoint for Python AI engineering guidance. `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
+`.claude/` holds the canonical guidance, skills, agents, hooks, templates, and AI state; do not hand-edit generated target adapters.
 
 **Project:** [TODO: project name and one-liner description]
 **Python:** 3.12+ | **Package Manager:** uv
@@ -1347,31 +1340,25 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 
 ## Source Of Truth
 
-- Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
-- Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
-- Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
-- Reporting rules are output requirements. For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
-- Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly three guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`); these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. `ctx_index` takes text or one file, never a folder or URL; cached content is never repository truth, and missing optional helpers are warnings, not hard failures.
-- An optional OpenWiki knowledge layer, enabled when `openwiki/INSTRUCTIONS.md` exists, is derived context, never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
+- Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; refreshes keep consumer-owned state.
+- Follow `.claude/instructions/agent-reporting.instructions.md` for human-facing communication. Reporting rules are output requirements. {PLAIN_LANGUAGE_RULE} Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`.
+- OpenWiki pages are derived context, never authority over source, tests, or policy. Refresh them only per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 
 ## Task Lanes
 
 - Read the authoritative Task Lanes decision table in `.claude/instructions/workflow.instructions.md` before acting; it is the sole normative classifier.
-- Read-only/reporting stays with the main agent and produces evidence only. Diagnose stays read-only until a fix is requested.
-- Only an explicit, one-file, low-risk edit with no high-risk impact and no requested commit or PR is lightweight; it stays with the main agent and needs focused verification, not lifecycle artifacts.
-- Standard implementation and control-plane/high-risk work use `orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout`; an approved implementation-ready plan normally skips planner. All commit/PR work is standard or higher.
-- Control-plane/high-risk includes control-plane, security, dependency/lockfile, migration, multi-file, user-data, generators, and scripts. It always uses a full plan and the required high-risk review profiles.
+- Read-only/reporting work and an explicit one-file low-risk edit with no commit or PR stay with the main agent. Standard and control-plane/high-risk work, including all commit/PR work, use `orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout`.
 - Audited typo commit bypasses are recovery exceptions, never lane classification.
 
 ## Required Lifecycle
 
 `{ROOT_GUIDANCE_WORKFLOW}`
 
-- Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
+- Before non-trivial work, search `.claude/MEMORY.md` for the task's area tags (for example `[LEARN:installer]`) and keywords and read the matching entries. Save the approved plan under `.claude/plans/` and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
-- Run focused and fast checks during implementation, then profile-driven review until clean. CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings, then runs `verify phase` and `verify closeout`.
-- Commit each completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the recorded review gate result is `PASS` with no open request, every review profile the changed paths require is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
-- After every successful outer-repository commit, the orchestrator attempts one normal non-force push: use the branch upstream when configured, otherwise `origin`; set `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning that preserves the local commit. This does not apply to nested `.claude` AI-state sync, PR creation, or merges. The user owns PR and merge decisions.
+- CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings; follow `.claude/instructions/closeout.instructions.md` step by step.
+- Commit a completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the review gate is `PASS` with no open request, and the closeout session log is complete.
+- After every successful outer-repository commit, the orchestrator attempts one normal non-force push to the branch upstream when configured, otherwise `origin`, with `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning. This does not apply to nested `.claude` AI-state sync, PR creation, or merges; the user owns PR and merge decisions.
 
 ## Exact Commands
 
@@ -1383,20 +1370,17 @@ uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 ```
 
-Use `uv run` for project Python entrypoints and tooling; never substitute bare `python`, `pip`, `pytest`, `mypy`, or `ruff` in the normal workflow.
+Use `uv run` for all Python tooling; never bare `python`, `pip`, `pytest`, `mypy`, or `ruff`.
 
 ## Safety And Control Plane
 
 - Keep hook guardrails enabled. Never hand-edit `.env*`, private keys, credentials, secret-bearing files, or `uv.lock`; never run destructive Git commands such as force-push, hard reset, or cleaning untracked files without explicit safe authorization.
-- Control-plane files include {control_plane_paths}. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
-- Keep `.claude/` as the canonical runtime basis. Treat generated adapters as managed runtime files; customize only project context and consumer-owned state.
+- Control-plane files include {CONTROL_PLANE_INVENTORY}. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
 
 ## Map
 
-- Policies: `.claude/instructions/workspace.instructions.md`, `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
-- Skills: `.claude/skills/<name>/SKILL.md`; apply Ponytail to all coding and use task-matched skills when relevant.
-- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, review, and documentation. Deterministic verification and closeout run through canonical scripts.
-- Hooks: target-native configuration dispatches to `.claude/hooks/scripts/`; runtime errors are recorded under `.claude/session_logs/`.
+- Policies: `.claude/instructions/<name>.instructions.md` for `workspace`, `workflow`, `closeout`, `quality-and-testing`, and `tool-routing` (choose retrieval tools by it).
+- Skills: `.claude/skills/<name>/SKILL.md`. Agents: `.claude/agents/`. Hook scripts: `.claude/hooks/scripts/`.
 
 ## Target Runtime
 
@@ -1502,7 +1486,7 @@ def canonical_agent_path(agent_id: str) -> str:
 
 
 def render_copilot_instructions() -> str:
-    return """# GitHub Copilot Workspace Adapter
+    return f"""# GitHub Copilot Workspace Adapter
 
 This target is generated from `shared/`. Do not edit generated files manually.
 
@@ -1514,9 +1498,11 @@ Native Copilot files under `.github/` are adapters:
 - `.github/agents/*.agent.md` preserves Copilot agent metadata and points to `.claude/agents/`.
 - `.github/hooks/hooks.json` invokes shared hook scripts in `.claude/hooks/scripts/`.
 
-Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`. Before every coding action, load `.claude/skills/ponytail/SKILL.md` in `full` mode.
+Classify each request with the Task Lanes table in `.claude/instructions/workflow.instructions.md`, and read other files in `.claude/instructions/` only when the task needs them. Before every coding action, load `.claude/skills/ponytail/SKILL.md` in `full` mode.
 
-Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> document -> learn -> session-log -> commit workflow. A passing `verify phase` plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+Preserve the lifecycle `{ROOT_GUIDANCE_WORKFLOW}`, and follow `.claude/instructions/closeout.instructions.md` before commit. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+
+Follow `.claude/instructions/agent-reporting.instructions.md` for human-facing communication. {PLAIN_LANGUAGE_RULE}
 """
 
 

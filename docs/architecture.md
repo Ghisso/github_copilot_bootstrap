@@ -392,8 +392,9 @@ for stale phase and session-log state. `verify.py closeout --persist`
 refuses to write a receipt the terminal push gate could never accept when
 the big plan is not yet retrievable from nested Git. See [Task lanes and
 the enforced lifecycle](../openwiki/workflows/lifecycle-and-task-lanes.md)
-for the full closeout sequence, the pause/cancel paths, and which rules
-these hooks enforce mechanically versus policy text.
+for how the lifecycle runs and which rules these hooks enforce mechanically versus policy text. The numbered closeout sequence is
+in `.claude/instructions/closeout.instructions.md`; the pause, cancel, and
+reopen paths are in `.claude/instructions/plan-lifecycle.instructions.md`.
 
 ### Reporting reminders
 

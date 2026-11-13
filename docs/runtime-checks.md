@@ -95,6 +95,7 @@ Optional helpers:
   - **Node.js floor.** Context Mode 2.x needs Node.js 24.15.0 or newer (`engines.node`). In server mode and `--self-check`, the dispatcher reads `node --version`. Server mode exits 1 with one error line when Node.js is older; `--self-check` warns. Legacy hook calls run no Node.js check. The devcontainer image is `node:24.22.3-bookworm-slim`.
   - **One server identity.** Every client starts `context-mode server --agent codex` (or `npx -y context-mode@2.1.8 server --agent codex`) through the filter. The dispatcher changes to the outer repository root first, and sets no `CLAUDE_PROJECT_DIR` and no `--workspace-folder`. Under `--agent codex` the server keys its project to the working folder's Git repository, so a server started inside the nested `.claude` repository would use a separate project. Starting from the root also lets the server and the filter resolve a relative `ctx_index` path from the same folder.
   - **Storage.** The dispatcher exports `CONTEXT_MODE_DATA_DIR` as the guarded root `.claude/.cache/context-mode/`, overwriting any inherited value. 2.x ignores `CONTEXT_MODE_DIR`; the dispatcher still reads it as the kit's own override, subject to the same guard. Everything the three tools write is under that root (spike S4 saw no network calls and no writes elsewhere).
+  - **Adapters and override guard.** The root adapters (`.mcp.json`, `.vscode/mcp.json`, and `.codex/config.toml`) start the server only through the guarded dispatcher, and `validate_targets.py` checks each adapter's `context-mode` entry. The dispatcher exports the absolute project-local cache root `<repo>/.claude/.cache/context-mode` by default. An override that resolves anywhere else, inside or outside the repository, is ignored with a warning and the project-local cache is used. The cache is derived local state: never commit, sync, restore, or cite it as lifecycle evidence.
   - **Older caches.** A cache the dispatcher did not produce for this exact pin is moved aside as `<cache>.untrusted.<timestamp>.<pid>`, never migrated and never deleted. Provenance includes the exact version, so every pin bump starts with an empty cache, and the 1.x cache is not imported. The moved folders use disk space; delete them by hand when you no longer need them.
   - **Lost race.** Two servers that start together may both try to move the old cache. When the move fails and the cache folder no longer exists, the dispatcher treats the other server as the winner, warns once, and continues with a fresh root. When the folder still exists, the move fails as before and the server exits nonzero.
 
@@ -599,9 +600,11 @@ The relevant nested tracked/dirty state that provenance binds to is not
 informational the way the nested HEAD is, and its ordering is exact in both
 directions.
 
-Checkpoint nested plan state once every plan, log, and memory edit is
-final and before
-`verify.py phase --persist`/`closeout --persist`. `control_plane_provenance`
+The order of the two nested checkpoints and the receipts is CLOSEOUT steps 3
+to 6 in `.claude/instructions/closeout.instructions.md`; this section explains
+why. Checkpoint nested plan state once every plan and memory edit is final and
+before `verify.py phase --persist`, then again once the session log is final
+and before `closeout --persist`. `control_plane_provenance`
 records `big_plan_digest` from the big plan's working-tree bytes, while the two
 predicates that authorize a terminal push
 (`has_only_terminal_big_plan_change`, `has_only_checkpointed_terminal_big_plan_change`)
@@ -616,8 +619,8 @@ condition before writing anything, and names the checkpoint command.
 `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the canonical operation, used by the
 editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies running it from an agent's Bash tool (any command outside the guard's read-only list that names a `.claude/hooks/` path); the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
 
-Never checkpoint or publish nested state *after* the receipts are persisted.
-That changes what they are bound to and fails the next commit closed with
+Never checkpoint or publish nested state between the closeout receipt (step 6)
+and the commit (step 7). That changes what the receipts are bound to and fails the next commit closed with
 `closeout receipt governing control-plane provenance is stale`. Findings and
 receipt files are not provenance-bound paths, so writing them after the
 checkpoint is expected. Leave nested publication itself to the native
@@ -737,7 +740,8 @@ exists. The commit gate passes a phase only when `gate_result` is `PASS` with
 no open request. The gates also require review profiles by changed path (test
 surfaces need `tests`; control-plane, generator, and dependency-file paths need
 `code`, `architecture`, `security`, `tests`, and `ponytail`), computed from the
-closeout receipt's `changed_paths`, cumulative from the merge-base. See
+closeout receipt's `changed_paths`, cumulative from the merge-base. See the
+Review Profiles section of `shared/policies/workspace.instructions.md` and
 `shared/policies/quality-and-testing.instructions.md`.
 
 When routing selects the `ponytail` profile, `record_findings.py --profile
@@ -880,7 +884,7 @@ required because slug dates are planning dates, not completion dates. The user
 approved this on 2026-10-23 as a narrow reversal of the 2026-09-02 rule
 (commit `8ed2c9e`) that a phase predating receipts gets no implicit pass.
 
-The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested.
+The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested. When the native post-commit hook completes the final big-plan transition, a normal push uses that terminal receipt path and needs no manual receipt refresh; the inactive-plan diagnostic's `--phase <slug>` command is optional recovery advice only.
 
 **Closed session logs are immutable.** Because a closeout log's bytes are
 hashed into its phase's receipt, editing a log after its phase closes breaks

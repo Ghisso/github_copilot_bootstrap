@@ -311,36 +311,9 @@ later phase still needs one, and a receipt file that exists is always checked.
 
 After the refresh, verify the consumer's nested `.claude` repository has a
 valid `HEAD` and a clean worktree. Then regenerate evidence with the current
-runtime, in order:
-
-1. Run focused/fast verification and complete review.
-2. Update documentation, final small-plan state, `[LEARN]` evidence, and the
-   completed session closeout log.
-3. Checkpoint nested plan state, so the closeout receipt binds big-plan
-   bytes that Git already holds. From an agent use
-   `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`;
-   `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the
-   editor task and the lifecycle hooks.
-4. Explicitly stage intended outer files, inspect the staged diff, and persist
-   the converged findings.
-5. Run `verify phase --persist`, then `verify closeout --persist`. Closeout
-   first runs every command in the plan's `## Verification` block itself and
-   records each result in the receipt; one failing command means no receipt
-   (see the Verification Evidence Contract in
-   `.claude/instructions/workflow.instructions.md`).
-6. Run `git commit` in its own command, after the receipts exist. The commit
-   gate hook judges a command's text before it runs, so a chain that ends in
-   `git commit` is denied on the old receipts and nothing in it executes. The
-   orchestrator then attempts the permitted outer-repository push. The
-   step-by-step version of this list, with the reason each step precedes the
-   next, is the CLOSEOUT sequence in
-   `.claude/instructions/workflow.instructions.md`.
-
-Step 3's position is exact. `closeout --persist` refuses, writes nothing, and
-names the remediation when the big plan is not yet retrievable from nested
-Git, because a receipt bound to uncommitted big-plan bytes can never satisfy
-the terminal push gate. Never checkpoint after step 5: that stales the
-receipts and fails the commit closed.
+runtime by following the numbered CLOSEOUT sequence in
+`.claude/instructions/closeout.instructions.md`. It gives the order, the
+reason for each step, and the recovery path for stale receipts.
 
 Evidence-only checkpoints do not make current evidence stale. Changes to the
 governing plan or runtime do make it stale and require the affected evidence
@@ -348,7 +321,7 @@ to be regenerated before continuing. If a governing plan or runtime change
 occurs during the upgrade, rerun the verification and closeout sequence.
 
 Re-record the current phase's findings report with `--gate-result` before
-closeout (step 4); a report written before the upgrade has no `gate_result`
+closeout; a report written before the upgrade has no `gate_result`
 and blocks the commit gate. A re-record is not always enough: the commit gate
 applies the path-based profile rule to any report. If the branch diff from the
 merge-base, including earlier phases, includes a test file and the report
@@ -1218,9 +1191,13 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, implementation, verification, review, documentation, learn, session-log, commit protocol; coder-time Ponytail discipline and conditional review routing are defined here
+  - Pre-flight, branch, plan, implementation, verification, review, documentation, learn, session-log, commit protocol (the CLOSEOUT sequence itself lives in `closeout.instructions.md`); coder-time Ponytail discipline and conditional review routing are defined here
   - Branch lifecycle and commit/PR gates
   - Session logging and recovery reminders
+- [closeout.instructions.md](shared/policies/closeout.instructions.md)
+  - The numbered CLOSEOUT sequence, the completion-commit gate, the final-phase audit, and stale-receipt recovery
+- [plan-lifecycle.instructions.md](shared/policies/plan-lifecycle.instructions.md)
+  - Declaring, pausing, cancelling, and reopening plans; the conditional checkpoint branch; the Knowledge-Refresh Final Phase rule
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
   - Verification commands and required testing order
   - Deterministic PASS/FAIL verification detail and severity-gated findings contract (CRITICAL/MAJOR block phase completion, MINOR needs an explicit disposition and reason) — there is no numeric score

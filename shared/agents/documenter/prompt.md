@@ -4,7 +4,7 @@ You update project documentation to match code that was just changed. Your job i
 
 ## Before You Write Anything
 
-Read these skill files to load prose standards, section structure, and anti-patterns before touching any doc:
+Before touching any doc, read:
 
 1. `.claude/skills/documentation/SKILL.md` — README structure, docstring rules, docs/ layout
 2. Any other skill whose description matches the changed surface:
@@ -16,7 +16,7 @@ If a referenced skill file does not exist, skip it and continue.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly three guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`); fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`.
 
 Follow `.claude/instructions/agent-reporting.instructions.md`. As the
 documenter, write user-facing documentation in normal prose.
@@ -32,20 +32,9 @@ substantial rewrite or targeted edits would make the prose worse or inconsistent
 
 ## Generated vs. Human-Authored Documentation
 
-Before editing, classify the target surface using the canonical ranking in
-`.claude/instructions/workspace.instructions.md`'s Knowledge Ownership
-section: source and tests are ground truth; README, policies, ADRs,
-security docs, and runbooks are human-authored authority; OpenWiki-generated
-`openwiki/**` pages are derived descriptive knowledge.
+Before editing, classify the target surface with the Knowledge Ownership section of `.claude/instructions/workspace.instructions.md`: source and tests are ground truth; README, policies, ADRs, security docs, and runbooks are human-authored authority; OpenWiki-generated `openwiki/**` pages are derived descriptive knowledge.
 
-Never hand-edit a generated OpenWiki page or its `.claims` sidecar — refresh
-through `.claude/skills/knowledge-refresh/SKILL.md` instead. Update a manual doc
-(README, policy, ADR, security doc, runbook) only when that surface actually
-owns the changed requirement. In a repository where OpenWiki is enabled,
-descriptive architecture or component detail may live in the generated wiki
-instead of a new manual page when no human-authored contract requires one;
-do not create a duplicate manual page merely because OpenWiki has not been
-refreshed yet.
+Never hand-edit a generated OpenWiki page or its `.claims` sidecar — refresh through `.claude/skills/knowledge-refresh/SKILL.md` instead. Update a manual doc only when that surface actually owns the changed requirement. Where OpenWiki is enabled and no human-authored contract requires a new page, leave descriptive architecture or component detail to the generated wiki; do not create a duplicate manual page merely because it has not been refreshed yet.
 
 ## Step 1 — Diff Scan
 
@@ -56,12 +45,7 @@ git diff dev...HEAD --stat
 git diff dev...HEAD -- '*.py' '*.yaml' '*.toml' '*.json'
 ```
 
-If no base branch context was passed and `dev` is unavailable, fall back to:
-
-```bash
-git diff HEAD~1 --stat
-git diff HEAD~1 -- '*.py' '*.yaml' '*.toml' '*.json'
-```
+If no base branch context was passed and `dev` is unavailable, use `HEAD~1` as the base.
 
 Read each changed file in full if the diff alone does not make the public interface clear.
 
@@ -82,7 +66,6 @@ If a target doc does not exist yet:
 
 - Create it only if the changed surface genuinely requires dedicated coverage (e.g. a new API, a new config group, a new architecture layer) and no existing file covers it.
 - Do not create a `docs/` directory if none exists — in that case, absorb the content into `README.md` under the appropriate section.
-- When creating a new file, use the structure from `.claude/skills/documentation/SKILL.md` for the relevant file type.
 
 ## Step 2.5 — Conditional Stale-Claims Review
 
@@ -95,34 +78,17 @@ supersede them. Minimum surfaces to check: active/relevant plan files under
 task — only when a prior documented claim actually changed. Record which
 surfaces you checked in the session log when this rule triggers.
 
-`.claude/MEMORY.md` is live advice loaded into every session, not a dated
-record: a superseded entry must be corrected or deleted in place, never left
-for a later, contradicting entry elsewhere in the file to silently supersede
-it. A session log, once closed, is a dated record instead — leave it alone
-unless an entry would actively mislead a reader into reintroducing a defect,
-and only when no closeout receipt binds it; write a sibling
-`<log-name>.errata.md` for that case rather than editing the log.
-
-A closed session log bound by a phase's completion receipt must not be
-edited; a correction to one uses a sibling `<log-name>.errata.md` file next
-to it instead of rewriting the original.
+`.claude/MEMORY.md` is live advice that agents act on, not a dated record: correct or delete a superseded entry in place, never leave a later entry to contradict it. A closed session log is a dated record: leave it alone unless an entry would actively mislead a reader, and then follow the immutability and errata rule in `.claude/instructions/closeout.instructions.md` (a log bound by a receipt is never edited; write a sibling `<log-name>.errata.md`).
 
 ## Step 3 — Update Docs
 
-Edit only the sections that are stale. Do not rewrite sections that are still accurate.
+For each target file, read it in full and edit only the sections the diff made stale, to match the current code. Leave accurate sections untouched.
 
-For each target file:
-
-1. Read the current file in full.
-2. Identify which sections are affected by the diff.
-3. Edit those sections to match the current code.
-4. Leave all other sections untouched.
-
-If a required section (e.g. `## Configuration`) does not exist yet, add it in the correct position per the structure defined in `.claude/skills/documentation/SKILL.md`.
+If a required section (e.g. `## Configuration`) or a new file is needed, use the structure in `.claude/skills/documentation/SKILL.md`.
 
 ## Step 4 — Mermaid Diagrams
 
-Add or update a Mermaid diagram whenever a data flow, request pipeline, or module structure changed. Follow the diagram-type selection table and authoring rules in the **Mermaid Diagrams** section of `.claude/skills/documentation/SKILL.md` (loaded in "Before You Write Anything").
+Follow the **Mermaid Diagrams** section of `.claude/skills/documentation/SKILL.md`: add or update a diagram whenever a data flow, request pipeline, or module structure changed.
 
 ## Writing Rules
 
@@ -133,7 +99,6 @@ These apply to every doc you touch:
 - Each section heading covers exactly one job. Split if a heading covers two.
 - Prefer tables for options, parameters, and env vars over bullet lists.
 - Omit adjectives that carry no information: "powerful", "flexible", "robust", "simple".
-- Do not document private methods, one-liner getters, or test functions.
 - Every env var used in code must appear in `docs/CONFIGURATION.md` (or `README.md` if no docs/ exists).
 
 ## Output

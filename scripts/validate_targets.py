@@ -23,9 +23,12 @@ from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
+    ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER,
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
+    CONTROL_PLANE_INVENTORY,
     OPENWIKI_BEGIN_MATCHER,
+    PLAIN_LANGUAGE_RULE,
     ROOT_GUIDANCE_WORKFLOW,
     SIDECAR_HUMANIZE_CREDIT,
     SIDECAR_TEXT_REPLACEMENTS,
@@ -391,10 +394,15 @@ ROOT_GUIDANCE_HEADERS = (
     "## Map",
     "## Target Runtime",
 )
+# Each file holds a tuple of (kind, limit) budgets, and every one must hold.
 ROOT_GUIDANCE_BUDGETS = {
-    "CLAUDE.md": ("lines", 200),
-    "AGENTS.md": ("bytes", 16 * 1024),
+    "CLAUDE.md": (("lines", 200), ("bytes", 5 * 1024)),
+    "AGENTS.md": (("bytes", 5 * 1024),),
 }
+# Byte budgets for policies in `shared/policies/` that agents read before real
+# work. The closeout and plan-lifecycle sections live in their own files so the
+# workflow core stays under its budget.
+POLICY_BYTE_BUDGETS = {"workflow.instructions.md": 16 * 1024}
 ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS = {
     "CLAUDE.md": ("`.claude/hooks/`", "`.github/hooks/`"),
     "AGENTS.md": ("`.codex/`", "`.github/hooks/`"),
@@ -406,6 +414,7 @@ ROOT_GUIDANCE_AUTHORING_PHRASES = (
     "Bootstrap maintainers own authoring and regeneration",
 )
 REPORTING_POLICY_POINTER = ".claude/instructions/agent-reporting.instructions.md"
+RECORD_FINDINGS_OUT_PATTERN = re.compile(r"record_findings\.py[\s\S]{0,240}?--out\b")
 REPORTING_POLICY_REQUIRED_FRAGMENTS = (
     "## Human-facing communication",
     "precise, clear, direct, natural prose",
@@ -537,7 +546,9 @@ TASK_LANE_CONTROL_PLANE_PATHS = (
     ".claude/settings.json",
     ".github/hooks/",
     ".codex/",
+    ".agents/",
     ".mcp.json",
+    ".vscode/mcp.json",
     ".devcontainer/",
 )
 TASK_LANE_CONTROL_PLANE_FILES = {"CLAUDE.md", "AGENTS.md"}
@@ -648,21 +659,25 @@ def check(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
-def root_guidance_errors(name: str, text: str) -> list[str]:
-    """Return structural invariant failures for one generated root guidance file."""
-    errors: list[str] = []
-    budget_kind, budget = ROOT_GUIDANCE_BUDGETS[name]
-    size = len(text.splitlines()) if budget_kind == "lines" else len(text.encode())
-    if size > budget:
-        errors.append(f"{name} exceeds its {budget_kind} budget of {budget}")
-    for header in ROOT_GUIDANCE_HEADERS:
-        if text.count(f"{header}\n") != 1:
-            errors.append(f"{name} must contain exactly one {header!r} section")
-    lifecycle_matches = [
+def canonical_lifecycle_matches(text: str) -> list[str]:
+    """Return every lifecycle chain in ``text``, upper-cased and single-spaced."""
+    return [
         " ".join(match.group(0).upper().split())
         for match in ROOT_LIFECYCLE_PATTERN.finditer(text)
     ]
-    if lifecycle_matches != [ROOT_GUIDANCE_WORKFLOW]:
+
+
+def root_guidance_errors(name: str, text: str) -> list[str]:
+    """Return structural invariant failures for one generated root guidance file."""
+    errors: list[str] = []
+    for budget_kind, budget in ROOT_GUIDANCE_BUDGETS[name]:
+        size = len(text.splitlines()) if budget_kind == "lines" else len(text.encode())
+        if size > budget:
+            errors.append(f"{name} exceeds its {budget_kind} budget of {budget}")
+    for header in ROOT_GUIDANCE_HEADERS:
+        if text.count(f"{header}\n") != 1:
+            errors.append(f"{name} must contain exactly one {header!r} section")
+    if canonical_lifecycle_matches(text) != [ROOT_GUIDANCE_WORKFLOW]:
         errors.append(
             f"{name} must contain exactly one canonical lifecycle in the required phase order"
         )
@@ -672,6 +687,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         ".claude/skills/ponytail/SKILL.md",
         "`verify phase` reports PASS",
         "CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings",
+        "closeout.instructions.md",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -684,6 +700,8 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
                 f"{name} is missing mandatory root-guidance invariant: {fragment}"
             )
     semantic_text = normalized_text(text)
+    if normalized_text(CONTROL_PLANE_INVENTORY) not in semantic_text:
+        errors.append(f"{name} must contain the shared control-plane inventory")
     for fragment in ROOT_GUIDANCE_USER_FACING_FRAGMENTS:
         if normalized_text(fragment) not in semantic_text:
             errors.append(
@@ -700,16 +718,61 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
     return errors
 
 
+ANTIGRAVITY_ORCHESTRATOR_POINTER = ".agents/agents/orchestrator/agent.md"
+
+
 def antigravity_default_agent_contract_errors(text: str) -> list[str]:
     """Return failures for the native Antigravity default-agent bridge."""
-    contract = render_antigravity_default_agent_contract()
-    if contract in text:
-        return []
-    return ["AGENTS.md must contain the canonical Antigravity default-agent contract"]
+    errors: list[str] = []
+    if render_antigravity_default_agent_contract() not in text:
+        errors.append(
+            "AGENTS.md must contain the canonical Antigravity default-agent contract"
+        )
+    if ANTIGRAVITY_ORCHESTRATOR_POINTER not in text:
+        errors.append(
+            "AGENTS.md must point the Antigravity default agent to "
+            f"{ANTIGRAVITY_ORCHESTRATOR_POINTER}"
+        )
+    return errors
+
+
+COPILOT_STALE_PRELOAD_FRAGMENT = (
+    "especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, "
+    "and `tool-routing.instructions.md`"
+)
+
+
+def copilot_guidance_errors(text: str) -> list[str]:
+    """Return failures for the generated Copilot workspace adapter."""
+    errors: list[str] = []
+    if ".claude/skills/ponytail/SKILL.md" not in text:
+        errors.append(
+            "Copilot guidance must activate the canonical Ponytail skill for coding"
+        )
+    if REPORTING_POLICY_POINTER not in text:
+        errors.append("Copilot guidance must point to the canonical reporting policy")
+    if "closeout.instructions.md" not in text:
+        errors.append("Copilot guidance must point to the closeout procedure")
+    if canonical_lifecycle_matches(text) != [ROOT_GUIDANCE_WORKFLOW]:
+        errors.append(
+            "Copilot guidance must contain exactly one canonical lifecycle in the "
+            "required phase order"
+        )
+    semantic_text = normalized_text(text)
+    if normalized_text(PLAIN_LANGUAGE_RULE) not in semantic_text:
+        errors.append(
+            "Copilot guidance must carry the root guidance's plain-language rule"
+        )
+    if COPILOT_STALE_PRELOAD_FRAGMENT in semantic_text:
+        errors.append(
+            "Copilot guidance contains a stale preload list: "
+            f"{COPILOT_STALE_PRELOAD_FRAGMENT}"
+        )
+    return errors
 
 
 def workspace_guidance_errors(text: str) -> list[str]:
-    """Return failures for the shared Git-hook control-plane inventory."""
+    """Return failures for the shared control-plane inventory in workspace guidance."""
     errors: list[str] = []
     for fragment in ("`.claude/hooks/`", "`.github/hooks/`"):
         if text.count(fragment) != 1:
@@ -717,6 +780,10 @@ def workspace_guidance_errors(text: str) -> list[str]:
                 "workspace guidance must contain exactly one control-plane inventory path: "
                 f"{fragment}"
             )
+    if normalized_text(CONTROL_PLANE_INVENTORY) not in normalized_text(text):
+        errors.append(
+            "workspace guidance must contain the shared control-plane inventory"
+        )
     return errors
 
 
@@ -843,6 +910,119 @@ def workflow_reporting_errors(text: str) -> list[str]:
         if fragment.lower() in semantic_text:
             errors.append(f"workflow policy duplicates reporting rules: {fragment}")
     return errors
+
+
+CLOSEOUT_STEP_COUNT = 8
+CLOSEOUT_HEADING_PATTERN = re.compile(
+    r"^(#{2,3}) CLOSEOUT procedure[ \t]*$", re.MULTILINE
+)
+CLOSEOUT_LEARN_SKILL_PATH = ".claude/skills/learn/SKILL.md"
+CLOSEOUT_HARD_RULE_FRAGMENTS = (
+    "Never put `git commit` in the same Bash command",
+    "Never checkpoint, publish, or push nested state between step 6 and step 7",
+)
+# The two messages `verify.py closeout` prints for a stale receipt
+# (`shared/scripts/verify.py`). Operators search for them word for word.
+CLOSEOUT_STALE_RECEIPT_MESSAGES = (
+    "closeout receipt final tracked state is stale",
+    "closeout receipt governing control-plane provenance is stale",
+)
+CLOSEOUT_POINTER = "closeout.instructions.md"
+CLOSEOUT_STALE_POINTER_FRAGMENTS = (
+    "CLOSEOUT sequence below",
+    "CLOSEOUT sequence in `.claude/instructions/workflow.instructions.md`",
+)
+
+
+def closeout_procedure_steps(section: str) -> list[tuple[int, str]]:
+    """Split a CLOSEOUT procedure section into its numbered steps, in order written.
+
+    A step runs from its ``N. `` line until the next numbered line, any heading,
+    or a blank line followed by an unindented line (the next paragraph).
+    """
+    steps: list[tuple[int, list[str]]] = []
+    in_step = False
+    previous_blank = False
+    for line in section.splitlines():
+        number = re.match(r"(\d+)\. ", line)
+        if number:
+            steps.append((int(number[1]), [line]))
+            in_step = True
+        elif re.match(r"#{1,6} ", line) or (
+            previous_blank and line and not line[0].isspace()
+        ):
+            in_step = False
+        elif in_step:
+            steps[-1][1].append(line)
+        previous_blank = not line.strip()
+    return [(number, "\n".join(body)) for number, body in steps]
+
+
+def closeout_procedure_errors(text: str) -> list[str]:
+    """Return failures for the CLOSEOUT procedure in the closeout policy."""
+    errors: list[str] = []
+    headings = list(CLOSEOUT_HEADING_PATTERN.finditer(text))
+    if len(headings) != 1:
+        errors.append(
+            "closeout policy must contain exactly one CLOSEOUT procedure heading, "
+            f"found {len(headings)}"
+        )
+    section = ""
+    if headings:
+        rest = text[headings[0].end() :]
+        next_heading = re.search(
+            rf"^#{{1,{len(headings[0].group(1))}}} ", rest, re.MULTILINE
+        )
+        section = rest[: next_heading.start()] if next_heading else rest
+    steps = closeout_procedure_steps(section)
+    numbers = [number for number, _body in steps]
+    if numbers != list(range(1, CLOSEOUT_STEP_COUNT + 1)):
+        errors.append(
+            f"closeout policy must number its steps 1 to {CLOSEOUT_STEP_COUNT} in "
+            f"order, found {numbers}"
+        )
+    for number, body in steps:
+        if "*Why" not in body:
+            errors.append(f"closeout step {number} must state its reason with '*Why'")
+    step_two = next((body for number, body in steps if number == 2), "")
+    if CLOSEOUT_LEARN_SKILL_PATH not in step_two:
+        errors.append(f"closeout step 2 must read {CLOSEOUT_LEARN_SKILL_PATH}")
+    for fragment in CLOSEOUT_HARD_RULE_FRAGMENTS:
+        if fragment not in text:
+            errors.append(f"closeout policy is missing hard rule: {fragment}")
+    for message in CLOSEOUT_STALE_RECEIPT_MESSAGES:
+        if message not in text:
+            errors.append(
+                f"closeout policy is missing stale-receipt message: {message}"
+            )
+    return errors
+
+
+def closeout_pointer_errors(surfaces: dict[str, str]) -> list[str]:
+    """Return failures for surfaces that must point to the closeout policy.
+
+    ``surfaces`` maps a label to that surface's text. Each must name the closeout
+    policy and must not call the procedure a section of the workflow policy.
+    """
+    errors: list[str] = []
+    for label, text in surfaces.items():
+        if CLOSEOUT_POINTER not in text:
+            errors.append(f"{label} must point to {CLOSEOUT_POINTER}")
+        semantic_text = normalized_text(text)
+        for fragment in CLOSEOUT_STALE_POINTER_FRAGMENTS:
+            if fragment in semantic_text:
+                errors.append(
+                    f"{label} still points to the old CLOSEOUT sequence: {fragment}"
+                )
+    return errors
+
+
+def policy_budget_errors(name: str, text: str) -> list[str]:
+    """Return a failure when a budgeted policy exceeds its byte budget."""
+    budget = POLICY_BYTE_BUDGETS.get(name)
+    if budget is not None and len(text.encode()) > budget:
+        return [f"{name} exceeds its bytes budget of {budget}"]
+    return []
 
 
 def task_lane_contract_errors(text: str) -> list[str]:
@@ -1016,6 +1196,35 @@ def validate_task_lane_contract(errors: list[str]) -> None:
     workflow = read(REPO_ROOT / "shared" / "policies" / "workflow.instructions.md")
     errors.extend(task_lane_contract_errors(workflow))
     errors.extend(workflow_reporting_errors(workflow))
+
+
+def validate_policy_budgets(errors: list[str]) -> None:
+    """Keep each budgeted shared policy within its byte budget."""
+    for name in POLICY_BYTE_BUDGETS:
+        path = REPO_ROOT / "shared" / "policies" / name
+        if not path.is_file():
+            errors.append(f"missing budgeted shared policy: {path}")
+            continue
+        errors.extend(policy_budget_errors(name, read(path)))
+
+
+def validate_closeout_procedure(errors: list[str]) -> None:
+    """Pin the generated closeout procedure and the surfaces that point to it."""
+    closeout = TARGET_ROOT / ".claude" / "instructions" / CLOSEOUT_POINTER
+    if closeout.is_file():
+        errors.extend(closeout_procedure_errors(read(closeout)))
+    else:
+        errors.append(f"missing generated closeout policy: {closeout}")
+    shared = REPO_ROOT / "shared"
+    surfaces = {
+        "workflow policy": shared / "policies" / "workflow.instructions.md",
+        "orchestrator prompt": shared / "agents" / "orchestrator" / "prompt.md",
+        "commit skill": shared / "skills" / "commit" / "SKILL.md",
+        "plan-small template": shared / "templates" / "plan-small.md",
+    }
+    errors.extend(
+        closeout_pointer_errors({label: read(path) for label, path in surfaces.items()})
+    )
 
 
 def validate_root_guidance(errors: list[str]) -> None:
@@ -2282,6 +2491,15 @@ def antigravity_agent_adapter_errors(path: Path, agent: dict[str, Any]) -> list[
         f"Antigravity agent must retain canonical retrieval routing: {path}",
         errors,
     )
+    # AGENTS.md only points here; the orchestrator's Antigravity supplement
+    # lives in this adapter alone.
+    if is_orchestrator:
+        check(
+            ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(agent_id="orchestrator")
+            in text,
+            f"Antigravity orchestrator must carry its role supplement: {path}",
+            errors,
+        )
     return errors
 
 
@@ -2742,12 +2960,14 @@ def validate_agents(errors: list[str]) -> None:
         # R-AGENTS-08: only the orchestrator persists findings evidence;
         # coder and reviewer must never gain their own record_findings.py
         # --out invocation (the orchestrator owns final closeout evidence).
-        # The bounded `[\s\S]{0,120}?` gap (not `[^\n]*`) tolerates a markdown
+        # The bounded `[\s\S]{0,240}?` gap (not `[^\n]*`) tolerates a markdown
         # reflow wrapping the invocation across a line break.
-        # The bound must clear the canonical long-form invocation documented in
-        # quality-and-testing.instructions.md, whose flag run stays under the gap
-        # bound in the regex below.
-        if re.search(r"record_findings\.py[\s\S]{0,240}?--out\b", text):
+        # The bound must clear both canonical invocations: the short form in
+        # quality-and-testing.instructions.md (`record_findings.py . --findings-json -
+        # --phase ... --out ...`) and the long form with its `--profile`,
+        # `--gate-result`, and `--open-request` flags in closeout.instructions.md.
+        # RECORD_FINDINGS_OUT_PATTERN holds the gap bound.
+        if RECORD_FINDINGS_OUT_PATTERN.search(text):
             check(
                 path.stem == "orchestrator",
                 f"only the orchestrator may persist findings evidence (record_findings.py ... --out): {path}",
@@ -8216,11 +8436,10 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     validate_root_guidance(errors)
     validate_policy_adapters(errors)
 
-    copilot_guidance = read(TARGET_ROOT / ".github" / "copilot-instructions.md")
-    check(
-        ".claude/skills/ponytail/SKILL.md" in copilot_guidance,
-        "Copilot guidance must activate the canonical Ponytail skill for coding",
-        errors,
+    errors.extend(
+        copilot_guidance_errors(
+            read(TARGET_ROOT / ".github" / "copilot-instructions.md")
+        )
     )
 
     stale_workflow_fragments = (
@@ -8783,6 +9002,8 @@ def validate_support_files(errors: list[str]) -> None:
         "session_logs/README.md",
         "explorations/README.md",
         "instructions/workflow.instructions.md",
+        "instructions/closeout.instructions.md",
+        "instructions/plan-lifecycle.instructions.md",
         "instructions/quality-and-testing.instructions.md",
         "instructions/tool-routing.instructions.md",
         "instructions/workspace.md",
@@ -11878,13 +12099,12 @@ def validate_typo_bypass_path_restriction(errors: list[str]) -> None:
             (repo / relative_path).unlink()
 
         # R-BYPASS-02: root-level control-plane files and directories named
-        # verbatim by shared/policies/workspace.instructions.md's
-        # control-plane definition ("Control-plane files include
-        # .claude/hooks/, .claude/settings.json, .github/hooks/, .codex/,
-        # .mcp.json, .vscode/mcp.json, .devcontainer/, CLAUDE.md, and
-        # AGENTS.md") must also be
-        # excluded - a docs(typo): commit must never rewrite root guidance
-        # or the .codex/.devcontainer control-plane surfaces unreviewed.
+        # by the shared control-plane inventory (CONTROL_PLANE_INVENTORY in
+        # scripts/generate_targets.py, repeated by
+        # shared/policies/workspace.instructions.md) must also be excluded - a
+        # docs(typo): commit must never rewrite root guidance or the
+        # .codex/.devcontainer control-plane surfaces unreviewed. The fixtures
+        # below sample that inventory; they are not the whole list.
         for relative_path in (
             "CLAUDE.md",
             "AGENTS.md",
@@ -12265,6 +12485,8 @@ def main() -> int:
 
     if not errors:
         validate_task_lane_contract(errors)
+        validate_policy_budgets(errors)
+        validate_closeout_procedure(errors)
         validate_codex_model_contract_cases(errors)
         validate_agents(errors)
         validate_mcp_and_hooks(errors)

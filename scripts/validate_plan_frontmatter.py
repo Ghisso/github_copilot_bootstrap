@@ -48,7 +48,7 @@ BODY_PHASE_HEADING_PATTERN = re.compile(
 # body-phase check: a valid phase slug never starts with a separator.
 PHASE_SLUG_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # See the canonical Knowledge-Refresh Final Phase rule in
-# shared/policies/workflow.instructions.md. This suffix is how a big plan's
+# shared/policies/plan-lifecycle.instructions.md. This suffix is how a big plan's
 # own dedicated final knowledge-refresh phase is recognized; enforcing at
 # most one, and only as the last phase, is what makes the rule's termination
 # condition deterministic rather than a convention the planner could forget.
