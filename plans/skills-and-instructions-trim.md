@@ -173,6 +173,7 @@ Done criteria:
     - This runs before `populate_bootstrap_root`, so the `bootstrap-root/.agents` copy, `validate_agents_takeover`, and `verify.py`'s root-adapter comparison all see the same tree.
     - A folder holding a symlink or non-regular entry deeper inside is checked whole first and skipped with a warning.
 - The mirror is unmarked, so it is ordinary generated content: the next refresh prunes it and writes it again.
+- **Scope change (2026-11-13, orchestrator, Phase A implementation):** the mirror keeps the marker. The coder found that an unmarked mirror lands in `bootstrap-root/.agents/skills/`, the shipped-before record, so a project skill whose `.claude` marker went missing would count as retired and be deleted without a refusal. With the marker in the mirror (and so in the record), `validate_project_skills()` refuses an unmarked `.claude/skills/<name>/` whose record copy holds `.project-skill`, whether or not the new source ships `<name>`. The marker under `.agents/skills/` grants no ownership (`is_project_skill_dir()` requires a `.claude/skills` parent), so the mirror is still pruned and rewritten each refresh.
 
 **Why not a state folder.** A `CONSUMER_STATE_PATHS` entry (for example `project-skills/`) would survive refreshes, but no client lists skills from it.
 
