@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-13
 **Plan:** `.claude/plans/2026-11-12_phase-C-skill-set.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -36,6 +36,30 @@ Take the shipped skills from 55 to 37 (9 removed, 4 + 4 merged into `haystack` a
 
 ## Verification
 
+```text
+PASS        0.4s  uv run python scripts/generate_targets.py --all
+PASS      131.1s  uv run pytest tests/test_validate_targets.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_workflow_scenario.py -q --tb=short
+PASS        0.3s  uv run pytest tests/test_validate_targets.py -q --tb=short -k "description_cap or loading_rules or merged_skills"
+PASS        0.0s  test ! -e tests/test_caveman_compress_detect.py
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; want = {"shared/skills": 37, "dist/multi-agent/.claude/skills": 37, "dist/multi-agent/.agents/skills": 37, ".claude/skills": 38}; got = {r: sum(1 for p in pathlib.Path(r).iterdir() if p.is_dir() and not p.is_symlink()) for r in want}; print(got); sys.exit(0 if got == want else 1)'
+PASS        0.1s  uv run python -I -c 'import sys; sys.path.insert(0, "scripts"); import validate_targets as v; from pathlib import Path; d = {p.parent.name: v.skill_listing_length(v.extract_frontmatter(p.read_text(encoding="utf-8"))) for p in sorted(Path("shared/skills").glob("*/SKILL.md"))}; long = sorted(n for n, k in d.items() if k > v.SKILL_DESCRIPTION_MAX_CHARS and n not in v.SKILL_DESCRIPTION_CAP_EXEMPT); print(len(d), sum(d.values()), long); sys.exit(0 if len(d) == 37 and sum(d.values()) <= 10500 and not long else 1)'
+PASS        0.0s  uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.exists()] + [str(p) for r in roots if r.exists() for p in ([r] if r.is_file() else sorted(r.rglob("*"))) if p.is_file() and "__pycache__" not in p.parts and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'skills/(review-api|run-tests|refactor|pdf|caveman-compress|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing|pipeline-patterns|haystack-conditional-router|docling-haystack|ollama-chat-generator|pandas-nan-bool-coercion|networkx-igraph-graphml-interop|pyvis-xss-testing|csv-driven-integration-tests|deploy-service|context-manager-testing|test-helper-public-api)/|`(review-api|run-tests|caveman-compress|pipeline-patterns|csv-driven-integration-tests|deploy-service|pandas-nan-bool-coercion|pyvis-xss-testing|networkx-igraph-graphml-interop|haystack-conditional-router|docling-haystack|ollama-chat-generator|context-manager-testing|test-helper-public-api|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing)`' shared scripts README.md docs/smoke-tests.md docs/architecture.md docs/target-mapping.md
+PASS        0.0s  grep -q -F '"deployment.instructions.md": "bentoml-service"' scripts/validate_targets.py
+PASS        0.0s  grep -q -F 'haystack/SKILL.md' shared/agents/documenter/prompt.md
+PASS        0.0s  test "$(grep -c -F 'code-style/SKILL.md' shared/agents/coder/prompt.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'testing-patterns/SKILL.md' shared/agents/coder/prompt.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '`refactor`' shared/agents/coder/prompt.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Always read `plan-decomposition/SKILL.md`' shared/agents/planner/prompt.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Skills are sourced from the shared .claude basis' scripts/generate_targets.py)" = "0"
+PASS        0.0s  test "$(grep -c -F 'hidden helpers' README.md)" = "0"
+PASS       44.7s  uv run python scripts/validate_targets.py
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      310.8s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-12_phase-C-skill-set.json` (0 findings after review round 2; gate PASS; six profiles; round 1 was WARN with three MINORs and two open requests, all fixed or answered before round 2).
+- Phase receipt: `verify.py phase --persist` PASS (pytest completed (5084 passed, 1 skipped in 307.41s (0:05:07)); mypy 0 errors; Ruff 0 violations).
 - optional 1: PASS — Claude Code 2.1.226, spike S5 method with `--setting-sources project` (`--bare` cannot authenticate here): `Loaded 37 unique skills`, `Sending 51 skills via attachment`, 0 `Skill listing over budget` lines; the positive-control text is known from S5. The 55-skill S5 baseline also had no warning, so this shows no overflow at 37, not an improvement.
 - optional 2: NOT RUN — `/context`, `/doctor`, and "What skills are available?" need an interactive Claude Code session this agent cannot drive. The session's own live skill list did switch to the 37-skill descriptions after the self-refresh.
 - optional 3: PASS — Codex 0.147.0 `debug prompt-input`, isolated trusted home, S1-shaped tree of the regenerated bundle: 42 entries, 42 unique; the 37 shipped names equal `dist/multi-agent/.agents/skills`, each listed once from `.agents/skills/`; descriptions shown whole (longest `ponytail` 504).
