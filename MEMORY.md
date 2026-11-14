@@ -1861,4 +1861,9 @@
   round, compare `git status --short` with the files each agent reported.
   Also, never edit `shared/` while a full `verify.py phase` runs: the run then
   fails `test_validate_targets` on a stale `dist/` and must be repeated.
+- [LEARN:tooling] OpenWiki's `openwiki_submit_page` refuses a Claim whose
+  evidence range starts or ends on a blank line with `Evidence does not
+  resolve`. That also hits a plain `confirmedClaimIds` entry when the stored
+  range's edge line became blank after the source changed. Revise the Claim
+  with the same `id` and a range whose first and last lines hold text.
 
