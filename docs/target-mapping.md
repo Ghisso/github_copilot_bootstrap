@@ -121,6 +121,12 @@ Recorded follow-ups:
 - The commit gate enforces the Task Lanes five-profile review for control-plane, generator, and dependency paths, but not for every multi-file diff. A multi-file diff requires the Ponytail profile only.
 - Antigravity needs a logged native run for two open questions. The MCP tool-name format inside a PreToolUse `toolCall.name` is undocumented ([hooks](https://antigravity.google/docs/hooks)), so the bridge keeps denying MCP calls. Subagent MCP access is unverified: the docs describe `mcpServers: object[]` ([subagents](https://antigravity.google/docs/subagents)), not the `inheritMcp: true` the bootstrap writes. A 2026-08 native run reported `agy mcp list` as "No MCP servers configured", and the docs do not explain it. The documented workspace config is `.agents/mcp_config.json` ([MCP](https://antigravity.google/docs/mcp)).
 - Bash reads of secret-shaped files such as `cat .env` are allowed, while native read tools on them are denied. This is kept by user decision (2026-10-21) for a later policy choice.
+- The 37 `[[skills.config]]` entries are inert. Removing or keeping them is a user decision, and their on/off effect is untested.
+- A clone that already exists gets no automatic cleanup of stale `.agents/` content (big plan `skills-and-instructions-trim`, Decision 10).
+- The skill listing still overflows on 200K-context models.
+- Consumer MEMORY entries that name removed skills (RAG 14, industrial-inspection 1) need an update at each consumer's refresh.
+- Consumers installed at `76887a8` (2026-08-22) cannot refresh because of an older takeover rule.
+- The typo-bypass allowlist in `shared/hooks/scripts/_lib-frontmatter.sh` does not exclude `.agents/*.md`.
 
 ## Backlog-Followups Client Parity
 
@@ -174,8 +180,8 @@ default (`dist/sidecar/<profile>/`); an explicit `--source` overrides that.
 The `skills` profile ships the four skills — `debug-investigator`,
 `humanize`, `ponytail`, and `ponytail-review` — plus the two bridges above.
 The `workflow` profile ships every eligible public skill (a fixed denylist
-in `scripts/runtime_ownership.py` excludes skills that need the full
-install) plus the agent, rule, instructions, review-profile, template, and
+in `shared/sidecar/workflow/skills.txt` excludes skills that need the full
+install; `scripts/runtime_ownership.py` holds the allowlist) plus the agent, rule, instructions, review-profile, template, and
 state rows above. No `.github/agents` or `.codex/agents` file ships in
 either profile: neither Copilot nor Codex has a config-free way to discover
 a custom agent from an ignored file, so those two clients get the workflow

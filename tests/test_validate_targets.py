@@ -499,16 +499,49 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     )
 
 
+# Big plan skills-and-instructions-trim, Decision 12: the budgeted policies.
+POLICY_BYTE_BUDGET_PINS = {
+    "workflow.instructions.md": 16 * 1024,
+    "workspace.instructions.md": 7680,
+    "quality-and-testing.instructions.md": 3 * 1024,
+    "tool-routing.instructions.md": 3 * 1024,
+    "closeout.instructions.md": 16 * 1024,
+    "plan-lifecycle.instructions.md": 11 * 1024,
+}
+
+
 def test_root_guidance_budget_limits_are_pinned() -> None:
     """The validator only gains checks or lowers limits: CLAUDE.md keeps its
-    200-line limit and adds 5 KiB; AGENTS.md drops from 16 KiB to 5 KiB."""
+    200-line limit and adds 5 KiB; AGENTS.md drops from 16 KiB to 5 KiB. The
+    workflow core, workspace, quality-and-testing, tool-routing, closeout, and
+    plan-lifecycle policies carry the budgets of Decision 12."""
     assert target_validator.ROOT_GUIDANCE_BUDGETS == {
         "CLAUDE.md": (("lines", 200), ("bytes", 5 * 1024)),
         "AGENTS.md": (("bytes", 5 * 1024),),
     }
-    assert target_validator.POLICY_BYTE_BUDGETS == {
-        "workflow.instructions.md": 16 * 1024
-    }
+    assert target_validator.POLICY_BYTE_BUDGETS == POLICY_BYTE_BUDGET_PINS
+
+
+@pytest.mark.parametrize(("name", "limit"), sorted(POLICY_BYTE_BUDGET_PINS.items()))
+def test_policy_budget_passes_at_the_limit_and_fails_one_byte_over(
+    name: str, limit: int
+) -> None:
+    """Every budgeted policy is accepted at exactly its limit and rejected one
+    byte over, whatever its content."""
+    assert target_validator.policy_budget_errors(name, "x" * limit) == []
+
+    errors = target_validator.policy_budget_errors(name, "x" * (limit + 1))
+
+    assert errors == [f"{name} exceeds its bytes budget of {limit}"]
+
+
+@pytest.mark.parametrize("name", sorted(POLICY_BYTE_BUDGET_PINS))
+def test_policy_budget_holds_for_the_real_shared_policy(name: str) -> None:
+    """The shared source of each budgeted policy fits its budget."""
+    assert (
+        target_validator.policy_budget_errors(name, _shared_text(f"policies/{name}"))
+        == []
+    )
 
 
 def test_root_guidance_budget_rejects_a_valid_claude_file_over_200_lines() -> None:
@@ -548,8 +581,8 @@ def test_root_guidance_budget_rejects_a_valid_file_over_5_kib(
 
 
 def test_root_guidance_budget_workflow_policy_stays_within_16_kib() -> None:
-    """The workflow core passes at exactly 16 KiB and fails one byte over. Other
-    policies have no byte budget."""
+    """The workflow core passes at exactly 16 KiB and fails one byte over. A
+    policy with no budget entry is never flagged."""
     name = "workflow.instructions.md"
     workflow = _shared_text(f"policies/{name}")
     at_limit = workflow + " " * (16 * 1024 - len(workflow.encode()))
@@ -563,6 +596,43 @@ def test_root_guidance_budget_workflow_policy_stays_within_16_kib() -> None:
         target_validator.policy_budget_errors("tests.instructions.md", "x" * 10**6)
         == []
     )
+
+
+def _memory_search_rule(text: str) -> str:
+    """Return the collapsed line or list entry that says how to search MEMORY."""
+    matches = [
+        entry
+        for entry in _list_entries(text)
+        if ".claude/MEMORY.md" in entry and "area tags" in entry
+    ]
+    assert len(matches) >= 1, "the MEMORY search rule is missing"
+    return matches[0]
+
+
+@pytest.mark.parametrize("target", ("claude-code", "openai-codex", "multi-agent"))
+def test_root_guidance_memory_sentence_searches_with_a_literal_match(
+    target: str,
+) -> None:
+    """R7: the area-tag example `[LEARN:installer]` is a regular-expression
+    character class when pasted into `grep` or `rg`, so the generated root
+    guidance says to search with `rg -F`."""
+    rule = _memory_search_rule(render_root_guidance(target))
+
+    assert "[LEARN:installer]" in rule
+    assert "rg -F" in rule
+
+
+def test_root_guidance_memory_rule_in_the_workflow_core_is_one_literal_search() -> None:
+    """R7: the core holds one full copy of the rule, in Plan-First step 1. It
+    says to search with a literal match and shows the command that lists the
+    tags in use; Context Management points to it instead of repeating it."""
+    workflow = _shared_text("policies/workflow.instructions.md")
+    rule = _memory_search_rule(workflow)
+
+    assert "rg -F" in rule
+    assert "grep -oE" in rule
+    assert workflow.count("[LEARN:installer]") == 1
+    assert workflow.count("grep -oE") == 1
 
 
 @pytest.mark.parametrize(
@@ -758,7 +828,8 @@ CLOSEOUT_FIXTURE_TAIL = (
     "step 7.**\n\n"
     "## Recovering from a stale receipt\n\n"
     "**`closeout receipt final tracked state is stale`**\n\n"
-    "**`closeout receipt governing control-plane provenance is stale`**\n"
+    "**`closeout receipt governing control-plane provenance is stale`**\n\n"
+    "**`findings report content_hash is stale`**\n"
 )
 
 
@@ -782,6 +853,28 @@ def _closeout_without_learn_path_in_step_2() -> str:
         "3. **First nested checkpoint.** Read `.claude/skills/learn/SKILL.md`. Commit",
         1,
     )
+
+
+RECOVERY_HEADING = "## Recovering from a stale receipt"
+
+
+def _closeout_with_message_moved_out_of_the_recovery_section() -> str:
+    """The fixture, with the first stale-receipt message in step 6 only."""
+    message = target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES[0]
+    text = _closeout_fixture()
+    moved = text.replace(f"**`{message}`**", "**`receipt is stale`**", 1)
+    return moved.replace("Persist it.", f"Persist it. It can print `{message}`.", 1)
+
+
+def _closeout_without_the_recovery_section() -> str:
+    """The fixture with every stale-receipt message kept outside the recovery
+    section (the first in step 6, the rest in a hard rule) and the section
+    itself removed."""
+    first, *rest = target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES
+    head = _closeout_fixture().partition(RECOVERY_HEADING)[0]
+    text = head.replace("Persist it.", f"Persist it. It prints `{first}`.", 1)
+    printed = " or ".join(f"`{message}`" for message in rest)
+    return text.replace("step 7.**\n", f"step 7.** It prints {printed}.\n", 1)
 
 
 def test_closeout_procedure_pin_accepts_a_complete_policy() -> None:
@@ -887,6 +980,19 @@ def test_closeout_procedure_pin_accepts_the_shared_closeout_policy() -> None:
             "closeout receipt governing control-plane provenance is stale",
             id="stale-message-provenance",
         ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "findings report content_hash is stale", "findings are stale", 1
+            ),
+            "missing stale-receipt message: findings report content_hash is stale",
+            id="stale-message-findings-hash",
+        ),
+        pytest.param(
+            _closeout_with_message_moved_out_of_the_recovery_section(),
+            "missing stale-receipt message: "
+            "closeout receipt final tracked state is stale",
+            id="stale-message-only-outside-the-recovery-section",
+        ),
     ),
 )
 def test_closeout_procedure_pin_rejects_each_broken_rule(
@@ -912,19 +1018,39 @@ def test_closeout_procedure_pin_does_not_credit_a_reason_written_after_step_8() 
     assert any("closeout step 8 must state its reason" in error for error in errors)
 
 
+def test_closeout_procedure_pin_needs_the_messages_inside_the_recovery_section() -> (
+    None
+):
+    """R6: the three stale-receipt messages count only inside the "Recovering
+    from a stale receipt" section. A policy that prints them in step 6 and in a
+    hard rule, with no recovery section, is rejected."""
+    text = _closeout_without_the_recovery_section()
+
+    for message in target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES:
+        assert message in text
+    assert RECOVERY_HEADING not in text
+    errors = target_validator.closeout_procedure_errors(text)
+
+    assert any("Recovering from a stale receipt" in error for error in errors), errors
+
+
 def test_closeout_procedure_pin_matches_the_messages_the_verifier_prints() -> None:
     """The pinned strings are the verifier's own, word for word."""
     assert target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES == (
         "closeout receipt final tracked state is stale",
         "closeout receipt governing control-plane provenance is stale",
+        "findings report content_hash is stale",
     )
     assert target_validator.CLOSEOUT_HARD_RULE_FRAGMENTS == (
         "Never put `git commit` in the same Bash command",
         "Never checkpoint, publish, or push nested state between step 6 and step 7",
     )
     verifier = _shared_text("scripts/verify.py")
-    for message in target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES:
+    for message in target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES[:2]:
         assert f'"{message}"' in verifier
+    # The findings message is built from the report label, so pin both parts.
+    assert 'label = "findings report"' in verifier
+    assert 'f"{label} content_hash is stale"' in verifier
 
 
 CLOSEOUT_POINTER_SURFACES = {
@@ -991,6 +1117,75 @@ def test_closeout_procedure_pointer_is_required_in_root_guidance(
         "missing mandatory root-guidance invariant: closeout.instructions.md" in error
         for error in errors
     )
+
+
+CODEX_FALLBACK_CASES = sorted(target_validator.CODEX_POLICY_SKILL_FALLBACKS.items())
+
+
+@pytest.mark.parametrize(("policy", "skill"), CODEX_FALLBACK_CASES)
+def test_codex_fallback_skill_must_name_its_mapped_policy(
+    policy: str, skill: str
+) -> None:
+    """R8: Codex has no path rules, so a fallback skill is the only route to its
+    policy. A skill that does not name the policy file fails; naming it passes."""
+    silent = f"---\nname: {skill}\n---\n\nWrite good code in every case.\n"
+    named = f"{silent}Read `.claude/instructions/{policy}` first.\n"
+
+    errors = target_validator.codex_fallback_skill_errors(policy, skill, silent)
+
+    assert errors == [f"Codex scoped-policy fallback skill {skill} must name {policy}"]
+    assert target_validator.codex_fallback_skill_errors(policy, skill, named) == []
+
+
+@pytest.mark.parametrize(("policy", "skill"), CODEX_FALLBACK_CASES)
+def test_codex_fallback_real_skill_names_its_mapped_policy(
+    policy: str, skill: str
+) -> None:
+    """Each shipped fallback skill names its policy; `bentoml-service` is the
+    route for two policies and names both."""
+    text = _shared_text(f"skills/{skill}/SKILL.md")
+
+    assert target_validator.codex_fallback_skill_errors(policy, skill, text) == []
+    assert f".claude/instructions/{policy}" in text
+
+
+def test_codex_fallback_bentoml_service_routes_both_service_policies() -> None:
+    routed = {
+        policy for policy, skill in CODEX_FALLBACK_CASES if skill == "bentoml-service"
+    }
+
+    assert routed == {
+        "api-service-standards.instructions.md",
+        "deployment.instructions.md",
+    }
+
+
+@pytest.mark.parametrize("names_policy", (True, False))
+def test_codex_fallback_is_checked_on_the_generated_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, names_policy: bool
+) -> None:
+    """The policy-adapter validation reads each generated fallback skill's text,
+    not only its existence."""
+    dist = REPO_ROOT / "dist" / "multi-agent"
+    if not dist.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    copy = tmp_path / "multi-agent"
+    shutil.copytree(dist, copy, symlinks=True)
+    mention = (
+        "Read `.claude/instructions/config-first-design.instructions.md`.\n"
+        if names_policy
+        else ""
+    )
+    (copy / ".claude" / "skills" / "hydra-config" / "SKILL.md").write_text(
+        f"---\nname: hydra-config\n---\n\n{mention}", encoding="utf-8"
+    )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", copy)
+    errors: list[str] = []
+
+    target_validator.validate_policy_adapters(errors)
+
+    hydra_errors = [error for error in errors if "hydra-config" in error]
+    assert bool(hydra_errors) is not names_policy, hydra_errors
 
 
 def test_record_findings_out_pattern_clears_the_canonical_invocations() -> None:
@@ -3737,8 +3932,7 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
 #     for TARGET_ROOT-scoped tests), and (2) the Phase A/B content
 #     corrections, which are prose facts re-verified by targeted textual or
 #     structural assertions - not runtime behavior - except where an existing
-#     executable helper already provides real execution coverage (noted
-#     below).
+#     executable helper already provides real execution coverage.
 
 
 def test_shared_skill_integrity_errors_accepts_the_real_skill_library() -> None:
@@ -3775,6 +3969,91 @@ def test_skill_frontmatter_yaml_errors_accepts_well_formed_frontmatter() -> None
     assert (
         skill_frontmatter_yaml_errors(Path("shared/skills/ok/SKILL.md"), raw_text) == []
     )
+
+
+LONG_TEXT = " ".join(["word"] * 80)  # 399 characters, over the 300 cap
+
+
+def _listing_frontmatter(key: str, value: str) -> str:
+    """A skill frontmatter whose `key` holds `value`; `when_to_use` needs a
+    short description beside it."""
+    short = "description: Short text.\n" if key == "when_to_use" else ""
+    return (
+        f"---\nname: broken\nvisibility: public\n{short}{key}: {value}\n---\n\nBody\n"
+    )
+
+
+# YAML forms the cap cannot measure by joining the block lines: each is over
+# 300 characters, and the check must reject it instead of undercounting it.
+UNMEASURABLE_LISTING_FORMS = (
+    pytest.param(f"|+\n  {LONG_TEXT}\n", "|+", id="keep-block-header"),
+    pytest.param(f">2\n  {LONG_TEXT}\n", ">2", id="indent-indicator-header"),
+    pytest.param(f"| # comment\n  {LONG_TEXT}\n", "| # comment", id="header-comment"),
+    pytest.param(f"First line.\n  {LONG_TEXT}\n", "plain value", id="plain-continued"),
+    pytest.param(
+        f"First line.\n\n  {LONG_TEXT}\n", "plain value", id="plain-after-blank-line"
+    ),
+    pytest.param(
+        f'"First line.\n  {LONG_TEXT}"\n', "quoted value", id="double-quoted-continued"
+    ),
+    pytest.param(
+        f"'First line.\n  {LONG_TEXT}'\n", "quoted value", id="single-quoted-continued"
+    ),
+)
+
+
+@pytest.mark.parametrize("key", ("description", "when_to_use"))
+@pytest.mark.parametrize(("value", "form"), UNMEASURABLE_LISTING_FORMS)
+def test_frontmatter_yaml_rejects_a_listing_form_the_cap_cannot_measure(
+    key: str, value: str, form: str
+) -> None:
+    """R9: `description` and `when_to_use` must use a form whose length the cap
+    measures. The error names the key and the form."""
+    assert len(value) > SKILL_DESCRIPTION_MAX_CHARS
+
+    errors = skill_frontmatter_yaml_errors(
+        Path("shared/skills/broken/SKILL.md"), _listing_frontmatter(key, value)
+    )
+
+    assert len(errors) == 1, errors
+    assert "SKILL_FRONTMATTER_INVALID" in errors[0]
+    assert f"'{key}'" in errors[0]
+    assert form in errors[0]
+
+
+@pytest.mark.parametrize("key", ("description", "when_to_use"))
+@pytest.mark.parametrize(
+    "value",
+    (
+        pytest.param(f"|\n  {LONG_TEXT}\n", id="literal-block"),
+        pytest.param(f">\n  {LONG_TEXT}\n", id="folded-block"),
+        pytest.param(f"|-\n  {LONG_TEXT}\n", id="literal-strip-block"),
+        pytest.param(f">-\n  {LONG_TEXT}\n", id="folded-strip-block"),
+        pytest.param(f"{LONG_TEXT}\n", id="plain-one-line"),
+        pytest.param(f'"{LONG_TEXT}"\n', id="double-quoted-one-line"),
+        pytest.param(f"'{LONG_TEXT}'\n", id="single-quoted-one-line"),
+        pytest.param(f'"{LONG_TEXT}" # note\n', id="quoted-with-trailing-comment"),
+        pytest.param(f"{LONG_TEXT}\n  # indented comment\n", id="plain-then-comment"),
+    ),
+)
+def test_frontmatter_yaml_accepts_the_listing_forms_the_cap_measures(
+    key: str, value: str
+) -> None:
+    errors = skill_frontmatter_yaml_errors(
+        Path("shared/skills/ok/SKILL.md"), _listing_frontmatter(key, value)
+    )
+
+    assert errors == []
+
+
+def test_frontmatter_yaml_accepts_every_real_skill() -> None:
+    """The 37 shipped skills use only the measurable forms."""
+    skills = sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md"))
+
+    assert len(skills) >= 37
+    for skill in skills:
+        errors = skill_frontmatter_yaml_errors(skill, skill.read_text(encoding="utf-8"))
+        assert errors == [], skill
 
 
 @pytest.mark.parametrize(
@@ -5383,7 +5662,7 @@ def test_loading_rules_coder_tier_one_is_ponytail_and_a_conditional_tests_read()
     None
 ):
     """Phase C: only Ponytail loads on every task; the tests policy is read
-    when the task adds or changes a test file."""
+    when the task adds or changes a test file or fixes a bug (R8)."""
     coder = _read_shared({"coder": "agents/coder/prompt.md"})["coder"]
     tier_one = re.search(
         r"\*\*Tier 1[^\n]*\n(.*?)\*\*Tier 2",
@@ -5401,6 +5680,30 @@ def test_loading_rules_coder_tier_one_is_ponytail_and_a_conditional_tests_read()
     assert len(tests_reads) == 1
     assert ".claude/instructions/tests.instructions.md" in tests_reads[0]
     assert re.search(r"\b(when|if)\b", tests_reads[0], re.IGNORECASE)
+    assert re.search(r"\bbug\b", tests_reads[0], re.IGNORECASE), tests_reads[0]
+
+
+def test_loading_rules_coder_reads_code_standards_when_editing_python_source() -> None:
+    """R8: Codex has no path rules, so the coder reads the code-standards policy
+    itself when the task edits Python source. It stays out of Tier 1's skills."""
+    coder = _read_shared({"coder": "agents/coder/prompt.md"})["coder"]
+    tier_one = re.search(
+        r"\*\*Tier 1[^\n]*\n(.*?)\*\*Tier 2",
+        _section(coder, SKILLS_FIRST_RULE),
+        re.DOTALL,
+    )
+
+    assert tier_one is not None, "the coder's Tier 1 block is missing"
+    standards_reads = [
+        entry
+        for entry in _list_entries(tier_one.group(1))
+        if "code-standards.instructions.md" in entry
+    ]
+    assert len(standards_reads) == 1
+    assert ".claude/instructions/code-standards.instructions.md" in standards_reads[0]
+    assert re.search(r"\b(when|if)\b", standards_reads[0], re.IGNORECASE)
+    assert "Python" in standards_reads[0]
+    assert not re.search(r"[\w-]+/SKILL\.md", standards_reads[0])
 
 
 @pytest.mark.parametrize("surface", ["claude", "codex"])

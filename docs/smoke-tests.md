@@ -148,10 +148,12 @@ Expected:
   neither a Claude conditional rule nor a Copilot `applyTo` field.
 - Codex generates no `.codex/rules/` and no nested `AGENTS.md` for the current
   mixed/glob/file-specific policy scopes. Their non-widening fallback is the
-  corresponding enabled `.claude/skills/` workflow.
+  corresponding enabled skill; Codex reads its `.agents/skills/` copy.
 - The root `AGENTS.md` stays at or below 5 KiB, well under Codex's default
   32 KiB combined project guidance limit, and `CLAUDE.md` stays at or below
-  200 lines and 5 KiB. The workflow policy stays at or below 16 KiB.
+  200 lines and 5 KiB. `POLICY_BYTE_BUDGETS` in `scripts/validate_targets.py`
+  caps six policies: workflow and closeout at 16 KiB, plan-lifecycle at 11 KiB,
+  workspace at 7,680 bytes, and quality-and-testing and tool-routing at 3 KiB.
 - These are structural generation checks. Real Claude, Codex, and Copilot
   adapter-loading probes are covered by `scripts/check_native_clients.py`.
 - In particular, these checks do not prove current native Codex routing for all
@@ -273,6 +275,9 @@ It does not prove model tier or the formal automatic escalation contract.
 tier proof, bounded Flash-only task, skill discovery or use, specialist MCP,
 or PreToolUse hard-deny execution was completed. This remains an external
 acceptance gap/blocker.
+
+This native evidence predates the one-line orchestrator pointer in `AGENTS.md`.
+No native run has yet observed Antigravity following that pointer.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms. Creating an implementation branch also runs the plan-frontmatter validator on the big plan and its listed phase files, and denies with the first errors; an unrelated draft plan does not block.
 - The `add-dependency` deprecation check keeps pytest's exit status, and `scripts/validate_targets.py` rejects shipped `pytest`, `mypy`, `ruff`, or `verify.py` lines that end in `|| true`, `|| :`, or `|| echo`.
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh findings report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.

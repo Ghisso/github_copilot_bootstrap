@@ -301,8 +301,8 @@ schema-v2/schema-v3 receipts, but those receipts cannot authorize current
 schema-v4 gates: `verify.py` fails closed on a schema mismatch (a clear
 "unsupported schema_version" error, never a silent pass or a crash) rather
 than accepting or bypassing them. Recovery needs no manual receipt edit or
-gate bypass — step 1 below regenerates a valid current-schema phase receipt
-at its normal deterministic path.
+gate bypass — CLOSEOUT step 4 in `.claude/instructions/closeout.instructions.md`
+regenerates a valid current-schema phase receipt at its normal deterministic path.
 
 Phases completed before 2026-08-29 need no backfilled closeout receipts. The
 commit, push, and PR gates skip a plan's leading run of complete phases whose slug
@@ -1253,7 +1253,7 @@ guidance. Codex discovers `AGENTS.md` from the repository root to the current
 working directory; closer files take precedence, and the combined project
 guidance limit defaults to 32 KiB. Generate nested `AGENTS.md` only where a
 policy owns one stable concrete directory. Mixed, file-specific, or glob scopes
-use the corresponding `.claude/skills/` workflow instead, so the root guidance
+use the corresponding fallback skill instead (Codex reads its `.agents/skills/` copy), so the root guidance
 budget is not widened speculatively. See [Codex AGENTS.md
 guidance](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
@@ -1530,6 +1530,6 @@ If you customize it, prioritize:
 - preserving the PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
-- treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
+- treating terse-mode as an opt-in guardrailed tool, not blanket rewrites of source-of-truth customization files
 
 See [plans/adr-001-multi-target-lcd.md](plans/adr-001-multi-target-lcd.md) for the recorded decision behind supporting Copilot, Claude, and Codex from one shared basis instead of native Claude plugin packaging, and [plans/adr-002-git-backed-state-sync.md](plans/adr-002-git-backed-state-sync.md) for why AI state syncs through a nested git repository instead of a Hugging Face bucket.

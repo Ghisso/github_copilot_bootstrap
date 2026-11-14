@@ -399,10 +399,18 @@ ROOT_GUIDANCE_BUDGETS = {
     "CLAUDE.md": (("lines", 200), ("bytes", 5 * 1024)),
     "AGENTS.md": (("bytes", 5 * 1024),),
 }
-# Byte budgets for policies in `shared/policies/` that agents read before real
-# work. The closeout and plan-lifecycle sections live in their own files so the
-# workflow core stays under its budget.
-POLICY_BYTE_BUDGETS = {"workflow.instructions.md": 16 * 1024}
+# Byte budgets for the policies in `shared/policies/` that the skills-and-
+# instructions-trim plan cut (its Decision 12). The workflow core has its own
+# budget because the closeout and plan-lifecycle sections live in their own
+# files. A policy with no entry has no budget.
+POLICY_BYTE_BUDGETS = {
+    "workflow.instructions.md": 16 * 1024,
+    "workspace.instructions.md": 7680,
+    "quality-and-testing.instructions.md": 3 * 1024,
+    "tool-routing.instructions.md": 3 * 1024,
+    "closeout.instructions.md": 16 * 1024,
+    "plan-lifecycle.instructions.md": 11 * 1024,
+}
 ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS = {
     "CLAUDE.md": ("`.claude/hooks/`", "`.github/hooks/`"),
     "AGENTS.md": ("`.codex/`", "`.github/hooks/`"),
@@ -636,7 +644,8 @@ CODEX_POLICY_SKILL_FALLBACKS = {
 }
 # Claude Code lists every skill's description (plus `when_to_use`) each turn and
 # truncates the list past its budget (big plan skills-and-instructions-trim,
-# Decision 1). The two exempt skills are the always-on coding rules.
+# Decision 1). The two exempt skills are exempt because their text is
+# hash-pinned to upstream, not because both are always on.
 SKILL_DESCRIPTION_MAX_CHARS = 300
 SKILL_DESCRIPTION_CAP_EXEMPT = frozenset({"ponytail", "ponytail-review"})
 
@@ -926,11 +935,16 @@ CLOSEOUT_HARD_RULE_FRAGMENTS = (
     "Never put `git commit` in the same Bash command",
     "Never checkpoint, publish, or push nested state between step 6 and step 7",
 )
-# The two messages `verify.py closeout` prints for a stale receipt
-# (`shared/scripts/verify.py`). Operators search for them word for word.
+# The messages the commit gate prints for stale receipt state
+# (`shared/scripts/verify.py`). Operators search for them word for word. Each
+# must appear in the recovery section, not only in a step or a hard rule.
 CLOSEOUT_STALE_RECEIPT_MESSAGES = (
     "closeout receipt final tracked state is stale",
     "closeout receipt governing control-plane provenance is stale",
+    "findings report content_hash is stale",
+)
+CLOSEOUT_RECOVERY_HEADING_PATTERN = re.compile(
+    r"^(#{2,3}) Recovering from a stale receipt[ \t]*$", re.MULTILINE
 )
 CLOSEOUT_POINTER = "closeout.instructions.md"
 CLOSEOUT_STALE_POINTER_FRAGMENTS = (
@@ -963,6 +977,13 @@ def closeout_procedure_steps(section: str) -> list[tuple[int, str]]:
     return [(number, "\n".join(body)) for number, body in steps]
 
 
+def markdown_section(text: str, heading: re.Match[str]) -> str:
+    """Return the text under ``heading``, up to the next heading of its level or higher."""
+    rest = text[heading.end() :]
+    next_heading = re.search(rf"^#{{1,{len(heading.group(1))}}} ", rest, re.MULTILINE)
+    return rest[: next_heading.start()] if next_heading else rest
+
+
 def closeout_procedure_errors(text: str) -> list[str]:
     """Return failures for the CLOSEOUT procedure in the closeout policy."""
     errors: list[str] = []
@@ -972,13 +993,7 @@ def closeout_procedure_errors(text: str) -> list[str]:
             "closeout policy must contain exactly one CLOSEOUT procedure heading, "
             f"found {len(headings)}"
         )
-    section = ""
-    if headings:
-        rest = text[headings[0].end() :]
-        next_heading = re.search(
-            rf"^#{{1,{len(headings[0].group(1))}}} ", rest, re.MULTILINE
-        )
-        section = rest[: next_heading.start()] if next_heading else rest
+    section = markdown_section(text, headings[0]) if headings else ""
     steps = closeout_procedure_steps(section)
     numbers = [number for number, _body in steps]
     if numbers != list(range(1, CLOSEOUT_STEP_COUNT + 1)):
@@ -995,8 +1010,16 @@ def closeout_procedure_errors(text: str) -> list[str]:
     for fragment in CLOSEOUT_HARD_RULE_FRAGMENTS:
         if fragment not in text:
             errors.append(f"closeout policy is missing hard rule: {fragment}")
+    recoveries = list(CLOSEOUT_RECOVERY_HEADING_PATTERN.finditer(text))
+    if len(recoveries) != 1:
+        errors.append(
+            "closeout policy must contain exactly one 'Recovering from a stale "
+            f"receipt' section, found {len(recoveries)}"
+        )
+        return errors
+    recovery = markdown_section(text, recoveries[0])
     for message in CLOSEOUT_STALE_RECEIPT_MESSAGES:
-        if message not in text:
+        if message not in recovery:
             errors.append(
                 f"closeout policy is missing stale-receipt message: {message}"
             )
@@ -1297,6 +1320,18 @@ def copilot_instruction_paths(text: str) -> tuple[str, ...]:
     return ()
 
 
+def codex_fallback_skill_errors(
+    policy_name: str, skill_name: str, skill_text: str
+) -> list[str]:
+    """Return a failure when a Codex fallback skill never names its policy file.
+
+    Codex has no path rules, so the skill is its only route to the policy.
+    """
+    if policy_name in skill_text:
+        return []
+    return [f"Codex scoped-policy fallback skill {skill_name} must name {policy_name}"]
+
+
 def requires_codex_skill_fallback(patterns: tuple[str, ...]) -> bool:
     """Return whether directory-scoped AGENTS.md would widen this policy's scope."""
     return len(patterns) != 1 or not re.fullmatch(r"[^*?]+/\*\*", patterns[0])
@@ -1461,11 +1496,17 @@ def validate_policy_adapters(errors: list[str]) -> None:
             errors,
         )
         skill_name = CODEX_POLICY_SKILL_FALLBACKS[policy.source.name]
-        check(
-            (TARGET_ROOT / ".claude" / "skills" / skill_name / "SKILL.md").exists(),
-            f"Codex scoped-policy fallback skill is missing: {skill_name}",
-            errors,
-        )
+        skill_path = TARGET_ROOT / ".claude" / "skills" / skill_name / "SKILL.md"
+        if skill_path.exists():
+            errors.extend(
+                codex_fallback_skill_errors(
+                    policy.source.name, skill_name, read(skill_path)
+                )
+            )
+        else:
+            errors.append(
+                f"Codex scoped-policy fallback skill is missing: {skill_name}"
+            )
 
     nested_agents = [
         path
@@ -8552,13 +8593,17 @@ def extract_frontmatter_description(frontmatter: str) -> str:
     return extract_frontmatter_scalar(frontmatter, "description")
 
 
+LISTING_KEYS = ("description", "when_to_use")
+LISTING_BLOCK_HEADERS = ("|", ">", "|-", ">-")
+
+
 def extract_frontmatter_scalar(frontmatter: str, key: str) -> str:
     lines = frontmatter.splitlines()
     for index, line in enumerate(lines):
         if not line.startswith(f"{key}:"):
             continue
         rest = line[len(key) + 1 :].strip()
-        if rest in ("|", ">", "|-", ">-", ""):
+        if rest in (*LISTING_BLOCK_HEADERS, ""):
             # A blank line does NOT end a YAML block scalar - only a
             # less-indented (or EOF) line does. Treating an empty `follow`
             # as "end of block" would silently truncate the description at
@@ -8598,13 +8643,39 @@ def extract_frontmatter_name(frontmatter: str) -> str:
     return ""
 
 
+def listing_scalar_form_error(key: str, value: str, following: list[str]) -> str:
+    """Return why a listing key's form is one the cap cannot measure, or "".
+
+    ``extract_frontmatter_scalar`` joins the lines of a plain `|`, `>`, `|-`, or
+    `>-` block and reads a one-line plain or quoted value. Any other form would
+    be counted short, so it is rejected instead of measured. ``following`` is
+    the frontmatter after the key's line.
+    """
+    if value[:1] in ("|", ">"):
+        if value in LISTING_BLOCK_HEADERS:
+            return ""
+        return f"'{key}' uses the block header {value!r}; use only |, >, |-, or >-"
+    if not value:
+        return ""
+    quote = value[0]
+    if quote in ("'", '"'):
+        closed = r"'(?:[^']|'')*'" if quote == "'" else r'"(?:[^"\\]|\\.)*"'
+        if not re.fullmatch(rf"{closed}\s*(?:#.*)?", value):
+            return f"'{key}' continues a quoted value on the next line; use a | block"
+    next_line = next((line for line in following if line.strip()), "")
+    if next_line[:1] in (" ", "\t") and not next_line.lstrip().startswith("#"):
+        return f"'{key}' continues a plain value on the next line; use a | block"
+    return ""
+
+
 def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
     """Hard rule (R-SKILL-01): SKILL.md frontmatter must be well-formed YAML in
     the flat `key: value` (or `key: |` block-scalar) schema every shared skill
     already uses - matched `---` delimiters, no tabs, no duplicate top-level
-    keys. This is a structural check, not a full YAML parser, mirroring the
-    same minimal schema `generate_targets.parse_policy` enforces for policy
-    frontmatter."""
+    keys. The `description` and `when_to_use` values must also use a form the
+    listing cap can measure (`listing_scalar_form_error`). This is a structural
+    check, not a full YAML parser, mirroring the same minimal schema
+    `generate_targets.parse_policy` enforces for policy frontmatter."""
     parts = raw_text.split("---\n", 2)
     if not raw_text.startswith("---\n") or len(parts) != 3:
         return [
@@ -8619,7 +8690,8 @@ def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
             "contain tab characters"
         )
     seen_keys: set[str] = set()
-    for line in frontmatter.splitlines():
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
         if not line or line[0] in (" ", "\t"):
             continue  # blank line, or block-scalar/list continuation
         if ":" not in line:
@@ -8628,13 +8700,20 @@ def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
                 f"line: {line!r}"
             )
             continue
-        key = line.split(":", 1)[0].strip()
+        key, _, value = line.partition(":")
+        key = key.strip()
         if key in seen_keys:
             errors.append(
                 f"{skill_path}: SKILL_FRONTMATTER_INVALID - duplicate "
                 f"frontmatter key: {key}"
             )
         seen_keys.add(key)
+        if key in LISTING_KEYS:
+            form_error = listing_scalar_form_error(
+                key, value.strip(), lines[index + 1 :]
+            )
+            if form_error:
+                errors.append(f"{skill_path}: SKILL_FRONTMATTER_INVALID - {form_error}")
     return errors
 
 

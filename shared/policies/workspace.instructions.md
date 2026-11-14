@@ -15,7 +15,7 @@ Always use `uv`. Run every Python command through `uv run`, add dependencies wit
 
 - Plan first when plan creation is needed for non-trivial work; an approved implementation-ready plan follows the conditional planner route in `workflow.instructions.md`.
 - Search before writing new code. Prefer config-first design for new features.
-- Before writing, fixing, refactoring, or designing code, read `.claude/skills/ponytail/SKILL.md` and apply it in `full` mode once per coding task during IMPLEMENT (coder discipline, not a lifecycle phase).
+- Before writing, fixing, refactoring, or designing code, read `.claude/skills/ponytail/SKILL.md` and apply it in `full` mode once per coding task during IMPLEMENT.
 - Keep hook guardrails enabled. Capture reusable lessons in `.claude/MEMORY.md`.
 - Hooks block edits to secret-bearing files (`.env*`, `*.pem`, `*.key`, `*secret*`, `credentials*`) and `uv.lock`, and block destructive Git commands (`git push --force`/`-f`, `git reset --hard`, `git clean -fd`, `git branch -D main`/`master`). If asked to change or run one, stop and explain why it is protected.
 
@@ -41,7 +41,7 @@ Relevant files under `.claude/instructions/`:
 |---|---|
 | `workflow.instructions.md` | Task Lanes, plan first, branches, orchestrator loop |
 | `closeout.instructions.md` | CLOSEOUT steps, through commit and push |
-| `plan-lifecycle.instructions.md` | Future phases, pause, cancel, reopen |
+| `plan-lifecycle.instructions.md` | Future phases, pause, cancel, reopen, knowledge-refresh final phase |
 | `quality-and-testing.instructions.md` | Verification commands, severity gates, findings |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, context-mode |
 | `code-standards`, `tests`, `config-first-design`, `api-service-standards`, `deployment` (each `.instructions.md`) | Path-scoped rules |
@@ -54,7 +54,7 @@ Classify work with the single authoritative **Task Lanes** table in `workflow.in
 orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout
 ```
 
-Control-plane files include root guidance (`CLAUDE.md`, `AGENTS.md`), `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.agents/`, `.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`. They always use the full control-plane/high-risk lane. The commit gate is wider: it treats every tracked path under `.claude/`, `.codex/`, `.agents/`, `.github/`, and `.devcontainer/` as control plane.
+Control-plane files include root guidance (`CLAUDE.md`, `AGENTS.md`), `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.agents/`, `.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`. They always use the full control-plane/high-risk lane. The commit gate is wider: it also treats `shared/` and every tracked path under `.claude/`, `.codex/`, `.agents/`, `.github/`, and `.devcontainer/` as control plane.
 
 ## Agents
 

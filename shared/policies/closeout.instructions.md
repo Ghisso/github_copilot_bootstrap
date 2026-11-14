@@ -9,7 +9,7 @@ Read this file in full when you enter CLOSEOUT, and follow it step by step. The
 workflow policy (`.claude/instructions/workflow.instructions.md`) says when
 CLOSEOUT starts. This file is the only place that lists the order. The
 orchestrator prompt, the `commit` skill, the `code-review` skill, README, and
-the plan templates point here and do not restate it.
+the small-plan and session-log templates point here and do not restate it.
 
 ## CLOSEOUT procedure
 
@@ -20,14 +20,14 @@ skipped.
 
 1. **Documentation.** Update `README.md` and `docs/` for changed public behaviour (delegate to `documenter` unless the change is pure-internal; then record the reason and pass it to step 6). When the phase is the big plan's last entry in `phases:`, also run the standing final-phase audit below. *Why first:* findings and receipts bind the final code and docs.
 2. **Final AI state.** Read `.claude/skills/learn/SKILL.md` and route each lesson from this phase: to a project skill (a `.claude/skills/<name>/` folder with an empty `.project-skill` file), to a `.claude/MEMORY.md` entry, or to none. Record each lesson as a `[LEARN:category]` entry in the session log, or write the exact no-lessons marker. Then set the small plan to `status: complete` with `closeout_session_log:` filled in and every step box ticked; tick the phase in the big plan; write the `.claude/MEMORY.md` entries; write the session log's `## Verification` section for optional items. Leave the required-items summary lines for step 4. *Why here:* the receipts bind the plan files, the session log, and the `.claude/` runtime files, including any skill you create now, so none of them may change after this step except the log's `## Verification` lines and `**Status:**` at step 4.
-3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`. Use this form: the file-protection hook denies `bash .claude/hooks/scripts/state-sync.sh checkpoint` from an agent's Bash tool. *Why here:* `verify closeout` refuses to run at all while the big plan's bytes are not retrievable from nested Git, and the push gate later re-derives the plan digest from the bytes Git holds.
+3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`. Use this form: the file-protection hook denies `bash .claude/hooks/scripts/state-sync.sh checkpoint` from an agent's Bash tool. *Why here:* `verify closeout` refuses to produce a passing receipt while the big plan's bytes are not retrievable from nested Git, and the push gate later re-derives the plan digest from the bytes Git holds.
 4. **Stage, findings, phase receipt, closeout dry run.** In one Bash command that contains no `git commit`:
    - `git add` the intended outer files (never `git add -A`; never `openwiki/.run.json`) and inspect `git diff --cached`. *Why before findings:* the findings report records `dirty: true` when any tracked change is unstaged, and receipts bind `git write-tree` on the index.
    - Give every surviving MINOR an explicit `disposition` and non-empty `reason`, then `uv run python .claude/scripts/record_findings.py . --findings-json - --phase <current_phase> --profile <name>... --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json`, one `--profile` per reviewed profile, the reviewer's Gate Result as `--gate-result`, and one `--open-request` per open request. The recorder refuses `PASS` with an open request, and the commit gate accepts only `PASS` with no open request. When the findings text names a protected path, write the findings JSON with the Write tool to a scratch file and pass `--findings-json <file>`, because the guard denies heredoc text that names a protected path.
    - `uv run python .claude/scripts/verify.py phase --format json --persist`.
    - `uv run python .claude/scripts/verify.py closeout --format text` **without** `--persist`. It needs the findings report and the phase receipt to exist, runs the plan's required `## Verification` items, and prints one summary line per item. Paste those lines into the session log's `## Verification` section and set `**Status:** COMPLETED`. If any item is not `PASS`, return to IMPLEMENT.
 5. **Second nested checkpoint.** Same command as step 3. *Why here:* the closeout receipt hashes the session log, so the log must be final and checkpointed before the receipt exists. Findings and receipt files are not provenance-bound, so having them in this checkpoint is expected.
-6. **Closeout receipt.** `uv run python .claude/scripts/verify.py closeout --format json --persist` (add `--documentation-na "<reason>"` only when documentation is explicitly not applicable). A receipt made before staging is rejected at commit with `closeout receipt final tracked state is stale`. *Why last:* the receipt binds the staged tree, the phase receipt, the findings report, the session log, and the governing control-plane state, so everything it covers must be final first.
+6. **Closeout receipt.** `uv run python .claude/scripts/verify.py closeout --format json --persist` (add `--documentation-na "<reason>"` only when documentation is explicitly not applicable). A receipt made before staging is rejected at commit with `closeout receipt final tracked state is stale`. *Why after steps 2 to 5:* the receipt binds the staged tree, the phase receipt, the findings report, the session log, and the governing control-plane state, so everything it covers must be final first.
 7. **Commit.** `git commit` in its **own** Bash command, after step 6 has finished. The `post-commit` hook checkpoints and publishes nested state; do not do that yourself. *Why alone:* the commit gate reads the Bash command's text before it runs and checks the receipts that exist at that moment.
 8. **Push.** One normal non-force push: `GIT_TERMINAL_PROMPT=0 git push` when the branch has an upstream, otherwise `GIT_TERMINAL_PROMPT=0 git push -u origin HEAD` when `origin` exists. A missing remote or an authentication or network failure is a warning, not a failure: keep the local commit and do not retry interactively. *Why after the commit:* the push gate checks the pushed commit against the receipt and findings made before it (the receipt's `head_sha` must be that commit's direct parent), so nothing can be pushed until step 7 has made the commit. This push is separate from the nested `ai-state` sync that the `post-commit` hook runs. PR creation and merge stay the user's decision.
 
@@ -40,13 +40,15 @@ The reviewer does not persist findings; the coder does not create receipts; the 
 
 ## Completion-commit gate
 
-A normal completion commit needs all of these:
+A normal completion commit needs all of these review conditions:
 
 - a passing `verify phase`/`verify closeout` receipt;
 - a matching findings report with `counts.critical == 0` and `counts.major == 0`;
 - an explicit disposition and a non-empty reason on every surviving MINOR;
 - the reviewer's recorded `gate_result` of `PASS` with no open request;
 - every review profile the changed paths require.
+
+The gate also checks that the small plan is `complete` with `closeout_session_log`, the log's status and `## [LEARN] Entries` section, the final-phase audit section, the plan frontmatter checks, and every optional item's outcome.
 
 Severity contract: CRITICAL and MAJOR both block the phase-completion commit,
 not only push or PR. A surviving MINOR needs a disposition and a reason, and is
@@ -113,10 +115,13 @@ invalidated (not only this plan's own changes), and correct or supersede each
 one. The live-advice surfaces are root guidance (`CLAUDE.md`, `AGENTS.md`,
 `README.md`), active plans, `docs/` except dated documents, the canonical
 policy, skill, template, agent, and review-profile source, the state READMEs,
-and `.claude/MEMORY.md`. Archived plans, dated design narratives, and closed
-session logs are dated records and stay unchanged; write a sibling
-`<log-name>.errata.md` only where a closed log's entry would actively mislead
-a reader and no closeout receipt binds that log. Record the audited surfaces and each one's outcome
+`.claude/MEMORY.md`, the project context file
+(`.claude/instructions/project-context.instructions.md`), `.github/`, and
+`openwiki/` (fix a generated page only through OpenWiki's tools). Archived
+plans, dated design narratives, and closed session logs are dated records and
+stay unchanged. Where a closed log's entry would actively mislead a reader,
+write a sibling `<log-name>.errata.md`, whether or not a closeout receipt binds
+that log; the closed log itself never changes. Record the audited surfaces and each one's outcome
 under a `## Stale-claims surfaces checked` heading in that phase's closeout
 session log, the same heading the conditional review uses.
 
@@ -133,15 +138,22 @@ section exists and is not empty, not the correctness of its judgement, like the
 Use this only before step 7 succeeds. After the completion commit, never
 re-persist that phase's receipts. A new passing receipt replaces the old one
 for the same phase, so repeating a step is safe. Never edit a receipt by hand.
+When only receipt state went stale and no code changed, these recoveries are
+the exception to the FIX LOOP rule in the workflow policy.
 
 **`closeout receipt final tracked state is stale`**
 
-- What changed: the receipt records the Git tree of the staged index (`git write-tree`) as it stood at step 6. The commit gate computes it again and refuses the commit when the two differ. Any change to the index after step 6 (staging, unstaging, or restaging a file) does this, even for a documentation file; an unstaged working-tree edit alone does not. A receipt made before staging finished does the same. The push gate gives the same error when the pushed commit's tree differs from the receipt's.
+- What changed: the receipt records the Git tree of the staged index (`git write-tree`) as it stood at step 6. The commit gate computes it again and refuses the commit when the two differ. Any change to the index after step 6 (staging, unstaging, or restaging a file) does this, even for a documentation file. An unstaged working-tree edit does not change the index, so it does not stale this receipt; it does stale the findings report (see the third entry). A receipt made before staging finished does the same. The push gate gives the same error when the pushed commit's tree differs from the receipt's.
 - What to repeat: stage the intended files again as in step 4 (`git add` them and inspect `git diff --cached`).
-  - If the late change is documentation only (`README.md`, `docs/`, or another `.md` or `.rst` file outside `shared/` and the control-plane paths), repeat step 6 only. The phase receipt and findings do not cover documentation.
+  - If the late change is documentation only (`README.md`, `docs/`, or another `.md` or `.rst` file outside `shared/` and the control-plane paths), the phase receipt stays valid, because its content hash skips ordinary documentation. The findings report does not: its `content_hash` covers every tracked change from the merge base, documentation and unstaged edits included. Re-record the findings with the step 4 recorder command, repeat step 5 only if the session log changed, then repeat step 6. Do not rerun the closeout dry run: the gate never compares the log's summary lines, and step 6 runs every required item again.
   - If it touched anything else (code, tests, scripts, `shared/`, configuration), the findings report and the phase receipt are stale too. Return to the FIX LOOP so verification and review restart, then repeat steps 4, 5, and 6.
 
 **`closeout receipt governing control-plane provenance is stale`**
 
-- What changed: the receipt records the governing state as it stood at step 6: the `.claude/` runtime files (hooks, scripts, instructions, skills, agents, templates), the root adapters, the big plan, the current small plan, and the nested Git state of those files. It does not cover `MEMORY.md`, `explorations/`, `session_logs/`, `quality_reports/`, `settings.local.json`, or `instructions/project-context.instructions.md`. The gate computes the state again at commit, and any difference stales the receipt. A nested commit that changes only those uncovered files does not, because the nested HEAD is not compared. Breaking the second hard rule can cause it, and so can a plan, skill, runtime file, or root adapter changed after the receipt. Find the change with `git -C .claude status` and `git -C .claude log -3 --stat`.
+- What changed: the receipt records the governing state as it stood at step 6: the `.claude/` runtime files (hooks, scripts, instructions, skills, agents, templates), the root adapters, the big plan, every small plan the big plan lists in `phases:` (a future phase's plan included), and the nested Git state of those files. It does not cover `MEMORY.md`, `explorations/`, `session_logs/`, `quality_reports/`, `settings.local.json`, or `instructions/project-context.instructions.md`. The gate computes the state again at commit, and any difference stales the receipt. A nested commit that changes only those uncovered files does not, because the nested HEAD is not compared. Breaking the second hard rule can cause it, and so can a plan, skill, runtime file, or root adapter changed after the receipt. Revise a future phase's plan before step 3 or after the commit, not between them. Find the change with `git -C .claude status` and `git -C .claude log -3 --stat`.
 - What to repeat: make the change final first (go back to step 2 for a plan or lesson file, or to the FIX LOOP for a runtime change), then repeat steps 3, 4, 5, and 6 in order. The phase receipt records the same state, and `verify closeout` fails while the phase receipt differs from the current state, so step 4 must run again.
+
+**`findings report content_hash is stale`**
+
+- What changed: the findings report records a hash of the tracked changes from the merge base (`git diff <merge base>`, working tree included) as they stood when step 4 recorded it. The commit gate computes it again. Any tracked change after that, staged or not, documentation or code, makes the two differ.
+- What to repeat: inspect `git diff` and `git diff --cached`. If the change was not intended, undo it (for example `git restore <path>` for an unstaged edit); nothing needs redoing. If it was intended, follow the first entry's documentation-only or code branch.

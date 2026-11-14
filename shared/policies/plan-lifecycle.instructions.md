@@ -134,7 +134,7 @@ appended phase's slug so it ends with `-knowledge-refresh` (for example
 `2026-09-19_phase-D-knowledge-refresh`, not `...-phase-D-openwiki-sync` or
 any other conventionally reasonable but differently worded slug) — this
 exact suffix is what the termination rule below and
-`scripts/validate_plan_frontmatter.py` both key on; a phase named anything
+`.claude/scripts/validate_plan_frontmatter.py` both key on; a phase named anything
 else is invisible to both and the recursion guard silently does nothing.
 
 **Termination.** This rule runs only while drafting or revising a plan's
@@ -145,7 +145,7 @@ append another one. The self-referential exclusion above means a plan whose
 own purpose is a knowledge refresh never has one appended to itself, so
 that phase can never produce a second one, whether through a later revision
 of the same plan or as the reason for a follow-up plan.
-`scripts/validate_plan_frontmatter.py` enforces this deterministically: a
+`.claude/scripts/validate_plan_frontmatter.py` enforces this deterministically: a
 big plan fails validation if more than one phase carries the
 `-knowledge-refresh` suffix, or if one exists but is not the last phase.
 Reopening a completed big plan (see "Reopening a completed big plan" above)

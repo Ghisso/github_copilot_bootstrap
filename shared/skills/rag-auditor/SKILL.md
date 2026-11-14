@@ -2,8 +2,8 @@
 name: rag-auditor
 visibility: public
 description: |
-  Audit a RAG pipeline: "RAG quality", "why is RAG failing", "hallucination
-  detection", "retrieval precision", "grounding check", "chunk quality".
+  Audit a RAG pipeline: "RAG evaluation", "RAG quality", "retrieval quality",
+  "why is RAG failing", "hallucination detection", "grounding check".
   Measures retrieval precision, recall, MRR, groundedness, and hallucination
   rate, then diagnoses causes. For architecture audits use `reviewer`.
 ---

@@ -9,7 +9,9 @@ Before implementing any code, load skills in two tiers:
 **Tier 1 — always load (every task):**
 1. `ponytail/SKILL.md` in `full` mode
 
-When the task adds or changes a test file, also read `.claude/instructions/tests.instructions.md` (Claude Code loads it through `.claude/rules/`).
+When the task adds or changes a test file, or fixes a bug (a bug fix needs a regression test), also read `.claude/instructions/tests.instructions.md` (Claude Code loads it through `.claude/rules/`).
+
+When the task edits Python source, also read `.claude/instructions/code-standards.instructions.md` (Claude Code loads it through `.claude/rules/`).
 
 **Tier 2 — load by task type:**
 - New modules or features → `create-feature/SKILL.md`

@@ -87,6 +87,6 @@ After PUSH, give the user the short summary that `.claude/instructions/agent-rep
 
 ## Safety and Policy
 
-- Respect repository hooks and file protection rules.
+- Respect repository hooks. Protected files are listed under Core Principles in `workspace.instructions.md`.
 - Avoid destructive git operations.
 - Keep changes minimal and focused on task scope.

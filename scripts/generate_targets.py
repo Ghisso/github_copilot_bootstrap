@@ -219,6 +219,14 @@ SIDECAR_WORKFLOW_PATH_REPLACEMENTS: tuple[tuple[str, str], ...] = (
         ".claude/instructions/workflow.instructions.md",
         ".claude/rules/ai-bootstrap-workflow.md",
     ),
+    # The profile ships `hydra-config` but no `.claude/instructions/`, so the
+    # skill's pointer to the config-first policy would name a file that is absent.
+    (
+        "Read `.claude/instructions/config-first-design.instructions.md` first. "
+        "It holds the config-first rule, including the rule for a project that "
+        "does not use Hydra. ",
+        "",
+    ),
 )
 
 ROOT_GUIDANCE_WORKFLOW = (
@@ -1361,7 +1369,7 @@ def render_root_guidance(target: str) -> str:
 
 `{ROOT_GUIDANCE_WORKFLOW}`
 
-- Before non-trivial work, search `.claude/MEMORY.md` for the task's area tags (for example `[LEARN:installer]`) and keywords and read the matching entries. Save the approved plan under `.claude/plans/` and create one `<plan_name>_implementation` branch from a clean `dev` branch.
+- Before non-trivial work, search `.claude/MEMORY.md` with `rg -F` for the task's area tags (for example `[LEARN:installer]`) and keywords and read the matching entries. Save the approved plan under `.claude/plans/` and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings; follow `.claude/instructions/closeout.instructions.md` step by step.
 - Commit a completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the review gate is `PASS` with no open request, and the closeout session log is complete.
