@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-15
 **Plan:** `.claude/plans/2026-11-14_phase-G-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -27,6 +27,24 @@ Refresh the OpenWiki pages that carry review finding R23 or describe what Phases
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/workflows/lifecycle-and-task-lanes.md 'phase --persist` before review' 'repeat step 6 alone'
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/architecture/agents-and-skills.md 'workspace Ponytail rule' 'lives unchanged'
+PASS        0.0s  uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.is_dir()] + [str(p) for r in roots if r.is_dir() for p in sorted(r.rglob("*.md")) if p.is_file() and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'skills/(review-api|run-tests|refactor|pdf|caveman-compress|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing|pipeline-patterns|haystack-conditional-router|docling-haystack|ollama-chat-generator|pandas-nan-bool-coercion|networkx-igraph-graphml-interop|pyvis-xss-testing|csv-driven-integration-tests|deploy-service|context-manager-testing|test-helper-public-api)/|lost its own' openwiki
+PASS        0.0s  grep -q -F 'findings report content_hash is stale' openwiki/workflows/lifecycle-and-task-lanes.md
+PASS        0.0s  grep -q -F 'Refusing to write through symlinks:' openwiki/operations/install-ownership-and-runtime-checks.md
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"
+PASS       47.0s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      350.0s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-14_phase-G-knowledge-refresh.json` (1 MINOR, disposition `accepted`; gate PASS; six profiles; round 1 WARN on the open verify request with three MINORs, fixed through a second OpenWiki run; rounds 2 and 3 PASS).
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation); the last full run before it reported pytest 5198 passed, 1 skipped.
 - optional 1: PASS — the reviewer read every refreshed page's prose, not only its flagged claims, against the code and tests it cites, in three rounds. It found three prose mismatches (sidecar pointer scope, an unexplained RAG parenthetical, the missing devcontainer step), all fixed through a second OpenWiki run. One wording nuance (`--state-remote` or `AI_STATE_REMOTE`) remains as a recorded follow-up.
 
 ## Stale-claims surfaces checked
