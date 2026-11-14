@@ -91,10 +91,11 @@ THIRD_PARTY_SKILL_PATHS = ("skills/openwiki",)
 THIRD_PARTY_SKILL_MARKER = ".openwiki-install.json"
 
 # The file that marks `.claude/skills/<name>/` as the project's own skill. A
-# full-install refresh deletes every `.claude/` file it does not generate; RAG
-# lost its own `retrieval-routing` and `iterative-plan-review` skills that way
-# on 2026-08-09. The marker sits inside the skill folder because no client
-# reads skills from any other repository folder.
+# full-install refresh deletes every `.claude/` file it does not generate, and
+# the learn skill once told consumers to save new skills under
+# `.claude/skills/`, where the next refresh would delete them. The marker sits
+# inside the skill folder because no client reads skills from any other
+# repository folder.
 PROJECT_SKILL_MARKER = ".project-skill"
 
 INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"

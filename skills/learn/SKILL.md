@@ -55,9 +55,15 @@ ls shared/skills/ && grep -r -i "KEYWORD" shared/skills/
 # Installed consumer project:
 ls .claude/skills/ && grep -r -i "KEYWORD" .claude/skills/
 ```
-- Nothing related → create new skill
-- Same trigger & fix → update existing skill
-- Partial overlap → add variant to existing
+- Nothing related → create a new skill.
+- Same trigger and fix, or partial overlap → extend the existing skill, but
+  only where you own it:
+  - In this bootstrap's authoring repository, update `shared/skills/<name>`.
+  - In a consumer project, update a skill only when its folder holds
+    `.project-skill`.
+- Never edit a shipped skill in a consumer. A refresh overwrites it, and
+  marking it is a name clash. Create a new marked project skill with its own
+  name, or write a `.claude/MEMORY.md` entry instead.
 
 ## Phase 3: Create Skill
 
@@ -67,15 +73,32 @@ repository, so it regenerates into every target; `.claude/skills/[skill-name]/SK
 in an installed consumer project, which has no `shared/skills/`.
 
 In a consumer project, also create an empty `.project-skill` file in the
-skill folder (`.claude/skills/[skill-name]/.project-skill`). Without it, the
-next refresh refuses to run until you mark or remove the folder. Rules:
+skill folder (`.claude/skills/[skill-name]/.project-skill`). Mark every
+project skill when you create it. What a refresh does with an unmarked folder
+depends on its name:
+
+- The bootstrap neither ships the name nor shipped it before: the refresh
+  refuses to run until you mark or remove the folder.
+- The name is newly shipped and the shipped-before record does not list it:
+  the refresh refuses and does not overwrite the folder.
+- There is no shipped-before record and the bootstrap ships the name: the
+  refresh overwrites the folder.
+- The name is a retired bootstrap name: the refresh deletes the folder.
+
+Rules:
 
 - Use a lowercase kebab-case name equal to `name:`, and one no bootstrap or
   third-party skill uses.
 - Put no symlinks in the folder.
-- Codex, Antigravity, and Copilot read `.agents/skills/`, so they see the
-  skill only after the next refresh copies it to
-  `.agents/skills/[skill-name]/`. Never create or edit that folder by hand.
+- Keep `description` plus `when_to_use` to at most 300 characters, trigger
+  words first. The validator enforces this in the authoring repository; keep
+  to it in consumers too.
+- Codex and Antigravity read only `.agents/skills/`, so they see the skill
+  after the next refresh copies it to `.agents/skills/[skill-name]/`. Copilot
+  also reads `.claude/skills/`, so it can find a new project skill without a
+  refresh. Once a mirror copy exists in `.agents/skills/`, Copilot lists that
+  copy, so edits show after the next refresh. Never create or edit that
+  folder by hand.
 - Create or edit the skill no later than CLOSEOUT step 2, because receipts
   bind `.claude/` runtime files.
 

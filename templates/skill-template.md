@@ -4,7 +4,8 @@ name: descriptive-kebab-case-name
 # Required: public | background. Authoring: `shared/skills/`; installed: `.claude/skills/`.
 visibility: public
 # Required and must be unique; two skills sharing a description break
-# description-match loading.
+# description-match loading. Description plus `when_to_use` must stay at most
+# 300 characters, trigger words first; the validator fails longer text.
 description: |
   [CRITICAL: Include specific triggers in the description]
   - What the skill does

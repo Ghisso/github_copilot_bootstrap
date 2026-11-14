@@ -52,8 +52,45 @@ Use this workflow when:
    unless the record's copy holds `.project-skill`: that folder is a project
    skill that lost its marker, so restore the marker. The installer refuses
    the same set.
-7. Preserve the normal human-operated update-and-push behavior when
+7. With no shipped-before record, the installer cannot tell a retired
+   bootstrap skill from a project skill. Run the installer with `--dry-run`
+   and read the folders it lists. For each one, check whether every file is
+   an unmodified bootstrap copy: the file's `git hash-object` must appear in
+   `git rev-list --all --objects` of a bootstrap checkout. Remove unmodified
+   copies. Mark the project's own folders with `.project-skill`.
+8. A refresh refuses when the live `.agents/skills/` holds folders that the
+   shipped-before record no longer lists. This happens when another clone
+   refreshed, because this clone's restore copies files but never deletes
+   them. Delete the listed folders if you did not create them, then rerun.
+9. A refresh refuses before any write when a path it would write is a symlink
+   or sits under a symlinked folder. The message starts
+   `Refusing to write through symlinks:`. Replace each link with a regular
+   file or folder, or remove it.
+10. Preserve the normal human-operated update-and-push behavior when
    local-only mode is absent.
+
+## Retired Skills
+
+The skill trim removed 20 skills. Update consumer MEMORY entries that name
+them.
+
+| Retired skill | Where the content went |
+| --- | --- |
+| `pipeline-patterns` | `haystack`, `references/pipelines.md` |
+| `haystack-conditional-router` | `haystack`, `references/conditional-router.md` |
+| `docling-haystack` | `haystack`, `references/docling.md` |
+| `ollama-chat-generator` | `haystack`, `references/ollama-chat.md` |
+| `pandas-nan-bool-coercion` | `data-and-graph-pitfalls`, `references/pandas-nan-bool.md` |
+| `networkx-igraph-graphml-interop` | `data-and-graph-pitfalls`, `references/graphml-interop.md` |
+| `pyvis-xss-testing` | `data-and-graph-pitfalls`, `references/pyvis-xss.md` |
+| `csv-driven-integration-tests` | `data-and-graph-pitfalls`, `references/csv-driven-tests.md` |
+| `deploy-service` | `bentoml-service`, "Deploy" section |
+| `context-manager-testing` | one rule in the tests policy |
+| `test-helper-public-api` | one rule in the tests policy |
+| `dataclass-classvar-constant` | removed; the rule is in the code-standards policy |
+| `review-api` | removed; use `code-review` |
+| `run-tests` | removed; use `.claude/scripts/verify.py` |
+| `refactor`, `pdf`, `caveman-compress`, `domain-type-placement`, `graph-schema-compat-migration`, `extraction-metadata-sourcing` | removed |
 
 ## Verification
 
