@@ -1848,4 +1848,17 @@
   (Phase E's `hydra-config` pointer) needs a `SIDECAR_WORKFLOW_PATH_REPLACEMENTS`
   entry in `scripts/generate_targets.py` that removes it for that build;
   denylisting the skill instead changes what sidecar users get.
+- [LEARN:documentation] Safety docs drift into overclaiming. Phase F's README,
+  `docs/runtime-checks.md`, and refresh skill first said the symlink refusal
+  covers "any path it would write", while `state-sync.sh`'s own writes
+  (nested `.gitignore` and `.gitattributes` appends, the `settings.local.json`
+  restore) are unchecked; a later edit then claimed a check the code never
+  makes. Describe a guard by listing exactly what it covers and what it does
+  not, and check each sentence against the code before review.
+- [LEARN:review] A subagent can report a file as fixed when its edit never
+  landed (Phase F's documenter reported `docs/architecture.md` changed; the
+  file was untouched, and review round 2 caught it). Before sending a review
+  round, compare `git status --short` with the files each agent reported.
+  Also, never edit `shared/` while a full `verify.py phase` runs: the run then
+  fails `test_validate_targets` on a stale `dist/` and must be repeated.
 
