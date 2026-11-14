@@ -80,7 +80,7 @@ For each small plan:
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
 3. **VERIFY:** Run focused and fast checks during implementation. Route a deterministic failure to the coder with its changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
-5. **CLOSEOUT:** On entering CLOSEOUT, read and follow `.claude/instructions/closeout.instructions.md` step by step. The orchestrator prompt, the `commit` skill, README, and the plan templates point at that file and do not restate it.
+5. **CLOSEOUT:** On entering CLOSEOUT, read and follow `.claude/instructions/closeout.instructions.md` step by step. The orchestrator prompt, the `commit` skill, README, and the small-plan and session-log templates point at that file and do not restate it.
 6. **FIX LOOP:** If focused verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat the checks and review before CLOSEOUT. A later code change restarts verification and review. When only receipt state went stale and no code changed, use the stale-receipt recoveries in the closeout file instead. Continue until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings by the severity contract in the closeout file: CRITICAL and MAJOR both block the completion commit.
 7. **COMMIT:** On normal completion, commit the explicitly staged completed small plan atomically.
 8. **PUSH:** After every successful outer-repository commit, attempt one normal non-force push; a missing remote or an authentication or network failure is a warning that keeps the local commit. This push is separate from the nested `.claude` `ai-state` sync. PR creation and merge remain explicitly user-requested.
@@ -207,7 +207,7 @@ the correction. Archived plans, dated design narratives, and closed session
 logs are dated records: they describe what was true at the time and stay
 unchanged. A closed log's correction goes in a sibling `<log-name>.errata.md`
 (whether or not a closeout receipt binds the log), only where the original
-entry would actively mislead a reader into reintroducing a defect.
+entry would actively mislead a reader.
 
 ---
 
