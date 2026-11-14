@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-14
 **Plan:** `.claude/plans/2026-11-14_phase-E-closeout-and-guidance-fixes.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -34,6 +34,35 @@ Fix review findings R1 to R12 (`.claude/quality_reports/merges/2026-11-14_skills
 
 ## Verification
 
+```text
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS        3.1s  uv run pytest tests/test_validate_targets.py -q --tb=short -k "closeout_procedure or codex_fallback or frontmatter_yaml or policy_budget or root_guidance or loading_rules or description_cap"
+PASS        3.1s  uv run pytest tests/test_verify.py -q --tb=short -k docs_only_recovery
+PASS       86.9s  uv run pytest tests/test_validate_targets.py tests/test_validate_plan_frontmatter.py tests/test_verify.py -q --tb=short
+PASS        0.0s  test "$(grep -c -F 'repeat step 6 only' shared/policies/closeout.instructions.md)" = "0"
+PASS        0.0s  grep -q -F 'findings report content_hash is stale' shared/policies/closeout.instructions.md
+PASS        0.0s  grep -q -F 'rg -F' dist/multi-agent/CLAUDE.md
+PASS        0.0s  grep -q -F 'rg -F' dist/multi-agent/AGENTS.md
+PASS        0.0s  grep -q -F 'config-first-design.instructions.md' dist/multi-agent/.claude/skills/hydra-config/SKILL.md
+PASS        0.0s  grep -q -F 'code-standards.instructions.md' dist/multi-agent/.codex/agents/coder.toml
+PASS        0.0s  grep -q -F 'review an API or endpoint' shared/skills/code-review/SKILL.md
+PASS        0.0s  grep -q -F 'RAG evaluation' shared/skills/rag-auditor/SKILL.md
+PASS        0.0s  grep -q -F 'review this research' shared/skills/research-critique/SKILL.md
+PASS        0.0s  grep -q -F 'SQL generator' shared/skills/data-and-graph-pitfalls/SKILL.md
+PASS        0.0s  test "$(wc -c < shared/policies/workflow.instructions.md)" -le 16000
+PASS        0.0s  test "$(wc -c < shared/policies/workspace.instructions.md)" -le 7500
+PASS        0.0s  test "$(wc -c < dist/multi-agent/CLAUDE.md)" -le 4500
+PASS        0.0s  test "$(wc -c < dist/multi-agent/AGENTS.md)" -le 4800
+PASS        0.0s  test "$(grep -c -F 'before REVIEW' CLAUDE.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Once the 2.x migration merges' .claude/instructions/project-context.instructions.md)" = "0"
+PASS       45.0s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      327.6s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-14_phase-E-closeout-and-guidance-fixes.json` (0 findings after review round 2; gate PASS; six profiles; round 1 had three MINORs, all fixed before round 2).
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation); the two earlier full runs reported pytest 5151 passed, 1 skipped.
 - optional 1: PASS — this phase's CLOSEOUT steps 1 to 4 were taken from the corrected `.claude/instructions/closeout.instructions.md` alone, in its order; nothing about their action or order had to come from elsewhere. Steps 5 to 8 follow the same file after this log is final.
 
 ## Open Questions / Next Steps
