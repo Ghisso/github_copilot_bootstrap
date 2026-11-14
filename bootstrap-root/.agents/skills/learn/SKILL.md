@@ -76,8 +76,8 @@ In a consumer project, also create an empty `.project-skill` file in the
 skill folder (`.claude/skills/[skill-name]/.project-skill`). Mark every
 project skill when you create it. The shipped-before record is
 `.claude/bootstrap-root/.agents/skills`, the copy of what the last install
-shipped. When that copy is missing, the live `.agents/skills/` stands in only
-for the never-shipped check. What a refresh does with an unmarked folder
+shipped. When that copy is missing, the live `.agents/skills/` stands in for
+every check except the newly-shipped-name refusal. What a refresh does with an unmarked folder
 depends on its name:
 
 - The bootstrap neither ships the name nor shipped it before: the refresh
