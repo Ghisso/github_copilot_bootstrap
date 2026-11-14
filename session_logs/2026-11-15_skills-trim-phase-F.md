@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-15
 **Plan:** `.claude/plans/2026-11-14_phase-F-installer-safety.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -33,6 +33,28 @@ Fix review findings R13 to R22 (`.claude/quality_reports/merges/2026-11-14_skill
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       45.6s  uv run pytest tests/test_install_bootstrap.py tests/test_validate_targets.py -q --tb=short -k "project_skill or destination_link or stale_agents"
+PASS      130.8s  uv run pytest tests/test_install_bootstrap.py tests/test_check_runtime.py tests/test_verify.py tests/test_sidecar_install.py tests/test_sidecar_update.py -q --tb=short
+PASS        0.0s  cmp scripts/runtime_ownership.py dist/multi-agent/.claude/scripts/runtime_ownership.py
+PASS        0.0s  test "$(grep -c -F 'lost its own' scripts/runtime_ownership.py)" = "0"
+PASS        0.0s  test "$(grep -c -F 'is an unmarked skill the bootstrap never shipped' scripts/install_bootstrap.py)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Its only refusal about existing content' README.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'Same trigger & fix → update existing skill' shared/skills/learn/SKILL.md)" = "0"
+PASS        0.0s  grep -q -F 'Refusing to write through symlinks:' scripts/install_bootstrap.py
+PASS        0.0s  grep -q -F '300 characters' dist/multi-agent/.claude/skills/learn/SKILL.md
+PASS        0.0s  grep -q -F 'git hash-object' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
+PASS        0.0s  grep -q -F 'pyvis-xss-testing' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
+PASS        0.0s  test -f .claude/skills/openwiki/.openwiki-install.json
+PASS       47.5s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      350.7s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-14_phase-F-installer-safety.json` (2 MINOR, disposition `accepted`; gate PASS; six profiles; round 1 FAIL with two MAJORs and seven MINORs, round 2 FAIL with one MAJOR, rounds 3 and 4 PASS).
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation); the last full run before it reported pytest 5198 passed, 1 skipped.
 - optional 1: PASS — a real install in a fresh scratch repository, then a shipped `.claude/skills/learn/SKILL.md` replaced by a symlink to an outside sentinel; the refresh exited 1 with `Refusing to write through symlinks:` naming that path; the sentinel was unchanged and the link kept.
 - optional 2: PASS — scratch copies only (`git clone` plus copies of the git-ignored `.claude/`, `.agents/`, and root adapters; nested remotes removed): RAG and industrial-inspection refreshed with exit 0 and no refusal; img-classification exited 1, listing exactly its 22 old bootstrap folders with the new wording ("no shipped-before record was found", both remedies) and without "never shipped". The real consumers were not touched.
 
