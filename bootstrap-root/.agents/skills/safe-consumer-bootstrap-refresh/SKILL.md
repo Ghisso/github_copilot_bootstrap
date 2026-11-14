@@ -76,14 +76,14 @@ them.
 
 | Retired skill | Where the content went |
 | --- | --- |
-| `pipeline-patterns` | `haystack`, `references/pipelines.md` |
-| `haystack-conditional-router` | `haystack`, `references/conditional-router.md` |
-| `docling-haystack` | `haystack`, `references/docling.md` |
-| `ollama-chat-generator` | `haystack`, `references/ollama-chat.md` |
-| `pandas-nan-bool-coercion` | `data-and-graph-pitfalls`, `references/pandas-nan-bool.md` |
-| `networkx-igraph-graphml-interop` | `data-and-graph-pitfalls`, `references/graphml-interop.md` |
-| `pyvis-xss-testing` | `data-and-graph-pitfalls`, `references/pyvis-xss.md` |
-| `csv-driven-integration-tests` | `data-and-graph-pitfalls`, `references/csv-driven-tests.md` |
+| `pipeline-patterns` | `.claude/skills/haystack/references/pipelines.md` |
+| `haystack-conditional-router` | `.claude/skills/haystack/references/conditional-router.md` |
+| `docling-haystack` | `.claude/skills/haystack/references/docling.md` |
+| `ollama-chat-generator` | `.claude/skills/haystack/references/ollama-chat.md` |
+| `pandas-nan-bool-coercion` | `.claude/skills/data-and-graph-pitfalls/references/pandas-nan-bool.md` |
+| `networkx-igraph-graphml-interop` | `.claude/skills/data-and-graph-pitfalls/references/graphml-interop.md` |
+| `pyvis-xss-testing` | `.claude/skills/data-and-graph-pitfalls/references/pyvis-xss.md` |
+| `csv-driven-integration-tests` | `.claude/skills/data-and-graph-pitfalls/references/csv-driven-tests.md` |
 | `deploy-service` | `bentoml-service`, "Deploy" section |
 | `context-manager-testing` | one rule in the tests policy |
 | `test-helper-public-api` | one rule in the tests policy |
