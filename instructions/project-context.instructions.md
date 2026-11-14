@@ -33,8 +33,7 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `shared/agents/`: canonical agent metadata and target-neutral prompts.
 - `shared/review-profiles/`: profile checklists used by the unified reviewer.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
-  including `context-mode-dispatch.sh` (pins Context Mode `2.1.8` on the
-  migration branch).
+  including `context-mode-dispatch.sh` (pins Context Mode `2.1.8`).
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
   (Context Mode is filtered to exactly three tools: `ctx_index`,
   `ctx_search`, `ctx_stats`; Antigravity gets no Context Mode entry).
@@ -204,20 +203,20 @@ Pull requests merged into `dev` since the 2026-10-20 refresh:
   for PRs #52 and #53.
 
 `origin/main` was last updated on 2026-10-23 by PR #50 (`dev` into `main`);
-`dev` is 12 commits ahead of it (PRs #51 to #54). Releasing `dev` to `main` is
-the user's call. Every local implementation branch is already merged into
-`dev`.
+`dev` is 18 commits ahead of it (`cfde280`, the merge of PR #55,
+`context-mode-2x-migration_implementation`). Releasing `dev` to `main` is the
+user's call. The one unmerged branch is `skills-and-instructions-trim_implementation`.
 
 On 2026-11-12 none of the four local full consumers (`~/work/RAG`,
 `~/work/git_projects/img-classification`, `industrial-inspection`, and
 `schema-bootstrap-llm-wiki`) had PR #53's matcher in `.claude/settings.json`.
-Once the 2.x migration merges, a refresh through `scripts/update_consumers.py`
+A refresh through `scripts/update_consumers.py`
 brings them MCP-only Context Mode 2.1.8 (no hooks; Node.js 24.15.0 or newer
 needed on the host or in a rebuilt devcontainer). Refreshing is the user's
 call.
 
-Pinned versions: Context Mode `2.1.8` (on the migration branch since Phase
-B; `dev` still pins the previous 1.x release until the merge), OpenWiki
+Pinned versions: Context Mode `2.1.8` (pinned on `dev` by PR #55;
+`PINNED_CONTEXT_MODE_VERSION` in `shared/hooks/scripts/context-mode-dispatch.sh`), OpenWiki
 `0.7.2` (the guard allows only `mode: "update"`), and Ponytail partially
 merged from upstream `v5.3.2` (`ponytail-review` stays complexity-only).
 Context Mode 2.x is a full rewrite: it needs Node.js 24.15.0 or newer (the
