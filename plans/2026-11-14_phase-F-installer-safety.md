@@ -6,8 +6,8 @@ phase_index: 6
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-15_skills-trim-phase-F.md
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -49,7 +49,7 @@ Risk notes:
 
 ## Steps
 
-- [ ] **1. Write the failing tests first.**
+- [x] **1. Write the failing tests first.**
   - Owner: `coder`. Files (modify): `tests/test_install_bootstrap.py`, `tests/test_validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Every new test name contains `project_skill`, `destination_link`, or `stale_agents`. Every refusal case checks four things: a non-zero exit; a message naming each path; unchanged bytes and link targets in the target tree; an unchanged outside sentinel (reuse `_exact_snapshot` and `_make_outside`).
   - `destination_link` (R13), with real installer runs; each refusal lists every offending path at once:
@@ -72,7 +72,7 @@ Risk notes:
   - R14's assumption, in `tests/test_validate_targets.py` (name contains `project_skill`): the validator fails when a generated tree's `.claude/skills/` and `.agents/skills/` hold different skill names.
   - Record each new test's first failing run in the session log. Mutate each fix away once and confirm its test fails, then restore it byte-identical.
 
-- [ ] **2. Never write through a link (R13).**
+- [x] **2. Never write through a link (R13).**
   - Owner: `coder`. Files (modify): `scripts/install_bootstrap.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - Add a preflight in `main()`. It runs after `commit_copilot_surface` is computed, because the skip rules need it, and before `migrate_pre_existing_state`, the first write. It refuses when a write path, or any directory between the target root and it, is a symlink. The write paths are the ones in the risk notes:
     - each file and directory the copy step writes, minus the paths it skips; use the same predicates as `copy_generated_tree` (factor them out if needed) so the two cannot disagree;
@@ -85,7 +85,7 @@ Risk notes:
   - No separate copy-time guard: the preflight is complete, and a refusal halfway through `copytree` would leave a partial write.
   - Unchanged: the removal loop (unlinking a link removes the link itself), the `.agents` takeover rules, and sidecar mode.
 
-- [ ] **3. Tighten the project-skill preflight and the mirror (R14, R15, R18, R19, R20).**
+- [x] **3. Tighten the project-skill preflight and the mirror (R14, R15, R18, R19, R20).**
   - Owner: `coder`. Files (modify): `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py` (comment only), `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R14 (Decision 9): when the record is the `bootstrap-root` copy and is a real directory, refuse an unmarked folder holding `SKILL.md` whose name that record lacks, even when the new source ships the name. The message says the refresh would overwrite it, and to rename and mark it, or remove it. With only the live `.agents/skills/` fallback or no record, keep today's behavior for shipped names.
   - R15 (Decision 11): reword the no-record and never-listed refusal so it says what is known. The new source does not ship the folder, and no shipped-before record lists it (name the record path, or say none was found). Then: remove it if it is an unmodified copy of an old bootstrap skill, or add the marker if the project wrote it.
@@ -96,7 +96,7 @@ Risk notes:
   - R17 (Decision 10): in `validate_agents_takeover`, take the paths that exist only in the live tree. When every conflict is such a path inside `.agents/skills/<name>/`, and `<name>` is in neither the record nor `.claude/skills/`, append an explanation. It lists those live `.agents/skills/<name>/` folders and says the shipped-before record no longer lists them: another clone refreshed and this clone's restore copies files but never deletes them. If you did not create them, delete the listed folders and rerun. Any other conflict keeps today's message.
   - `scripts/runtime_ownership.py:94-96`: replace the false RAG incident with the real risk. The learn skill told consumers to save skills under `.claude/skills/`, and a refresh deletes every `.claude/` file it does not generate. RAG's two lost folders were retired bootstrap skills.
 
-- [ ] **4. Correct the skill-authoring guidance and the installer docs (R16, R17, R21).**
+- [x] **4. Correct the skill-authoring guidance and the installer docs (R16, R17, R21).**
   - Owner: `documenter`. Files (modify): `shared/skills/learn/SKILL.md`, `shared/skills/safe-consumer-bootstrap-refresh/SKILL.md`, `shared/templates/skill-template.md`, `shared/skills/deep-audit/SKILL.md`, `README.md`, `docs/runtime-checks.md`, `docs/target-mapping.md`, `docs/architecture.md` (only if it lists the refusals). Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `learn` (R16):
     - In Phase 2, rewrite the outcome rows (the old "Same trigger & fix → update existing skill" row must not survive, even with a qualifier) so they separate the cases. In this bootstrap's authoring repository, update `shared/skills/<name>`. In a consumer, update an existing skill only when it holds `.project-skill`. Never edit a shipped skill there: a refresh overwrites it, and marking it is a name clash. Instead, create a new marked project skill with its own name, or write a MEMORY entry.
@@ -117,10 +117,10 @@ Risk notes:
     - "never create or edit `.agents/skills/<name>/` by hand", with the one exception: deleting folders a refused refresh lists as stale.
   - `docs/runtime-checks.md:35-36, 53-56`: name the project-skill exception and the refusals, and replace "promote it into `shared/skills/`" with "mark it with `.project-skill`" for consumers. `docs/target-mapping.md:72`: the Copilot wording.
 
-- [ ] **5. Regenerate and refresh this repository.**
+- [x] **5. Regenerate and refresh this repository.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`. This repository's own refresh must pass the new preflight.
 
-- [ ] **6. Review.**
+- [x] **6. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`. State the acceptance bar from the Scope in the first-round prompt.
   - Focus:
     - no path the copy writes can be reached through a link;
@@ -175,8 +175,8 @@ uv run python .claude/scripts/verify.py phase --format text
 
 Run the numbered CLOSEOUT sequence in `.claude/instructions/closeout.instructions.md` in order. Tick both boxes at its step 2. Later steps bind this file's bytes, so do not edit this file after step 2.
 
-- [ ] Step 1: documentation updated, or skipped as pure-internal with a reason
-- [ ] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
+- [x] Step 1: documentation updated, or skipped as pure-internal with a reason
+- [x] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
 
 ## Pause Checkpoint
 
