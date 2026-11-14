@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:a82d4d79a6ea8a2138c91645cc200e31ab419b1adc3dd98073d34ce5f0b8bcaf",
+  "pageVersion": "sha256:65df04e7b0730380f238077509ff88b0b40b9f86737eb9907f3a840ae5c13a98",
   "claims": [
     {
       "id": "claim_b0158374af164219ad80eee5f9baed11",
       "statement": "The sidecar writes the four SIDECAR_SKILLS skills under both .claude/skills and .agents/skills and two bridges, .claude/rules/ai-bootstrap-sidecar.md with no frontmatter and .github/instructions/ai-bootstrap-sidecar.instructions.md with applyTo \"**\"; it keeps its manifest ai-bootstrap-sidecar.json, the pending record ai-bootstrap-sidecar.json.next, its staging folder, its preserved-copy folder ai-bootstrap-sidecar-preserved, the lock file ai-bootstrap-sidecar.lock, and its marked info/exclude block in the Git directory.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L109-L137",
+          "resource": "repo://scripts/runtime_ownership.py#L110-L138",
           "version": "repo-lines-v1:sha256:2fc6a2efef98a7e7de823eb20f5a254536bc0b6c9c7d4e6e0b2ff0ea5c9ade7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUwMGU5Y2Q2YTA0NDVlOTMwZTZkYjZjMjkzOGNmYzQ0YTA1YjBlZTE5MTRhNjU2OGM0ZGNkZGRiZGMzOWIzNzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlYmI2YzA5OTE0NmU3MGI5MTViNDU5N2I1OTYxMTZhMzA0MGI0ZTgzNjUwZGU3MWU3MzEwMDNmNjA3ZjRiZTEifQ"
         },
         {
@@ -647,11 +647,11 @@
       "statement": "load_desired_units reads each profile's skills at both roots and its file units from dist/sidecar; the skills profile has four skills and two bridges, while workflow has 22 public skills including haystack, data-and-graph-pitfalls, and its own onboard, five agents, three rules, a Copilot instructions file, review profiles, templates, and an .ai-bootstrap state folder.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L109-L124",
+          "resource": "repo://scripts/runtime_ownership.py#L110-L125",
           "version": "repo-lines-v1:sha256:893666155dd43055ea040917b44512f0233b160d585c7da28099d21712d0d371:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1ZDBmMWY2NzFkNjllY2NlZGFmZTUwYmIyYzc3YzcwMzYwMDgzYTU1ZWEzOGFlMzZiYzAyODc0OThmMGFlZGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjOWNkY2E3ZjVhOWY3MjVhMDRlYzAxZTE2MTI5NTAwNmQzYWQyYzIzMDI3YzMzZmExYTkyMzUwZjg5MTE3NTIifQ"
         },
         {
-          "resource": "repo://scripts/runtime_ownership.py#L147-L250",
+          "resource": "repo://scripts/runtime_ownership.py#L148-L251",
           "version": "repo-lines-v1:sha256:7ecdb94e34ecc24066343a8ddcbcc1ebb49219f81ec6cdad9368cdd167e328dc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTA0LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJhODExZmEyYWQwYjA3YTc2NDU0ZWZiYWNmNjNiNTVjM2U2MTExNWM2MDA2Y2IzZDYwYmI5MDA2ZTNhMTFkYTBkIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI5MTg2NjRhMTAzNjE5NDE5ZDU2MjNmM2JlNmM3NTU2YzgyY2VhZGVjMmViOWJmNjdhMjE4OTUyNmI2YmQ3NDNlIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI0MDZkNTg1MmNlYjFkZmMxZjc4NTFmMGI4NWJhNzc4YzJhNjMyOGI5OWU3YzFhYTU2ZWUyYjQ1NTkwMTNjZGEyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5YTYzNmZkZWIzNGUyNmJiZjZhN2ZlNjQ1Njg2ZGE0MzUxODNmOTc0MzliOGU1MTcwYzMxNzkxNDNhMTJhYzEzIn0"
         },
         {
@@ -683,7 +683,7 @@
       "statement": "A workflow install or update migrates a legacy .claude/ai-bootstrap state folder to .ai-bootstrap only when the sidecar's own exclude block lists the legacy root and .ai-bootstrap is absent: under the install lock it adds and proves the new exclude line (restoring info/exclude on failure), refuses a cross-filesystem move before any backup, makes a full backup, rechecks the destination, renames without merging, and then reconciles normally; it refuses before any write when both roots exist or the legacy folder is not listed.",
       "evidence": [
         {
-          "resource": "repo://scripts/runtime_ownership.py#L213-L227",
+          "resource": "repo://scripts/runtime_ownership.py#L214-L228",
           "version": "repo-lines-v1:sha256:c3e4f4ba5fd18143c1d6f1d0a766ac6ba117bf563bc6bad7d92f731229bf010a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyYzlhMjQ5NzJiMjEwMjExN2FlYzE4ZGM3NmIyZDZmNTIzOTc5N2ZmNmI2OGEwMGU0ZjllNWU5YTE3N2ZhN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4YjU5NmE5OGRhNjlkNTIxY2QyMjZkNWFkOGFmNjg5ZGZjNWMxMDJjOTdhOGIzZWFhYTQwMjhhNTY3MzIwNTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NzA2YjExNTExZTMxYWMwZTg5ZmNjMjY1NWI5MzJjMzZmOGMwMWMwMDFlM2E2MTgyNmQxNDlmZWY2ZmFlNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiMmFmOGExOGVlMGIyNTFhYWJmYTVlYTE2YmZiMjJhMmE1MTQyNTU1MzU0NGE1ZjJjMzY1NzYxMmMxNGViYmIifQ"
         },
         {
@@ -701,7 +701,7 @@
       "statement": "The workflow-only onboard skill checks private destinations before writing project context and a memory pointer; its team conventions distinguish explicit rules from patterns inferred from repeated repository examples.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1900-L1913",
+          "resource": "repo://scripts/generate_targets.py#L1908-L1921",
           "version": "repo-lines-v1:sha256:b91e918bb2643539a2466d5f1f909a4bb90d53403ea566c8a468bfd3cf73a9a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMWNmZmFiZTBhNzBjZTdkYmNiNmM4ZmQ2M2EyODdkYjI3ZDdjZTU2MzBjN2FmY2JhNTRkYjNlMmE1MGI5ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhOTk1MmZlZDlkOTJiNDFmYWMyMTZmNjZhNTg0ZjdjNmQwMjJhZTYyMTRkNWM5MjUzNzJiNDUzNGZmNmYzMjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkZTUzNzlhNzEzYjAyOWVmYzVlNjA0YzM2ZDc3NWFmNzljZDlhNTViOTExZGI0MWQwODU1NDkzMDVmODg3NzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdhNDA1YWIzMTg1MWE1OTIzZjIxOTk2OGVmYmE5ZTZjMDY5NjEyNzI2OGU0ZWMxMGZkNzllNjFlODllMTE3ZmEifQ"
         },
         {
@@ -723,10 +723,34 @@
           "version": "repo-lines-v1:sha256:52dbe7a488298e49ecbb31f35b7994ee2946d67ee5f8abc4145222ffaf6cb113:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5ZGU5MjU4NDEyOTAxZTU3NjQyZWM2MjIzMWE5ODYxZGU1MjNjOWI3ZDlhZTFiNGMyNjVmOTlmZWU0NWYwYTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4OWJhMThmMGJkYWM5YzU0M2Y2ZGQ2ZWNiZjM3ZmY2MWMzZDFlODkzMmY5NjlkODI3ZjVkMDZiN2VjOTVmM2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZmYjQ1ZjVjYzY4ODcxMTFlMmE1ZTZlZmE3MjM3ZGQ3NzYwMTQ5YjQ3ODllOGM5MjY5OWYwNmY3NTUxZmQ2M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVlZDZiYzZkZDNhZGNlNDg2MzhjZjk1ZDA1ZDk2MmU3ZjcyNGIxMjNiNDVkNDNiNTgxYmRkNTg0ZWI4NDM3NDYifQ"
         }
       ]
+    },
+    {
+      "id": "claim_e13b622cb532400a867b98ebf1d35968",
+      "statement": "The sidecar workflow profile ships no .claude/instructions/ folder, so SIDECAR_WORKFLOW_PATH_REPLACEMENTS deletes the hydra-config sentence that points to config-first-design.instructions.md, and the sidecar forbidden-token check fails a tree that still names .claude/instructions/.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L207-L230",
+          "version": "repo-lines-v1:sha256:84b56b4bf8190361b3c15d2bcb62c2a953d18e7f9d8f369339c6bfce17ff62b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5YmViODNlMTUzY2QyMmMxN2RlYTk1NmM5NTYzNTUzZDJkOGYyYWY0NWZjODA3NWM2ODQ1MjhhYjJmZjNkNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFmNTdmNzdlNTQxNmZkZDNjOTcwNDlhNDc0NGJkYzg2ZGVmMGRlOTZlYjdhM2YxN2VjY2UyNmU3NGE2NTc5ZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjOGVlZWE0NzFiM2I0ZTRhOWUzNGFhYjBiOGNiM2FiMjBiNDgzNjM4NWVhYmI4M2M0MjFmYjMzMDBjMDhkOWQifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L9273-L9277",
+          "version": "repo-lines-v1:sha256:bf7ae14a8bbbf94af0dad4b35c5ef6493496a14e30e963a06fa79b05733caf66:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWMyZTA2NjU0OGE5OGQyOTI0NmY5MDliZjViZTI2ZjlkZjI1ODY4ZjI0YWRkNGRlNzU4MTI3M2VhYTIwM2Q0MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTRjNDFmNDBmM2E4Y2RhMDVmMjc5Y2JiY2IwMDNkMWUxNWM3ZTc3ZGQ3ZWVlMzNjMGYyYmJjOGYxNTM1NGY5YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGNjNGE3ZDFjYzc5NmFiYTNlNDY3MjMzMjdmNTE3ZTlmODExOTgyZDI1MGYwNzAyOTg2ZTRiNTc2NGFkOTU4OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjMxODZjZWZiOTNlYzA4MTA1ZmJjOTMwZTdiY2JmYzQ3OWI4Y2Y1NWRkNGI4YzljM2E1OGExODBkOWI1YTJjMSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4daa3ffc3b574192b598b1d05aee9b76",
+      "statement": "SIDECAR_WORKFLOW_PATH_REPLACEMENTS rewrites the workspace and workflow policy paths to the workflow profile's own rule file .claude/rules/ai-bootstrap-workflow.md and deletes one exact hydra-config sentence; it removes no other pointer to a full-install policy file.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L207-L230",
+          "version": "repo-lines-v1:sha256:84b56b4bf8190361b3c15d2bcb62c2a953d18e7f9d8f369339c6bfce17ff62b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5YmViODNlMTUzY2QyMmMxN2RlYTk1NmM5NTYzNTUzZDJkOGYyYWY0NWZjODA3NWM2ODQ1MjhhYjJmZjNkNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFmNTdmNzdlNTQxNmZkZDNjOTcwNDlhNDc0NGJkYzg2ZGVmMGRlOTZlYjdhM2YxN2VjY2UyNmU3NGE2NTc5ZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjOGVlZWE0NzFiM2I0ZTRhOWUzNGFhYjBiOGNiM2FiMjBiNDgzNjM4NWVhYmI4M2M0MjFmYjMzMDBjMDhkOWQifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-13T15:20:28.565Z"
+    "at": "2026-11-14T17:16:32.491Z"
   }
 }

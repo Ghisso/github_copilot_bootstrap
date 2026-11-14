@@ -32,10 +32,10 @@ sources:
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-11-13T15:20:28.565Z" }
+generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-13T15:20:28.565Z
+    at: 2026-11-14T16:56:38.985Z
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -106,7 +106,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 `render_sidecar(target_root, profile)` builds one much smaller sidecar tree from the profile constants in `scripts/runtime_ownership.py`, and refuses an unknown profile name:
 
 1. It copies each skill of the profile whole (`SIDECAR_SKILLS`, the four skills `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`, for `skills`; `SIDECAR_WORKFLOW_SKILLS`, the eligible public skills plus `onboard`, for `workflow`) into both `SIDECAR_SKILL_WRITE_ROOTS`, `.claude/skills/` and `.agents/skills/`. Workflow `onboard` comes from `shared/sidecar/workflow/skills/onboard/`, while the full install keeps its separate skill under `shared/skills/onboard/`.
-2. It rewrites each copied `SKILL.md` through `SIDECAR_TEXT_REPLACEMENTS`, so no sidecar file names a bootstrap path the sidecar does not install. For the `workflow` profile it also rewrites the full install's state and policy paths to the profile's own `.ai-bootstrap/` folder and its rule file.
+2. It rewrites each copied `SKILL.md` through `SIDECAR_TEXT_REPLACEMENTS`, so no sidecar file names a bootstrap path the sidecar does not install. For the `workflow` profile it also rewrites the full install's state and policy paths to the profile's own `.ai-bootstrap/` folder and its rule file, and `SIDECAR_WORKFLOW_PATH_REPLACEMENTS` deletes the `hydra-config` sentence that points to `config-first-design.instructions.md`, a policy file the sidecar does not ship.
 3. It copies the vendored Ponytail MIT `LICENSE` into `ponytail/` and `ponytail-review/` at both roots.
 4. For `skills`, it renders each bridge in `SIDECAR_BRIDGES` from `shared/sidecar/bridge.md`, adding only that client's frontmatter: none for `.claude/rules/ai-bootstrap-sidecar.md`, and `applyTo: "**"` for `.github/instructions/ai-bootstrap-sidecar.instructions.md`.
 5. For `workflow`, `render_sidecar_workflow_units` writes instead: the three rules as `.claude/rules/ai-bootstrap-<name>.md`, the Copilot file `.github/instructions/ai-bootstrap-workflow.instructions.md` with `applyTo: "**"`, the five agents from their `workflow-prompt.md` with the Claude Code frontmatter minus any `mcp__` tool grant, the review profiles and the four relaxed templates with the state-path rewrite, and the state seeds under `.ai-bootstrap/`, which sits at the repository root because Claude Code refuses agent writes anywhere under `.claude/`. The `skills` profile renders the same file set the old single `dist/sidecar/` tree had. A snapshot-hash test in `tests/test_validate_targets.py` pins its exact bytes, and every deliberate edit to one of its four shipped skills or to the vendored Ponytail LICENSE re-captures that hash.
@@ -115,7 +115,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 
 `scripts/validate_targets.py` is the structural gate over `dist/`. Its `main` runs a fixed sequence of checks and prints `FAIL ...` lines and exits 1 on any error, or `PASS generated target is structurally valid`. The checks, in order:
 
-- the task-lane contract, the workflow policy's 16 KiB byte budget, the closeout procedure pin on the generated `closeout.instructions.md` (eight numbered steps with a reason each, the learn skill in step 2, both hard rules, and both stale-receipt messages), and the Codex model contract;
+- the task-lane contract, the byte budgets in `POLICY_BYTE_BUDGETS` (workflow and closeout 16 KiB, plan-lifecycle 11 KiB, workspace 7,680 bytes, quality-and-testing and tool-routing 3 KiB), the closeout procedure pin on the generated `closeout.instructions.md` (eight numbered steps with a reason each, the learn skill in step 2, both hard rules, and the three stale-receipt messages inside its recovery section), and the Codex model contract;
 - agents, MCP and hook wiring, the Antigravity manifest and skills, the Context Mode tool surface;
 - skills and paths;
 - both sidecar profile trees, `sidecar_target_errors(root, profile)`, and their adversarial cases per profile: only paths the profile installs (a shipped skill folder may hold any file, since a skill is copied whole; everything else must match the exact set); the exact source set, with nothing missing and nothing extra; no forbidden text token for that profile; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; for `skills`, each bridge with its client's frontmatter; for `workflow`, each single-file unit with exactly its client's frontmatter, every agent's frontmatter equal to what `sidecar_agent_frontmatter` builds, and both `onboard` copies checked for private output and destination safety instructions;
