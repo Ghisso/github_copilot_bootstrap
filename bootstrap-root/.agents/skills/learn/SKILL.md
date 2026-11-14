@@ -74,13 +74,18 @@ in an installed consumer project, which has no `shared/skills/`.
 
 In a consumer project, also create an empty `.project-skill` file in the
 skill folder (`.claude/skills/[skill-name]/.project-skill`). Mark every
-project skill when you create it. What a refresh does with an unmarked folder
+project skill when you create it. The shipped-before record is
+`.claude/bootstrap-root/.agents/skills`, the copy of what the last install
+shipped. When that copy is missing, the live `.agents/skills/` stands in only
+for the never-shipped check. What a refresh does with an unmarked folder
 depends on its name:
 
 - The bootstrap neither ships the name nor shipped it before: the refresh
   refuses to run until you mark or remove the folder.
 - The name is newly shipped and the shipped-before record does not list it:
-  the refresh refuses and does not overwrite the folder.
+  the refresh refuses and does not overwrite the folder. This needs the
+  `bootstrap-root` copy; with only the live `.agents/skills/` or no record, a
+  newly shipped name is overwritten.
 - There is no shipped-before record and the bootstrap ships the name: the
   refresh overwrites the folder.
 - The name is a retired bootstrap name: the refresh deletes the folder.

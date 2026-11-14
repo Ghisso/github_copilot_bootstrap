@@ -50,7 +50,8 @@ here rather than becoming hard lint. `scripts/validate_targets.py`'s
 skill-integrity gate already fails closed on the objective, high-confidence
 skill-library facts (frontmatter validity, `name`-matches-directory,
 recognized `visibility`, non-empty and non-duplicate descriptions of at most 300 characters
-(description plus `when_to_use`), a required
+(description plus `when_to_use`), no `.project-skill` marker in a shipped
+skill, a required
 root `SKILL.md`, and broken local references to real repository paths); see
 "Skill Library Validation Contract" in `docs/architecture.md`. Do not
 re-flag any of those here as a Critical/Major finding — report a genuine hit
