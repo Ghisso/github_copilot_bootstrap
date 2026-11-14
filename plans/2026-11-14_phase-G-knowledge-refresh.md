@@ -39,9 +39,9 @@ Risk notes:
 - [ ] **1. Refresh OpenWiki through its own tools.**
   - Owner: orchestrator, in the main session. Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
   - Call `openwiki_begin` with `mode: "update"`. Plan these pages plus every page OpenWiki flags:
-    - `workflows/lifecycle-and-task-lanes.md`: the persisted phase check runs at CLOSEOUT step 4, not before review; the corrected stale-receipt recoveries; "the plan templates point here"; the double blank line;
-    - `architecture/agents-and-skills.md`: drop the removed workspace Ponytail rule; say the merged bodies kept their text apart from frontmatter and the CSV pair's link renames; the restored trigger phrases if the page quotes descriptions;
-    - `operations/install-ownership-and-runtime-checks.md`: the symlink refusal, the newly-shipped-name refusal, the reworded no-record refusal, the mirror's exclusions and walk errors, the stale `.agents` explanation;
+    - `workflows/lifecycle-and-task-lanes.md`: the persisted phase check runs at CLOSEOUT step 4, not before review; the corrected stale-receipt recoveries, quoting the error `findings report content_hash is stale` word for word; "the plan templates point here"; the double blank line;
+    - `architecture/agents-and-skills.md`: drop the removed workspace Ponytail rule; replace "lives unchanged" with the fact that the merged bodies kept their text apart from frontmatter and the CSV pair's link renames; the restored trigger phrases if the page quotes descriptions;
+    - `operations/install-ownership-and-runtime-checks.md`: the symlink refusal, quoting its opening `Refusing to write through symlinks:` word for word; the newly-shipped-name refusal; the reworded no-record refusal; the mirror's exclusions and walk errors; the stale `.agents` explanation;
     - `operations/deterministic-verification.md`: the new validator checks (fallback policy names, YAML forms, budgets, stray marker, section-scoped recovery pin);
     - `operations/sidecar-overlay.md`: name the files of the two project-skill sidecar tests.
   - Right after `openwiki_begin`, run `git status --porcelain -- AGENTS.md CLAUDE.md` (the skill's restore check).
@@ -91,10 +91,10 @@ Risk notes:
 ```bash
 uv run python scripts/generate_targets.py --all
 uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/workflows/lifecycle-and-task-lanes.md 'phase --persist` before review' 'repeat step 6 alone'
-uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/architecture/agents-and-skills.md 'workspace Ponytail rule'
+uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/architecture/agents-and-skills.md 'workspace Ponytail rule' 'lives unchanged'
 uv run python -I -c 'import pathlib, re, sys; pat = re.compile(sys.argv[1].encode()); roots = [pathlib.Path(a) for a in sys.argv[2:]]; bad = [str(r) for r in roots if not r.is_dir()] + [str(p) for r in roots if r.is_dir() for p in sorted(r.rglob("*.md")) if p.is_file() and pat.search(p.read_bytes())]; sys.exit("missing or matching: " + ", ".join(bad) if bad else 0)' 'skills/(review-api|run-tests|refactor|pdf|caveman-compress|dataclass-classvar-constant|domain-type-placement|graph-schema-compat-migration|extraction-metadata-sourcing|pipeline-patterns|haystack-conditional-router|docling-haystack|ollama-chat-generator|pandas-nan-bool-coercion|networkx-igraph-graphml-interop|pyvis-xss-testing|csv-driven-integration-tests|deploy-service|context-manager-testing|test-helper-public-api)/|lost its own' openwiki
-grep -q -F 'content_hash' openwiki/workflows/lifecycle-and-task-lanes.md
-grep -q -F '.project-skill' openwiki/operations/install-ownership-and-runtime-checks.md
+grep -q -F 'findings report content_hash is stale' openwiki/workflows/lifecycle-and-task-lanes.md
+grep -q -F 'Refusing to write through symlinks:' openwiki/operations/install-ownership-and-runtime-checks.md
 test ! -e openwiki/.run.json
 test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
 test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"

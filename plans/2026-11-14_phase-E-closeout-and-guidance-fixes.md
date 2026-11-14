@@ -6,7 +6,7 @@ phase_index: 5
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: planned
+status: in-progress
 closeout_session_log:
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
@@ -35,16 +35,23 @@ It runs before the installer phase so that Phases F and G close out with the cor
 Review acceptance bar (the user's rule for guard and checker work): block only on a decision looser than before, a hole this change introduces, or a false or missing statement about what is checked. List any other pre-existing gap as a follow-up in `docs/target-mapping.md` instead of chasing it.
 
 Risk notes:
-- The workflow core has 429 bytes left under its 16 KiB budget, and the generated `AGENTS.md` has 355 bytes left under 5 KiB. Every addition there must be paid for by a removal; the duplicated MEMORY sentence in the core is the planned source.
+- Size targets from Phase B stay the acceptance line, and the verification block checks them with `wc -c`. Room left today:
+  - workflow core: 45 bytes under 16,000 (its validator limit is 16 KiB);
+  - generated `AGENTS.md`: 35 bytes under 4,800 (limit 5 KiB);
+  - generated `CLAUDE.md`: 66 bytes under 4,500 (limit 5 KiB);
+  - workspace policy: 34 bytes under 7,500.
+- Every addition must be paid for by removals in the same file. The planned cuts in the core are: one full MEMORY rule instead of two copies, and one session-log reminder line instead of three (Session Logging "Frequency", Context Management, Manual reminders), carrying the R4 exception.
 - Validator pins guard the closeout steps, the hard rules, the stale-receipt messages, and "CLOSEOUT sequence" pointers. Change pinned text only together with its pin and test.
-- R2 (errata) is decided by evidence: if any script or hook reads `*.errata.md` files, stop and report instead of choosing a rule.
+- R2 (errata) is decided by evidence. If a script or hook reads `*.errata.md` files to decide a gate, stop and report instead of choosing a rule. The check in `scripts/validate_targets.py` (about lines 7152-7488) that writes an errata file to show the push gate ignores it is not such a reader.
 
 ## Steps
 
 - [ ] **1. Write the failing tests first.**
-  - Owner: `coder`. Files (modify): `tests/test_validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
-  - Every new test name contains one of `closeout_procedure`, `codex_fallback`, `frontmatter_yaml`, `policy_budget`, or `root_guidance`.
-  - `closeout_procedure`: a copy of the real closeout file with the whole "Recovering from a stale receipt" section removed must fail validation, although both stale-receipt messages still appear in step 6 and hard rule 2 (R6). The section must also name `findings report content_hash is stale` (R1). The real file passes.
+  - Owner: `coder`. Files (modify): `tests/test_validate_targets.py`, `tests/test_verify.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
+  - Every new test name contains one of `closeout_procedure`, `codex_fallback`, `frontmatter_yaml`, `policy_budget`, `root_guidance`, or `docs_only_recovery`.
+  - `closeout_procedure` (R6, R1): build a fixture that keeps all three stale-receipt messages outside the recovery section (for example in step 6 and in a hard rule), then remove the whole "Recovering from a stale receipt" section. Validation must fail, so only the new section scoping can catch it. The section must also name `findings report content_hash is stale`. The real file passes.
+  - `docs_only_recovery` (R1), in `tests/test_verify.py`: a documentation-only edit changes `content_hash_for` (the findings hash) but leaves the phase receipt's scoped content hash unchanged. This pins the fact the corrected recovery relies on.
+  - Update the existing budget pins that R10 makes false: `test_root_guidance_budget_limits_are_pinned` (it asserts the workflow core is the only budgeted policy) and the docstring of `test_root_guidance_budget_workflow_policy_stays_within_16_kib` ("Other policies have no byte budget").
   - `codex_fallback`: for each entry of `CODEX_POLICY_SKILL_FALLBACKS`, a fixture skill whose `SKILL.md` does not name its mapped policy file fails; the five real skills pass (R8). `bentoml-service` must name both `api-service-standards.instructions.md` and `deployment.instructions.md`.
   - `frontmatter_yaml`: each of these `description` forms is rejected with `SKILL_FRONTMATTER_INVALID`, or measured at its true length and failing the cap: `|+`, `>2`, `| # comment`, a plain value continued on indented lines, and a double-quoted value continued on the next line (R9). Each case's text is over 300 characters. The 37 real skills still pass.
   - `policy_budget`: each new `POLICY_BYTE_BUDGETS` entry fails one byte over its limit and passes at it (R10).
@@ -56,11 +63,11 @@ Risk notes:
   - R1, the documentation-only branch of "`closeout receipt final tracked state is stale`":
     - the phase receipt stays valid, because its content hash skips ordinary documentation;
     - the findings report does not: its `content_hash` covers every tracked change from the merge base, documentation and unstaged edits included, and the commit gate recomputes it;
-    - so: stage, re-record findings with the step 4 recorder command, rerun the closeout dry run (step 4 without the phase receipt) and update the log's `## Verification` lines if they changed, then repeat steps 5 and 6.
+    - so: stage, re-record findings with the step 4 recorder command, repeat step 5 only if the session log changed, then repeat step 6. Do not rerun the closeout dry run: the gate never compares the log's summary lines, and step 6 runs every required item again.
     - Fix the sentence saying an unstaged edit "alone does not" stale anything: it does not stale the closeout receipt's tree, but it does stale the findings hash.
-  - Add a third recovery entry for `findings report content_hash is stale` (cause and the same repair), and add that message to `CLOSEOUT_STALE_RECEIPT_MESSAGES`.
+  - Add a third recovery entry for `findings report content_hash is stale`. Cause: a tracked change after the findings were recorded. Repair: inspect `git diff`. An unintended edit is undone (for example `git restore <path>`) and nothing needs redoing. An intended one follows the documentation-only or the code branch above. Add the message to `CLOSEOUT_STALE_RECEIPT_MESSAGES`.
   - R6: `closeout_procedure_errors` checks the three messages inside the "Recovering from a stale receipt" section only, not anywhere in the file.
-  - R2: first run `rg -n -F 'errata' shared/scripts shared/hooks scripts`. If nothing reads errata files, make the standing audit passage say a sibling `<log-name>.errata.md` is allowed for any closed log, bound by a receipt or not, when an entry would actively mislead a reader; the closed log itself never changes. This matches the Immutability paragraph. The core's copy is fixed in Step 3.
+  - R2: first run `rg -n -F 'errata' shared/scripts shared/hooks scripts`. If nothing reads errata files to decide a gate (see the risk note), make the standing audit passage say a sibling `<log-name>.errata.md` is allowed for any closed log, bound by a receipt or not, when an entry would actively mislead a reader; the closed log itself never changes. This matches the Immutability paragraph. The core's copy is fixed in Step 3.
   - R3: the provenance coverage list names the big plan and every small plan listed in its `phases:`, and says to revise a future phase's plan before step 3 or after the commit.
   - R5:
     - the completion-commit list says it holds the review conditions, and names the other gate checks in one sentence (small plan complete with `closeout_session_log`, the log's status and LEARN section, the final-phase audit section, plan frontmatter checks, and optional-item outcomes);
@@ -73,7 +80,7 @@ Risk notes:
 - [ ] **3. Correct the workflow core and the root-guidance MEMORY sentence.**
   - Owner: `coder`. Files (modify): `shared/policies/workflow.instructions.md`, `scripts/generate_targets.py` (root guidance text), `CLAUDE.md` (authoring, hand-maintained). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R7: the MEMORY rule says to search with a literal match (`rg -F` or `grep -F`) for area tags such as `[LEARN:installer]` and for keywords, and gives the one command that lists the tags in use, for example `grep -oE '\[LEARN:[a-z-]+\]' .claude/MEMORY.md | sort | uniq -c`. Keep one full copy in the core (Plan-First step 1); the Context Management list points to it.
-  - R4: the two session-log update lines (Context Management and Manual reminders) exclude a log that a closeout receipt already binds; such work goes in a new log.
+  - R4: replace the three session-log update reminders (Session Logging "Frequency", Context Management "update the session log", and Manual reminders) with one line that also excludes a log a closeout receipt already binds; such work goes in a new log.
   - R2: the Session Logging errata sentence matches Step 2.
   - Workflow line 84 (FIX LOOP) names the closeout file's stale-receipt recoveries as its exception.
   - Point the plan-validator references at `.claude/scripts/validate_plan_frontmatter.py`, the path that exists in consumers; fix the claim that the session-log template and the orchestrator link to the Verification Evidence Contract; replace "(see root guidance)" in Automatic Reminders with the file that actually describes the guarded paths.
@@ -84,23 +91,24 @@ Risk notes:
   - Owner: `coder`. Files (modify): `shared/skills/hydra-config/SKILL.md`, `shared/agents/coder/prompt.md`, `shared/agents/coder/workflow-prompt.md` (only where it has the same tier), `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R8:
     - `hydra-config` names `.claude/instructions/config-first-design.instructions.md` and says to read it, including its rule for projects without Hydra;
-    - the coder prompt adds two conditional reads beside the existing tests-policy read: when the task edits Python source, read `.claude/instructions/code-standards.instructions.md` (Claude Code loads it through `.claude/rules/`); when the task fixes a bug, add a regression test (the tests policy's rule);
+    - the coder prompt adds one conditional read: when the task edits Python source, read `.claude/instructions/code-standards.instructions.md` (Claude Code loads it through `.claude/rules/`);
+    - the existing tests-policy entry also triggers on a bug fix, because a bug fix needs a regression test: "when the task adds or changes a test file, or fixes a bug, ...". Keep it one entry: `test_loading_rules_coder_tier_one_is_ponytail_and_a_conditional_tests_read` requires exactly one entry naming `tests.instructions.md`;
     - the always-load tier stays Ponytail only, so the Phase C `loading_rules` tests keep passing;
     - the validator requires each fallback skill's `SKILL.md` to name its mapped policy file.
 
 - [ ] **5. Close the validator gaps.**
   - Owner: `coder`. Files (modify): `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R9: `skill_frontmatter_yaml_errors` rejects, for `description` and `when_to_use`, a block header other than `|`, `>`, `|-`, or `>-`; a header followed by a comment; and a plain or quoted value continued on following lines. Prefer rejecting these forms over adding a YAML parser. The error names the key and the form.
-  - R10: add to `POLICY_BYTE_BUDGETS` the values in big plan Decision 12: `workspace.instructions.md` 8 KiB, `quality-and-testing.instructions.md` 3 KiB, `tool-routing.instructions.md` 3 KiB, `closeout.instructions.md` 16 KiB, `plan-lifecycle.instructions.md` 11 KiB. Update the comment above it, which says the budgets cover policies read before real work.
+  - R10: add to `POLICY_BYTE_BUDGETS` the values in big plan Decision 12: `workspace.instructions.md` 7.5 KiB (7,680 bytes), `quality-and-testing.instructions.md` 3 KiB, `tool-routing.instructions.md` 3 KiB, `closeout.instructions.md` 16 KiB, `plan-lifecycle.instructions.md` 11 KiB. Update the comment above it, which says the budgets cover policies read before real work.
   - Fix the comment at `SKILL_DESCRIPTION_CAP_EXEMPT`: the two skills are exempt because their text is hash-pinned, not because both are always on.
 
 - [ ] **6. Restore lost trigger phrases and correct the remaining docs.**
   - Owner: `documenter`. Files (modify): `shared/skills/code-review/SKILL.md`, `shared/skills/rag-auditor/SKILL.md`, `shared/skills/research-critique/SKILL.md`, `shared/skills/data-and-graph-pitfalls/SKILL.md` (descriptions only), `README.md`, `docs/smoke-tests.md`, `docs/target-mapping.md`, `docs/runtime-checks.md`, `shared/policies/workspace.instructions.md`, `shared/agents/orchestrator/prompt.md`, `.claude/instructions/project-context.instructions.md`, `tests/test_validate_targets.py` (one stale comment). Required Skills: `.claude/skills/documentation/SKILL.md`.
-  - R11, each description at most 300 characters:
+  - R11, each description at most 300 characters (now: `code-review` 153, `rag-auditor` 288, `research-critique` 299, `data-and-graph-pitfalls` 250). Where a phrase does not fit, drop a near-duplicate trigger already in the same description; keep the most specific ones.
     - `code-review` gains "review an API or endpoint";
     - `rag-auditor` gains "RAG evaluation" and "retrieval quality";
     - `research-critique` gains "review this research";
-    - `data-and-graph-pitfalls` gains the integration tests for a classifier, router, or SQL generator.
+    - `data-and-graph-pitfalls` gains "integration tests for a classifier, router, or SQL generator".
   - R12:
     - `README.md:304`: the "step 1 below" list no longer exists; point to CLOSEOUT step 4 in the closeout file.
     - `README.md:1533`: drop "compression" (that tool was `caveman-compress`).
@@ -138,6 +146,7 @@ Risk notes:
 ```bash
 uv run python scripts/generate_targets.py --all
 uv run pytest tests/test_validate_targets.py -q --tb=short -k "closeout_procedure or codex_fallback or frontmatter_yaml or policy_budget or root_guidance or loading_rules or description_cap"
+uv run pytest tests/test_verify.py -q --tb=short -k docs_only_recovery
 uv run pytest tests/test_validate_targets.py tests/test_validate_plan_frontmatter.py tests/test_verify.py -q --tb=short
 test "$(grep -c -F 'repeat step 6 only' shared/policies/closeout.instructions.md)" = "0"
 grep -q -F 'findings report content_hash is stale' shared/policies/closeout.instructions.md
@@ -145,6 +154,14 @@ grep -q -F 'rg -F' dist/multi-agent/CLAUDE.md
 grep -q -F 'rg -F' dist/multi-agent/AGENTS.md
 grep -q -F 'config-first-design.instructions.md' dist/multi-agent/.claude/skills/hydra-config/SKILL.md
 grep -q -F 'code-standards.instructions.md' dist/multi-agent/.codex/agents/coder.toml
+grep -q -F 'review an API or endpoint' shared/skills/code-review/SKILL.md
+grep -q -F 'RAG evaluation' shared/skills/rag-auditor/SKILL.md
+grep -q -F 'review this research' shared/skills/research-critique/SKILL.md
+grep -q -F 'SQL generator' shared/skills/data-and-graph-pitfalls/SKILL.md
+test "$(wc -c < shared/policies/workflow.instructions.md)" -le 16000
+test "$(wc -c < shared/policies/workspace.instructions.md)" -le 7500
+test "$(wc -c < dist/multi-agent/CLAUDE.md)" -le 4500
+test "$(wc -c < dist/multi-agent/AGENTS.md)" -le 4800
 test "$(grep -c -F 'before REVIEW' CLAUDE.md)" = "0"
 test "$(grep -c -F 'Once the 2.x migration merges' .claude/instructions/project-context.instructions.md)" = "0"
 uv run python scripts/validate_targets.py
@@ -159,7 +176,6 @@ uv run python .claude/scripts/verify.py phase --format text
      bullet per item, numbered in the order it appears. -->
 
 - Walk this phase's own CLOSEOUT with the corrected `closeout.instructions.md` alone, and record any step whose action or order had to come from elsewhere.
-- In a scratch copy of this repository (`git archive HEAD` into a fresh `mktemp -d` folder), stage a documentation-only edit after a recorded findings report and confirm that the recovery in the corrected file produces findings and a receipt that the commit gate's check functions accept (`verify.py gate` against the scratch tree). Record the commands and outcome.
 
 ## Closeout Checklist
 

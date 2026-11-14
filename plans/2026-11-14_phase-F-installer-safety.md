@@ -36,7 +36,13 @@ Covers REQ-012 in the big plan; Decisions 8 to 11 there set the behavior. The ph
 Review acceptance bar (the user's rule for guard and checker work): block only on a decision looser than before, a hole this change introduces, or a false or missing statement about what is checked. List any other pre-existing gap as a follow-up in `docs/target-mapping.md` instead of chasing it.
 
 Risk notes:
-- The symlink refusal must cover only paths the copy would write. Consumer state that already exists, preserved tracked adapters, marker-claimed third-party bundles, and marked project skills are never written, so a link there is not refused.
+- The symlink refusal covers every path a full refresh writes, not only the copy step:
+  - the copy step's paths;
+  - the project-name and Python-version substitution files (`PROJECT_NAME_FILES`, `PYTHON_FACT_FILES`), even when they are preserved tracked adapters;
+  - `.gitignore`;
+  - `.claude/bootstrap-root/` with every path `populate_bootstrap_root` writes or removes there, and `.claude/bootstrap-ownership.env`;
+  - `.devcontainer/devcontainer.json` when `--state-remote` is given.
+- The copy step never writes existing consumer state, other preserved tracked adapters, marker-claimed third-party bundles, or marked project skills, so a link there is not refused. A state-folder README (`STATE_DIR_OWNED_README_PATHS`) whose folder or file is a link is skipped with a warning instead: it is consumer state.
 - Every new refusal must happen before any write. The existing tests' pattern (target-tree snapshot plus an outside sentinel) proves it.
 - Sidecar mode returns before both full-install checks; it must stay untouched.
 - Decision 10 keeps the second-clone fix to an explanation and documentation; automatic deletion stays a follow-up.
@@ -46,13 +52,15 @@ Risk notes:
 - [ ] **1. Write the failing tests first.**
   - Owner: `coder`. Files (modify): `tests/test_install_bootstrap.py`, `tests/test_validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Every new test name contains `project_skill`, `destination_link`, or `stale_agents`. Every refusal case checks four things: a non-zero exit; a message naming each path; unchanged bytes and link targets in the target tree; an unchanged outside sentinel (reuse `_exact_snapshot` and `_make_outside`).
-  - `destination_link` (R13), with real installer runs:
+  - `destination_link` (R13), with real installer runs; each refusal lists every offending path at once:
     - a shipped `.claude/skills/<name>/SKILL.md` replaced by a link to the outside sentinel;
     - a generated hook script replaced by a link;
     - a generated directory (for example `.claude/templates`) replaced by a link to an outside directory;
-    - a link where the state-directory README refresh writes (`STATE_DIR_OWNED_README_PATHS`).
-    - A unit test shows the copy step itself refuses to write through a link, even when called without the preflight.
-    - A pass case: a symlinked consumer-state path that already exists (for example `.claude/settings.local.json`) is not refused.
+    - `.claude/bootstrap-root` replaced by a link to an outside directory (today `populate_bootstrap_root` deletes and writes through it);
+    - `.gitignore` replaced by a link;
+    - a preserved tracked `CLAUDE.md` replaced by a link (the substitutions write it);
+    - `.claude` itself replaced by a link.
+    - Pass cases: a symlinked consumer-state path that already exists (for example `.claude/settings.local.json`) is not refused. A symlinked `.claude/plans` folder is not refused, its `README.md` refresh is skipped with a warning, and nothing is written through it. `chmod_runtime_scripts` skips a linked script instead of changing its target.
   - `project_skill`:
     - R14: the `bootstrap-root` record exists and lacks `haystack`; an unmarked `.claude/skills/haystack/` with a `SKILL.md` and an extra file; the new source ships `haystack`. The refresh is refused before any write. With no `bootstrap-root` record, the same folder is still overwritten as before (Decision 9), and the test pins that.
     - R15: with no record, the refusal does not contain "never shipped", says no record lists the folder, and names both remedies (remove an unmodified old bootstrap copy, or mark the project's own).
@@ -60,13 +68,21 @@ Risk notes:
     - R20: under a symlinked `.claude`, the refusal happens and `_declared_skill_name` is never called (patch it with a spy).
     - R22: edit a marked skill's `SKILL.md` and delete one of its reference files, refresh, and assert that the mirror and its `bootstrap-root` copy equal the edited folder exactly. Make the existing lost-marker run assert its specific message, not only the folder name.
     - R19, in `tests/test_validate_targets.py`: a `.project-skill` file in a fixture copy of `shared/skills/<name>/` fails validation; the real tree passes.
-  - `stale_agents` (R17): a target whose `bootstrap-root` record lists 37 skills while the live `.agents/skills/` also holds retired folders that neither the record nor `.claude/skills/` has. The refusal names those paths and explains that they are copies of skills the bootstrap no longer ships. After deleting the listed folders, the refresh succeeds and the live `.agents/` equals the record. A conflict of any other shape keeps today's generic message.
+  - `stale_agents` (R17): a target whose `bootstrap-root` record lists 37 skills while the live `.agents/skills/` also holds retired folders that neither the record nor `.claude/skills/` has. The explanation lists only live `.agents/skills/<name>/` folders, never `.claude/bootstrap-root/...` paths, and says the record no longer lists them. After deleting the listed folders, the refresh succeeds and the live `.agents/` equals the record. A conflict of any other shape keeps today's generic message.
+  - R14's assumption, in `tests/test_validate_targets.py` (name contains `project_skill`): the validator fails when a generated tree's `.claude/skills/` and `.agents/skills/` hold different skill names.
   - Record each new test's first failing run in the session log. Mutate each fix away once and confirm its test fails, then restore it byte-identical.
 
 - [ ] **2. Never write through a link (R13).**
   - Owner: `coder`. Files (modify): `scripts/install_bootstrap.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
-  - Add a preflight, run in `main()` before any write (beside `validate_project_skills`). For every path the copy would write, it refuses if the path, or any directory between the target root and it, is a symlink. Paths the copy would write are each file and directory under the source, plus each `STATE_DIR_OWNED_README_PATHS` destination. Skip paths the copy leaves alone (existing consumer state, preserved tracked adapters, marker-claimed third-party bundles, marked project skills), using the same predicates `copy_generated_tree` uses, so the two cannot disagree. Collect every problem and refuse once, listing them all, with the remedy: replace the link with a regular file or folder, or remove it, then rerun.
-  - Defense in depth: the copy step (the `copytree` calls, the top-level `copy2`, and the README refresh) refuses to write through a link at its destination, even if the preflight is bypassed. Use a `copy_function` for `copytree`.
+  - Add a preflight in `main()`. It runs after `commit_copilot_surface` is computed, because the skip rules need it, and before `migrate_pre_existing_state`, the first write. It refuses when a write path, or any directory between the target root and it, is a symlink. The write paths are the ones in the risk notes:
+    - each file and directory the copy step writes, minus the paths it skips; use the same predicates as `copy_generated_tree` (factor them out if needed) so the two cannot disagree;
+    - the substitution files;
+    - `.gitignore`;
+    - `.claude/bootstrap-root` and each path `populate_bootstrap_root` writes or removes under it, plus `.claude/bootstrap-ownership.env`;
+    - `.devcontainer/devcontainer.json` when `--state-remote` is given.
+  - Collect every problem and refuse once, listing them all. The message starts with `Refusing to write through symlinks:` and gives the remedy: replace each link with a regular file or folder, or remove it, then rerun.
+  - The README refresh skips, with a warning, a state-folder README whose folder or file is a link. `chmod_runtime_scripts` skips links.
+  - No separate copy-time guard: the preflight is complete, and a refusal halfway through `copytree` would leave a partial write.
   - Unchanged: the removal loop (unlinking a link removes the link itself), the `.agents` takeover rules, and sidecar mode.
 
 - [ ] **3. Tighten the project-skill preflight and the mirror (R14, R15, R18, R19, R20).**
@@ -76,13 +92,15 @@ Risk notes:
   - R20: return the "marked but not protected" problem before reading `SKILL.md` through the unprotected path.
   - R18: `_mirrorable_files` passes an `onerror` handler to `os.walk`, and any walk error skips the whole folder with a warning that names the error. It leaves out `__pycache__/` and `*.pyc`, the generator's exclusions. Reuse an importable constant if one exists; otherwise define the two names once. Print "mirror project skill" only after the destination check passes.
   - R19: `validate_targets.py` fails when any `.project-skill` file exists under `shared/skills/` or under a generated skill folder in `dist/`.
-  - R17 (Decision 10): in `validate_agents_takeover`, when every conflict is a path that exists only in the live `.agents/skills/<name>/`, and `<name>` is in neither the record nor `.claude/skills/`, append an explanation. Those are copies of skills the bootstrap no longer ships, left by an older restore on this clone; if you did not create them, delete the listed folders and rerun. Any other conflict keeps today's message.
+  - R14's assumption: `validate_targets.py` fails when a generated tree's `.claude/skills/` and `.agents/skills/` hold different skill names.
+  - R17 (Decision 10): in `validate_agents_takeover`, take the paths that exist only in the live tree. When every conflict is such a path inside `.agents/skills/<name>/`, and `<name>` is in neither the record nor `.claude/skills/`, append an explanation. It lists those live `.agents/skills/<name>/` folders and says the shipped-before record no longer lists them: another clone refreshed and this clone's restore copies files but never deletes them. If you did not create them, delete the listed folders and rerun. Any other conflict keeps today's message.
   - `scripts/runtime_ownership.py:94-96`: replace the false RAG incident with the real risk. The learn skill told consumers to save skills under `.claude/skills/`, and a refresh deletes every `.claude/` file it does not generate. RAG's two lost folders were retired bootstrap skills.
 
 - [ ] **4. Correct the skill-authoring guidance and the installer docs (R16, R17, R21).**
   - Owner: `documenter`. Files (modify): `shared/skills/learn/SKILL.md`, `shared/skills/safe-consumer-bootstrap-refresh/SKILL.md`, `shared/templates/skill-template.md`, `shared/skills/deep-audit/SKILL.md`, `README.md`, `docs/runtime-checks.md`, `docs/target-mapping.md`, `docs/architecture.md` (only if it lists the refusals). Required Skills: `.claude/skills/documentation/SKILL.md`.
   - `learn` (R16):
-    - In Phase 2, separate the cases. In this bootstrap's authoring repository, update `shared/skills/<name>`. In a consumer, update an existing skill only when it holds `.project-skill`. Never edit a shipped skill there: a refresh overwrites it, and marking it is a name clash. Instead, create a new marked project skill with its own name, or write a MEMORY entry.
+    - In Phase 2, rewrite the outcome rows (the old "Same trigger & fix → update existing skill" row must not survive, even with a qualifier) so they separate the cases. In this bootstrap's authoring repository, update `shared/skills/<name>`. In a consumer, update an existing skill only when it holds `.project-skill`. Never edit a shipped skill there: a refresh overwrites it, and marking it is a name clash. Instead, create a new marked project skill with its own name, or write a MEMORY entry.
+    - Say plainly that every project skill needs the marker from the moment it is created. With no shipped-before record, an unmarked folder whose name the bootstrap later ships is overwritten (big plan Decision 9).
     - Replace the refusal promise with the real rules. An unmarked folder is refused only when the bootstrap neither ships its name nor shipped it before, and it is refused, not overwritten, when its name is newly shipped. Retired bootstrap names are deleted.
     - State the cap: `description` plus `when_to_use` at most 300 characters, trigger words first. The validator enforces it in the authoring repository; keep to it in consumers too.
     - Copilot also reads `.claude/skills/`, so it can find a new project skill without a refresh. Once a mirror copy exists, it lists that copy, so edits show after the next refresh.
@@ -131,6 +149,7 @@ test "$(grep -c -F 'lost its own' scripts/runtime_ownership.py)" = "0"
 test "$(grep -c -F 'is an unmarked skill the bootstrap never shipped' scripts/install_bootstrap.py)" = "0"
 test "$(grep -c -F 'Its only refusal about existing content' README.md)" = "0"
 test "$(grep -c -F 'Same trigger & fix → update existing skill' shared/skills/learn/SKILL.md)" = "0"
+grep -q -F 'Refusing to write through symlinks:' scripts/install_bootstrap.py
 grep -q -F '300 characters' dist/multi-agent/.claude/skills/learn/SKILL.md
 grep -q -F 'git hash-object' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
 grep -q -F 'pyvis-xss-testing' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
@@ -147,7 +166,10 @@ uv run python .claude/scripts/verify.py phase --format text
      bullet per item, numbered in the order it appears. -->
 
 - In a fresh `mktemp -d` Git repository outside the checkout, install from `dist/multi-agent` with `--local-only`, replace a shipped `SKILL.md` with a symlink to an outside sentinel file, and refresh. Expected: a refusal naming the path, and the sentinel unchanged.
-- Run `uv run python scripts/install_bootstrap.py ~/work/git_projects/img-classification --dry-run --local-only` (writes nothing). Expected: the 22 old bootstrap folders are listed with the new wording, without "never shipped". Record the output; do not refresh that consumer.
+- Real-consumer shapes, on scratch copies only, never the real repositories. For RAG, industrial-inspection, and img-classification: `git clone` each into a fresh `mktemp -d` folder and copy in its git-ignored `.claude/` and `.agents/` (when present). Then run a real `--local-only` refresh from `dist/multi-agent`.
+  - RAG and industrial-inspection (both have a shipped-before record): exit 0 and no refusal, which shows R13 and R14 do not refuse real consumers.
+  - img-classification (no record): the 22 old bootstrap folders are listed with the new wording, without "never shipped".
+  - Record the outputs.
 
 ## Closeout Checklist
 

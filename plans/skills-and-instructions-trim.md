@@ -81,7 +81,9 @@ On 2026-11-13, two independent plan reviews were folded in:
 
 Phases A to D were complete and pushed, with no PR. On 2026-11-14, a consolidated review held the PR. The findings are R1 to R23 in `.claude/quality_reports/merges/2026-11-14_skills-and-instructions-trim-review-claude.md`, with the two Codex reports beside it.
 
-The user asked for the fix plan and, before going to sleep, put the main agent in charge of implementing it to the end of the big plan. Three phases were appended, following "Reopening a completed big plan" in `.claude/instructions/plan-lifecycle.instructions.md`:
+The user asked for the fix plan and, before going to sleep, put the main agent in charge of implementing it to the end of the big plan. A separate read-only Opus devil's-advocate review challenged the three plans before implementation. Its two HIGH points (the symlink check covered only the copy step; the byte room was overstated) and its smaller points were folded in.
+
+Three phases were appended, following "Reopening a completed big plan" in `.claude/instructions/plan-lifecycle.instructions.md`:
 - E fixes the closeout procedure, guidance, validators, and docs (R1 to R12). It runs first so that F and G close out with the corrected recovery.
 - F fixes installer safety and the project-skill guidance (R13 to R22).
 - G is the final knowledge refresh and audit (R23).
@@ -94,11 +96,11 @@ Corrections recorded at the reopen:
 
 ### Decisions for the reopen (2026-11-14, recommended options taken while the user was away; the user may overturn them)
 
-8. **Symlinked destinations (R13).** A full refresh refuses, before any write, every path it would write that is a symlink or sits under a symlinked folder. It lists each path; the operator replaces the link with a regular file or removes it. Rejected option: silently replace the link, which would hide a change the user made.
-9. **Unmarked folder with a newly shipped name (R14).** When the `bootstrap-root` record exists and lacks the name, the refresh refuses instead of overwriting. With no such record, an unmarked folder with a shipped name is still treated as an old bootstrap copy and overwritten.
+8. **Symlinked destinations (R13).** A full refresh refuses, before any write, every path it would write that is a symlink or sits under a symlinked folder. That covers the copy step, the substitution files, `.gitignore`, `.claude/bootstrap-root/`, and the devcontainer file. It lists each path; the operator replaces the link with a regular file or removes it. A state-folder README under a symlinked consumer-state folder is skipped with a warning, because that folder is consumer state. Rejected option: silently replace the link, which would hide a change the user made.
+9. **Unmarked folder with a newly shipped name (R14).** When the `bootstrap-root` record exists and lacks the name, the refresh refuses instead of overwriting. With no such record, an unmarked folder with a shipped name is still treated as an old bootstrap copy and overwritten. So a consumer with no record can still lose an unmarked project skill whose name the bootstrap later ships; the learn skill therefore tells consumers to mark every project skill when they create it.
 10. **Stale `.agents/` on an existing second clone (R17).** The refusal explains the cause and the safe recovery (delete the listed folders). The docs allow that one manual deletion. Rejected for now: automatic deletion in the restore hook or the installer, which would need proof that each file is an old record copy. It stays a recorded follow-up.
 11. **Consumers with no record (R15).** The refusal says what is known and names both remedies. The refresh skill documents how to check that a folder is an unmodified bootstrap copy. Rejected: having the installer read the bootstrap's Git history, which needs a full clone.
-12. **Byte budgets (R10).** Add `workspace` 8 KiB, `quality-and-testing` 3 KiB, `tool-routing` 3 KiB, `closeout` 16 KiB, and `plan-lifecycle` 11 KiB to `POLICY_BYTE_BUDGETS`.
+12. **Byte budgets (R10).** Add `workspace` 7.5 KiB (7,680 bytes), `quality-and-testing` 3 KiB, `tool-routing` 3 KiB, `closeout` 16 KiB, and `plan-lifecycle` 11 KiB to `POLICY_BYTE_BUDGETS`. The Phase B size targets (workflow core 16,000; generated `CLAUDE.md` 4,500 and `AGENTS.md` 4,800; workspace 7,500) stay the acceptance line for Phase E, and its verification block checks them with `wc -c`.
 
 ### Measured baseline (2026-11-12, re-checked 2026-11-13)
 
