@@ -46,6 +46,7 @@ from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
     FULL_INSTALL_ROOT_PATHS,
+    PROJECT_SKILL_MARKER,
     SIDECAR_BRIDGES,
     SIDECAR_DEFAULT_PROFILE,
     SIDECAR_LEGACY_STATE_ROOT,
@@ -8190,6 +8191,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         f"multi-agent skill count mismatch: {count}",
         errors,
     )
+    errors.extend(generated_skill_surface_errors(TARGET_ROOT))
     # Skill frontmatter integrity (visibility, description) is checked once,
     # in validate_docs_parity, alongside the other named-inventory checks.
     for skill_name in ("ponytail", "ponytail-review"):
@@ -8863,6 +8865,48 @@ def readme_agent_contract_errors(
     return errors
 
 
+def _project_skill_marker_errors(skill_root: Path) -> list[str]:
+    """One error per ``.project-skill`` entry anywhere under ``skill_root``.
+    A marker inside a shipped skill would make every consumer's next-but-one
+    refresh refuse a name clash until each operator deleted it by hand."""
+    return [
+        f"{marker}: SKILL_PROJECT_MARKER_SHIPPED - a shipped skill must not "
+        f"hold {PROJECT_SKILL_MARKER}; it is the consumer's own-skill marker"
+        for marker in sorted(skill_root.rglob(PROJECT_SKILL_MARKER))
+    ]
+
+
+def generated_skill_surface_errors(tree_root: Path) -> list[str]:
+    """Skill-surface invariants of one generated tree (``dist/multi-agent`` or
+    a ``dist/sidecar/<profile>`` overlay): no ``.project-skill`` marker in
+    either skill folder, and ``.claude/skills`` and ``.agents/skills`` hold
+    the same skill names. The installer's shipped-before record is the
+    ``.agents/skills`` copy, so a name in only one folder would make that
+    record disagree with what ``.claude/skills`` ships."""
+    surfaces = {
+        surface: tree_root / surface / "skills" for surface in (".claude", ".agents")
+    }
+    errors: list[str] = []
+    for skill_root in surfaces.values():
+        errors.extend(_project_skill_marker_errors(skill_root))
+    names = {
+        surface: {path.name for path in skill_root.iterdir() if path.is_dir()}
+        if skill_root.is_dir()
+        else set()
+        for surface, skill_root in surfaces.items()
+    }
+    claude_only = sorted(names[".claude"] - names[".agents"])
+    agents_only = sorted(names[".agents"] - names[".claude"])
+    if claude_only or agents_only:
+        errors.append(
+            f"{tree_root}: SKILL_SURFACE_MISMATCH - .claude/skills and "
+            ".agents/skills must hold the same skill names; "
+            f"only in .claude/skills: {', '.join(claude_only) or 'none'}; "
+            f"only in .agents/skills: {', '.join(agents_only) or 'none'}"
+        )
+    return errors
+
+
 def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
     """Hard, deterministic skill-library invariants for
     `skill_library_root` (normally `REPO_ROOT / "shared" / "skills"`): valid
@@ -8870,13 +8914,14 @@ def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
     non-empty, non-duplicate description (duplicate descriptions break
     description-match loading of background skills) within the listing-length
     cap (`skill_listing_length`), a required root
-    `SKILL.md` per directory, and local relative references that name a
-    repository path. See "Skill Library Validation Contract" in
+    `SKILL.md` per directory, no `.project-skill` marker anywhere, and local
+    relative references that name a repository path. See "Skill Library
+    Validation Contract" in
     docs/architecture.md for the hard/advisory split this function enforces;
     `deep-audit` owns the semantic judgments this function deliberately
     leaves out. Kept as a single pure helper so it stays independently
     testable while `validate_docs_parity` remains the one gate that calls it."""
-    errors: list[str] = []
+    errors: list[str] = _project_skill_marker_errors(skill_library_root)
     for skill_dir in sorted(p for p in skill_library_root.iterdir() if p.is_dir()):
         check(
             (skill_dir / "SKILL.md").is_file(),
@@ -9544,6 +9589,7 @@ def validate_sidecar_target(errors: list[str]) -> None:
             errors.append(f"missing generated sidecar profile: {profile}")
             continue
         errors.extend(sidecar_target_errors(target_root, profile))
+        errors.extend(generated_skill_surface_errors(target_root))
 
 
 def _sidecar_skills_profile_cases(good_root: Path, errors: list[str]) -> None:

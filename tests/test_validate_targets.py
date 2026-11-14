@@ -105,6 +105,7 @@ from validate_targets import (  # noqa: E402
     documenter_humanize_errors,
     execution_defaults_policy_errors,
     failure_masking_command_errors,
+    generated_skill_surface_errors,
     humanize_contract_errors,
     planner_supervision_contract_errors,
     reporting_policy_errors,
@@ -4261,6 +4262,127 @@ def test_description_cap_counts_when_to_use_toward_the_limit(tmp_path: Path) -> 
     assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
     assert str(over) in errors[0]
     assert "301" in errors[0]
+
+
+def test_project_skill_marker_in_a_shared_skill_fails_the_integrity_check(
+    tmp_path: Path,
+) -> None:
+    """R19: a stray `.project-skill` inside a shipped skill would make every
+    consumer's next-but-one refresh refuse a name clash."""
+    library = tmp_path / "skills"
+    shutil.copytree(REPO_ROOT / "shared" / "skills", library)
+    assert not [
+        error
+        for error in shared_skill_integrity_errors(library)
+        if "SKILL_PROJECT_MARKER_SHIPPED" in error
+    ]
+    marker = library / "haystack" / ".project-skill"
+    marker.write_bytes(b"")
+
+    errors = [
+        error
+        for error in shared_skill_integrity_errors(library)
+        if "SKILL_PROJECT_MARKER_SHIPPED" in error
+    ]
+
+    assert len(errors) == 1
+    assert str(marker) in errors[0]
+
+
+def _write_skill_surfaces(
+    root: Path, claude: tuple[str, ...], agents: tuple[str, ...]
+) -> None:
+    for surface, names in ((".claude", claude), (".agents", agents)):
+        for name in names:
+            skill = root / surface / "skills" / name / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("surface", (".claude", ".agents"))
+def test_project_skill_marker_in_a_generated_skill_folder_fails(
+    tmp_path: Path, surface: str
+) -> None:
+    _write_skill_surfaces(tmp_path, ("alpha", "beta"), ("alpha", "beta"))
+    assert generated_skill_surface_errors(tmp_path) == []
+    marker = tmp_path / surface / "skills" / "beta" / ".project-skill"
+    marker.write_bytes(b"")
+
+    errors = generated_skill_surface_errors(tmp_path)
+
+    assert len(errors) == 1
+    assert "SKILL_PROJECT_MARKER_SHIPPED" in errors[0]
+    assert str(marker) in errors[0]
+
+
+def test_project_skill_generated_surfaces_must_hold_the_same_skill_names(
+    tmp_path: Path,
+) -> None:
+    """R14 assumes every shipped skill is in both folders, so the installer's
+    record (the `.agents/skills` copy) lists exactly what `.claude/skills`
+    ships."""
+    _write_skill_surfaces(tmp_path, ("alpha", "beta"), ("alpha", "gamma"))
+
+    errors = generated_skill_surface_errors(tmp_path)
+
+    assert len(errors) == 1
+    assert "SKILL_SURFACE_MISMATCH" in errors[0]
+    assert "only in .claude/skills: beta" in errors[0]
+    assert "only in .agents/skills: gamma" in errors[0]
+
+
+def test_project_skill_checks_accept_every_real_generated_skill_tree() -> None:
+    roots = [
+        REPO_ROOT / "dist" / "multi-agent",
+        *(REPO_ROOT / "dist" / "sidecar" / profile for profile in SIDECAR_PROFILES),
+    ]
+    if not all(root.exists() for root in roots):
+        pytest.skip("dist not generated in this checkout")
+
+    for root in roots:
+        assert generated_skill_surface_errors(root) == []
+
+
+def test_project_skill_marker_in_the_generated_target_fails_the_validator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dist = REPO_ROOT / "dist" / "multi-agent"
+    if not dist.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    copy = tmp_path / "multi-agent"
+    shutil.copytree(dist, copy, symlinks=True)
+    marker = copy / ".claude" / "skills" / "learn" / ".project-skill"
+    marker.write_bytes(b"")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", copy)
+    errors: list[str] = []
+
+    target_validator.validate_skills_and_paths(errors)
+
+    assert any(
+        "SKILL_PROJECT_MARKER_SHIPPED" in error and str(marker) in error
+        for error in errors
+    )
+
+
+def test_project_skill_marker_in_a_generated_sidecar_fails_the_validator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sidecar = REPO_ROOT / "dist" / "sidecar"
+    if not sidecar.exists():
+        pytest.skip("dist/sidecar not generated in this checkout")
+    shutil.copytree(sidecar, tmp_path / "sidecar", symlinks=True)
+    marker = tmp_path / "sidecar" / "skills" / ".agents" / "skills" / "ponytail"
+    marker = marker / ".project-skill"
+    marker.write_bytes(b"")
+    monkeypatch.setattr(target_validator, "DIST_ROOT", tmp_path)
+    errors: list[str] = []
+
+    target_validator.validate_sidecar_target(errors)
+
+    assert any(
+        "SKILL_PROJECT_MARKER_SHIPPED" in error and str(marker) in error
+        for error in errors
+    )
 
 
 MERGED_SKILL_REFERENCES = (

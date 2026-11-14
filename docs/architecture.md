@@ -126,6 +126,15 @@ run when any is violated:
   (`SKILL_DESCRIPTION_CAP_EXEMPT`). A longer skill is reported as
   `SKILL_DESCRIPTION_TOO_LONG` by `shared_skill_integrity_errors`;
 - every `shared/skills/*` directory has a root `SKILL.md`;
+- no shipped skill folder holds a `.project-skill` marker
+  (`SKILL_PROJECT_MARKER_SHIPPED`): `shared_skill_integrity_errors` checks
+  `shared/skills/`, and `generated_skill_surface_errors` checks the
+  `.claude/skills/` and `.agents/skills/` folders of `dist/multi-agent` and of
+  each `dist/sidecar/<profile>`, because a stray marker would make every
+  consumer's refresh refuse a name clash;
+- a generated tree's `.claude/skills/` and `.agents/skills/` hold the same
+  skill names (`SKILL_SURFACE_MISMATCH`, `generated_skill_surface_errors`),
+  which the installer's newly-shipped-name refusal relies on;
 - a backtick-quoted local reference that names a known repository root
   (`shared/`, `scripts/`, `docs/`, `tests/`, `.claude/`, `.github/`,
   `.codex/`, `.agents/`, or a same-directory `references/...` path) resolves

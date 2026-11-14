@@ -940,7 +940,9 @@ keep a skill your project wrote, create an empty file
 deletes or overwrites that folder. It copies the folder, marker included, to
 `.agents/skills/<name>/`. The marker there grants no ownership; it records
 that the name is a project skill, so a later refresh refuses, instead of
-deleting, a folder whose `.claude` marker went missing. A symlink or other
+deleting, a folder whose `.claude` marker went missing. The mirror leaves out
+`.git`, `__pycache__/`, and `*.pyc` entries; it does not copy the folder
+whole. A symlink or other
 non-regular entry inside the folder makes the refresh skip the mirror for
 that folder with a warning; Claude Code still sees the skill.
 
@@ -949,12 +951,24 @@ that folder with a warning; Claude Code still sees the skill.
 | Claude Code | Directly from `.claude/skills/` | Sees edits at once |
 | Codex | Through `.agents/skills/` | Sees edits after the next refresh; Codex 0.147.0 lists it once |
 | Google Antigravity | Through `.agents/skills/` | Sees edits after the next refresh; documented, not observed |
-| Copilot in VS Code | Through `.agents/skills/` | Sees edits after the next refresh |
+| Copilot in VS Code | Reads `.claude/skills/` too, so it finds a new skill without a refresh; once a mirror copy exists in `.agents/skills/`, it lists that copy | Sees edits after the next refresh |
+
+The shipped-before record is `.claude/bootstrap-root/.agents/skills`, the copy
+of what the last install shipped. When that copy is missing, the live
+`.agents/skills/` stands in for every check except the newly-shipped-name
+refusal, which needs the `bootstrap-root` copy: with only the live
+`.agents/skills/` or no record, a newly shipped name is overwritten.
 
 Never create or edit `.agents/skills/<name>/` by hand: the next refresh refuses
-through the `.agents` takeover check, and the receipt fingerprint breaks. A
-name that a shipped or third-party skill uses blocks that refresh until you
-rename the project skill. Create or edit a project skill no later than
+through the `.agents` takeover check, and the receipt fingerprint breaks. The
+one exception: delete folders that a refused refresh lists as stale (another
+clone refreshed and this clone's restore never deletes). A name that a shipped
+or third-party skill uses blocks that refresh until you rename the project
+skill. A refresh also refuses an unmarked folder whose name the bootstrap
+neither ships nor shipped before, and one whose name is newly shipped and
+missing from the shipped-before record. With no such record, an unmarked
+folder named like a shipped skill is overwritten, so mark every project skill
+when you create it. Create or edit a project skill no later than
 CLOSEOUT step 2, because receipts bind `.claude/` runtime files. This covers
 the full install only. In a sidecar repository, team skills are never touched,
 the marker has no effect, and nothing is mirrored.
@@ -965,8 +979,20 @@ The full installer is a takeover, and its protection is narrower than it
 looks — this is why the sidecar exists as a separate mode instead of a
 gentler full install. Checked against `scripts/install_bootstrap.py`:
 
-- Its only refusal about existing content is for an `.agents/` tree it
-  cannot prove it generated.
+- It refuses to run in these cases: an `.agents/` tree it cannot prove it
+  generated; an unmarked skill folder whose name the bootstrap neither ships
+  nor shipped before; an unmarked skill folder whose name is newly shipped
+  and not in the shipped-before record; and a symlink (the message starts
+  `Refusing to write through symlinks:`). The symlink refusal covers
+  a link at a path it writes or may write: the copy step's paths, the
+  project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
+  workspace instruction files), `.gitignore`, `.claude/bootstrap-root/`,
+  `.claude/bootstrap-ownership.env`, and `.devcontainer/devcontainer.json` with
+  `--state-remote`. It refuses a link at a substitution file or `.gitignore`
+  even when no rewrite would happen, so a symlinked `AGENTS.md -> CLAUDE.md` is
+  refused. The nested state sync's own writes are not checked: it may append to
+  `.claude/.gitignore` and `.claude/.gitattributes`, and it restores
+  `settings.local.json`.
 - A non-empty `.claude/` with no `.git` is treated as legacy state and
   turned into a nested Git repository.
 - Under `.claude/`, it overwrites every file it generates and deletes every
@@ -974,10 +1000,10 @@ gentler full install. Checked against `scripts/install_bootstrap.py`:
   only in the new nested repository's history. The exceptions are consumer
   state, third-party bundles such as `openwiki`, and a skill folder marked
   with `.project-skill` (see [Project-owned skills](#project-owned-skills)).
-- Before it writes anything, it refuses a project skill that clashes with a
-  shipped skill, a third-party name, an invalid or mismatched name, any
-  symlink at the skill-folder level, an unmarked skill folder it never
-  shipped, and a project skill whose marker went missing.
+- Before it writes anything, it also refuses a project skill that clashes
+  with a shipped skill or a third-party name, an invalid or mismatched name,
+  any symlink at the skill-folder level, and a project skill whose marker
+  went missing.
 - Inside the root adapter paths, it deletes every untracked file it does not
   generate as an "obsolete generated file". Tracked root adapter files such
   as `CLAUDE.md` and `AGENTS.md` are preserved, except the Copilot surface

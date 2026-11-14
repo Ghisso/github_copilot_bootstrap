@@ -50,10 +50,57 @@ Use this workflow when:
    have no `.project-skill`. Mark or move each one first. A name in that
    record was shipped before and is retired on purpose, so do not mark it,
    unless the record's copy holds `.project-skill`: that folder is a project
-   skill that lost its marker, so restore the marker. The installer refuses
-   the same set.
-7. Preserve the normal human-operated update-and-push behavior when
+   skill that lost its marker, so restore the marker. Also list unmarked
+   folders whose name the new source ships but that
+   `.claude/bootstrap-root/.agents/skills` does not list. Rename each one and
+   its `name:` line, then mark it, or remove it. The installer refuses both
+   kinds.
+7. With no shipped-before record, the installer cannot tell a retired
+   bootstrap skill from a project skill. Run the installer with `--dry-run`
+   and read the folders it lists. For each one, check whether every file is
+   an unmodified bootstrap copy: the file's `git hash-object` must appear in
+   `git rev-list --all --objects` of a bootstrap checkout. Remove unmodified
+   copies. Mark the project's own folders with `.project-skill`.
+8. A refresh refuses when the live `.agents/skills/` holds folders that the
+   shipped-before record no longer lists. This happens when another clone
+   refreshed, because this clone's restore copies files but never deletes
+   them. Delete the listed folders if you did not create them, then rerun.
+9. A refresh refuses before any write (message starts
+   `Refusing to write through symlinks:`) on a link at a path it writes or may write: the copy step's paths, the
+   project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
+   workspace instruction files), `.gitignore`, `.claude/bootstrap-root/`,
+   `.claude/bootstrap-ownership.env`, and `.devcontainer/devcontainer.json` with
+   `--state-remote`. It refuses a link at a substitution file or `.gitignore`
+   even when no rewrite would happen, so a symlinked `AGENTS.md -> CLAUDE.md` is
+   refused. The nested state sync's own writes are not checked: it may append to
+   `.claude/.gitignore` and `.claude/.gitattributes`, and it restores
+   `settings.local.json`.
+   Replace each link with a regular file or folder, or remove it.
+10. Preserve the normal human-operated update-and-push behavior when
    local-only mode is absent.
+
+## Retired Skills
+
+The skill trim removed 20 skills. Update consumer MEMORY entries that name
+them.
+
+| Retired skill | Where the content went |
+| --- | --- |
+| `pipeline-patterns` | `.claude/skills/haystack/references/pipelines.md` |
+| `haystack-conditional-router` | `.claude/skills/haystack/references/conditional-router.md` |
+| `docling-haystack` | `.claude/skills/haystack/references/docling.md` |
+| `ollama-chat-generator` | `.claude/skills/haystack/references/ollama-chat.md` |
+| `pandas-nan-bool-coercion` | `.claude/skills/data-and-graph-pitfalls/references/pandas-nan-bool.md` |
+| `networkx-igraph-graphml-interop` | `.claude/skills/data-and-graph-pitfalls/references/graphml-interop.md` |
+| `pyvis-xss-testing` | `.claude/skills/data-and-graph-pitfalls/references/pyvis-xss.md` |
+| `csv-driven-integration-tests` | `.claude/skills/data-and-graph-pitfalls/references/csv-driven-tests.md` |
+| `deploy-service` | `bentoml-service`, "Deploy" section |
+| `context-manager-testing` | one rule in the tests policy |
+| `test-helper-public-api` | one rule in the tests policy |
+| `dataclass-classvar-constant` | removed; the rule is in the code-standards policy |
+| `review-api` | removed; use `code-review` |
+| `run-tests` | removed; use `.claude/scripts/verify.py` |
+| `refactor`, `pdf`, `caveman-compress`, `domain-type-placement`, `graph-schema-compat-migration`, `extraction-metadata-sourcing` | removed |
 
 ## Verification
 

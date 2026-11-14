@@ -33,7 +33,33 @@ Never hand-copy `dist/` into place; always regenerate and install.
 ### What a self-refresh removes
 
 Files under `.claude/` that the generated target does not contain are removed as
-obsolete owned files. Consumer state (`MEMORY.md`, `plans`, `explorations`,
+obsolete owned files. The exception is a project skill: a folder under
+`.claude/skills/` that holds `.project-skill` is never removed or overwritten.
+
+Before any write, the refresh refuses, among other cases (the README lists
+the project-skill refusals):
+
+- an `.agents/` tree it cannot prove it generated;
+- an unmarked skill folder it cannot account for: one the new source does not
+  ship and the shipped-before record does not list, or one whose name the new
+  source newly ships while the `.claude/bootstrap-root/.agents/skills` copy
+  does not list it;
+- a link at a path it writes or may write (`Refusing to write through
+  symlinks:`): the copy step's paths, the project-name and Python-version files
+  (`CLAUDE.md`, `AGENTS.md`, and the two workspace instruction files),
+  `.gitignore`, `.claude/bootstrap-root/`, `.claude/bootstrap-ownership.env`,
+  and `.devcontainer/devcontainer.json` with `--state-remote`. A link at a
+  substitution file or `.gitignore` is refused even when no rewrite would
+  happen, so a symlinked `AGENTS.md -> CLAUDE.md` is refused. The nested state
+  sync's own writes are not checked: it may append to `.claude/.gitignore` and
+  `.claude/.gitattributes`, and it restores `settings.local.json`.
+
+The shipped-before record is `.claude/bootstrap-root/.agents/skills`, the copy
+of what the last install shipped. When that copy is missing, the live
+`.agents/skills/` stands in for every check except the newly-shipped-name
+refusal.
+
+Consumer state (`MEMORY.md`, `plans`, `explorations`,
 `session_logs`, `quality_reports`, `project-context.instructions.md`,
 `settings.local.json`, and the nested `.gitignore` and `.gitattributes`) is
 preserved, as are tracked authoring adapters such as `.codex/config.toml` and
@@ -52,9 +78,10 @@ treated as bootstrap-owned.
 
 A file that exists under `.claude/` but not in the generated target is still
 removed as obsolete. `check_runtime.py` reports such orphans before a refresh
-does anything, so read its output first. An authored skill living only in the
-overlay should be promoted into `shared/skills/` so it regenerates, rather than
-being left to be deleted by the next refresh.
+does anything, so read its output first. In this authoring repository, an authored skill
+living only in the overlay should be promoted into `shared/skills/` so it
+regenerates. In a consumer, mark the folder with `.project-skill` so the next
+refresh keeps it.
 
 ### Expected side effects
 
