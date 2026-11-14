@@ -17,10 +17,17 @@ Refresh the OpenWiki pages that carry review finding R23 or describe what Phases
 - Step 3: `generate_targets.py --all` exit 0; `install_bootstrap.py . --allow-self --local-only` exit 0, no refusal; every quick Verification item PASS (`validate_targets.py` PASS, `check_runtime.py` exit 0, `validate_plan_frontmatter.py` exit 0); full `verify.py phase --format text` PASS (Ruff 0, mypy 0, pytest 5198 passed, 1 skipped).
 - Review round 1 (`reviewer`, six profiles): no CRITICAL or MAJOR; gate WARN only on the open request for the full `verify.py phase` result (PASS, given in round 2). Three MINORs on wiki prose: the sidecar page said the generator removes any pointer to a full-install policy file (it rewrites two named paths and deletes one sentence; the validator catches the rest); the install page's RAG parenthetical had no cited source and an unexplained name; the full-install sequence omitted `update_devcontainer_state_remote` (pre-existing). The reviewer also found the orchestrator's user-level memory `project_context_mode_agent_matcher.md` still saying "Once that branch merges"; corrected in place (PR #55 merged).
 - Second OpenWiki run (`296e6399`) for the three MINORs, on two pages: the sidecar paragraph states exactly what `SIDECAR_WORKFLOW_PATH_REPLACEMENTS` handles; the RAG parenthetical removed; the sequence gains step 12 `update_devcontainer_state_remote` (later steps renumbered), with the sequence claim revised and one new claim. `openwiki_finish` returned `complete`; no run file; no root block; every quick Verification item still PASS.
+- Review round 2 (same reviewer): gate PASS, no open request; the three round-1 MINORs closed; one new MINOR: step 12 and line 133 say the devcontainer write and its symlink check happen "with `--state-remote`", but an exported `AI_STATE_REMOTE` triggers both too (the same wording is in README and `docs/runtime-checks.md`). It understates when the check runs, the safe direction, so under the user's acceptance bar it became a recorded follow-up in `docs/target-mapping.md` instead of a third OpenWiki run. Round 3 (same reviewer) confirmed the follow-up text and gate PASS.
+- CLOSEOUT step 1: documentation is this phase's content (seven refreshed pages, the follow-up bullet in `docs/target-mapping.md`) and the standing final-phase audit below.
+- CLOSEOUT step 2: read `.claude/skills/learn/SKILL.md`. One lesson went to `.claude/MEMORY.md` (below). Small plan set to `status: complete` with every step ticked; Phase G ticked in the big plan (the post-commit hook completes the big plan). The surviving MINOR is recorded with disposition `accepted`.
 
 ## [LEARN] Entries
 
+- [LEARN:tooling] OpenWiki's `openwiki_submit_page` refuses a Claim whose evidence range starts or ends on a blank line (`Evidence does not resolve`), even on a plain confirm when the stored range's edge became blank; revise the Claim with the same `id` and a tightened range. Saved to `.claude/MEMORY.md`.
+
 ## Verification
+
+- optional 1: PASS — the reviewer read every refreshed page's prose, not only its flagged claims, against the code and tests it cites, in three rounds. It found three prose mismatches (sidecar pointer scope, an unexplained RAG parenthetical, the missing devcontainer step), all fixed through a second OpenWiki run. One wording nuance (`--state-remote` or `AI_STATE_REMOTE`) remains as a recorded follow-up.
 
 ## Stale-claims surfaces checked
 
