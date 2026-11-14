@@ -39,7 +39,7 @@ constraints, regressions, or architecture decisions materially affect remaining
 work; revise affected future phases only, without reopening completed or
 unaffected scope.
 
-1. Search `.claude/MEMORY.md` for the task's area tags (for example `[LEARN:installer]`) and keywords, and read the matching entries. Read the whole file only for a memory audit.
+1. Search `.claude/MEMORY.md` with a literal match (`rg -F` or `grep -F`) for the task's area tags, for example `rg -F '[LEARN:installer]'`, and for keywords, and read the matching entries. List the tags in use with `grep -oE '\[LEARN:[a-z-]+\]' .claude/MEMORY.md | sort | uniq -c`. Read the whole file only for a memory audit.
 2. For ambiguous/complex tasks: clarify user preferences (max 3-5 questions) and settle decisive technical assumptions with evidence (planner Phase 1). A spec in `.claude/quality_reports/specs/` and requirement IDs are optional; equivalent approved content in the plan suffices.
 3. Draft plan -> save to `.claude/plans/` for concrete implementation plans or `.claude/explorations/` for exploratory/PoC plans.
 4. Present to user -> wait for approval unless the user explicitly supplied an approved implementation plan.
@@ -81,7 +81,7 @@ For each small plan:
 3. **VERIFY:** Run focused and fast checks during implementation. Route a deterministic failure to the coder with its changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
 5. **CLOSEOUT:** On entering CLOSEOUT, read and follow `.claude/instructions/closeout.instructions.md` step by step. The orchestrator prompt, the `commit` skill, README, and the plan templates point at that file and do not restate it.
-6. **FIX LOOP:** If focused verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat the checks and review before CLOSEOUT. A later code change restarts verification and review. Continue until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings by the severity contract in the closeout file: CRITICAL and MAJOR both block the completion commit.
+6. **FIX LOOP:** If focused verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat the checks and review before CLOSEOUT. A later code change restarts verification and review. When only receipt state went stale and no code changed, use the stale-receipt recoveries in the closeout file instead. Continue until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings by the severity contract in the closeout file: CRITICAL and MAJOR both block the completion commit.
 7. **COMMIT:** On normal completion, commit the explicitly staged completed small plan atomically.
 8. **PUSH:** After every successful outer-repository commit, attempt one normal non-force push; a missing remote or an authentication or network failure is a warning that keeps the local commit. This push is separate from the nested `.claude` `ai-state` sync. PR creation and merge remain explicitly user-requested.
 
@@ -112,9 +112,8 @@ Environment-variable bypasses are not supported.
 ## Verification Evidence Contract
 
 This is the single authoritative definition of a small plan's verification
-evidence. Every other surface — the plan and session-log templates, the
-`plan-decomposition` skill, the planner and orchestrator prompts, and the
-`commit` skill — links to this section instead of restating it.
+evidence. The small-plan template, the `plan-decomposition` skill, the planner
+prompt, and the `commit` skill link to this section instead of restating it.
 
 ### The required `## Verification` block
 
@@ -163,7 +162,7 @@ a dated record and is never re-judged. The matching patterns are
 
 ### Enforcement
 
-`scripts/validate_plan_frontmatter.py` (L1-L4, at branch creation and commit)
+`.claude/scripts/validate_plan_frontmatter.py` (L1-L4, at branch creation and commit)
 and `verify.py gate` (G1-G4, at commit) name the broken rule in their
 messages.
 
@@ -187,12 +186,9 @@ communication and agent-to-agent status or handoffs.
 - At small-plan closeout: the fields in "Closeout session log" in `.claude/instructions/closeout.instructions.md`
 - At an explicit checkpoint: `**Status:** PAUSED`, `**Plan:** <small-plan path>`, pause reason, completed and remaining work, verification state, incomplete checks, and resume point
 
-**Frequency:** Every 30 responses or at session end, whichever comes first.
+**Frequency:** Every 30 responses or at session end, whichever comes first, except a log a closeout receipt already binds. That log is never edited (see "Immutability" in `.claude/instructions/closeout.instructions.md`); put later work in a new log.
 
 Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
-
-A session log bound by a closeout receipt is never edited; see "Immutability"
-in `.claude/instructions/closeout.instructions.md`.
 
 **Conditional stale-claims review:** When a phase changes a previously
 documented fact, number/count, behavior, API, decision, conclusion, or
@@ -209,19 +205,19 @@ correction elsewhere in the file and leaving the wrong entry standing is not
 sufficient, because a reader can act on the wrong entry before ever reaching
 the correction. Archived plans, dated design narratives, and closed session
 logs are dated records: they describe what was true at the time and stay
-unchanged. A closed log's correction goes in a sibling `<log-name>.errata.md`,
-only where the original entry would actively mislead a reader into
-reintroducing a defect and no closeout receipt binds the log.
+unchanged. A closed log's correction goes in a sibling `<log-name>.errata.md`
+(whether or not a closeout receipt binds the log), only where the original
+entry would actively mislead a reader into reintroducing a defect.
 
 ---
 
 ## Context Management
 
-**Before finishing or when context is getting large:** save `[LEARN]` entries to `.claude/MEMORY.md`, update the session log, make sure the plan is saved to disk, and document open questions.
+**Before finishing or when context is getting large:** save `[LEARN]` entries to `.claude/MEMORY.md`, make sure the plan is saved to disk, and document open questions.
 
 **Starting a new session:**
 1. Read `.claude/instructions/workspace.instructions.md` plus the current plan in `.claude/plans/` or exploration in `.claude/explorations/`.
-2. Search `.claude/MEMORY.md` for the task's area tags (for example `[LEARN:installer]`) and keywords, and read the matching entries. Read the whole file only for a memory audit.
+2. Search `.claude/MEMORY.md` as in Plan-First step 1.
 3. If the current small plan is `paused`, read its `pause_session_log`, then set that same plan to `in-progress` while preserving its pause metadata; do not create another small plan.
 4. Check `git log --oneline -10`, `git status`, and `git diff`.
 5. State the recorded resume point, understood task, and next step.
@@ -231,7 +227,7 @@ reintroducing a defect and no closeout receipt binds the log.
 ## Automatic Reminders
 
 **Automated via hooks:**
-- Secret-shaped files, hook, server, agent, and workspace configuration, and dangerous Git commands are guarded (see root guidance).
+- Secret-shaped files, hook, server, agent, and workspace configuration, and dangerous Git commands are guarded (see `.claude/instructions/workspace.instructions.md`).
 - Implementation branch creation is gated on `dev`, a clean tree, a matching big plan, and plan checks L1-L4 on the big plan and its listed phase files.
 - A completion commit is gated by the completion-commit gate in `.claude/instructions/closeout.instructions.md`. That file also lists the PR and push gates.
 - Session start/end events go to `.claude/session_logs/hooks-sessions.log`; runtime hook errors go to `hooks-errors.log` in the same folder.
@@ -239,4 +235,3 @@ reintroducing a defect and no closeout receipt binds the log.
 
 **Manual reminders:**
 - After editing any Python source file, run `uv run python .claude/scripts/verify.py fast --format json` (it selects the repository's real scope, in an installed consumer or the authoring repository).
-- Every ~30 responses or before stopping, update the session log in `.claude/session_logs/` and flush `[LEARN]` entries to `.claude/MEMORY.md`.

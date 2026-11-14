@@ -2,9 +2,8 @@
 name: research-critique
 visibility: public
 description: |
-  Critique a paper: "critique this paper", "is this paper sound", "evaluate the
-  methodology", "does the evidence support the claims", "strengths and
-  weaknesses". Weighs methodology, claims versus evidence, and significance in
+  Critique a paper: "critique this paper", "review this research", "is this paper
+  sound", "evaluate the methodology", "does the evidence support the claims". Weighs methodology, claims versus evidence, and significance in
   prose. For formatting use documentation; for surveys use literature-review.
 ---
 

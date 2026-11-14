@@ -24,7 +24,7 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 `PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH`
 
-- Before non-trivial work, search `.claude/MEMORY.md` for the task's area tags (for example `[LEARN:installer]`) and keywords and read the matching entries. Save the approved plan under `.claude/plans/` and create one `<plan_name>_implementation` branch from a clean `dev` branch.
+- Before non-trivial work, search `.claude/MEMORY.md` with `rg -F` for the task's area tags (for example `[LEARN:installer]`) and keywords and read the matching entries. Save the approved plan under `.claude/plans/` and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings; follow `.claude/instructions/closeout.instructions.md` step by step.
 - Commit a completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the review gate is `PASS` with no open request, and the closeout session log is complete.
@@ -53,7 +53,7 @@ since it selects the correct scope for whichever repository it runs in:
 
 ```bash
 uv run python .claude/scripts/verify.py fast --format text     # during IMPLEMENT
-uv run python .claude/scripts/verify.py phase --format text    # before REVIEW
+uv run python .claude/scripts/verify.py phase --format text    # CLOSEOUT step 4 persists it
 ```
 
 Use `uv run` for all Python tooling; never bare `python`, `pip`, `pytest`, `mypy`, or `ruff`.

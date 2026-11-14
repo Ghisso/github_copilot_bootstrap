@@ -4,8 +4,8 @@ visibility: public
 description: |
   Data and graph pitfalls: pandas NaN and numpy bool coercion, NetworkX versus
   igraph GraphML node IDs and control characters, pyvis XSS escaping tests, and
-  CSV-driven integration tests. Use when one of these bugs appears or such a
-  test is being built.
+  CSV-driven integration tests for a classifier, router, or SQL generator. Use
+  when one of these bugs appears or such a test is being built.
 ---
 
 # Data and Graph Pitfalls

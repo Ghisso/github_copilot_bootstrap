@@ -2,7 +2,7 @@
 name: code-review
 visibility: public
 description: |
-  Unified review workflow. Runs the `reviewer` agent with one or more
+  Unified review workflow: "review an API or endpoint", "code review". Runs the `reviewer` agent with one or more
   profiles from `.claude/review-profiles/` and synthesizes findings into a gate result.
 argument-hint: "[file-or-directory]"
 ---
