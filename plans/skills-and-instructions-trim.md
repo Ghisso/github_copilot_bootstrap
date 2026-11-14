@@ -14,7 +14,7 @@ phases:
   - 2026-11-14_phase-E-closeout-and-guidance-fixes
   - 2026-11-14_phase-F-installer-safety
   - 2026-11-14_phase-G-knowledge-refresh
-current_phase: 2026-11-14_phase-E-closeout-and-guidance-fixes
+current_phase: 2026-11-14_phase-F-installer-safety
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
