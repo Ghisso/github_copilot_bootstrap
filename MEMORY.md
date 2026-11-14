@@ -1826,8 +1826,26 @@
   `.claude/instructions/project-context.instructions.md` directly: it is
   consumer state, so the self-refresh never rewrites it, and it held "55
   reusable skills" and the old "refresh deletes everything" rule after the
-  skills trim. Search counts with any adjective (`\b55 (\w+ )?skills`) and
-  every surface that states a changed rule (the `shared/plans/README.md` seed
-  still said "Always: `plan-decomposition`"); an exact-phrase sweep missed
-  all three, and the Phase D review caught them.
+  skills trim. Since 2026-11-14 the closeout file's standing audit list names
+  it, `.github/`, and `openwiki/`. Search counts with any adjective
+  (`\b55 (\w+ )?skills`) and every surface that states a changed rule (the
+  `shared/plans/README.md` seed still said "Always: `plan-decomposition`");
+  an exact-phrase sweep missed all three, and the Phase D review caught them.
+- [LEARN:testing] A validator pin that searches the whole file for a guarded
+  string cannot catch the deletion of the section that string belongs to
+  when the same string also appears elsewhere: the closeout stale-receipt
+  messages also appear in step 6 and a hard rule, so deleting the whole
+  recovery section still passed. Scope the pin to its section, and test it
+  with a fixture that keeps the strings outside the section.
+- [LEARN:tooling] `grep -F` with a multi-word phrase misses Markdown text
+  wrapped across lines: the `plan-decomposition` skill links the Verification
+  Evidence Contract with the phrase split between "Evidence" and "Contract".
+  Before stating that a surface does not mention something, search with a
+  multi-line pattern such as `rg -U 'Verification\s+Evidence\s+Contract'`.
+- [LEARN:architecture] The workflow sidecar build ships some skills verbatim
+  but has no `.claude/instructions/`, and `test_validate_targets` forbids
+  that token in its tree. A policy pointer added to a sidecar-shipped skill
+  (Phase E's `hydra-config` pointer) needs a `SIDECAR_WORKFLOW_PATH_REPLACEMENTS`
+  entry in `scripts/generate_targets.py` that removes it for that build;
+  denylisting the skill instead changes what sidecar users get.
 

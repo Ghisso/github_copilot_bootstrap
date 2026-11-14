@@ -6,8 +6,8 @@ phase_index: 5
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-14_skills-trim-phase-E.md
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -46,7 +46,7 @@ Risk notes:
 
 ## Steps
 
-- [ ] **1. Write the failing tests first.**
+- [x] **1. Write the failing tests first.**
   - Owner: `coder`. Files (modify): `tests/test_validate_targets.py`, `tests/test_verify.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/testing-patterns/SKILL.md`.
   - Every new test name contains one of `closeout_procedure`, `codex_fallback`, `frontmatter_yaml`, `policy_budget`, `root_guidance`, or `docs_only_recovery`.
   - `closeout_procedure` (R6, R1): build a fixture that keeps all three stale-receipt messages outside the recovery section (for example in step 6 and in a hard rule), then remove the whole "Recovering from a stale receipt" section. Validation must fail, so only the new section scoping can catch it. The section must also name `findings report content_hash is stale`. The real file passes.
@@ -58,7 +58,7 @@ Risk notes:
   - `root_guidance`: the generated `CLAUDE.md` and `AGENTS.md` MEMORY sentence contains `rg -F` (R7).
   - Record each new test's first failing run in the session log. For the closeout and fallback checks, mutate the source to remove the guarded text and confirm the test fails, then restore it byte-identical.
 
-- [ ] **2. Correct the closeout procedure.**
+- [x] **2. Correct the closeout procedure.**
   - Owner: `coder`. Files (modify): `shared/policies/closeout.instructions.md`, `scripts/validate_targets.py` (`CLOSEOUT_STALE_RECEIPT_MESSAGES` and `closeout_procedure_errors`). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode), `.claude/skills/documentation/SKILL.md`.
   - R1, the documentation-only branch of "`closeout receipt final tracked state is stale`":
     - the phase receipt stays valid, because its content hash skips ordinary documentation;
@@ -77,7 +77,7 @@ Risk notes:
     - the opening paragraph names the small-plan and session-log templates, not "the plan templates".
   - Standing audit surface list: add `.claude/instructions/project-context.instructions.md`, `.github/`, and `openwiki/` (generated pages are fixed only through OpenWiki's tools). This turns the Phase D lesson into procedure.
 
-- [ ] **3. Correct the workflow core and the root-guidance MEMORY sentence.**
+- [x] **3. Correct the workflow core and the root-guidance MEMORY sentence.**
   - Owner: `coder`. Files (modify): `shared/policies/workflow.instructions.md`, `scripts/generate_targets.py` (root guidance text), `CLAUDE.md` (authoring, hand-maintained). Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R7: the MEMORY rule says to search with a literal match (`rg -F` or `grep -F`) for area tags such as `[LEARN:installer]` and for keywords, and gives the one command that lists the tags in use, for example `grep -oE '\[LEARN:[a-z-]+\]' .claude/MEMORY.md | sort | uniq -c`. Keep one full copy in the core (Plan-First step 1); the Context Management list points to it.
   - R4: replace the three session-log update reminders (Session Logging "Frequency", Context Management "update the session log", and Manual reminders) with one line that also excludes a log a closeout receipt already binds; such work goes in a new log.
@@ -87,7 +87,7 @@ Risk notes:
   - The generated `CLAUDE.md` and `AGENTS.md` MEMORY sentence gains `rg -F`. Keep `AGENTS.md` at or under 4,800 bytes and `CLAUDE.md` at or under 4,500; keep the core at or under 16,000 bytes (budget 16 KiB).
   - The authoring `CLAUDE.md`: the same MEMORY wording, and the `verify.py phase` line no longer says "before REVIEW" (the core runs focused and fast checks before review and the persisted phase check at CLOSEOUT step 4).
 
-- [ ] **4. Restore reliable Codex routes and the regression-test rule.**
+- [x] **4. Restore reliable Codex routes and the regression-test rule.**
   - Owner: `coder`. Files (modify): `shared/skills/hydra-config/SKILL.md`, `shared/agents/coder/prompt.md`, `shared/agents/coder/workflow-prompt.md` (only where it has the same tier), `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R8:
     - `hydra-config` names `.claude/instructions/config-first-design.instructions.md` and says to read it, including its rule for projects without Hydra;
@@ -96,13 +96,13 @@ Risk notes:
     - the always-load tier stays Ponytail only, so the Phase C `loading_rules` tests keep passing;
     - the validator requires each fallback skill's `SKILL.md` to name its mapped policy file.
 
-- [ ] **5. Close the validator gaps.**
+- [x] **5. Close the validator gaps.**
   - Owner: `coder`. Files (modify): `scripts/validate_targets.py`. Required Skills: `.claude/skills/ponytail/SKILL.md` (`full` mode).
   - R9: `skill_frontmatter_yaml_errors` rejects, for `description` and `when_to_use`, a block header other than `|`, `>`, `|-`, or `>-`; a header followed by a comment; and a plain or quoted value continued on following lines. Prefer rejecting these forms over adding a YAML parser. The error names the key and the form.
   - R10: add to `POLICY_BYTE_BUDGETS` the values in big plan Decision 12: `workspace.instructions.md` 7.5 KiB (7,680 bytes), `quality-and-testing.instructions.md` 3 KiB, `tool-routing.instructions.md` 3 KiB, `closeout.instructions.md` 16 KiB, `plan-lifecycle.instructions.md` 11 KiB. Update the comment above it, which says the budgets cover policies read before real work.
   - Fix the comment at `SKILL_DESCRIPTION_CAP_EXEMPT`: the two skills are exempt because their text is hash-pinned, not because both are always on.
 
-- [ ] **6. Restore lost trigger phrases and correct the remaining docs.**
+- [x] **6. Restore lost trigger phrases and correct the remaining docs.**
   - Owner: `documenter`. Files (modify): `shared/skills/code-review/SKILL.md`, `shared/skills/rag-auditor/SKILL.md`, `shared/skills/research-critique/SKILL.md`, `shared/skills/data-and-graph-pitfalls/SKILL.md` (descriptions only), `README.md`, `docs/smoke-tests.md`, `docs/target-mapping.md`, `docs/runtime-checks.md`, `shared/policies/workspace.instructions.md`, `shared/agents/orchestrator/prompt.md`, `.claude/instructions/project-context.instructions.md`, `tests/test_validate_targets.py` (one stale comment). Required Skills: `.claude/skills/documentation/SKILL.md`.
   - R11, each description at most 300 characters (now: `code-review` 153, `rag-auditor` 288, `research-critique` 299, `data-and-graph-pitfalls` 250). Where a phrase does not fit, drop a near-duplicate trigger already in the same description; keep the most specific ones.
     - `code-review` gains "review an API or endpoint";
@@ -121,10 +121,10 @@ Risk notes:
     - Project context: correct the current-status lines (35-37, 207-220): PR #55 is merged and `dev` pins Context Mode `2.1.8`. Keep dated history as history.
     - `tests/test_validate_targets.py:3736-3741`: remove "(noted below)", whose note was deleted with the `run-tests` test.
 
-- [ ] **7. Regenerate and refresh this repository.**
+- [x] **7. Regenerate and refresh this repository.**
   - Owner: orchestrator. Run `uv run python scripts/generate_targets.py --all`, then `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
 
-- [ ] **8. Review.**
+- [x] **8. Review.**
   - Owner: `reviewer`. Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`. State the acceptance bar from the Scope in the first-round prompt.
   - Focus:
     - the R1 recovery matches `record_findings.py`, `verify.py`, and the commit hook;
@@ -181,8 +181,8 @@ uv run python .claude/scripts/verify.py phase --format text
 
 Run the numbered CLOSEOUT sequence in `.claude/instructions/closeout.instructions.md` in order. Tick both boxes at its step 2. Later steps bind this file's bytes, so do not edit this file after step 2.
 
-- [ ] Step 1: documentation updated, or skipped as pure-internal with a reason
-- [ ] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
+- [x] Step 1: documentation updated, or skipped as pure-internal with a reason
+- [x] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
 
 ## Pause Checkpoint
 
