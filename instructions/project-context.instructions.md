@@ -271,8 +271,9 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
 - A new file under `.claude/` survives a self-refresh only inside a
   `CONSUMER_STATE_PATHS` entry, a marker-claimed third-party bundle, or a
   `.claude/skills/<name>/` folder marked with `.project-skill`; elsewhere the
-  installer deletes it, and an unmarked never-shipped skill folder makes it
-  refuse instead.
+  installer deletes it. An unmarked skill folder the bootstrap never shipped,
+  or one whose shipped name no shipped-before record lists, makes it refuse
+  instead.
 
 ## Known documentation/status caveats
 

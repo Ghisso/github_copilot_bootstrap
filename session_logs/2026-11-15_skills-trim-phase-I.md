@@ -56,7 +56,7 @@ Fix finding R29 in the wiki: the install page repeated the claims R24 to R28 cor
   - line 118 keeps Decision 10's original "delete the listed folders" text as the record, with the 2026-11-15 change listed after Decision 12.
   - Both are deliberate records. No change.
 - `.claude/MEMORY.md`: the `hash-object` entries (lines 153, 1633) are unrelated. Line 1853 is the Phase F lesson that quotes the old overclaim as history. No change; Phase H's two LEARN entries were added at its closeout.
-- Project context (`.claude/instructions/project-context.instructions.md`): Phase H updated lines 72-77 (the newly-shipped-name refusal). Current. No change.
+- Project context (`.claude/instructions/project-context.instructions.md`): Phase H updated lines 72-77, the newly-shipped-name refusal. The first audit missed lines 271-275, which still said only an unmarked never-shipped skill folder makes the refresh refuse. Review round 1 caught it. Corrected in place: an unrecorded shipped name is refused too.
 - `.github/`: no hit.
 - `openwiki/`:
   - the install page and quickstart were refreshed in Step 1 through OpenWiki's tools;
