@@ -54,9 +54,22 @@ Fix finding R29 in the wiki: the install page repeated the claims R24 to R28 cor
   - Reran: `generate_targets.py --all` exit 0, self-refresh exit 0, quick Verification lines all PASS. The full `verify.py phase` run was started for the open request.
 - **Step 2, audit.** `rg` across every surface in the standing list, using the six claim patterns from the plan plus variants: "is still overwritten", "overwrites the folder", "delete the listed folders", "delete them and rerun", "if you did not create", `hash-object`, `rev-list --all --objects`, "any path it would write", "preflight is complete", "with/without `--state-remote`", "Decisions 8", "confirm or overturn", "symlink preflight", "except the newly-shipped", "Decision 9", and "newly shipped name". The results are under the heading below.
 
+- **The full `verify.py phase --format text` after the round-1 fixes** (the reviewer's open request): PASS. Ruff 0, mypy 0, pytest 5243 passed and 1 skipped, and freshness, provenance, and generation all PASS.
+- **Review round 2** (same reviewer). Gate PASS. It confirmed all five round-1 findings fixed, found no new finding, and had no open request.
+  - It noted, without raising it, that the quickstart claim `claim_7e91…` still read "A path a full refresh writes is refused ... when it is unsafe".
+- **Third OpenWiki run.** Run `238b6751-a35f-4e37-af7c-5e476611ec47`: root adapters clean right after `openwiki_begin`, and a one-page plan for `quickstart.md`.
+  - It narrowed that claim to "A path that the unsafe-destination check covers is refused ...", with the same evidence (L1149-L1170). The prose row is unchanged.
+  - `openwiki_finish` returned `complete`, with no `openwiki/.run.json` left.
+- **Review round 3** (same reviewer). Gate PASS, no finding, no open request.
+  - The claim is right. The quickstart body is unchanged; only the tool-written `verified.at` moved. The install page's manifest entry was untouched by the third run.
+
 ## [LEARN] Entries
 
+- [LEARN:documentation] The overclaim pattern recurred after its own lesson: the refreshed wiki page introduced the unsafe-destination check as covering "every path a full refresh writes", right above its own not-checked list. Review round 1 rated it MAJOR. Routed to `.claude/MEMORY.md` by correcting the existing Phase F `[LEARN:documentation]` entry in place, not by adding a new one. The fix: introduce a guard's list as "each path in the list below", and before review grep the text and its claims for "every path" and "any path".
+
 ## Verification
+
+- optional 1: PASS — the main agent read each refreshed page's prose against the code it cites, and so did the reviewer in three rounds. The one MAJOR (the overclaim) and four MINORs from round 1 were fixed through a second OpenWiki run and confirmed in round 2. The quickstart claim was narrowed in a third run and confirmed in round 3.
 
 ## Stale-claims surfaces checked
 
@@ -89,3 +102,7 @@ Fix finding R29 in the wiki: the install page repeated the claims R24 to R28 cor
 - Closed session logs, quality reports, explorations, and dated docs are dated records and stay unchanged. No closed log misleads enough to need an errata file.
 
 ## Open Questions / Next Steps
+
+- This is the big plan's final phase: after its commit, the post-commit hook marks `skills-and-instructions-trim` complete.
+- The PR from `skills-and-instructions-trim_implementation` to `dev` is the user's decision.
+- The recorded follow-ups are in `docs/target-mapping.md`. The `state-sync.sh` symlink gap is the priority one.

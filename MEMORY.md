@@ -1853,8 +1853,12 @@
   covers "any path it would write", while `state-sync.sh`'s own writes
   (nested `.gitignore` and `.gitattributes` appends, the `settings.local.json`
   restore) are unchecked; a later edit then claimed a check the code never
-  makes. Describe a guard by listing exactly what it covers and what it does
-  not, and check each sentence against the code before review.
+  makes. It recurred in Phase I: the wiki page introduced the check as
+  covering "every path a full refresh writes" right above its own
+  not-checked list. Describe a guard by listing exactly what it covers and
+  what it does not, introduce the list as "each path in the list below",
+  and before review grep the text and its claims for "every path" and
+  "any path" and check each sentence against the code.
 - [LEARN:review] A subagent can report a file as fixed when its edit never
   landed (Phase F's documenter reported `docs/architecture.md` changed; the
   file was untouched, and review round 2 caught it). Before sending a review
