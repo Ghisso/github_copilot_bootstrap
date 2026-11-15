@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:a75e0b8140d3a900a3b8548d1857a9d998bc92af14b5fc0d4ef97cba5008d755",
+  "pageVersion": "sha256:ca6a57dcb50542d197ceecb3616661ded526199b5ac7f443a912b43b061e1b90",
   "claims": [
     {
       "id": "claim_170b66d0359a4df39a8029164feadafe",
@@ -21,11 +21,11 @@
       "statement": "Repository verification uses generated-target generation and validation, runtime checks, and verify.py fast or phase mode; an isolated validator interpreter without pytest must use the devcontainer or uv run --with pytest, while verify.py selects the repository's lint, type, and test scope.",
       "evidence": [
         {
-          "resource": "repo://README.md#L1437-L1445",
+          "resource": "repo://README.md#L1480-L1488",
           "version": "repo-lines-v1:sha256:6b53ebd59d6fb4c54ad0d98640a6edefd4605cf7252a1402dadd77c69186782e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMWFmYWJjMTE2N2M2YWM2M2VlYTQzMjNiYWU3ODFlNzcyZTlkZmE3NGY3Nzk5YjhiNzUwY2Q5OTgzZDkxZmU2MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQxMjZlZTA0OTRkYTk3NjJhNWQ5YzgwZGQwOGJhMDI0N2U3Yzc3YTc4YTBkZmQwODY1NTZiMGEwODZjZTIxYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDc4MTRjNmI3NDc5ZDJhOGIwYTU4ZGQwMjM4NzFjNjMxZjRhNTJmNDMxZDAzY2UzZmM3MWU3MjEyMTAzMTQ4NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGQ5MzZkYTA4NzA1ZmM0YzI5ZTMwMmRkMDczNDlmYTM5MWQzNTc0MmU1YWE5NzhiZjkyNTliNzEwMGUxZjA0ZiJ9"
         },
         {
-          "resource": "repo://README.md#L1520-L1524",
+          "resource": "repo://README.md#L1563-L1567",
           "version": "repo-lines-v1:sha256:e3b4ee1b2bdcb34158507c830f61df49d2fcc6405ce2a2137fe19aa0b916301c:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzZkNWQwZWU0NGM2YzdmYjljYjE3ODlmZmFiZjU0MjBkZGVhMzMxZDgxZmNhY2RhY2JhYzYwODFmZDQyYWZiNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDdjMDZjNTYxZDVjMzI3MzQzNjg1MjY4YTQ2YjMzOTFmMzk5OGVlZTg5MGQyYmU1MWYwZDIxY2M0YTUzYWU2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWViM2QzZTg4MzJkMjRkZTM5MjU3YzJiZTA4ZDM5NjhiYzY5M2JjMjA4YmQ4MmEyY2IzODFhNjc4NjdlMTIyMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTBjM2NjYmVhNTMxY2Y4NThmY2YyNTE4YjZkNGJmNjc0YTI3Y2RjN2RlN2U5M2M0Y2U3YzQwNmEyNmZmOGM1NyJ9"
         },
         {
@@ -65,11 +65,11 @@
           "version": "repo-lines-v1:sha256:2ed0bc69ace69b87e053ce8ba3b6b8bbd8373025df430dfdbc7078a17c328df9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzZGY0YTg1Mzc3M2RkZTMyNjY1NTg0NTdiMzM5MmM0ZTA2MWRlMTI5MDcyMzQxZTBmZTM3NjA4YmFkMzhkNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmYzViNDlkMjMwNzM5ZTc3MTZlNzEzZmZiZTY4YWZlMjg1NjY5NWU4NGFiOGEzMDEwNDIwMzQ3OWZiOGY5ZmMifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L2179-L2228",
+          "resource": "repo://scripts/install_bootstrap.py#L2315-L2364",
           "version": "repo-lines-v1:sha256:eb64e9c8c3aac58b198b14b4e86ce9f9e414a5ff8953df8ada5d111a4abf817f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmODljODJlZDZjMDBlMGViNWVkNTBlNTNjNzMxYWJmNTJmMTM5YWY5NDk3ZjIxNjAyNTRmZTUwZDQyMzZjOWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmJiYWZlODYxM2NjMjA1M2Y1NTRmZmU5NzRiNWQwZmY2M2VlNGVhMTc0NGQ2OGE3NjBmZjcwYjRkZmQyZTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0NzQ4ZTNjYTA2MzdjMzgzYmY0NWVlMjBjZjMwYTQ0Yjc1Y2RhZmU4ZDRhZjIwOTg1NGE2NWRkYWM3ZTUzY2YifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L74-L79",
+          "resource": "repo://scripts/install_bootstrap.py#L75-L80",
           "version": "repo-lines-v1:sha256:6b257b57a02ac2a88bf61a43edf86a21292bda467ba5478622ded4d7ceaa4f76:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzJlMDg5ZTFjYmJlOGJjNzNiNTE5ZGQ5YWQ3MTA5MzNiNTUyMWQxNWI5MWY0MGI2NTZiOGRiOTA3ZmE1NmQ1ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmYwMzYxZTJhYzJhYjVjNTMyZDIwODg4NTIyMDM3YWFjMzc1YTA5ZmFmNjg2MzdlZTEyNjk4ZWRmNzZhZWZlMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWZjNDRhMTIyNjZkZjI3Y2RiM2QxNzU2NTFmZDQ5ZjQyOGFlMGU3NjkyNTUyODg3M2FkMDMxNTAwMTgyOGRkMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjk4MjkwMDExNjY3MTY2OTFhNDE4MjRjZWU3NjRlZmE0YmUzMGYwNDlmZmI4NTM3OGRlMDg2MTdkNjczOGI3OSJ9"
         }
       ]
@@ -79,8 +79,8 @@
       "statement": "docs/target-mapping.md's Gate-Repair and Backlog-Followups Client Parity sections record, per client (Claude Code, Codex, GitHub Copilot, Antigravity), which guard or capability applies, the test evidence for each row, and the recorded follow-ups and gaps.",
       "evidence": [
         {
-          "resource": "repo://docs/target-mapping.md#L88-L149",
-          "version": "repo-lines-v1:sha256:96d095068a6961b219d569a5047f719f19b21d88ce363bdbdc440e9440f07c5b:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5MGMyNzNhMDEyOTdhYjgwYjA2NjQyNzg0ZDdkYTJlZTEwMTlmYjg4MTU0ZGQ3ZDRhMmE5MDc2YTIxMTIzYzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1N2U5ODUxZmZiNjg2ZWNhODUwYTM3YjcxMmMxNWUzMWRlNzlmNjJmOTBjYmNmZWFjYTI5OWQ0NDY1ZGIxMDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjZDVjNTIzNDA2YmJmOTQ3ODYyNDMxNjE3YzQ3MmI5MjNhZDFmNGM2Yzc0YThlNDdjMDY0OWE1ZjQ1Y2IzYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2YjlhNmI3MDFmNmZmZWFhMmFhY2UzODFkOWQyNThmYWUwYWM5Yzc0NGZiODk5M2FiOGEwODEyMjc4ODkxODIifQ"
+          "resource": "repo://docs/target-mapping.md#L88-L154",
+          "version": "repo-lines-v1:sha256:f0acfd38768724143bde2e9c094a6a8ab117a1bf12113fe2b12a63931af75d93:eyJzZWxlY3RlZExpbmVDb3VudCI6NjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5MGMyNzNhMDEyOTdhYjgwYjA2NjQyNzg0ZDdkYTJlZTEwMTlmYjg4MTU0ZGQ3ZDRhMmE5MDc2YTIxMTIzYzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1N2U5ODUxZmZiNjg2ZWNhODUwYTM3YjcxMmMxNWUzMWRlNzlmNjJmOTBjYmNmZWFjYTI5OWQ0NDY1ZGIxMDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjZDVjNTIzNDA2YmJmOTQ3ODYyNDMxNjE3YzQ3MmI5MjNhZDFmNGM2Yzc0YThlNDdjMDY0OWE1ZjQ1Y2IzYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM2YjlhNmI3MDFmNmZmZWFhMmFhY2UzODFkOWQyNThmYWUwYWM5Yzc0NGZiODk5M2FiOGEwODEyMjc4ODkxODIifQ"
         }
       ]
     },
@@ -114,17 +114,17 @@
     },
     {
       "id": "claim_7e911729697b4784a86661041b17cfa8",
-      "statement": "A symlink at a path a full refresh writes is refused before any write with a message that opens 'Refusing to write through symlinks:', and the install ownership page routes both that refusal and the project-skill refusals.",
+      "statement": "A path that the unsafe-destination check covers is refused before any write when it is unsafe: a link is listed under 'Refusing to write through symlinks:' and every other unsafe case under 'Refusing to write over a path of the wrong kind:', and the install ownership page routes both refusals and the project-skill refusals.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1029-L1036",
-          "version": "repo-lines-v1:sha256:ffc96446f232b50ee7e35cb217b5da15578b5d390be1e7e7450989b4fc519fbf:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzYxMDRhZmJmYTFkZjQ3ZjdhODM0MzE2MDg1MTIzMmNmZjFkMmZmOWRkNTk2MjM5YzgyYzFiZmEwMjNhMjJhYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkwOWE1M2E2MThkMDI4ZTFkMzAwMGMwYTdhYmNlZWNiZTVmYjM3ZjRlNTExZWZlNDY2NDNmYWQ2ZTY2ODcyZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjJmNmVlNzUwMjY1NjNhODRlZWY5OGU0MTllZmNiZmNmNTNmOWQ3OTA4YzkyYjY1OTMxNDUzNDM3ZTJiMzk5MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDhkNWU0ZjFhNmZkOTExMzQ1MTRhMWRkYzMzZjQ4NDNjZjMwMjlhYzk0YmY4MWI5ZTRhZWIzZjg0MmUxYzMyOSJ9"
+          "resource": "repo://scripts/install_bootstrap.py#L1149-L1170",
+          "version": "repo-lines-v1:sha256:4d5a9fcca8837a2e83a26e06ba32a05fa897b90cf349ee77187e5c53f6fa9a86:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiYzRlN2Y5ZjMxNmFmYTkwNWQ2YTM2OGVkYTgxMmRmODgxMDI5ODQwYjEzNWMwN2FjM2Q3ZTIwNmQyODVhMDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJmMjBmOTU1MzQzMmNjY2UyZDYwMDQ5OTNkM2FkODYwMDRhYmU5NzZiMzVjYjJkMjRiYjc1NWM5ZGYzZWQ0NzkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMwNGE4MDY5NTkwM2M4ZjAzY2ZlM2VlNjVhMzM3ZWI1Njk3NDBiZDRiOGQ5Y2Q1MTM2ODk5MzI2ODA0M2U0NWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA4ZDVlNGYxYTZmZDkxMTM0NTE0YTFkZGMzM2Y0ODQzY2YzMDI5YWM5NGJmODFiOWU0YWViM2Y4NDJlMWMzMjkifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-14T16:56:38.985Z"
+    "at": "2026-11-15T05:24:17.625Z"
   }
 }

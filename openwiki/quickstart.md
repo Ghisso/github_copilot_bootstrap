@@ -28,10 +28,10 @@ sources:
     resource: repo://shared/scripts/verify.py
   - id: openwiki-source-1c38db574c5e411bfd8c36ea
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
-generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
+generated: { by: "claude-code", at: "2026-11-15T04:54:58.755Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-14T16:56:38.985Z
+    at: 2026-11-15T05:24:17.625Z
 ---
 
 # Quickstart: where to look for what
@@ -63,7 +63,7 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 | declare, pause, cancel, or reopen a phase or plan, or add the knowledge-refresh final phase | [Task lanes and the enforced lifecycle](workflows/lifecycle-and-task-lanes.md) | `shared/policies/plan-lifecycle.instructions.md`, `scripts/validate_plan_frontmatter.py` |
 | understand why a commit, push, or PR was denied | [Deterministic verification](operations/deterministic-verification.md), then [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `docs/runtime-checks.md` |
 | add or change an agent, a review profile, or a skill, or check the 300-character skill description cap | [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md) | `shared/agents/<id>/agent.yaml`, `shared/skills/<name>/SKILL.md`, `scripts/validate_targets.py` |
-| keep a skill a consumer project wrote itself across refreshes (`.project-skill`), or act on a `Refusing project skills` or `Refusing to write through symlinks:` message | [Installing the bootstrap, file ownership, and runtime drift checks](operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `shared/skills/learn/SKILL.md` |
+| keep a skill a consumer project wrote itself across refreshes (`.project-skill`), or act on a `Refusing project skills`, `Refusing to write through symlinks:`, or `Refusing to write over a path of the wrong kind:` message | [Installing the bootstrap, file ownership, and runtime drift checks](operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `shared/skills/learn/SKILL.md` |
 | add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
 | understand why the file-protection guard denied or refused a shell command, or which shell forms it does not check | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `docs/runtime-checks.md` (the shell-parsing rules, the harmless commands it blocks, and the forms not yet checked), `shared/hooks/scripts/protect-files.py`, `tests/test_protect_files_substitutions.py` |
 | choose an install mode, understand why a plain install refused, install or refresh a full consumer, run a batch update, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |

@@ -44,25 +44,25 @@
       "completedRunId": "c7627951-a5c7-48f9-aa64-fc6ef225a7d6"
     },
     "/openwiki/operations/install-ownership-and-runtime-checks.md": {
-      "pageVersion": "sha256:999db83b7ae7aa545894b373afbbd9499d54caa8a15a48a53561423cbd5415bd",
+      "gitHead": "969e59ce25c0d6e274e1074c4f8d2e86ce1d7cea",
+      "sourceFingerprint": "sha256:dbc505a88983ce9432016b366621852763227c28682f98cc8192fc055306ab74",
+      "pageVersion": "sha256:8b3dbe979757df60eb0a3b487bd1ff550ccfc63a50be359e65853da8a1b1d1b3",
       "completedBy": "claude-code",
-      "completedRunId": "296e6399-20d8-4015-bd22-76fff02dfc48",
-      "gitHead": "ea8b475384349fb11e5c21ccee2f14957bca9ce9",
-      "sourceFingerprint": "sha256:a93ab7c4af20c35797dabb58d25cef8e0273521c16a999a8d414dce7882454f5"
+      "completedRunId": "3961c1e0-323b-4f14-91ee-2254803dda08"
     },
     "/openwiki/operations/sidecar-overlay.md": {
-      "pageVersion": "sha256:65df04e7b0730380f238077509ff88b0b40b9f86737eb9907f3a840ae5c13a98",
-      "completedBy": "claude-code",
-      "completedRunId": "296e6399-20d8-4015-bd22-76fff02dfc48",
-      "gitHead": "ea8b475384349fb11e5c21ccee2f14957bca9ce9",
-      "sourceFingerprint": "sha256:a93ab7c4af20c35797dabb58d25cef8e0273521c16a999a8d414dce7882454f5"
-    },
-    "/openwiki/quickstart.md": {
       "gitHead": "ea8b475384349fb11e5c21ccee2f14957bca9ce9",
       "sourceFingerprint": "sha256:a93ab7c4af20c35797dabb58d25cef8e0273521c16a999a8d414dce7882454f5",
-      "pageVersion": "sha256:a75e0b8140d3a900a3b8548d1857a9d998bc92af14b5fc0d4ef97cba5008d755",
+      "pageVersion": "sha256:65df04e7b0730380f238077509ff88b0b40b9f86737eb9907f3a840ae5c13a98",
       "completedBy": "claude-code",
-      "completedRunId": "a3fd2131-a628-4fde-9518-622e8cd52a01"
+      "completedRunId": "296e6399-20d8-4015-bd22-76fff02dfc48"
+    },
+    "/openwiki/quickstart.md": {
+      "pageVersion": "sha256:ca6a57dcb50542d197ceecb3616661ded526199b5ac7f443a912b43b061e1b90",
+      "completedBy": "claude-code",
+      "completedRunId": "238b6751-a35f-4e37-af7c-5e476611ec47",
+      "gitHead": "969e59ce25c0d6e274e1074c4f8d2e86ce1d7cea",
+      "sourceFingerprint": "sha256:dbc505a88983ce9432016b366621852763227c28682f98cc8192fc055306ab74"
     },
     "/openwiki/workflows/lifecycle-and-task-lanes.md": {
       "gitHead": "ea8b475384349fb11e5c21ccee2f14957bca9ce9",
