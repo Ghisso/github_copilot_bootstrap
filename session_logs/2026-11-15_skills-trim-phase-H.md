@@ -103,6 +103,18 @@ Fix second-review findings R24 to R28 (`.claude/quality_reports/merges/2026-11-1
     - in the README's consumer-refresh paragraph, "refuses the same set" now also names the newly shipped refusal, and "copy back ... and mark them" says to rename first on a name clash;
     - `update_consumers.py` now says "no shipped-before record";
     - added two reviewer-suggested follow-ups to `docs/target-mapping.md`: removals and `write_text` calls have the preflight only, and an unmarked shipped-name folder without `SKILL.md` is not refused.
+- **Round-2 coder result.**
+  - (1) The symlinked-record fixture now links to an outside folder holding `fresh/SKILL.md`. Under a "follow the link" mutation the old fixture still passed, and the new one fails.
+  - (2) `_run_installer` takes `extra_env`; the devcontainer test has the ids `given`, `exported`, and `absent`. `exported` passed first, pinning documented behavior.
+  - (3) Two new real-run wrong-kind entries passed first, pinning the stricter behavior: `generated-claude-folder-is-a-file` and `untracked-root-guidance`.
+  - (5) The `known` clause is now `no shipped-before record was found`, `... is a symlink and was not read`, or `... does not list it`. Its new and updated tests failed first.
+  - (4, docstring) Git's own writes added.
+  - Mutations R1, R2, R3a, R3b, R4a, and R4b were each caught; restores byte-identical. `tests/test_install_bootstrap.py` 268 passed.
+- **Main agent.**
+  - `_actor_env()` copied an inherited `AI_STATE_REMOTE` into every installer test. Reproduced: with the variable exported, `...devcontainer_file_is_checked_only_with_a_state_remote[absent]` failed. The helper now drops the variable, so a test sets it only through `extra_env`. With the variable exported, all three ids pass.
+  - Rewrapped one long docstring line.
+  - Reran: `generate_targets.py --all` exit 0, self-refresh exit 0 (the nested repository unchanged), `validate_targets.py` PASS, `tests/test_install_bootstrap.py` 268 passed, ruff clean.
+- Review round 2 requested from the same reviewer, with the new diff and its delta from round 1.
 
 ## [LEARN] Entries
 
