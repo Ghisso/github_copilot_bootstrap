@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-15
 **Plan:** `.claude/plans/2026-11-15_phase-I-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -69,6 +69,23 @@ Fix finding R29 in the wiki: the install page repeated the claims R24 to R28 cor
 
 ## Verification
 
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/operations/install-ownership-and-runtime-checks.md 'is still overwritten' 'delete the listed folders if you did not create them' 'when `--state-remote` is given.' 'without `--state-remote` it writes nothing' 'which needs the `bootstrap-root` copy'
+PASS        0.0s  grep -q -F 'Refusing to write through symlinks:' openwiki/operations/install-ownership-and-runtime-checks.md
+PASS        0.0s  grep -q -F 'Refusing to write over a path of the wrong kind:' openwiki/operations/install-ownership-and-runtime-checks.md
+PASS        0.0s  grep -q -F 'Refusing to write over a path of the wrong kind:' openwiki/quickstart.md
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"
+PASS       47.1s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      373.0s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-15_phase-I-knowledge-refresh.json` (0 findings; gate PASS; six profiles; round 1 FAIL with one MAJOR and four MINORs, all fixed; rounds 2 and 3 PASS).
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation).
 - optional 1: PASS — the main agent read each refreshed page's prose against the code it cites, and so did the reviewer in three rounds. The one MAJOR (the overclaim) and four MINORs from round 1 were fixed through a second OpenWiki run and confirmed in round 2. The quickstart claim was narrowed in a third run and confirmed in round 3.
 
 ## Stale-claims surfaces checked
