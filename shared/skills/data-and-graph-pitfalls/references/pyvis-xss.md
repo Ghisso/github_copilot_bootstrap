@@ -1,15 +1,3 @@
----
-name: pyvis-xss-testing
-visibility: background
-description: |
-  Correctly test HTML escaping in pyvis-generated visualizations. Triggers:
-  - Writing tests that assert `&lt;script&gt;` appears in pyvis HTML output
-  - XSS escaping tests that pass in unit tests but fail against real pyvis output
-  - pyvis double-encodes HTML entities via JSON serialization
-version: 1.0.0
-user-invocable: false
----
-
 ## Problem
 
 Naive assertions like `assert "&lt;script&gt;" in content` fail because pyvis

@@ -69,7 +69,7 @@ Google Antigravity:
 
 - `AGENTS.md` — provider-neutral root guidance shared with Codex.
 - `.agents/agents/` — six static Markdown custom-agent adapters (the five universal agents plus `antigravity_flash_coder`; Codex-only `luna_coder`/`sol_coder` are not emitted here).
-- `.agents/skills/` — the shared skill tree.
+- `.agents/skills/` — the shared skill tree. A full install also mirrors each project-owned skill (a `.claude/skills/<name>/` folder with a `.project-skill` marker) here, marker included, so Codex and Antigravity see it after the next refresh. Copilot also reads `.claude/skills/`, so it finds a new project skill without a refresh; once a mirror copy exists, Copilot lists that copy and sees edits after the next refresh.
 - `.agents/mcp_config.json` — the shared MCP servers under Antigravity's `mcpServers` schema.
 - `.agents/hooks.json` — the named `bootstrap-safety` configuration.
 
@@ -118,9 +118,23 @@ Recorded follow-ups:
 - The fail-closed rule (big plan `backlog-followups`, decision 6) denies on all four clients some mixed commands that asked on Claude Code and GitHub Copilot before that plan, for example `git restore .claude/settings.json && rm .claude/settings.json`, or `cat > .claude/settings.json <<EOF` whose body names another protected path. Split the command, or write the file with the native Write or Edit tool. Evidence: `tests/test_hook_gates.py`.
 - The OpenWiki guard has not been run on Codex against the real OpenWiki server. The 2026-09-19 spike saw Codex honor a `PreToolUse` deny on a test MCP server ([spike](2026-09-19-openwiki-hook-mechanics-spike.md)), but the re-probe in this checkout (deny `mode: "init"`, `noop` on a current wiki, root adapters clean after the turn) was optional evidence and recorded `NOT RUN` in `backlog-followups` Phase F because no Codex session was available. Offline evidence: `tests/test_openwiki_guard.py` and `tests/test_openwiki_cli_smoke.py`.
 - The bootstrap wires no Context Mode hooks on any client and gives Antigravity no Context Mode server entry, so Antigravity has no Context Mode lane at all.
+- Priority follow-up: the unsafe-destination check does not cover `state-sync.sh`'s own writes: the nested `.gitignore` and `.gitattributes` appends, and the `settings.local.json` restore. A link at one of those paths can still send a write outside the project.
+- The unsafe-destination check does not cover hard links.
+- Unverified: whether the macOS `strip_quarantine` step (`xattr -rc` over whole folders, consumer state included) follows links.
+- The check on substitution files fires even when no rewrite would happen. Narrow it to when a rewrite would fire. A symlinked `AGENTS.md -> CLAUDE.md` is refused today.
+- `populate_bootstrap_root` follows links inside the `.codex` and `.github/*` source adapters, and a preserved, tracked adapter that is a link, when it copies them. That is a read, not a write, but the content lands in the AI state, which can then be pushed to the AI-state remote.
+- The wrong-kind refusal also refuses kind changes that the obsolete-file cleanup could resolve, for example a regular file at `.claude/templates` or a folder holding an untracked link at `CLAUDE.md`. Narrowing it to unsafe cases is a possible later change. Until then, a bootstrap version that turns a generated file into a folder, or the reverse, makes each refresh refuse until the old item is moved by hand.
+- The inactive-adapter removal in `populate_bootstrap_root` and the plain `write_text` calls (the project-name and Python-version files, `.gitignore`, the devcontainer file, and `.claude/bootstrap-ownership.env`) are checked by the preflight only, with no copy-time second line.
+- An unmarked folder under `.claude/skills/` whose name the bootstrap ships but that holds no `SKILL.md` is not refused: the refresh overwrites its shipped files and the obsolete-file cleanup deletes its other files as obsolete generated files.
 - The commit gate enforces the Task Lanes five-profile review for control-plane, generator, and dependency paths, but not for every multi-file diff. A multi-file diff requires the Ponytail profile only.
 - Antigravity needs a logged native run for two open questions. The MCP tool-name format inside a PreToolUse `toolCall.name` is undocumented ([hooks](https://antigravity.google/docs/hooks)), so the bridge keeps denying MCP calls. Subagent MCP access is unverified: the docs describe `mcpServers: object[]` ([subagents](https://antigravity.google/docs/subagents)), not the `inheritMcp: true` the bootstrap writes. A 2026-08 native run reported `agy mcp list` as "No MCP servers configured", and the docs do not explain it. The documented workspace config is `.agents/mcp_config.json` ([MCP](https://antigravity.google/docs/mcp)).
 - Bash reads of secret-shaped files such as `cat .env` are allowed, while native read tools on them are denied. This is kept by user decision (2026-10-21) for a later policy choice.
+- The 37 `[[skills.config]]` entries are inert. Removing or keeping them is a user decision, and their on/off effect is untested.
+- A clone that already exists gets no automatic cleanup of stale `.agents/` content (big plan `skills-and-instructions-trim`, Decision 10).
+- The skill listing still overflows on 200K-context models.
+- Consumer MEMORY entries that name removed skills (RAG 14, industrial-inspection 1) need an update at each consumer's refresh.
+- Consumers installed at `76887a8` (2026-08-22) cannot refresh because of an older takeover rule.
+- The typo-bypass allowlist in `shared/hooks/scripts/_lib-frontmatter.sh` does not exclude `.agents/*.md`.
 
 ## Backlog-Followups Client Parity
 
@@ -174,8 +188,8 @@ default (`dist/sidecar/<profile>/`); an explicit `--source` overrides that.
 The `skills` profile ships the four skills — `debug-investigator`,
 `humanize`, `ponytail`, and `ponytail-review` — plus the two bridges above.
 The `workflow` profile ships every eligible public skill (a fixed denylist
-in `scripts/runtime_ownership.py` excludes skills that need the full
-install) plus the agent, rule, instructions, review-profile, template, and
+in `shared/sidecar/workflow/skills.txt` excludes skills that need the full
+install; `scripts/runtime_ownership.py` holds the allowlist) plus the agent, rule, instructions, review-profile, template, and
 state rows above. No `.github/agents` or `.codex/agents` file ships in
 either profile: neither Copilot nor Codex has a config-free way to discover
 a custom agent from an ignored file, so those two clients get the workflow

@@ -23,9 +23,12 @@ from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
+    ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER,
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
+    CONTROL_PLANE_INVENTORY,
     OPENWIKI_BEGIN_MATCHER,
+    PLAIN_LANGUAGE_RULE,
     ROOT_GUIDANCE_WORKFLOW,
     SIDECAR_HUMANIZE_CREDIT,
     SIDECAR_TEXT_REPLACEMENTS,
@@ -43,6 +46,7 @@ from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
     FULL_INSTALL_ROOT_PATHS,
+    PROJECT_SKILL_MARKER,
     SIDECAR_BRIDGES,
     SIDECAR_DEFAULT_PROFILE,
     SIDECAR_LEGACY_STATE_ROOT,
@@ -391,9 +395,22 @@ ROOT_GUIDANCE_HEADERS = (
     "## Map",
     "## Target Runtime",
 )
+# Each file holds a tuple of (kind, limit) budgets, and every one must hold.
 ROOT_GUIDANCE_BUDGETS = {
-    "CLAUDE.md": ("lines", 200),
-    "AGENTS.md": ("bytes", 16 * 1024),
+    "CLAUDE.md": (("lines", 200), ("bytes", 5 * 1024)),
+    "AGENTS.md": (("bytes", 5 * 1024),),
+}
+# Byte budgets for the policies in `shared/policies/` that the skills-and-
+# instructions-trim plan cut (its Decision 12). The workflow core has its own
+# budget because the closeout and plan-lifecycle sections live in their own
+# files. A policy with no entry has no budget.
+POLICY_BYTE_BUDGETS = {
+    "workflow.instructions.md": 16 * 1024,
+    "workspace.instructions.md": 7680,
+    "quality-and-testing.instructions.md": 3 * 1024,
+    "tool-routing.instructions.md": 3 * 1024,
+    "closeout.instructions.md": 16 * 1024,
+    "plan-lifecycle.instructions.md": 11 * 1024,
 }
 ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS = {
     "CLAUDE.md": ("`.claude/hooks/`", "`.github/hooks/`"),
@@ -406,6 +423,7 @@ ROOT_GUIDANCE_AUTHORING_PHRASES = (
     "Bootstrap maintainers own authoring and regeneration",
 )
 REPORTING_POLICY_POINTER = ".claude/instructions/agent-reporting.instructions.md"
+RECORD_FINDINGS_OUT_PATTERN = re.compile(r"record_findings\.py[\s\S]{0,240}?--out\b")
 REPORTING_POLICY_REQUIRED_FRAGMENTS = (
     "## Human-facing communication",
     "precise, clear, direct, natural prose",
@@ -537,7 +555,9 @@ TASK_LANE_CONTROL_PLANE_PATHS = (
     ".claude/settings.json",
     ".github/hooks/",
     ".codex/",
+    ".agents/",
     ".mcp.json",
+    ".vscode/mcp.json",
     ".devcontainer/",
 )
 TASK_LANE_CONTROL_PLANE_FILES = {"CLAUDE.md", "AGENTS.md"}
@@ -620,9 +640,15 @@ CODEX_POLICY_SKILL_FALLBACKS = {
     "api-service-standards.instructions.md": "bentoml-service",
     "code-standards.instructions.md": "code-style",
     "config-first-design.instructions.md": "hydra-config",
-    "deployment.instructions.md": "deploy-service",
+    "deployment.instructions.md": "bentoml-service",
     "tests.instructions.md": "testing-patterns",
 }
+# Claude Code lists every skill's description (plus `when_to_use`) each turn and
+# truncates the list past its budget (big plan skills-and-instructions-trim,
+# Decision 1). The two exempt skills are exempt because their text is
+# hash-pinned to upstream, not because both are always on.
+SKILL_DESCRIPTION_MAX_CHARS = 300
+SKILL_DESCRIPTION_CAP_EXEMPT = frozenset({"ponytail", "ponytail-review"})
 
 
 def text_files(root: Path) -> list[Path]:
@@ -648,21 +674,25 @@ def check(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
-def root_guidance_errors(name: str, text: str) -> list[str]:
-    """Return structural invariant failures for one generated root guidance file."""
-    errors: list[str] = []
-    budget_kind, budget = ROOT_GUIDANCE_BUDGETS[name]
-    size = len(text.splitlines()) if budget_kind == "lines" else len(text.encode())
-    if size > budget:
-        errors.append(f"{name} exceeds its {budget_kind} budget of {budget}")
-    for header in ROOT_GUIDANCE_HEADERS:
-        if text.count(f"{header}\n") != 1:
-            errors.append(f"{name} must contain exactly one {header!r} section")
-    lifecycle_matches = [
+def canonical_lifecycle_matches(text: str) -> list[str]:
+    """Return every lifecycle chain in ``text``, upper-cased and single-spaced."""
+    return [
         " ".join(match.group(0).upper().split())
         for match in ROOT_LIFECYCLE_PATTERN.finditer(text)
     ]
-    if lifecycle_matches != [ROOT_GUIDANCE_WORKFLOW]:
+
+
+def root_guidance_errors(name: str, text: str) -> list[str]:
+    """Return structural invariant failures for one generated root guidance file."""
+    errors: list[str] = []
+    for budget_kind, budget in ROOT_GUIDANCE_BUDGETS[name]:
+        size = len(text.splitlines()) if budget_kind == "lines" else len(text.encode())
+        if size > budget:
+            errors.append(f"{name} exceeds its {budget_kind} budget of {budget}")
+    for header in ROOT_GUIDANCE_HEADERS:
+        if text.count(f"{header}\n") != 1:
+            errors.append(f"{name} must contain exactly one {header!r} section")
+    if canonical_lifecycle_matches(text) != [ROOT_GUIDANCE_WORKFLOW]:
         errors.append(
             f"{name} must contain exactly one canonical lifecycle in the required phase order"
         )
@@ -672,6 +702,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         ".claude/skills/ponytail/SKILL.md",
         "`verify phase` reports PASS",
         "CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings",
+        "closeout.instructions.md",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -684,6 +715,8 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
                 f"{name} is missing mandatory root-guidance invariant: {fragment}"
             )
     semantic_text = normalized_text(text)
+    if normalized_text(CONTROL_PLANE_INVENTORY) not in semantic_text:
+        errors.append(f"{name} must contain the shared control-plane inventory")
     for fragment in ROOT_GUIDANCE_USER_FACING_FRAGMENTS:
         if normalized_text(fragment) not in semantic_text:
             errors.append(
@@ -700,16 +733,61 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
     return errors
 
 
+ANTIGRAVITY_ORCHESTRATOR_POINTER = ".agents/agents/orchestrator/agent.md"
+
+
 def antigravity_default_agent_contract_errors(text: str) -> list[str]:
     """Return failures for the native Antigravity default-agent bridge."""
-    contract = render_antigravity_default_agent_contract()
-    if contract in text:
-        return []
-    return ["AGENTS.md must contain the canonical Antigravity default-agent contract"]
+    errors: list[str] = []
+    if render_antigravity_default_agent_contract() not in text:
+        errors.append(
+            "AGENTS.md must contain the canonical Antigravity default-agent contract"
+        )
+    if ANTIGRAVITY_ORCHESTRATOR_POINTER not in text:
+        errors.append(
+            "AGENTS.md must point the Antigravity default agent to "
+            f"{ANTIGRAVITY_ORCHESTRATOR_POINTER}"
+        )
+    return errors
+
+
+COPILOT_STALE_PRELOAD_FRAGMENT = (
+    "especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, "
+    "and `tool-routing.instructions.md`"
+)
+
+
+def copilot_guidance_errors(text: str) -> list[str]:
+    """Return failures for the generated Copilot workspace adapter."""
+    errors: list[str] = []
+    if ".claude/skills/ponytail/SKILL.md" not in text:
+        errors.append(
+            "Copilot guidance must activate the canonical Ponytail skill for coding"
+        )
+    if REPORTING_POLICY_POINTER not in text:
+        errors.append("Copilot guidance must point to the canonical reporting policy")
+    if "closeout.instructions.md" not in text:
+        errors.append("Copilot guidance must point to the closeout procedure")
+    if canonical_lifecycle_matches(text) != [ROOT_GUIDANCE_WORKFLOW]:
+        errors.append(
+            "Copilot guidance must contain exactly one canonical lifecycle in the "
+            "required phase order"
+        )
+    semantic_text = normalized_text(text)
+    if normalized_text(PLAIN_LANGUAGE_RULE) not in semantic_text:
+        errors.append(
+            "Copilot guidance must carry the root guidance's plain-language rule"
+        )
+    if COPILOT_STALE_PRELOAD_FRAGMENT in semantic_text:
+        errors.append(
+            "Copilot guidance contains a stale preload list: "
+            f"{COPILOT_STALE_PRELOAD_FRAGMENT}"
+        )
+    return errors
 
 
 def workspace_guidance_errors(text: str) -> list[str]:
-    """Return failures for the shared Git-hook control-plane inventory."""
+    """Return failures for the shared control-plane inventory in workspace guidance."""
     errors: list[str] = []
     for fragment in ("`.claude/hooks/`", "`.github/hooks/`"):
         if text.count(fragment) != 1:
@@ -717,6 +795,10 @@ def workspace_guidance_errors(text: str) -> list[str]:
                 "workspace guidance must contain exactly one control-plane inventory path: "
                 f"{fragment}"
             )
+    if normalized_text(CONTROL_PLANE_INVENTORY) not in normalized_text(text):
+        errors.append(
+            "workspace guidance must contain the shared control-plane inventory"
+        )
     return errors
 
 
@@ -843,6 +925,133 @@ def workflow_reporting_errors(text: str) -> list[str]:
         if fragment.lower() in semantic_text:
             errors.append(f"workflow policy duplicates reporting rules: {fragment}")
     return errors
+
+
+CLOSEOUT_STEP_COUNT = 8
+CLOSEOUT_HEADING_PATTERN = re.compile(
+    r"^(#{2,3}) CLOSEOUT procedure[ \t]*$", re.MULTILINE
+)
+CLOSEOUT_LEARN_SKILL_PATH = ".claude/skills/learn/SKILL.md"
+CLOSEOUT_HARD_RULE_FRAGMENTS = (
+    "Never put `git commit` in the same Bash command",
+    "Never checkpoint, publish, or push nested state between step 6 and step 7",
+)
+# The messages the commit gate prints for stale receipt state
+# (`shared/scripts/verify.py`). Operators search for them word for word. Each
+# must appear in the recovery section, not only in a step or a hard rule.
+CLOSEOUT_STALE_RECEIPT_MESSAGES = (
+    "closeout receipt final tracked state is stale",
+    "closeout receipt governing control-plane provenance is stale",
+    "findings report content_hash is stale",
+)
+CLOSEOUT_RECOVERY_HEADING_PATTERN = re.compile(
+    r"^(#{2,3}) Recovering from a stale receipt[ \t]*$", re.MULTILINE
+)
+CLOSEOUT_POINTER = "closeout.instructions.md"
+CLOSEOUT_STALE_POINTER_FRAGMENTS = (
+    "CLOSEOUT sequence below",
+    "CLOSEOUT sequence in `.claude/instructions/workflow.instructions.md`",
+)
+
+
+def closeout_procedure_steps(section: str) -> list[tuple[int, str]]:
+    """Split a CLOSEOUT procedure section into its numbered steps, in order written.
+
+    A step runs from its ``N. `` line until the next numbered line, any heading,
+    or a blank line followed by an unindented line (the next paragraph).
+    """
+    steps: list[tuple[int, list[str]]] = []
+    in_step = False
+    previous_blank = False
+    for line in section.splitlines():
+        number = re.match(r"(\d+)\. ", line)
+        if number:
+            steps.append((int(number[1]), [line]))
+            in_step = True
+        elif re.match(r"#{1,6} ", line) or (
+            previous_blank and line and not line[0].isspace()
+        ):
+            in_step = False
+        elif in_step:
+            steps[-1][1].append(line)
+        previous_blank = not line.strip()
+    return [(number, "\n".join(body)) for number, body in steps]
+
+
+def markdown_section(text: str, heading: re.Match[str]) -> str:
+    """Return the text under ``heading``, up to the next heading of its level or higher."""
+    rest = text[heading.end() :]
+    next_heading = re.search(rf"^#{{1,{len(heading.group(1))}}} ", rest, re.MULTILINE)
+    return rest[: next_heading.start()] if next_heading else rest
+
+
+def closeout_procedure_errors(text: str) -> list[str]:
+    """Return failures for the CLOSEOUT procedure in the closeout policy."""
+    errors: list[str] = []
+    headings = list(CLOSEOUT_HEADING_PATTERN.finditer(text))
+    if len(headings) != 1:
+        errors.append(
+            "closeout policy must contain exactly one CLOSEOUT procedure heading, "
+            f"found {len(headings)}"
+        )
+    section = markdown_section(text, headings[0]) if headings else ""
+    steps = closeout_procedure_steps(section)
+    numbers = [number for number, _body in steps]
+    if numbers != list(range(1, CLOSEOUT_STEP_COUNT + 1)):
+        errors.append(
+            f"closeout policy must number its steps 1 to {CLOSEOUT_STEP_COUNT} in "
+            f"order, found {numbers}"
+        )
+    for number, body in steps:
+        if "*Why" not in body:
+            errors.append(f"closeout step {number} must state its reason with '*Why'")
+    step_two = next((body for number, body in steps if number == 2), "")
+    if CLOSEOUT_LEARN_SKILL_PATH not in step_two:
+        errors.append(f"closeout step 2 must read {CLOSEOUT_LEARN_SKILL_PATH}")
+    for fragment in CLOSEOUT_HARD_RULE_FRAGMENTS:
+        if fragment not in text:
+            errors.append(f"closeout policy is missing hard rule: {fragment}")
+    recoveries = list(CLOSEOUT_RECOVERY_HEADING_PATTERN.finditer(text))
+    if len(recoveries) != 1:
+        errors.append(
+            "closeout policy must contain exactly one 'Recovering from a stale "
+            f"receipt' section, found {len(recoveries)}"
+        )
+        return errors
+    recovery = markdown_section(text, recoveries[0])
+    for message in CLOSEOUT_STALE_RECEIPT_MESSAGES:
+        if message not in recovery:
+            errors.append(
+                f"closeout policy is missing stale-receipt message: {message}"
+            )
+    return errors
+
+
+def closeout_pointer_errors(surfaces: dict[str, str]) -> list[str]:
+    """Return failures for surfaces that must point to the closeout policy.
+
+    ``surfaces`` maps a label to that surface's text. Each must name the closeout
+    policy and must not call the procedure a section of the workflow policy.
+    """
+    errors: list[str] = []
+    for label, text in surfaces.items():
+        if CLOSEOUT_POINTER not in text:
+            errors.append(f"{label} must point to {CLOSEOUT_POINTER}")
+        semantic_text = normalized_text(text)
+        for fragment in CLOSEOUT_STALE_POINTER_FRAGMENTS:
+            if fragment in semantic_text:
+                errors.append(
+                    f"{label} still points to the old CLOSEOUT sequence: {fragment}"
+                )
+    return errors
+
+
+def policy_budget_errors(name: str, text: str) -> list[str]:
+    """Return a failure when a budgeted policy exceeds its byte budget."""
+    budget = POLICY_BYTE_BUDGETS.get(name)
+    if budget is not None and len(text.encode()) > budget:
+        return [f"{name} exceeds its bytes budget of {budget}"]
+    return []
 
 
 def task_lane_contract_errors(text: str) -> list[str]:
@@ -1018,6 +1227,35 @@ def validate_task_lane_contract(errors: list[str]) -> None:
     errors.extend(workflow_reporting_errors(workflow))
 
 
+def validate_policy_budgets(errors: list[str]) -> None:
+    """Keep each budgeted shared policy within its byte budget."""
+    for name in POLICY_BYTE_BUDGETS:
+        path = REPO_ROOT / "shared" / "policies" / name
+        if not path.is_file():
+            errors.append(f"missing budgeted shared policy: {path}")
+            continue
+        errors.extend(policy_budget_errors(name, read(path)))
+
+
+def validate_closeout_procedure(errors: list[str]) -> None:
+    """Pin the generated closeout procedure and the surfaces that point to it."""
+    closeout = TARGET_ROOT / ".claude" / "instructions" / CLOSEOUT_POINTER
+    if closeout.is_file():
+        errors.extend(closeout_procedure_errors(read(closeout)))
+    else:
+        errors.append(f"missing generated closeout policy: {closeout}")
+    shared = REPO_ROOT / "shared"
+    surfaces = {
+        "workflow policy": shared / "policies" / "workflow.instructions.md",
+        "orchestrator prompt": shared / "agents" / "orchestrator" / "prompt.md",
+        "commit skill": shared / "skills" / "commit" / "SKILL.md",
+        "plan-small template": shared / "templates" / "plan-small.md",
+    }
+    errors.extend(
+        closeout_pointer_errors({label: read(path) for label, path in surfaces.items()})
+    )
+
+
 def validate_root_guidance(errors: list[str]) -> None:
     """Validate generated root guidance budgets and structural invariants."""
     for name in ROOT_GUIDANCE_BUDGETS:
@@ -1081,6 +1319,18 @@ def copilot_instruction_paths(text: str) -> tuple[str, ...]:
         if line.startswith("applyTo:"):
             return tuple(json.loads(line.split(":", 1)[1].strip()).split(","))
     return ()
+
+
+def codex_fallback_skill_errors(
+    policy_name: str, skill_name: str, skill_text: str
+) -> list[str]:
+    """Return a failure when a Codex fallback skill never names its policy file.
+
+    Codex has no path rules, so the skill is its only route to the policy.
+    """
+    if policy_name in skill_text:
+        return []
+    return [f"Codex scoped-policy fallback skill {skill_name} must name {policy_name}"]
 
 
 def requires_codex_skill_fallback(patterns: tuple[str, ...]) -> bool:
@@ -1247,11 +1497,17 @@ def validate_policy_adapters(errors: list[str]) -> None:
             errors,
         )
         skill_name = CODEX_POLICY_SKILL_FALLBACKS[policy.source.name]
-        check(
-            (TARGET_ROOT / ".claude" / "skills" / skill_name / "SKILL.md").exists(),
-            f"Codex scoped-policy fallback skill is missing: {skill_name}",
-            errors,
-        )
+        skill_path = TARGET_ROOT / ".claude" / "skills" / skill_name / "SKILL.md"
+        if skill_path.exists():
+            errors.extend(
+                codex_fallback_skill_errors(
+                    policy.source.name, skill_name, read(skill_path)
+                )
+            )
+        else:
+            errors.append(
+                f"Codex scoped-policy fallback skill is missing: {skill_name}"
+            )
 
     nested_agents = [
         path
@@ -2282,6 +2538,15 @@ def antigravity_agent_adapter_errors(path: Path, agent: dict[str, Any]) -> list[
         f"Antigravity agent must retain canonical retrieval routing: {path}",
         errors,
     )
+    # AGENTS.md only points here; the orchestrator's Antigravity supplement
+    # lives in this adapter alone.
+    if is_orchestrator:
+        check(
+            ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(agent_id="orchestrator")
+            in text,
+            f"Antigravity orchestrator must carry its role supplement: {path}",
+            errors,
+        )
     return errors
 
 
@@ -2742,12 +3007,14 @@ def validate_agents(errors: list[str]) -> None:
         # R-AGENTS-08: only the orchestrator persists findings evidence;
         # coder and reviewer must never gain their own record_findings.py
         # --out invocation (the orchestrator owns final closeout evidence).
-        # The bounded `[\s\S]{0,120}?` gap (not `[^\n]*`) tolerates a markdown
+        # The bounded `[\s\S]{0,240}?` gap (not `[^\n]*`) tolerates a markdown
         # reflow wrapping the invocation across a line break.
-        # The bound must clear the canonical long-form invocation documented in
-        # quality-and-testing.instructions.md, whose flag run stays under the gap
-        # bound in the regex below.
-        if re.search(r"record_findings\.py[\s\S]{0,240}?--out\b", text):
+        # The bound must clear both canonical invocations: the short form in
+        # quality-and-testing.instructions.md (`record_findings.py . --findings-json -
+        # --phase ... --out ...`) and the long form with its `--profile`,
+        # `--gate-result`, and `--open-request` flags in closeout.instructions.md.
+        # RECORD_FINDINGS_OUT_PATTERN holds the gap bound.
+        if RECORD_FINDINGS_OUT_PATTERN.search(text):
             check(
                 path.stem == "orchestrator",
                 f"only the orchestrator may persist findings evidence (record_findings.py ... --out): {path}",
@@ -7795,7 +8062,7 @@ def validate_generated_scripts(errors: list[str]) -> None:
 
 
 def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
-    """Return narrow lifecycle and installer drift errors for four shared skills."""
+    """Return narrow lifecycle and installer drift errors for five shared skills."""
     required: dict[str, tuple[str, ...]] = {
         "commit": (
             "status: complete",
@@ -7836,6 +8103,7 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
             "git init",
             "git add pyproject.toml .gitignore .env.example",
         ),
+        "learn": ("`.project-skill`", "`.agents/skills/`"),
     }
     forbidden: dict[str, tuple[str, ...]] = {
         "commit": ("commit exactly one completed small plan, after all gates pass",),
@@ -7847,6 +8115,7 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
             "copy `dist/multi-agent/` into the new project root",
             "git add .claude/ .github/ .codex/ agents.md claude.md",
         ),
+        "learn": (),
     }
     errors: list[str] = []
     for name, fragments in required.items():
@@ -7922,6 +8191,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         f"multi-agent skill count mismatch: {count}",
         errors,
     )
+    errors.extend(generated_skill_surface_errors(TARGET_ROOT))
     # Skill frontmatter integrity (visibility, description) is checked once,
     # in validate_docs_parity, alongside the other named-inventory checks.
     for skill_name in ("ponytail", "ponytail-review"):
@@ -8214,11 +8484,10 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     validate_root_guidance(errors)
     validate_policy_adapters(errors)
 
-    copilot_guidance = read(TARGET_ROOT / ".github" / "copilot-instructions.md")
-    check(
-        ".claude/skills/ponytail/SKILL.md" in copilot_guidance,
-        "Copilot guidance must activate the canonical Ponytail skill for coding",
-        errors,
+    errors.extend(
+        copilot_guidance_errors(
+            read(TARGET_ROOT / ".github" / "copilot-instructions.md")
+        )
     )
 
     stale_workflow_fragments = (
@@ -8323,12 +8592,20 @@ def extract_frontmatter(text: str) -> str:
 
 
 def extract_frontmatter_description(frontmatter: str) -> str:
+    return extract_frontmatter_scalar(frontmatter, "description")
+
+
+LISTING_KEYS = ("description", "when_to_use")
+LISTING_BLOCK_HEADERS = ("|", ">", "|-", ">-")
+
+
+def extract_frontmatter_scalar(frontmatter: str, key: str) -> str:
     lines = frontmatter.splitlines()
     for index, line in enumerate(lines):
-        if not line.startswith("description:"):
+        if not line.startswith(f"{key}:"):
             continue
-        rest = line[len("description:") :].strip()
-        if rest in ("|", ">", "|-", ">-", ""):
+        rest = line[len(key) + 1 :].strip()
+        if rest in (*LISTING_BLOCK_HEADERS, ""):
             # A blank line does NOT end a YAML block scalar - only a
             # less-indented (or EOF) line does. Treating an empty `follow`
             # as "end of block" would silently truncate the description at
@@ -8342,6 +8619,15 @@ def extract_frontmatter_description(frontmatter: str) -> str:
             return " ".join(block_lines).strip()
         return rest.strip("\"'")
     return ""
+
+
+def skill_listing_length(frontmatter: str) -> int:
+    """Return the characters Claude Code lists for a skill: the stripped
+    `description` plus the stripped `when_to_use`. The one length definition,
+    shared by the cap check and the library total."""
+    return len(extract_frontmatter_description(frontmatter).strip()) + len(
+        extract_frontmatter_scalar(frontmatter, "when_to_use").strip()
+    )
 
 
 def normalize_frontmatter_scalar(value: str) -> str:
@@ -8359,13 +8645,39 @@ def extract_frontmatter_name(frontmatter: str) -> str:
     return ""
 
 
+def listing_scalar_form_error(key: str, value: str, following: list[str]) -> str:
+    """Return why a listing key's form is one the cap cannot measure, or "".
+
+    ``extract_frontmatter_scalar`` joins the lines of a plain `|`, `>`, `|-`, or
+    `>-` block and reads a one-line plain or quoted value. Any other form would
+    be counted short, so it is rejected instead of measured. ``following`` is
+    the frontmatter after the key's line.
+    """
+    if value[:1] in ("|", ">"):
+        if value in LISTING_BLOCK_HEADERS:
+            return ""
+        return f"'{key}' uses the block header {value!r}; use only |, >, |-, or >-"
+    if not value:
+        return ""
+    quote = value[0]
+    if quote in ("'", '"'):
+        closed = r"'(?:[^']|'')*'" if quote == "'" else r'"(?:[^"\\]|\\.)*"'
+        if not re.fullmatch(rf"{closed}\s*(?:#.*)?", value):
+            return f"'{key}' continues a quoted value on the next line; use a | block"
+    next_line = next((line for line in following if line.strip()), "")
+    if next_line[:1] in (" ", "\t") and not next_line.lstrip().startswith("#"):
+        return f"'{key}' continues a plain value on the next line; use a | block"
+    return ""
+
+
 def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
     """Hard rule (R-SKILL-01): SKILL.md frontmatter must be well-formed YAML in
     the flat `key: value` (or `key: |` block-scalar) schema every shared skill
     already uses - matched `---` delimiters, no tabs, no duplicate top-level
-    keys. This is a structural check, not a full YAML parser, mirroring the
-    same minimal schema `generate_targets.parse_policy` enforces for policy
-    frontmatter."""
+    keys. The `description` and `when_to_use` values must also use a form the
+    listing cap can measure (`listing_scalar_form_error`). This is a structural
+    check, not a full YAML parser, mirroring the same minimal schema
+    `generate_targets.parse_policy` enforces for policy frontmatter."""
     parts = raw_text.split("---\n", 2)
     if not raw_text.startswith("---\n") or len(parts) != 3:
         return [
@@ -8380,7 +8692,8 @@ def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
             "contain tab characters"
         )
     seen_keys: set[str] = set()
-    for line in frontmatter.splitlines():
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
         if not line or line[0] in (" ", "\t"):
             continue  # blank line, or block-scalar/list continuation
         if ":" not in line:
@@ -8389,13 +8702,20 @@ def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
                 f"line: {line!r}"
             )
             continue
-        key = line.split(":", 1)[0].strip()
+        key, _, value = line.partition(":")
+        key = key.strip()
         if key in seen_keys:
             errors.append(
                 f"{skill_path}: SKILL_FRONTMATTER_INVALID - duplicate "
                 f"frontmatter key: {key}"
             )
         seen_keys.add(key)
+        if key in LISTING_KEYS:
+            form_error = listing_scalar_form_error(
+                key, value.strip(), lines[index + 1 :]
+            )
+            if form_error:
+                errors.append(f"{skill_path}: SKILL_FRONTMATTER_INVALID - {form_error}")
     return errors
 
 
@@ -8545,19 +8865,63 @@ def readme_agent_contract_errors(
     return errors
 
 
+def _project_skill_marker_errors(skill_root: Path) -> list[str]:
+    """One error per ``.project-skill`` entry anywhere under ``skill_root``.
+    A marker inside a shipped skill would make every consumer's next-but-one
+    refresh refuse a name clash until each operator deleted it by hand."""
+    return [
+        f"{marker}: SKILL_PROJECT_MARKER_SHIPPED - a shipped skill must not "
+        f"hold {PROJECT_SKILL_MARKER}; it is the consumer's own-skill marker"
+        for marker in sorted(skill_root.rglob(PROJECT_SKILL_MARKER))
+    ]
+
+
+def generated_skill_surface_errors(tree_root: Path) -> list[str]:
+    """Skill-surface invariants of one generated tree (``dist/multi-agent`` or
+    a ``dist/sidecar/<profile>`` overlay): no ``.project-skill`` marker in
+    either skill folder, and ``.claude/skills`` and ``.agents/skills`` hold
+    the same skill names. The installer's shipped-before record is the
+    ``.agents/skills`` copy, so a name in only one folder would make that
+    record disagree with what ``.claude/skills`` ships."""
+    surfaces = {
+        surface: tree_root / surface / "skills" for surface in (".claude", ".agents")
+    }
+    errors: list[str] = []
+    for skill_root in surfaces.values():
+        errors.extend(_project_skill_marker_errors(skill_root))
+    names = {
+        surface: {path.name for path in skill_root.iterdir() if path.is_dir()}
+        if skill_root.is_dir()
+        else set()
+        for surface, skill_root in surfaces.items()
+    }
+    claude_only = sorted(names[".claude"] - names[".agents"])
+    agents_only = sorted(names[".agents"] - names[".claude"])
+    if claude_only or agents_only:
+        errors.append(
+            f"{tree_root}: SKILL_SURFACE_MISMATCH - .claude/skills and "
+            ".agents/skills must hold the same skill names; "
+            f"only in .claude/skills: {', '.join(claude_only) or 'none'}; "
+            f"only in .agents/skills: {', '.join(agents_only) or 'none'}"
+        )
+    return errors
+
+
 def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
     """Hard, deterministic skill-library invariants for
     `skill_library_root` (normally `REPO_ROOT / "shared" / "skills"`): valid
     YAML frontmatter shape, `name` matching the directory, visibility +
     non-empty, non-duplicate description (duplicate descriptions break
-    description-match loading of background skills), a required root
-    `SKILL.md` per directory, and local relative references that name a
-    repository path. See "Skill Library Validation Contract" in
+    description-match loading of background skills) within the listing-length
+    cap (`skill_listing_length`), a required root
+    `SKILL.md` per directory, no `.project-skill` marker anywhere, and local
+    relative references that name a repository path. See "Skill Library
+    Validation Contract" in
     docs/architecture.md for the hard/advisory split this function enforces;
     `deep-audit` owns the semantic judgments this function deliberately
     leaves out. Kept as a single pure helper so it stays independently
     testable while `validate_docs_parity` remains the one gate that calls it."""
-    errors: list[str] = []
+    errors: list[str] = _project_skill_marker_errors(skill_library_root)
     for skill_dir in sorted(p for p in skill_library_root.iterdir() if p.is_dir()):
         check(
             (skill_dir / "SKILL.md").is_file(),
@@ -8592,6 +8956,16 @@ def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
         )
         if not description:
             continue
+        listing_length = skill_listing_length(frontmatter)
+        if (
+            listing_length > SKILL_DESCRIPTION_MAX_CHARS
+            and skill_path.parent.name not in SKILL_DESCRIPTION_CAP_EXEMPT
+        ):
+            errors.append(
+                f"{skill_path}: SKILL_DESCRIPTION_TOO_LONG - listing text "
+                f"(description plus when_to_use) is {listing_length} "
+                f"characters; the cap is {SKILL_DESCRIPTION_MAX_CHARS}"
+            )
         duplicate = descriptions.get(description)
         if duplicate is not None:
             errors.append(
@@ -8781,6 +9155,8 @@ def validate_support_files(errors: list[str]) -> None:
         "session_logs/README.md",
         "explorations/README.md",
         "instructions/workflow.instructions.md",
+        "instructions/closeout.instructions.md",
+        "instructions/plan-lifecycle.instructions.md",
         "instructions/quality-and-testing.instructions.md",
         "instructions/tool-routing.instructions.md",
         "instructions/workspace.md",
@@ -9213,6 +9589,7 @@ def validate_sidecar_target(errors: list[str]) -> None:
             errors.append(f"missing generated sidecar profile: {profile}")
             continue
         errors.extend(sidecar_target_errors(target_root, profile))
+        errors.extend(generated_skill_surface_errors(target_root))
 
 
 def _sidecar_skills_profile_cases(good_root: Path, errors: list[str]) -> None:
@@ -9368,8 +9745,8 @@ def _sidecar_workflow_profile_cases(good_root: Path, errors: list[str]) -> None:
     (skills included), ships the four templates from
     `shared/sidecar/workflow/templates/`, and because
     `runtime_ownership.sidecar_source_violations()` allows a shipped skill's
-    files beyond `SKILL.md`/`LICENSE` (`caveman-compress`, `draw-io`,
-    `md-to-pdf`, and `csv-driven-integration-tests` carry such files).
+    files beyond `SKILL.md`/`LICENSE` (`draw-io`, `md-to-pdf`, `haystack`,
+    and `data-and-graph-pitfalls` carry such files).
     """
     check(
         not sidecar_target_errors(good_root, "workflow"),
@@ -11876,13 +12253,12 @@ def validate_typo_bypass_path_restriction(errors: list[str]) -> None:
             (repo / relative_path).unlink()
 
         # R-BYPASS-02: root-level control-plane files and directories named
-        # verbatim by shared/policies/workspace.instructions.md's
-        # control-plane definition ("Control-plane files include
-        # .claude/hooks/, .claude/settings.json, .github/hooks/, .codex/,
-        # .mcp.json, .vscode/mcp.json, .devcontainer/, CLAUDE.md, and
-        # AGENTS.md") must also be
-        # excluded - a docs(typo): commit must never rewrite root guidance
-        # or the .codex/.devcontainer control-plane surfaces unreviewed.
+        # by the shared control-plane inventory (CONTROL_PLANE_INVENTORY in
+        # scripts/generate_targets.py, repeated by
+        # shared/policies/workspace.instructions.md) must also be excluded - a
+        # docs(typo): commit must never rewrite root guidance or the
+        # .codex/.devcontainer control-plane surfaces unreviewed. The fixtures
+        # below sample that inventory; they are not the whole list.
         for relative_path in (
             "CLAUDE.md",
             "AGENTS.md",
@@ -12263,6 +12639,8 @@ def main() -> int:
 
     if not errors:
         validate_task_lane_contract(errors)
+        validate_policy_budgets(errors)
+        validate_closeout_procedure(errors)
         validate_codex_model_contract_cases(errors)
         validate_agents(errors)
         validate_mcp_and_hooks(errors)

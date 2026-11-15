@@ -1,16 +1,3 @@
----
-name: csv-driven-integration-tests
-visibility: public
-description: |
-  Build integration test datasets as CSV files with expected outputs, then use
-  pytest parametrize to run them against real (or mock) components. Especially
-  effective for discovering regex classifier pattern gaps and SQL generation bugs.
-  Triggers:
-  - "I want integration tests for my classifier / router / SQL generator"
-  - Building a test dataset for component-level validation
-  - Need to check if a regex-based classifier handles real-world query variance
----
-
 ## Problem
 
 Unit tests cover happy paths but miss the breadth of real-world input. Regex-based
@@ -149,7 +136,7 @@ FAILED test_route[42] - Q: "List resolutions mentioning Syria"
 This tells you: need `\blist\b.*\bresolutions?\b` pattern (not just `\blist\s+all\b`).
 
 Use the failing question text to write the missing regex alternation, then
-rerun the parametrized suite. See `references/case-study.md` for a worked
+rerun the parametrized suite. See `references/csv-case-study.md` for a worked
 example of pattern gaps found this way and the before/after pass numbers.
 
 ## Verification
@@ -167,5 +154,5 @@ uv run -m pytest tests/ -v
 
 ## Example
 
-See `references/case-study.md` for a full worked case study (a UN Security
+See `references/csv-case-study.md` for a full worked case study (a UN Security
 Council resolution classifier) applying this method end-to-end.

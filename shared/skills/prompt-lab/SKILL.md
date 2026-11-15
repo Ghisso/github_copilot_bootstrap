@@ -2,17 +2,10 @@
 name: prompt-lab
 visibility: public
 description: |
-  Systematic LLM prompt engineering: analyzes existing prompts for failure
-  modes, generates structured variants (direct, few-shot, structured
-  rationale), designs evaluation rubrics with weighted criteria, and
-  produces test case suites for empirically comparing prompt performance
-  across models. Use when:
-  - "prompt engineering", "prompt lab", "generate prompt variants"
-  - "A/B test prompts", "evaluate prompt", "optimize prompt"
-  - "write a better prompt", "prompt design", "prompt iteration"
-  - "few-shot examples", "chain-of-thought prompt", "prompt failure modes"
-  - "improve this prompt"
-  NOT for evaluating agent skills or configuration files.
+  Prompt engineering: "improve this prompt", "write a better prompt", "prompt
+  variants", "A/B test prompts", "few-shot examples", "chain-of-thought prompt",
+  "prompt failure modes". Analyzes failures, builds variants, rubrics, and test
+  suites. Not for evaluating agent skills or config files.
 ---
 
 # Prompt Lab

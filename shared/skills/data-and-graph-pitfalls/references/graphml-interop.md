@@ -1,15 +1,3 @@
----
-name: networkx-igraph-graphml-interop
-visibility: background
-description: |
-  Fix two related problems when comparing NetworkX graphs against igraph/R-exported
-  GraphML files, or when exporting NetworkX graphs to GraphML:
-  1. edge_recall=0 despite visually correct output (opaque vs semantic node IDs)
-  2. GraphML export fails with XML parse errors (illegal control characters from OCR)
-version: 1.0.0
-user-invocable: false
----
-
 ## Problem 1: Cross-Format Node ID Comparison Gives 0% Recall
 
 igraph writes GraphML with opaque integer node IDs (`n0`, `n1`, `n2`, ...):

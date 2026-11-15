@@ -14,37 +14,47 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import stat
 import subprocess
 import sys
 import tomllib
+from collections.abc import Callable
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
+from generate_targets import copy_ignore as generated_copy_ignore
 from runtime_ownership import (
     COPILOT_SURFACE_PATHS,
     FULL_INSTALL_ROOT_PATHS,
     GIT_REPO_LOCAL_ENV_VARS,
+    PROJECT_SKILL_MARKER,
     RESTORABLE_ROOT_PATHS,
     SIDECAR_DEFAULT_PROFILE,
     SIDECAR_PRESERVED_NAME,
     SIDECAR_PROFILES,
     STATE_DIR_OWNED_README_PATHS,
+    THIRD_PARTY_SKILL_MARKER,
     active_ignore_patterns,
     bootstrap_root_paths,
     install_mode_from_manifest,
     is_consumer_state_path,
+    is_project_skill_dir,
     is_root_adapter_path,
     is_third_party_skill_dir,
+    is_third_party_skill_path,
     restore_manifest,
 )
 from sidecar_overlay import (
     _EXCLUDE_MARKER_REMEDY,
+    _FRONTMATTER_MAX_BYTES,
     ExcludeMarkerError,
     _c_locale_env,
+    _parse_frontmatter_name,
     _read_index_entries,
     _report_preserved_folder_if_nonempty,
     backup_sidecar_state,
@@ -431,6 +441,43 @@ def _legacy_agents_tree_matches(
     )
 
 
+def _stale_agents_skills_note(
+    target: Path,
+    mirror_tree: dict[str, bytes | None],
+    actual_tree: dict[str, bytes | None],
+) -> str:
+    """Explain a refusal whose only cause is live ``.agents/skills/<name>/``
+    folders that neither the ``bootstrap-root`` record nor ``.claude/skills``
+    has: another clone refreshed, and this clone's restore copies files but
+    never deletes them. Returns ``""`` for any other kind of conflict."""
+    if any(
+        actual_tree.get(path, object()) != body for path, body in mirror_tree.items()
+    ):
+        return ""
+    names: set[str] = set()
+    for path in set(actual_tree) - set(mirror_tree):
+        parts = PurePosixPath(path).parts
+        # A folder is a directory entry `skills/<name>` or any path inside it;
+        # a file directly under `skills/` (`.DS_Store`) is not a retired skill.
+        in_a_folder = len(parts) > 2 or (len(parts) == 2 and actual_tree[path] is None)
+        if parts[0] != "skills" or not in_a_folder:
+            return ""
+        names.add(parts[1])
+    known = _real_subdirectory_names(
+        target / _BOOTSTRAP_ROOT_RECORD
+    ) | _real_subdirectory_names(target / ".claude" / "skills")
+    if not names or names & known:
+        return ""
+    folders = ", ".join(f".agents/skills/{name}/" for name in sorted(names))
+    return (
+        f"\nThe live folders {folders} are not in the shipped-before record. "
+        "This usually means another clone refreshed the bootstrap and retired "
+        "them; this clone's restore copies files but never deletes them. "
+        "Move the listed folders out of .agents/skills/ and rerun. Delete them "
+        "only once you have confirmed they are old bootstrap copies."
+    )
+
+
 def validate_agents_takeover(source: Path, target: Path) -> None:
     """Fail before writes unless an existing `.agents` tree is proven generated."""
     source_tree, source_invalid = _agents_tree(source / ".agents", ".agents")
@@ -465,9 +512,14 @@ def validate_agents_takeover(source: Path, target: Path) -> None:
         )
     conflicts.extend(actual_invalid)
     conflicts.extend(mirror_invalid)
+    stale_note = ""
     if has_mirror and not mirror_invalid:
         if has_agents:
             if mirror_tree != actual_tree:
+                if not conflicts:
+                    stale_note = _stale_agents_skills_note(
+                        target, mirror_tree, actual_tree
+                    )
                 conflicts.extend(
                     _agents_conflicts(
                         mirror_tree, actual_tree, ".claude/bootstrap-root/.agents"
@@ -487,7 +539,9 @@ def validate_agents_takeover(source: Path, target: Path) -> None:
     if conflicts:
         raise SystemExit(
             "Refusing .agents takeover; move or back up the listed content, remove it "
-            "only if intended, then rerun: " + ", ".join(sorted(set(conflicts)))
+            "only if intended, then rerun: "
+            + ", ".join(sorted(set(conflicts)))
+            + stale_note
         )
     if has_agents and actual_tree == source_tree:
         return
@@ -514,6 +568,171 @@ def validate_agents_takeover(source: Path, target: Path) -> None:
     )
 
 
+_PROJECT_SKILL_NAME = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+
+
+def _real_dir(path: Path) -> bool:
+    return path.is_dir() and not path.is_symlink()
+
+
+def _regular_file(path: Path) -> bool:
+    return path.is_file() and not path.is_symlink()
+
+
+def _real_subdirectory_names(directory: Path) -> set[str]:
+    """Names of the real directories directly inside ``directory``; empty
+    when ``directory`` is not itself a real directory. Follows no link."""
+    if not _real_dir(directory):
+        return set()
+    return {entry.name for entry in directory.iterdir() if _real_dir(entry)}
+
+
+_BOOTSTRAP_ROOT_RECORD = Path(".claude") / "bootstrap-root" / ".agents" / "skills"
+
+
+def _shipped_before_record(target: Path) -> Path:
+    """The folder recording what an earlier install gave this target: the
+    ``bootstrap-root`` copy of ``.agents/skills``, or the live
+    ``.agents/skills`` only when that copy is absent. It also holds the mirror
+    of every project skill, marker included. When neither exists the record
+    lists nothing; that alone blocks no install, only an existing unmarked
+    skill folder the record does not list (``validate_project_skills``)."""
+    record = target / _BOOTSTRAP_ROOT_RECORD
+    return record if os.path.lexists(record) else target / ".agents" / "skills"
+
+
+def _declared_skill_name(skill_md: Path) -> str | None:
+    try:
+        with skill_md.open("rb") as handle:
+            return _parse_frontmatter_name(handle.read(_FRONTMATTER_MAX_BYTES))
+    except OSError:
+        return None
+
+
+def _skill_folder_problems(
+    entry: Path, shipped: set[str], record: Path, shipped_before: set[str]
+) -> list[str]:
+    """Problems with one entry directly under ``.claude/skills``. Every check
+    is link-aware; a file is read only after it is proven a regular file
+    inside a real folder."""
+    name = entry.name
+    label = f".claude/skills/{name}"
+    if entry.is_symlink():
+        return [f"{label} is a symlink"]
+    if not entry.is_dir():
+        return []
+    # A folder with an entry named `.project-skill` is meant to be the
+    # project's, so a link or a directory there is a problem, not "unmarked".
+    if not os.path.lexists(entry / PROJECT_SKILL_MARKER):
+        if not os.path.lexists(entry / "SKILL.md") or is_third_party_skill_path(
+            f"skills/{name}"
+        ):
+            return []
+        # The record holds the mirror of a project skill, marker included. A
+        # folder whose mirror still has the marker lost it; a refresh would
+        # delete it as a retired skill (or overwrite it), so refuse instead.
+        if name in shipped_before and os.path.lexists(
+            record / name / PROJECT_SKILL_MARKER
+        ):
+            return [
+                f"{label} was a project skill and its marker is missing; "
+                f"restore {label}/{PROJECT_SKILL_MARKER} to keep it, or "
+                "remove the folder"
+            ]
+        if name in shipped_before:
+            return []
+        target = entry.parents[2]
+        # An absent record proves nothing, and a link is never read, so say
+        # only what is known.
+        shown = record.relative_to(target).as_posix()
+        if not os.path.lexists(record):
+            known = "no shipped-before record was found"
+        elif record.is_symlink():
+            known = f"the shipped-before record ({shown}) is a symlink and was not read"
+        else:
+            known = f"the shipped-before record ({shown}) does not list it"
+        if name not in shipped:
+            return [
+                f"{label} is an unmarked skill folder. The new bootstrap does "
+                f"not ship it, and {known}. Remove the folder if it is an "
+                "unmodified copy of an old bootstrap skill; add "
+                f"{label}/{PROJECT_SKILL_MARKER} if the project wrote it"
+            ]
+        # Option A (R26): the new source ships this name and the record, or the
+        # lack of one, does not list the folder, so the installer cannot tell
+        # an old bootstrap copy from the project's own skill. The refresh would
+        # overwrite it, so refuse, whatever the record is.
+        return [
+            f"{label} is an unmarked skill folder. The new bootstrap ships a "
+            f"skill with this name, and {known}, so the refresh would "
+            "overwrite it. If the project wrote it, rename the folder and its "
+            f"`name:` line, then add {PROJECT_SKILL_MARKER} to it; otherwise "
+            "move it out of .claude/skills/"
+        ]
+    # The refresh prunes only what `is_project_skill_dir` accepts, which needs
+    # a real `.claude` and `.claude/skills`; a folder with an entry named
+    # `.project-skill` under a link would be deleted. Return here, whatever
+    # that entry is: nothing in the folder may be read through the link.
+    if not (_real_dir(entry.parent) and _real_dir(entry.parent.parent)):
+        return [
+            f"{label} is marked but not protected: .claude and "
+            ".claude/skills must be real directories"
+        ]
+    problems: list[str] = []
+    if not _regular_file(entry / PROJECT_SKILL_MARKER):
+        problems.append(f"{label}/{PROJECT_SKILL_MARKER} is not a regular file")
+    if not _PROJECT_SKILL_NAME.fullmatch(name):
+        problems.append(f"{label} is not a lowercase kebab-case name")
+    skill_md = entry / "SKILL.md"
+    if not _regular_file(skill_md):
+        problems.append(f"{label}/SKILL.md is missing or not a regular file")
+    elif _declared_skill_name(skill_md) != name:
+        problems.append(f"{label}/SKILL.md has no `name: {name}` in its frontmatter")
+    if name in shipped:
+        problems.append(f"{label} clashes with a skill the bootstrap ships")
+    # The shape check also covers a marker-claimed bundle at
+    # `.agents/skills/<name>`, which has this shape by definition.
+    if is_third_party_skill_path(f"skills/{name}") or os.path.lexists(
+        entry / THIRD_PARTY_SKILL_MARKER
+    ):
+        problems.append(f"{label} is a third-party skill bundle, not a project skill")
+    return problems
+
+
+def validate_project_skills(source: Path, target: Path) -> None:
+    """Fail before any write unless every project-owned skill is safe to keep
+    and to mirror, and no unmarked skill would be deleted by surprise.
+
+    A refresh deletes every ``.claude/`` file it does not generate, so an
+    unmarked skill folder that neither ``source`` nor the shipped-before record
+    lists is refused until the operator marks or removes it. So is an unmarked
+    folder whose record copy still holds the marker (a project skill that lost
+    its marker), and (option A, R26) an unmarked folder whose name ``source``
+    now ships and the shipped-before record does not list, whichever record it
+    is or even with none (the refresh would overwrite it). A missing record
+    never blocks an install by itself: a project with no unmarked skill folder
+    of that kind installs normally. Folder names, never frontmatter values,
+    drive every comparison.
+    """
+    skills_dir = target / ".claude" / "skills"
+    problems: list[str] = []
+    if skills_dir.is_symlink():
+        problems.append(".claude/skills is a symlink")
+    elif skills_dir.is_dir():
+        shipped = _real_subdirectory_names(source / ".claude" / "skills")
+        record = _shipped_before_record(target)
+        shipped_before = _real_subdirectory_names(record)
+        for entry in sorted(skills_dir.iterdir()):
+            problems.extend(
+                _skill_folder_problems(entry, shipped, record, shipped_before)
+            )
+    if problems:
+        raise SystemExit(
+            "Refusing project skills; fix each listed item, then rerun:\n  "
+            + "\n  ".join(problems)
+        )
+
+
 def _third_party_skill_owner(surface_root: Path, relative_path: Path) -> bool:
     """Return whether ``relative_path`` (relative to ``surface_root``, e.g.
     ``.claude`` or ``.agents``) sits inside a marker-claimed third-party
@@ -526,19 +745,18 @@ def _third_party_skill_owner(surface_root: Path, relative_path: Path) -> bool:
     )
 
 
-def copy_generated_tree(
+def _copy_rules(
     source: Path,
     target: Path,
-    dry_run: bool,
-    commit_copilot_surface: bool = False,
-    previously_committed_copilot_surface: bool = False,
-) -> None:
-    if not source.is_dir():
-        raise SystemExit(f"Generated source does not exist: {source}")
-    info(f"copy {source} -> {target}")
-    if dry_run:
-        return
-    target.mkdir(parents=True, exist_ok=True)
+    commit_copilot_surface: bool,
+    previously_committed_copilot_surface: bool,
+    log: Callable[[str], None] = info,
+) -> tuple[Callable[[Path], bool], Callable[[str, list[str]], set[str]]]:
+    """Return ``(should_preserve, copy_ignore)``: the one definition of which
+    destination paths a full refresh leaves alone. ``copy_generated_tree``
+    copies with them and ``validate_no_symlink_writes`` checks with them, so
+    the two cannot disagree about what is written. ``log`` receives each
+    "preserve ..." message; the check passes a no-op."""
 
     def is_tracked(relative_path: Path) -> bool:
         result = subprocess.run(
@@ -570,6 +788,67 @@ def copy_generated_tree(
             return False
         return is_tracked(relative_path)
 
+    def copy_ignore(directory: str, names: list[str]) -> set[str]:
+        relative_directory = Path(directory).relative_to(source)
+        ignored: set[str] = set()
+        for name in names:
+            relative_path = relative_directory / name
+            destination_path = target / relative_path
+            if relative_path == LEGACY_ANTIGRAVITY_ALLOWLIST:
+                ignored.add(name)
+                continue
+            claude_relative = (
+                relative_path.relative_to(".claude")
+                if relative_path.parts and relative_path.parts[0] == ".claude"
+                else None
+            )
+            if claude_relative is not None and is_consumer_state_path(claude_relative):
+                if destination_path.exists() or destination_path.is_symlink():
+                    ignored.add(name)
+                    log(f"preserve consumer state {relative_path.as_posix()}")
+            elif should_preserve(relative_path):
+                ignored.add(name)
+                log(f"preserve tracked authoring adapter {relative_path.as_posix()}")
+            elif (
+                # OpenWiki's own installer owns `.claude/skills/openwiki` and
+                # `.agents/skills/openwiki` once it writes its marker there;
+                # a refresh must not overwrite either once it exists, only
+                # seed it on a genuinely fresh install.
+                relative_path.parts
+                and relative_path.parts[0] in (".claude", ".agents")
+                and _third_party_skill_owner(
+                    target / relative_path.parts[0],
+                    relative_path.relative_to(relative_path.parts[0]),
+                )
+            ):
+                if destination_path.exists() or destination_path.is_symlink():
+                    ignored.add(name)
+                    log(f"preserve third-party skill {relative_path.as_posix()}")
+        return ignored
+
+    return should_preserve, copy_ignore
+
+
+def copy_generated_tree(
+    source: Path,
+    target: Path,
+    dry_run: bool,
+    commit_copilot_surface: bool = False,
+    previously_committed_copilot_surface: bool = False,
+) -> None:
+    if not source.is_dir():
+        raise SystemExit(f"Generated source does not exist: {source}")
+    info(f"copy {source} -> {target}")
+    if dry_run:
+        return
+    target.mkdir(parents=True, exist_ok=True)
+    should_preserve, copy_ignore = _copy_rules(
+        source,
+        target,
+        commit_copilot_surface,
+        previously_committed_copilot_surface,
+    )
+
     def owned_files() -> set[Path]:
         owned: set[Path] = set()
         claude_root = target / ".claude"
@@ -583,6 +862,10 @@ def copy_generated_tree(
                     and not is_consumer_state_path(relative_directory / name)
                     and not _third_party_skill_owner(
                         claude_root, relative_directory / name
+                    )
+                    # A project-owned skill is the project's, not generated.
+                    and not is_project_skill_dir(
+                        claude_root / relative_directory / name
                     )
                     and not (
                         relative_directory == Path(".") and name == "bootstrap-root"
@@ -632,44 +915,6 @@ def copy_generated_tree(
                 break
             parent = parent.parent
 
-    def copy_ignore(directory: str, names: list[str]) -> set[str]:
-        relative_directory = Path(directory).relative_to(source)
-        ignored: set[str] = set()
-        for name in names:
-            relative_path = relative_directory / name
-            destination_path = target / relative_path
-            if relative_path == LEGACY_ANTIGRAVITY_ALLOWLIST:
-                ignored.add(name)
-                continue
-            claude_relative = (
-                relative_path.relative_to(".claude")
-                if relative_path.parts and relative_path.parts[0] == ".claude"
-                else None
-            )
-            if claude_relative is not None and is_consumer_state_path(claude_relative):
-                if destination_path.exists() or destination_path.is_symlink():
-                    ignored.add(name)
-                    info(f"preserve consumer state {relative_path.as_posix()}")
-            elif should_preserve(relative_path):
-                ignored.add(name)
-                info(f"preserve tracked authoring adapter {relative_path.as_posix()}")
-            elif (
-                # OpenWiki's own installer owns `.claude/skills/openwiki` and
-                # `.agents/skills/openwiki` once it writes its marker there;
-                # a refresh must not overwrite either once it exists, only
-                # seed it on a genuinely fresh install.
-                relative_path.parts
-                and relative_path.parts[0] in (".claude", ".agents")
-                and _third_party_skill_owner(
-                    target / relative_path.parts[0],
-                    relative_path.relative_to(relative_path.parts[0]),
-                )
-            ):
-                if destination_path.exists() or destination_path.is_symlink():
-                    ignored.add(name)
-                    info(f"preserve third-party skill {relative_path.as_posix()}")
-        return ignored
-
     for child in sorted(source.iterdir()):
         destination = target / child.name
         if should_preserve(Path(child.name)):
@@ -680,11 +925,11 @@ def copy_generated_tree(
                 child,
                 destination,
                 dirs_exist_ok=True,
-                ignore=copy_ignore,
+                ignore=_guard_levels(target, child, destination, copy_ignore),
+                copy_function=partial(_copy_file, target),
             )
         else:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(child, destination)
+            _copy_file(target, child, destination)
         strip_quarantine(destination)
 
     # The per-directory ignore logic above protects the whole consumer-state
@@ -698,12 +943,231 @@ def copy_generated_tree(
         if not seed.is_file():
             continue
         destination_readme = target / ".claude" / relative_readme
-        destination_readme.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(seed, destination_readme)
+        unsafe = _unsafe_destination(target, Path(".claude") / relative_readme, "file")
+        if unsafe is not None:
+            part, reason = unsafe
+            warn(
+                "skip bootstrap-owned state directory README "
+                f".claude/{relative_readme}: "
+                f"{part.relative_to(target).as_posix()} is {reason}"
+            )
+            continue
+        _copy_file(target, seed, destination_readme)
         strip_quarantine(destination_readme)
         info(
             f"refresh bootstrap-owned state directory README .claude/{relative_readme}"
         )
+
+
+_LINK = "a symlink"
+DestinationKind = Literal["file", "folder"]
+
+
+def _unsafe_destination(
+    target: Path, relative: Path, kind: DestinationKind
+) -> tuple[Path, str] | None:
+    """Return the first unsafe part of ``target / relative`` and why, or
+    ``None``. ``kind`` is what a refresh writes at ``relative``. Each part is
+    read with ``lstat`` from the target root down, so no link is ever followed.
+    A part is unsafe when it is a link; when it sits above the written path
+    and is not a real folder; when the written path is a file and the part is
+    not a regular file (a folder, a FIFO); or when it is a folder and the part
+    is not a real folder. A part that does not exist, or cannot be read, ends
+    the check: nothing below it can be a link, and the write itself would
+    fail."""
+    path = target
+    for index, part in enumerate(relative.parts):
+        path = path / part
+        try:
+            mode = os.lstat(path).st_mode
+        except OSError:
+            return None
+        if stat.S_ISLNK(mode):
+            return path, _LINK
+        written = index == len(relative.parts) - 1
+        wanted = kind if written else "folder"
+        right_kind = stat.S_ISDIR if wanted == "folder" else stat.S_ISREG
+        if right_kind(mode):
+            continue
+        found = (
+            "a folder"
+            if stat.S_ISDIR(mode)
+            else "a file"
+            if stat.S_ISREG(mode)
+            else "a special file"
+        )
+        action = f"writes a {wanted}" if written else "needs a folder"
+        return path, f"{found} where the refresh {action}"
+    return None
+
+
+def _require_safe_destination(
+    target: Path, relative: Path, kind: DestinationKind
+) -> None:
+    """Stop the run with ``SystemExit`` when ``target / relative`` is unsafe
+    (``_unsafe_destination``). The copy-time guard: a second line behind
+    ``validate_no_symlink_writes``. A run stopped here is partial, which is
+    accepted, because the alternative is a write outside the project."""
+    unsafe = _unsafe_destination(target, relative, kind)
+    if unsafe is not None:
+        part, reason = unsafe
+        raise SystemExit(
+            f"Refusing to write {relative.as_posix()}: "
+            f"{part.relative_to(target).as_posix()} is {reason}. The refresh "
+            "stops here and may be partial; move or rename it, then rerun."
+        )
+
+
+def _copy_file(target: Path, source: str | Path, destination: str | Path) -> None:
+    """Copy one file of a full refresh. The only ``shutil.copy2`` call in this
+    module: it refuses an unsafe destination first (``_require_safe_destination``;
+    ``shutil.copy2`` writes to ``<folder>/<name>`` when the destination is a
+    folder, and a link there is followed), then creates the missing parent
+    folders. ``copytree`` calls it as its ``copy_function`` through
+    ``partial(_copy_file, target)``."""
+    destination_path = Path(destination)
+    _require_safe_destination(target, destination_path.relative_to(target), "file")
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination_path)
+
+
+def _guard_levels(
+    target: Path,
+    source: Path,
+    destination: Path,
+    skip: Callable[[str, list[str]], set[str]] | None = None,
+) -> Callable[[str, list[str]], set[str]]:
+    """Return a ``copytree`` ``ignore`` callback for ``copytree(source,
+    destination)`` that refuses an unsafe destination folder for each level.
+    ``copytree`` runs ``ignore`` before it creates that level's folder, so
+    nothing is created through a link. Names to leave out come from ``skip``."""
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        level = destination / Path(directory).relative_to(source)
+        _require_safe_destination(target, level.relative_to(target), "folder")
+        return skip(directory, names) if skip is not None else set()
+
+    return ignore
+
+
+def validate_no_symlink_writes(
+    source: Path,
+    target: Path,
+    commit_copilot_surface: bool,
+    previously_committed_copilot_surface: bool,
+    state_remote: str | None,
+) -> None:
+    """Fail before any write when a path a full refresh writes is unsafe
+    (``_unsafe_destination``): a link anywhere on it, a part above it that is
+    not a real folder, a file path that is not a regular file, or a folder
+    path that is not a real folder. A link could make the refresh overwrite a
+    file outside the repository; a wrong kind makes a copy write into the
+    wrong place or stop partway.
+
+    Checks the paths ``copy_generated_tree`` copies (found with its own
+    ``_copy_rules``, so existing consumer state, preserved tracked adapters,
+    and claimed third-party bundles are skipped exactly as there), the
+    substitution files, ``.gitignore``, ``.claude/bootstrap-ownership.env``,
+    every ``.claude/bootstrap-root/<adapter>`` path ``populate_bootstrap_root``
+    writes or removes, and the devcontainer file when ``state_remote`` is
+    given (``--state-remote`` or an exported ``AI_STATE_REMOTE``). The
+    substitution and ``.gitignore`` checks are blanket: an unsafe path there
+    is refused even when no rewrite would fire. A bootstrap-root adapter is a
+    folder when the generated source ships it as one, or when the copy step
+    preserves it and the target holds one. An unsafe path is listed once, at
+    its first unsafe part, and every problem is listed in one refusal: links
+    under ``Refusing to write through symlinks:``, every other case under
+    ``Refusing to write over a path of the wrong kind:``.
+
+    ``copy_generated_tree``, the state-README refresh, ``populate_bootstrap_root``
+    and ``mirror_project_skills`` check again at copy time, a second line that
+    stops the run (``_copy_file``, ``_guard_levels``). Only a state-folder
+    README is skipped with a warning instead of refused: it is consumer state.
+
+    Not checked: the nested state sync's own writes (``state-sync.sh setup``
+    may append to ``.claude/.gitignore`` and ``.claude/.gitattributes``, and
+    its settings restore copies onto ``settings.local.json``; the priority
+    follow-up); Git's own writes (``git config core.hooksPath`` in the outer
+    repository, ``configure_git_hooks_path``, and the nested state commit,
+    ``git add -A`` and ``git commit`` in ``.claude/``); hard links; whether
+    macOS ``strip_quarantine`` (``xattr -rc`` over whole folders, consumer
+    state included) follows links; and reads
+    through links, for example ``populate_bootstrap_root`` copying a preserved,
+    tracked adapter through a link into the AI state, which can then be
+    pushed.
+    """
+    should_preserve, copy_ignore = _copy_rules(
+        source,
+        target,
+        commit_copilot_surface,
+        previously_committed_copilot_surface,
+        log=lambda _message: None,
+    )
+    problems: dict[Path, str] = {}
+
+    def check(relative: Path, kind: DestinationKind) -> bool:
+        """Record the first unsafe part of one written path; say whether the
+        path is safe."""
+        unsafe = _unsafe_destination(target, relative, kind)
+        if unsafe is not None:
+            problems[unsafe[0]] = unsafe[1]
+        return unsafe is None
+
+    def visit(source_path: Path, relative: Path) -> None:
+        kind: DestinationKind = "folder" if source_path.is_dir() else "file"
+        if check(relative, kind) and kind == "folder" and (target / relative).is_dir():
+            names = sorted(entry.name for entry in source_path.iterdir())
+            skipped = copy_ignore(str(source_path), names)
+            for name in names:
+                if name not in skipped:
+                    visit(source_path / name, relative / name)
+
+    for child in sorted(source.iterdir()):
+        if not should_preserve(Path(child.name)):
+            visit(child, Path(child.name))
+
+    for relative in (
+        *PROJECT_NAME_FILES,
+        *PYTHON_FACT_FILES,
+        Path(".gitignore"),
+        Path(".claude") / "bootstrap-ownership.env",
+        *((Path(".devcontainer") / "devcontainer.json",) if state_remote else ()),
+    ):
+        check(relative, "file")
+    for adapter in RESTORABLE_ROOT_PATHS:
+        # The copy step leaves what the generated source ships, or the target's
+        # own adapter when it preserves that one; the record copy mirrors it.
+        base = target if should_preserve(Path(adapter)) else source
+        check(
+            Path(".claude") / "bootstrap-root" / adapter,
+            "folder" if (base / adapter).is_dir() else "file",
+        )
+
+    def listed(path: Path) -> str:
+        return path.relative_to(target).as_posix()
+
+    sections: list[str] = []
+    links = sorted(listed(path) for path, reason in problems.items() if reason == _LINK)
+    if links:
+        sections.append(
+            "Refusing to write through symlinks:\n  "
+            + "\n  ".join(links)
+            + "\nReplace each link with a regular file or folder, or remove it, "
+            "then rerun."
+        )
+    wrong = sorted(
+        f"{listed(path)} ({reason})"
+        for path, reason in problems.items()
+        if reason != _LINK
+    )
+    if wrong:
+        sections.append(
+            "Refusing to write over a path of the wrong kind:\n  "
+            + "\n  ".join(wrong)
+            + "\nMove or rename each listed path, then rerun."
+        )
+    if sections:
+        raise SystemExit("\n".join(sections))
 
 
 def _legacy_install_mode(text: str) -> bool | None:
@@ -926,6 +1390,90 @@ def substitute_python_version(target: Path, dry_run: bool) -> None:
             path.write_text(updated, encoding="utf-8")
 
 
+def _mirrorable_files(folder: Path) -> list[Path] | str:
+    """Relative regular files under a project skill folder, or the reason the
+    folder cannot be mirrored whole: it holds a symlink or a non-regular
+    entry, or the walk could not read part of it. Follows no link. Leaves out
+    what the generator leaves out (``.git``, ``__pycache__/``, ``*.pyc``)."""
+    files: list[Path] = []
+    walk_errors: list[OSError] = []
+    for directory, names, filenames in os.walk(
+        folder, followlinks=False, onerror=walk_errors.append
+    ):
+        left_out = generated_copy_ignore(directory, [*names, *filenames])
+        names[:] = [name for name in names if name not in left_out]
+        relative_directory = Path(directory).relative_to(folder)
+        for name in names:
+            if not stat.S_ISDIR((Path(directory) / name).lstat().st_mode):
+                return "it holds a symlink or a non-regular entry"
+        for name in filenames:
+            if name in left_out:
+                continue
+            if not stat.S_ISREG((Path(directory) / name).lstat().st_mode):
+                return "it holds a symlink or a non-regular entry"
+            files.append(relative_directory / name)
+    if walk_errors:
+        return f"it could not be read completely ({walk_errors[0]})"
+    return files
+
+
+def mirror_project_skills(target: Path, dry_run: bool) -> None:
+    """Copy each project-owned skill, exactly, to ``.agents/skills/<name>/``:
+    the folder Codex, Antigravity, and Copilot read. The marker travels with
+    it so a later refresh can tell a project skill that lost its marker from
+    a retired bootstrap skill (``validate_project_skills``). Under
+    ``.agents/skills`` the marker has no ownership effect
+    (``is_project_skill_dir`` needs a ``.claude/skills`` parent), so the next
+    refresh prunes the mirror and writes it again. A folder holding a symlink
+    or non-regular entry, or one the walk could not read completely, is
+    skipped whole with a warning; nothing in it is followed. ``.git``,
+    ``__pycache__/`` and ``*.pyc`` are left out, as the generator leaves them
+    out."""
+    skills_dir = target / ".claude" / "skills"
+    folders = (
+        sorted(path for path in skills_dir.iterdir() if is_project_skill_dir(path))
+        if skills_dir.is_dir()
+        else []
+    )
+    mirrorable: list[tuple[Path, list[Path]]] = []
+    for folder in folders:
+        files = _mirrorable_files(folder)
+        if isinstance(files, str):
+            warn(
+                f"skip project skill {folder.name}: {files}, so it is not "
+                f"mirrored to .agents/skills/{folder.name}"
+            )
+            continue
+        mirrorable.append((folder, files))
+
+    agents_skills = target / ".agents" / "skills"
+    if mirrorable and not dry_run:
+        for directory in (target / ".agents", agents_skills):
+            if directory.is_symlink() or (
+                directory.exists() and not directory.is_dir()
+            ):
+                raise SystemExit(
+                    "Refusing to mirror project skills: "
+                    f"{directory.relative_to(target).as_posix()} is not a real "
+                    "directory. Move it aside, then rerun."
+                )
+        agents_skills.mkdir(parents=True, exist_ok=True)
+    for folder, files in mirrorable:
+        destination = agents_skills / folder.name
+        if os.path.lexists(destination):
+            warn(
+                f"skip project skill {folder.name}: "
+                f".agents/skills/{folder.name} already exists"
+            )
+            continue
+        info(f"mirror project skill {folder.name} -> .agents/skills/{folder.name}")
+        if dry_run:
+            continue
+        for relative in files:
+            _copy_file(target, folder / relative, destination / relative)
+        strip_quarantine(destination)
+
+
 def merge_gitignore(
     target: Path,
     dry_run: bool,
@@ -969,7 +1517,7 @@ def chmod_runtime_scripts(target: Path, dry_run: bool) -> None:
     )
     for pattern in patterns:
         for path in target.glob(pattern):
-            if not path.is_file():
+            if path.is_symlink() or not path.is_file():
                 continue
             info(f"chmod +x {path.relative_to(target)}")
             if dry_run:
@@ -1068,17 +1616,20 @@ def populate_bootstrap_root(
             continue
         destination = destination_root / relative
         if source.is_dir():
-            if destination.is_dir() and not destination.is_symlink():
+            # Before the old copy is removed: a link above it must not lead
+            # the removal outside the project.
+            _require_safe_destination(target, destination.relative_to(target), "folder")
+            if destination.is_dir():
                 shutil.rmtree(destination)
-            elif destination.exists() or destination.is_symlink():
-                raise SystemExit(
-                    "Unsafe bootstrap-root adapter destination: "
-                    f"{destination.relative_to(target)}"
-                )
-            shutil.copytree(source, destination, dirs_exist_ok=True)
+            shutil.copytree(
+                source,
+                destination,
+                dirs_exist_ok=True,
+                ignore=_guard_levels(target, source, destination),
+                copy_function=partial(_copy_file, target),
+            )
         else:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
+            _copy_file(target, source, destination)
         strip_quarantine(destination)
 
     ownership_manifest = target / ".claude" / "bootstrap-ownership.env"
@@ -1813,6 +2364,7 @@ def main() -> int:
     state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     validate_install_roots(source, target, args.allow_self)
     validate_agents_takeover(source, target)
+    validate_project_skills(source, target)
     require_full_source_complete(source)
     persisted_mode = persisted_install_mode(target)
     commit_copilot_surface = (
@@ -1826,6 +2378,14 @@ def main() -> int:
     info(
         "Copilot surface mode: "
         f"{'committed' if commit_copilot_surface else 'local-only'} ({mode_source})"
+    )
+
+    validate_no_symlink_writes(
+        source,
+        target,
+        commit_copilot_surface,
+        previously_committed_copilot_surface=persisted_mode is True,
+        state_remote=state_remote,
     )
 
     claude_dir = target / ".claude"
@@ -1842,6 +2402,19 @@ def main() -> int:
         had_pre_existing_content,
         args.local_only,
     )
+    if had_pre_existing_content and not args.dry_run:
+        # The migration ran after the checks above and can change `.claude/`:
+        # check again before the copy. A refusal here comes after the
+        # migration's own writes.
+        validate_agents_takeover(source, target)
+        validate_project_skills(source, target)
+        validate_no_symlink_writes(
+            source,
+            target,
+            commit_copilot_surface,
+            previously_committed_copilot_surface=persisted_mode is True,
+            state_remote=state_remote,
+        )
     copy_generated_tree(
         source,
         target,
@@ -1851,6 +2424,7 @@ def main() -> int:
     )
     substitute_project_name(target, args.dry_run)
     substitute_python_version(target, args.dry_run)
+    mirror_project_skills(target, args.dry_run)
     populate_bootstrap_root(
         target,
         args.dry_run,

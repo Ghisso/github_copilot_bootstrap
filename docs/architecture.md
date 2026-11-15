@@ -118,7 +118,23 @@ run when any is violated:
 - public and background skills alike have a non-empty `description`;
 - no two skills share an identical `description` (a duplicate breaks
   description-match loading of background skills);
+- a skill's listing text stays within the cap: its stripped `description` plus
+  its stripped `when_to_use` (`skill_listing_length`, the one length
+  definition) is at most 300 characters (`SKILL_DESCRIPTION_MAX_CHARS`). Claude
+  Code lists both for every skill on every turn and drops descriptions when the
+  list passes its budget. `ponytail` and `ponytail-review` are exempt
+  (`SKILL_DESCRIPTION_CAP_EXEMPT`). A longer skill is reported as
+  `SKILL_DESCRIPTION_TOO_LONG` by `shared_skill_integrity_errors`;
 - every `shared/skills/*` directory has a root `SKILL.md`;
+- no shipped skill folder holds a `.project-skill` marker
+  (`SKILL_PROJECT_MARKER_SHIPPED`): `shared_skill_integrity_errors` checks
+  `shared/skills/`, and `generated_skill_surface_errors` checks the
+  `.claude/skills/` and `.agents/skills/` folders of `dist/multi-agent` and of
+  each `dist/sidecar/<profile>`, because a stray marker would make every
+  consumer's refresh refuse a name clash;
+- a generated tree's `.claude/skills/` and `.agents/skills/` hold the same
+  skill names (`SKILL_SURFACE_MISMATCH`, `generated_skill_surface_errors`),
+  which the installer's newly-shipped-name refusal relies on;
 - a backtick-quoted local reference that names a known repository root
   (`shared/`, `scripts/`, `docs/`, `tests/`, `.claude/`, `.github/`,
   `.codex/`, `.agents/`, or a same-directory `references/...` path) resolves
@@ -321,7 +337,20 @@ The generator creates the Antigravity workspace surface from the same
 canonical metadata and assets as the other adapters, and the installer
 treats `.agents/` as a single bootstrap-owned root adapter, like `.codex/`,
 with a pre-write takeover check that never silently adopts or deletes
-consumer content. See [Agent roster, prompts, and the skill
+consumer content. A skill folder under `.claude/skills/` that holds an empty `.project-skill`
+file is project-owned, a second ownership rule beside the OpenWiki marker
+(`THIRD_PARTY_SKILL_MARKER`, `.openwiki-install.json`). The marker comes from
+`PROJECT_SKILL_MARKER` and `is_project_skill_dir()` in
+`scripts/runtime_ownership.py`. A full install never deletes or overwrites a
+marked folder, refuses name clashes and symlinks before any write, and mirrors
+the folder, marker included, to `.agents/skills/<name>/`. The mirrored marker
+grants no ownership; it lets a later refresh refuse a project skill whose
+`.claude` marker went missing instead of deleting it as retired. A folder
+holding a symlink or other non-regular entry is not mirrored; the installer
+warns and skips it. See
+[README.md's Project-owned skills](../README.md#project-owned-skills).
+
+See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for the roster
 Antigravity renders and [Runtime
 Checks](runtime-checks.md#google-antigravity-evidence-boundary) for the
@@ -379,8 +408,9 @@ for stale phase and session-log state. `verify.py closeout --persist`
 refuses to write a receipt the terminal push gate could never accept when
 the big plan is not yet retrievable from nested Git. See [Task lanes and
 the enforced lifecycle](../openwiki/workflows/lifecycle-and-task-lanes.md)
-for the full closeout sequence, the pause/cancel paths, and which rules
-these hooks enforce mechanically versus policy text.
+for how the lifecycle runs and which rules these hooks enforce mechanically versus policy text. The numbered closeout sequence is
+in `.claude/instructions/closeout.instructions.md`; the pause, cancel, and
+reopen paths are in `.claude/instructions/plan-lifecycle.instructions.md`.
 
 ### Reporting reminders
 

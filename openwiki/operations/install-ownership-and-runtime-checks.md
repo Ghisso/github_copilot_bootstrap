@@ -4,6 +4,12 @@ title: Installing the bootstrap, file ownership, and runtime drift checks
 description: How install_bootstrap.py chooses between a full install and a sidecar install and refuses unsafe targets, which sidecar profile and source it picks, how a full install installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater that finishes every target and reports failures, and what check_runtime.py reports.
 tags: [install, refresh, ownership, runtime-ownership, check-runtime, drift, bootstrap-root, consumers]
 sources:
+  - id: openwiki-source-37cd5f3d3aa49832caf1a222
+    resource: repo://docs/runtime-checks.md
+  - id: openwiki-source-7aaa88e66a4141ea24c14706
+    resource: repo://docs/target-mapping.md
+  - id: openwiki-source-23775c3de52f3ab95a13cb8b
+    resource: repo://README.md
   - id: openwiki-source-42e51bf2d8e7ed2f137178e1
     resource: repo://scripts/check_runtime.py
   - id: openwiki-source-7c162969a98fb2f3fa853ffc
@@ -20,12 +26,16 @@ sources:
     resource: repo://shared/scripts/verify.py
   - id: openwiki-source-f48dfb5bc22ec5140aa8b810
     resource: repo://tests/test_install_bootstrap.py
+  - id: openwiki-source-2d0d5ea9c4029722239233b8
+    resource: repo://tests/test_sidecar_install.py
+  - id: openwiki-source-3917eaf8fd9f30e25e7198d1
+    resource: repo://tests/test_sidecar_update.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
+generated: { by: "claude-code", at: "2026-11-15T05:13:09.357Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-22T18:10:39.614Z
+    at: 2026-11-15T05:13:09.357Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
@@ -85,8 +95,9 @@ After detection, `main` picks the profile and the source. In sidecar mode the pr
 | Copilot surface (`COPILOT_SURFACE_PATHS`) | `.github/agents`, `.github/hooks`, `.github/instructions`, `.github/copilot-instructions.md` | mirrored and ignored like a root adapter, unless the consumer chose `--commit-copilot-surface` |
 | Tracked authoring adapters (`TRACKED_AUTHORING_PATHS`) | `AGENTS.md`, `CLAUDE.md` when tracked by the target's outer Git | preserved byte for byte |
 | Consumer state (`CONSUMER_STATE_PATHS`) | under `.claude/`: `MEMORY.md`, `plans`, `explorations`, `session_logs`, `quality_reports`, `.cache`, `instructions/project-context.instructions.md`, `settings.local.json`, and the nested `.gitignore` and `.gitattributes` | never compared, overwritten, or deleted; a seed is used only on a fresh install |
-| State-directory READMEs | the `README.md` in `plans`, `explorations`, `session_logs`, `quality_reports` | regenerated even inside consumer-owned directories; siblings untouched |
+| State-directory READMEs | the `README.md` in `plans`, `explorations`, `session_logs`, `quality_reports` | regenerated even inside consumer-owned directories, unless the README path or its folder is unsafe (then skipped with a warning); siblings untouched |
 | Third-party skill bundles (`THIRD_PARTY_SKILL_PATHS`) | `skills/openwiki` under `.claude` or `.agents`, once it contains `.openwiki-install.json` | preserved, not refreshed, excluded from drift and takeover comparisons |
+| Project-owned skills (`PROJECT_SKILL_MARKER`) | a real `.claude/skills/<name>/` folder holding a regular `.project-skill` file | never deleted or overwritten; mirrored, marker included, to `.agents/skills/<name>/` |
 
 The marker rule matters most. A directory shaped like `skills/openwiki` is ordinary bootstrap content until OpenWiki's own installer writes `.openwiki-install.json` inside it. From then on:
 
@@ -96,6 +107,60 @@ The marker rule matters most. A directory shaped like `skills/openwiki` is ordin
 - the verifier's bootstrap-root fingerprint excludes it.
 
 Ownership keys on a fact only the intended owner produces, not on path shape. `is_third_party_skill_dir` requires both the shape and the marker.
+
+### Project-owned skills
+
+A full refresh deletes every `.claude/` file it does not generate, so a skill a consumer writes under `.claude/skills/` would be deleted at the next refresh. A consumer keeps its own skill by adding an empty `.project-skill` file to its folder. `is_project_skill_dir` accepts the folder only when it is a real directory directly under a real `.claude/skills/`, and the marker is a regular file; every check uses `lstat` and follows no link.
+
+Before any write, `validate_project_skills` checks every entry under `.claude/skills/`, collects every problem, and refuses once with `Refusing project skills; fix each listed item, then rerun:`. It refuses:
+
+- a symlink as `.claude/skills/` or as an entry directly under it;
+- a marked folder whose marker or `SKILL.md` is a link or not a regular file, whose name is not lowercase kebab case, or whose `SKILL.md` frontmatter `name:` differs from the folder name;
+- a marked folder whose name the new source ships, or that has a third-party shape or holds the OpenWiki marker;
+- a folder with an entry named `.project-skill` that `is_project_skill_dir` would not protect, such as one under a symlinked `.claude`. The installer checks this first, lists it as the only problem for that folder, and never reads its `SKILL.md` through the link;
+- an unmarked folder holding a `SKILL.md` whose name the new source does not ship and the shipped-before record does not list. The message says only what is known (the record does not list it, the record is a symlink and was not read, or no shipped-before record was found) and names both remedies: remove an unmodified copy of an old bootstrap skill, or mark the project's own;
+- an unmarked folder holding a `SKILL.md`, other than a folder shaped like a third-party bundle (`skills/openwiki`), claimed or not, whose name the new source ships while no shipped-before record lists it, with or without a record, because the refresh would overwrite it. The message says what is known in the same way. It names two remedies: if the project wrote the folder, rename it and its `name:` line, then add `.project-skill`; otherwise move it out of `.claude/skills/`;
+- an unmarked folder whose name was a project skill before (its shipped-before record copy holds `.project-skill`), so a lost marker never deletes the skill.
+
+The shipped-before record is `.claude/bootstrap-root/.agents/skills/`, read as directory entries without following a link. When that copy is absent, the live `.agents/skills/` stands in for every check. A missing record never blocks an install by itself, so a project with no unmarked skill folder of these kinds installs normally. A legacy consumer that holds old bootstrap skill copies and no record is refused once, with every folder listed. Moving the listed folders into one backup folder outside `.claude/` and refreshing again writes the record; the project's own skills are then copied back and marked, renamed first when the bootstrap ships their name. An unmarked folder whose name is in the record without a marker is a retired bootstrap skill and is still deleted. These checks ignore folders without a `SKILL.md`. So an unmarked folder with a shipped name and no `SKILL.md` is not refused: the copy overwrites its shipped files, and the obsolete-file cleanup deletes its other files. Folder names, never frontmatter values, drive every comparison and destination.
+
+After copying, `mirror_project_skills` copies each marked folder, marker included, to `.agents/skills/<name>/`, where Codex, Copilot, and Antigravity read skills. It runs before `populate_bootstrap_root`, so the live `.agents/` tree, its `bootstrap-root` copy, the takeover check, and the verifier's root-adapter comparison all see the same tree. The mirror leaves out `.git`, `__pycache__/`, and `*.pyc` entries, as the generator does. It skips a whole folder, with a warning, when the folder holds a symlink or another non-regular entry, or when any part of it cannot be read, and it never overwrites an existing destination. It prints `mirror project skill <name> -> .agents/skills/<name>` only for a folder it actually mirrors. The marker under `.agents/skills/` grants no ownership, so the mirror is pruned and written again on every refresh. In a sidecar repository the marker has no effect: the sidecar never touches team skills.
+
+### Unsafe write destinations
+
+Before the first write, `validate_no_symlink_writes` checks each path in the coverage list below. It walks each path from the target root with `_unsafe_destination`, which reads each part with `lstat` and never follows a link. A path is unsafe when any of these holds:
+
+- a link sits at any part of it;
+- a part above the written path exists and is not a real folder;
+- the written path is a file that exists and is not a regular file, such as a folder or a FIFO;
+- the written path is a folder that exists and is not a real folder.
+
+The check covers:
+
+- the paths the copy step writes, found with the same `_copy_rules` the copy step uses, so the two cannot disagree;
+- the project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two workspace instruction files), even when they are preserved tracked adapters;
+- `.gitignore` and `.claude/bootstrap-ownership.env`;
+- every `.claude/bootstrap-root/<adapter>` path, with the kind the generated source gives it, or the target's own kind for an adapter the copy step preserves;
+- `.devcontainer/devcontainer.json`, when a state remote is set through `--state-remote` or an exported `AI_STATE_REMOTE`.
+
+The check refuses once and lists every problem in up to two sections. A link is listed under `Refusing to write through symlinks:`, and the remedy is to replace each link with a regular file or folder, or remove it. Every other case is listed under `Refusing to write over a path of the wrong kind:`, each path with its reason, such as `a folder where the refresh writes a file`. The remedy there is to move or rename each listed path, then rerun. The substitution and `.gitignore` checks are blanket, so a symlinked `AGENTS.md -> CLAUDE.md` is refused even when no rewrite would happen.
+
+The check is stricter than the old obsolete-file cleanup. A regular file at `.claude/templates`, or a folder holding an untracked link at `CLAUDE.md`, was resolved silently before and is now refused. So a bootstrap version that turns a generated file into a folder, or the reverse, makes each refresh refuse until the old item is moved by hand. `docs/target-mapping.md` records narrowing this as a possible later change.
+
+A second check runs at copy time. Every file copy goes through `_copy_file`, the module's only `shutil.copy2` call, and every folder `copytree` creates is checked first by `_guard_levels`, an `ignore` callback that `copytree` runs before it creates each level. An unsafe destination there stops the run with `Refusing to write <path>: ...`, and that stop may leave a partial refresh. `populate_bootstrap_root` also checks each record folder before it removes the old copy, so a link above it cannot lead the removal outside the project.
+
+Some writes have the preflight only, with no copy-time second line. These are the removal of inactive adapters in `populate_bootstrap_root`, and the plain `write_text` calls for the project-name and Python-version files, `.gitignore`, the devcontainer file, and `.claude/bootstrap-ownership.env`.
+
+A state-folder `README.md` is consumer state. When its path or folder is unsafe, the refresh skips it with a warning instead of refusing, and `chmod_runtime_scripts` skips links.
+
+These writes are not checked:
+
+- the nested state sync's own writes: `state-sync.sh` may append to `.claude/.gitignore` and `.claude/.gitattributes`, and it restores `settings.local.json` (the priority follow-up in `docs/target-mapping.md`);
+- Git's own writes: `git config core.hooksPath` in the outer repository and the nested state commit in `.claude/`;
+- hard links;
+- whether the macOS quarantine strip (`xattr -rc` over whole folders, consumer state included) follows links.
+
+Reads through links are not checked either. For example, `populate_bootstrap_root` copies a preserved, tracked root adapter that is a link into the AI state, which can then be pushed. The installer does not guarantee that it never writes outside the project.
 
 ## The full-install sequence
 
@@ -110,25 +175,32 @@ This diagram shows the order `main` follows in full mode, after mode detection.
 
 ```mermaid
 flowchart TD
-    V[validate] --> M[migrate pre-Git state]
-    M --> C[copy generated tree]
+    V[validate] --> L[unsafe-path preflight]
+    L --> M[migrate pre-Git state]
+    M --> R[recheck if migrated]
+    R --> C[copy generated tree]
     C --> S[substitute names]
-    S --> B[mirror root adapters]
+    S --> P[mirror project skills]
+    P --> B[mirror root adapters]
     B --> I[gitignore and hooks]
     I --> Y[state-sync commit]
 ```
 
 1. `validate_install_roots` rejects overlapping source and target trees. `--allow-self` permits exactly one overlap: this repository refreshing its own overlay from its own `dist/`.
-2. `validate_agents_takeover` refuses to write when an existing `.agents` tree cannot be proven generated. It compares the live tree, the mirror under `.claude/bootstrap-root/.agents`, and the generated source, all with marker-claimed bundles pruned, and reports conflicts with `Refusing .agents takeover; move or back up the listed content ...`.
-3. `require_full_source_complete` refuses a source without `.claude/hooks/scripts/state-sync.sh`. This catches a half-built tree or `--source dist/sidecar` in full mode before any write, instead of failing deep inside state sync after the `.gitignore` block and `core.hooksPath` were already written.
-4. The Copilot surface mode is resolved: explicit flag, else the mode persisted in `.claude/bootstrap-ownership.env`, else local-only.
-5. `migrate_pre_existing_state` commits a pre-Git `.claude/` with real content as `migrate: import pre-git state` before anything is replaced.
-6. `copy_generated_tree` copies `dist/multi-agent/` over the target. It logs `preserve consumer state`, `preserve tracked authoring adapter`, and `preserve third-party skill`, and `remove obsolete generated file` for bootstrap-owned files the new generation no longer produces. Pruning walks only `.claude/` and the restorable root paths.
-7. Project name and Python version are substituted into the installed instructions.
-8. `populate_bootstrap_root` mirrors the root adapters into `.claude/bootstrap-root/` so the Git-backed checkout carries them. The verifier's control-plane provenance requires each live root adapter to equal its mirror, so in this authoring repository an edit to a tracked root adapter such as `.mcp.json` or `.vscode/mcp.json` makes `verify.py` report invalid control-plane provenance until the self-install (`install_bootstrap.py . --allow-self --local-only`) repopulates the mirror.
-9. `merge_gitignore` writes or refreshes an idempotent block between `# BEGIN multi-agent bootstrap generated/private AI content` and its `# END` marker; runtime scripts are made executable; `configure_git_hooks_path` sets `core.hooksPath` to `.claude/hooks/git-hooks`; tracked paths that should be ignored are reported with the exact `git rm --cached` command. That check runs after most of the writes, so `warn_tracked_paths` turns a Git failure into the warning `could not check for tracked generated paths: <error>` instead of stopping the install.
-10. `sync_state_after_install` runs `state-sync.sh` to make the `bootstrap: install/update <timestamp>` nested commit and, unless `--local-only`, publish it.
-11. A reminder that Codex for VS Code may require renewed approval of the content-bound `.codex/hooks.json`. The installer never approves hooks itself.
+2. `validate_agents_takeover` refuses to write when an existing `.agents` tree cannot be proven generated. It compares the live tree, the mirror under `.claude/bootstrap-root/.agents`, and the generated source, all with marker-claimed bundles pruned, and reports conflicts with `Refusing .agents takeover; move or back up the listed content ...`. When every conflict is a folder that exists only in the live `.agents/skills/` and that neither the record nor `.claude/skills/` lists, the refusal adds an explanation: another clone refreshed and retired those skills, and this clone's restore copies files but never deletes them, so move the listed folders out of `.agents/skills/` and rerun, and delete them only once they are confirmed as old bootstrap copies.
+3. `validate_project_skills` refuses unsafe or unmarked skill folders before any write (see Project-owned skills above).
+4. `require_full_source_complete` refuses a source without `.claude/hooks/scripts/state-sync.sh`. This catches a half-built tree or `--source dist/sidecar` in full mode before any write, instead of failing deep inside state sync after the `.gitignore` block and `core.hooksPath` were already written.
+5. The Copilot surface mode is resolved: explicit flag, else the mode persisted in `.claude/bootstrap-ownership.env`, else local-only.
+6. `validate_no_symlink_writes` refuses an unsafe destination at each path its coverage list names (see Unsafe write destinations above). It needs the Copilot surface mode, and it also runs under `--dry-run`.
+7. `migrate_pre_existing_state` commits a pre-Git `.claude/` with real content as `migrate: import pre-git state` before anything is replaced. The migration runs `state-sync.sh`, which can change `.claude/`. So when it ran, which needs pre-Git content and no `--dry-run`, `main` runs `validate_agents_takeover`, `validate_project_skills`, and `validate_no_symlink_writes` again before the copy. A refusal there comes after the migration's own writes.
+8. `copy_generated_tree` copies `dist/multi-agent/` over the target, using the `_copy_rules` it shares with the preflight and the copy-time guard on every file and folder it writes. It logs `preserve consumer state`, `preserve tracked authoring adapter`, and `preserve third-party skill`, and `remove obsolete generated file` for bootstrap-owned files the new generation no longer produces. Pruning walks only `.claude/` and the restorable root paths, and skips marked project skill folders.
+9. Project name and Python version are substituted into the installed instructions.
+10. `mirror_project_skills` mirrors each marked project skill to `.agents/skills/<name>/`.
+11. `populate_bootstrap_root` mirrors the root adapters into `.claude/bootstrap-root/` so the Git-backed checkout carries them. The verifier's control-plane provenance requires each live root adapter to equal its mirror, so in this authoring repository an edit to a tracked root adapter such as `.mcp.json` or `.vscode/mcp.json` makes `verify.py` report invalid control-plane provenance until the self-install (`install_bootstrap.py . --allow-self --local-only`) repopulates the mirror.
+12. `update_devcontainer_state_remote` writes the state remote into `.devcontainer/devcontainer.json` as `containerEnv.AI_STATE_REMOTE`, so a fresh container clone finds the private state remote. `main` takes that remote from `--state-remote` or an exported `AI_STATE_REMOTE`; with neither, nothing is written.
+13. `merge_gitignore` writes or refreshes an idempotent block between `# BEGIN multi-agent bootstrap generated/private AI content` and its `# END` marker; runtime scripts are made executable; `configure_git_hooks_path` sets `core.hooksPath` to `.claude/hooks/git-hooks`; tracked paths that should be ignored are reported with the exact `git rm --cached` command. That check runs after most of the writes, so `warn_tracked_paths` turns a Git failure into the warning `could not check for tracked generated paths: <error>` instead of stopping the install.
+14. `sync_state_after_install` runs `state-sync.sh` to make the `bootstrap: install/update <timestamp>` nested commit and, unless `--local-only`, publish it.
+15. A reminder that Codex for VS Code may require renewed approval of the content-bound `.codex/hooks.json`. The installer never approves hooks itself.
 
 `--local-only` does the full refresh and creates the nested commits but performs no fetch, `ls-remote`, pull, merge, or push; it prints a quoted `state-sync.sh push` command for later. `--dry-run` prints the plan without writing.
 
@@ -142,7 +214,7 @@ This repository refreshes its own overlay with `uv run python scripts/install_bo
 
 ## Batch updates
 
-`uv run python scripts/update_consumers.py <repo>...` regenerates `dist/` (unless `--skip-regen`) and runs the installer for each consumer. It passes through `--dry-run`, `--local-only`, `--allow-self`, and the Copilot surface flags, but never `--mode`, `--uninstall`, `--profile`, or `--source`, so the installer detects each target's mode, each sidecar consumer keeps the profile its manifest records, and a batch never removes a sidecar. A mixed batch of full, `skills`, and `workflow` consumers therefore works, and a sidecar target warns once about the full-only options it ignores. Each full consumer gets the same migration-then-`bootstrap:` commit order.
+`uv run python scripts/update_consumers.py <repo>...` regenerates `dist/` (unless `--skip-regen`) and runs the installer for each consumer. It passes through `--dry-run`, `--local-only`, `--allow-self`, and the Copilot surface flags, but never `--mode`, `--uninstall`, `--profile`, or `--source`, so the installer detects each target's mode, each sidecar consumer keeps the profile its manifest records, and a batch never removes a sidecar. A mixed batch of full, `skills`, and `workflow` consumers therefore works, and a sidecar target warns once about the full-only options it ignores. Each full consumer gets the same migration-then-`bootstrap:` commit order. A legacy full consumer with old bootstrap skill copies and no shipped-before record is refused once, listing each folder, until each folder is moved out of `.claude/skills/` or kept as a project skill; the batch records it like any other failed target.
 
 A failed target no longer stops the batch:
 
@@ -169,7 +241,7 @@ The nested `.gitignore` and `.gitattributes` became consumer state because `stat
 
 ## Representative tests
 
-- `tests/test_install_bootstrap.py` covers mode detection and every refusal (including a team `.claude` submodule, a dubious-ownership Git error, a non-UTF-8 or non-regular `info/exclude`, a dangling manifest symlink, a sidecar tree passed to full mode, and the `--uninstall` hint in the `--mode full` refusal), the full-install default for a repository that tracks only code and `.gitignore`, the tracked-path warning on a Git failure, the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption.
+- `tests/test_install_bootstrap.py` covers mode detection and every refusal (including a team `.claude` submodule, a dubious-ownership Git error, a non-UTF-8 or non-regular `info/exclude`, a dangling manifest symlink, a sidecar tree passed to full mode, and the `--uninstall` hint in the `--mode full` refusal), the full-install default for a repository that tracks only code and `.gitignore`, the tracked-path warning on a Git failure, the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption. Tests named `project_skill` cover every project-skill refusal (each one checks a non-zero exit, the folder named in the message, an unchanged target tree, and an unchanged outside sentinel), the mirror and its skip cases (including an unreadable subfolder, Python caches, and `.git`), an edit or deleted file reaching the mirror on refresh, and real installer runs that keep a project skill, refuse a stray, a name clash, a newly shipped name the record lacks, or an unmarked shipped name with no record, delete a retired skill, and refuse a skill whose marker went missing. They also check the wording for a linked or dangling record, and two over-refusal guards: a project with no skill folders, or with only a marked one, installs with no record. Tests named `destination_link` cover the preflight with real installer runs, each refused before any write with an outside sentinel unchanged: linked paths (a shipped `SKILL.md`, a hook script, a generated folder, `.claude/bootstrap-root`, `.gitignore`, a preserved `CLAUDE.md`, and `.claude` itself) and wrong kinds (a folder in place of `.devcontainer/Dockerfile`, a tracked or untracked `CLAUDE.md`, or `.claude/bootstrap-root/CLAUDE.md`; a regular file at `.devcontainer` or `.claude/templates`; a regular file above a written path; a FIFO). They also cover a refusal with both sections, a dry run, the devcontainer check with `--state-remote`, an exported `AI_STATE_REMOTE`, or neither, the README and chmod skips, the copy-time guard at each copy site called directly, and the recheck after a legacy migration. Tests named `stale_agents` cover the explanation for stale live `.agents/skills/` folders, including the advice to move them aside, and the generic message for every other conflict shape.
 - `tests/test_sidecar_update.py` covers batch updates that mix full and sidecar consumers and continue past a refused target.
 - `tests/test_check_runtime.py` covers the plan-frontmatter delegation and every shape of the Bash 3.2 array-expansion rule.
 

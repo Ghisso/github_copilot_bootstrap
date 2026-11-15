@@ -2,14 +2,10 @@
 name: plan-decomposition
 visibility: public
 description: |
-  Decompose a large implementation plan into a big plan plus one small-plan file
-  per phase, matching templates/plan-small.md and the lifecycle the hooks
-  enforce. Use when:
-  - Creating a multi-step implementation plan for a feature or migration
-  - User asks to "write a plan", "break this down into phases", or "plan this out"
-  - A plan touches multiple files, configs, and test suites across >1 logical stage
-  - Refactoring an existing monolithic plan into smaller, reviewable pieces
-  Do NOT use for single-file fixes or tasks completable in one step.
+  Write or split a plan: "write a plan", "break this down into phases", "plan
+  this out". Turns a multi-file, multi-stage feature or migration into a big
+  plan plus one small-plan file per phase, per templates/plan-small.md. Not for
+  single-file or one-step tasks.
 ---
 
 # Plan Decomposition
@@ -114,26 +110,23 @@ and must appear in the big plan's `phases` list. Fill:
   conditional prose in the required section. See the Verification Evidence
   Contract in `.claude/instructions/workflow.instructions.md` for the full
   parsing and hedge rules.
-- **Closeout Checklist** — leave the template's checklist; it gates the normal
-  completion commit. An explicitly requested paused checkpoint uses its own
-  evidence path and does not complete or advance the phase.
+- **Closeout Checklist** — keep the template's two boxes and tick them at
+  CLOSEOUT step 2. The CLOSEOUT sequence in
+  `.claude/instructions/closeout.instructions.md`, not this checklist, gates
+  the normal completion commit. An explicitly requested paused checkpoint uses
+  its own evidence path and does not complete or advance the phase.
 
 **The last phase in the big plan's `phases:` list must add a documentation,
-memory, and LEARN audit step**: sweep every live-advice surface (root
-guidance, `docs/`, shared policies/skills/templates/agents/review-profiles,
-state READMEs, and `.claude/MEMORY.md`) for claims this plan or earlier work
-invalidated, correct or supersede each one, leave dated records (archived
-plans, dated design narratives, closed session logs) unchanged unless an
-entry would actively mislead a reader and no receipt binds its log, and
-record the audited surfaces and each one's outcome under a `## Stale-claims
-surfaces checked` heading in that phase's closeout session log. Do not limit
-the sweep to that phase's own changes. Use that exact heading: `verify.py`'s
-closeout gate requires it, with non-empty content, whenever the phase it is
-closing out is this list's last entry.
+memory, and LEARN audit step**: the standing final-phase audit in
+`.claude/instructions/closeout.instructions.md`, which lists the surfaces to
+sweep. It records them under a `## Stale-claims surfaces checked` heading in
+that phase's closeout session log; `verify.py`'s closeout gate requires that
+exact heading, with non-empty content, whenever the phase it is closing out is
+this list's last entry.
 
 In a repository where `openwiki/INSTRUCTIONS.md` exists, that last phase may
 also need to be a dedicated knowledge-refresh phase: see the canonical
-Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
+Knowledge-Refresh Final Phase rule in `.claude/instructions/plan-lifecycle.instructions.md`
 for exactly when and how, including its required `-knowledge-refresh` slug
 suffix and its recursion guard. Do not restate that rule here.
 

@@ -12,6 +12,8 @@ sources:
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-f11e4ce184d9addc83c16d26
     resource: repo://shared/hooks/scripts/_lib-frontmatter.sh
+  - id: openwiki-source-9fd0a35cebe588e6f39e1d28
+    resource: repo://shared/policies/closeout.instructions.md
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-ac6151a0e717fb82e280dbaf
@@ -22,10 +24,10 @@ sources:
     resource: repo://tests/test_validate_targets.py
   - id: openwiki-source-7c9c9eb3a89efa00dd8df426
     resource: repo://tests/test_verify.py
-generated: { by: "claude-code", at: "2026-11-11T14:51:38.121Z" }
+generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-11T15:10:30.745Z
+    at: 2026-11-14T16:56:38.985Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -80,7 +82,7 @@ Each lint, type, generation, or pytest command in `phase` mode runs under `COMMA
 
 ## What a receipt binds
 
-Receipt metadata holds `base_ref`, `branch`, `head_sha`, `merge_base_sha`, `tree_sha` (from `git write-tree`, so it binds the index), `phase`, `content_hash` (the diff against the merge base), `tracked_state_hash`, `changed_paths`, `relevant_paths`, `path_discovery_ok`, and a `control_plane_provenance` object. `tracked_state_hash` is informational and no gate compares it; at commit time `tree_sha` is the binding check, so any change staged after closeout, documentation included, makes the receipt stale. `changed_paths` also drives the required review profiles described below.
+Receipt metadata holds `base_ref`, `branch`, `head_sha`, `merge_base_sha`, `tree_sha` (from `git write-tree`, so it binds the index), `phase`, `content_hash` (a hash of the changed paths `scoped_paths` keeps, which leaves out ordinary documentation), `tracked_state_hash`, `changed_paths`, `relevant_paths`, `path_discovery_ok`, and a `control_plane_provenance` object. `tracked_state_hash` is informational and no gate compares it; at commit time `tree_sha` is the binding check, so any change staged after closeout, documentation included, makes the receipt stale. `changed_paths` also drives the required review profiles described below.
 
 `control_plane_provenance` stops evidence from one runtime or plan being reused for another:
 
@@ -126,6 +128,7 @@ Any violation fails `VFY-GEN-001` and, through the same function, the commit gat
 
 - Each finding needs a `severity` of `CRITICAL`, `MAJOR`, or `MINOR`, a non-empty `title`, and a `profile` among the repeated `--profile` arguments.
 - The report records `schema_version: 2`, `counts`, `profiles_reviewed`, the findings, the reviewer's `gate_result` (from the required `--gate-result PASS|WARN|FAIL`), `open_requests` (from repeatable `--open-request`), and Git metadata: `branch`, `head_sha`, `merge_base_sha`, `content_hash`, `changed_files`, and `dirty: true` when any tracked change is unstaged. That is why the closeout sequence stages before recording.
+- The report's `content_hash` is `git hash-object` of `git diff <merge base>`: it covers every tracked change in the working tree, staged or not, documentation included. A phase receipt's `content_hash` instead hashes only `scoped_paths`, which leave out ordinary documentation. So a late documentation edit leaves the phase receipt valid but makes the commit gate refuse the findings report with `findings report content_hash is stale`, until the findings are recorded again.
 - The recorder refuses `--gate-result PASS` together with any open request, and an empty open request, and writes nothing in that case.
 - When the findings text names a protected path, write the findings JSON with the native Write tool to a scratch file and pass `--findings-json <file>`; `protect-files` denies a heredoc or inline command text that names a protected path.
 - When `ponytail` was reviewed the report carries `ponytail_reviewed: true` and `ponytail_findings`.
@@ -139,6 +142,8 @@ Any violation fails `VFY-GEN-001` and, through the same function, the commit gat
 - `certified`, for the exact phase-completion commit: the pushed commit must be the direct child of the receipt's `head_sha`, because receipts are generated before the commit they certify.
 
 In every relation the gate requires a passing `closeout` receipt for `base_ref` `dev`, the same branch and phase, and a matching `merge_base_sha`. It also requires `counts.critical == 0` and `counts.major == 0` in the findings report and a `disposition` with a non-empty `reason` on every surviving MINOR.
+
+The written form of these rules lives in `.claude/instructions/closeout.instructions.md`: its `## Completion-commit gate` section lists the review conditions of a normal completion commit and names the gate's other checks, and its `## Closeout session log` section lists the log fields and the optional-item grammar. The Verification Evidence Contract (the required `## Verification` block and the `## Optional Verification` section) stays in the workflow core, `.claude/instructions/workflow.instructions.md`.
 
 Two more rules come from the review evidence itself:
 
@@ -158,9 +163,19 @@ For pushes and pull requests, `historical_chain_errors` additionally walks the e
 
 The walk skips only a plan's leading run of phases that predate closeout receipts, which exist only since 2026-08-29 (`RECEIPT_CHAIN_SINCE` in `shared/scripts/verify.py`). `leading_pre_receipt_count` puts a phase in that run when it is cancelled, or when it is complete, its slug and its `closeout_session_log` file name are both dated before 2026-08-29, and nothing exists at its closeout receipt path. The run ends at the first phase that does not qualify, so deleting a receipt cannot exempt a later phase, and a receipt file on disk is always validated.
 
+## Static checks on the guidance itself
+
+`scripts/validate_targets.py` also checks the guidance the gates depend on, so the written procedure cannot drift from what the gates expect:
+
+- `closeout_procedure_errors` requires the generated `closeout.instructions.md` to hold exactly one `## CLOSEOUT procedure` heading, steps 1 to 8 in order, a `*Why` reason inside every step, `.claude/skills/learn/SKILL.md` inside step 2, and both hard rules. It also requires exactly one "Recovering from a stale receipt" section and checks the three stale-receipt messages (`CLOSEOUT_STALE_RECEIPT_MESSAGES`) inside that section only, so deleting the section fails even though two of the messages also appear in step 6 and a hard rule.
+- `closeout_pointer_errors` requires the workflow core, the orchestrator prompt, the `commit` skill, and the plan-small template to name `closeout.instructions.md` and not to restate where the sequence lives.
+- `POLICY_BYTE_BUDGETS` caps six policies: the workflow core and the closeout file at 16 KiB, plan-lifecycle at 11 KiB, workspace at 7,680 bytes, and quality-and-testing and tool-routing at 3 KiB. `ROOT_GUIDANCE_BUDGETS` keeps the generated `CLAUDE.md` at or below 200 lines and 5 KiB and `AGENTS.md` at or below 5 KiB.
+- `SKILL_DESCRIPTION_TOO_LONG` caps each skill's listing text at 300 characters, and `SKILL_FRONTMATTER_INVALID` rejects a `description` or `when_to_use` form the cap cannot measure. `codex_fallback_skill_errors` requires each Codex fallback skill to name its policy file. `SKILL_PROJECT_MARKER_SHIPPED` and `SKILL_SURFACE_MISMATCH` guard the shipped skill folders (see the [skill library](../architecture/agents-and-skills.md)).
+
 ## Representative tests
 
 - `tests/test_verify.py` covers receipt schema migration (v2 and v3 receipts are rejected), per-phase receipt immutability, symlink rejection, the explicit documentation-not-applicable requirement, every LEARN-section rule, and the bootstrap-root fingerprint's third-party exemption.
+- `tests/test_verify.py` pins the fact the documentation-only recovery relies on (`docs_only_recovery`): a documentation edit changes the findings hash but not the phase receipt's scoped hash. `tests/test_validate_targets.py` pins the recovery-section scoping of the closeout pin (`closeout_procedure`) and each byte budget (`policy_budget`).
 - `tests/test_verify.py` also covers the pre-receipt skip: a leading pre-2026-08-29 run is skipped, a phase with a receipt after that run is still validated, a pre-cutoff phase after a receipt phase is refused, and a cancelled phase inside the run is allowed.
 - `tests/test_commit_closeout.py` covers the post-commit phase advance: a completed phase advances for every commit-message source, an incomplete or bypass commit does not, and a recorded head cannot advance a second phase.
 

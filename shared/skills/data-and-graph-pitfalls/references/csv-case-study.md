@@ -2,7 +2,7 @@
 
 Domain-specific example from a UN Security Council resolution classifier.
 Kept here because the vocabulary and numbers are project-specific — the
-technique in the root `SKILL.md` does not depend on this domain.
+technique in `csv-driven-tests.md` does not depend on this domain.
 
 ## Common Pattern Gaps Discovered Empirically
 

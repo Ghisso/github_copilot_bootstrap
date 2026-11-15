@@ -25,7 +25,10 @@ import generate_targets as target_generator  # noqa: E402
 
 from generate_targets import (  # noqa: E402
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    CONTROL_PLANE_INVENTORY,
     OPENWIKI_BEGIN_MATCHER,
+    PLAIN_LANGUAGE_RULE,
+    ROOT_GUIDANCE_WORKFLOW,
     claude_agent_frontmatter,
     sidecar_agent_frontmatter,
     load_shared_agents,
@@ -102,13 +105,17 @@ from validate_targets import (  # noqa: E402
     documenter_humanize_errors,
     execution_defaults_policy_errors,
     failure_masking_command_errors,
+    generated_skill_surface_errors,
     humanize_contract_errors,
     planner_supervision_contract_errors,
     reporting_policy_errors,
     reporting_prompt_errors,
+    SKILL_DESCRIPTION_CAP_EXEMPT,
+    SKILL_DESCRIPTION_MAX_CHARS,
     scope_matches,
     shared_skill_integrity_errors,
     skill_frontmatter_yaml_errors,
+    skill_listing_length,
     skill_local_reference_errors,
     skill_name_errors,
     task_lane_contract_errors,
@@ -458,8 +465,14 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     assert root_guidance_errors("AGENTS.md", codex) == []
     assert root_guidance_errors("AGENTS.md", multi_agent) == []
     assert antigravity_default_agent_contract_errors(multi_agent) == []
-    assert render_antigravity_default_agent_contract() in multi_agent
-    assert render_antigravity_default_agent_contract() not in codex
+    contract = render_antigravity_default_agent_contract()
+    assert contract in multi_agent
+    assert contract not in codex
+    # The contract is a pointer; the orchestrator's supplement stays in its adapter.
+    assert ".agents/agents/orchestrator/agent.md" in contract
+    assert ".agents/agents/orchestrator/agent.md" not in codex
+    supplement_delimiter = target_generator.ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER
+    assert supplement_delimiter.format(agent_id="orchestrator") not in multi_agent
     assert "`.claude/hooks/`" in claude
     assert "`.github/hooks/`" in claude
     assert "`.codex/`" in codex
@@ -475,8 +488,9 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     ):
         assert fragment in multi_agent
     assert len(claude.splitlines()) <= 200
-    assert len(codex.encode()) <= 16 * 1024
-    assert len(multi_agent.encode()) <= 16 * 1024
+    assert len(claude.encode()) <= 5 * 1024
+    assert len(codex.encode()) <= 5 * 1024
+    assert len(multi_agent.encode()) <= 5 * 1024
     missing_reporting_pointer = claude.replace(
         ".claude/instructions/agent-reporting.instructions.md", "reporting.md", 1
     )
@@ -484,6 +498,142 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
         "agent-reporting.instructions.md" in error
         for error in root_guidance_errors("CLAUDE.md", missing_reporting_pointer)
     )
+
+
+# Big plan skills-and-instructions-trim, Decision 12: the budgeted policies.
+POLICY_BYTE_BUDGET_PINS = {
+    "workflow.instructions.md": 16 * 1024,
+    "workspace.instructions.md": 7680,
+    "quality-and-testing.instructions.md": 3 * 1024,
+    "tool-routing.instructions.md": 3 * 1024,
+    "closeout.instructions.md": 16 * 1024,
+    "plan-lifecycle.instructions.md": 11 * 1024,
+}
+
+
+def test_root_guidance_budget_limits_are_pinned() -> None:
+    """The validator only gains checks or lowers limits: CLAUDE.md keeps its
+    200-line limit and adds 5 KiB; AGENTS.md drops from 16 KiB to 5 KiB. The
+    workflow core, workspace, quality-and-testing, tool-routing, closeout, and
+    plan-lifecycle policies carry the budgets of Decision 12."""
+    assert target_validator.ROOT_GUIDANCE_BUDGETS == {
+        "CLAUDE.md": (("lines", 200), ("bytes", 5 * 1024)),
+        "AGENTS.md": (("bytes", 5 * 1024),),
+    }
+    assert target_validator.POLICY_BYTE_BUDGETS == POLICY_BYTE_BUDGET_PINS
+
+
+@pytest.mark.parametrize(("name", "limit"), sorted(POLICY_BYTE_BUDGET_PINS.items()))
+def test_policy_budget_passes_at_the_limit_and_fails_one_byte_over(
+    name: str, limit: int
+) -> None:
+    """Every budgeted policy is accepted at exactly its limit and rejected one
+    byte over, whatever its content."""
+    assert target_validator.policy_budget_errors(name, "x" * limit) == []
+
+    errors = target_validator.policy_budget_errors(name, "x" * (limit + 1))
+
+    assert errors == [f"{name} exceeds its bytes budget of {limit}"]
+
+
+@pytest.mark.parametrize("name", sorted(POLICY_BYTE_BUDGET_PINS))
+def test_policy_budget_holds_for_the_real_shared_policy(name: str) -> None:
+    """The shared source of each budgeted policy fits its budget."""
+    assert (
+        target_validator.policy_budget_errors(name, _shared_text(f"policies/{name}"))
+        == []
+    )
+
+
+def test_root_guidance_budget_rejects_a_valid_claude_file_over_200_lines() -> None:
+    """A structurally valid CLAUDE.md under 5 KiB still fails on line count."""
+    guidance = render_root_guidance("claude-code")
+    at_limit = guidance + "\n" * (200 - len(guidance.splitlines()))
+    assert len(at_limit.splitlines()) == 200
+    assert len(at_limit.encode()) < 5 * 1024
+    assert root_guidance_errors("CLAUDE.md", at_limit) == []
+
+    errors = root_guidance_errors("CLAUDE.md", f"{at_limit}\n")
+
+    assert errors == ["CLAUDE.md exceeds its lines budget of 200"]
+
+
+@pytest.mark.parametrize(
+    ("name", "target"),
+    (
+        ("CLAUDE.md", "claude-code"),
+        ("AGENTS.md", "openai-codex"),
+        ("AGENTS.md", "multi-agent"),
+    ),
+)
+def test_root_guidance_budget_rejects_a_valid_file_over_5_kib(
+    name: str, target: str
+) -> None:
+    """A structurally valid root file passes at exactly 5 KiB and fails one
+    byte over, whatever its line count."""
+    guidance = render_root_guidance(target)
+    at_limit = guidance + " " * (5 * 1024 - len(guidance.encode()))
+    assert len(at_limit.encode()) == 5 * 1024
+    assert root_guidance_errors(name, at_limit) == []
+
+    errors = root_guidance_errors(name, f"{at_limit} ")
+
+    assert errors == [f"{name} exceeds its bytes budget of {5 * 1024}"]
+
+
+def test_root_guidance_budget_workflow_policy_stays_within_16_kib() -> None:
+    """The workflow core passes at exactly 16 KiB and fails one byte over. A
+    policy with no budget entry is never flagged."""
+    name = "workflow.instructions.md"
+    workflow = _shared_text(f"policies/{name}")
+    at_limit = workflow + " " * (16 * 1024 - len(workflow.encode()))
+    assert len(at_limit.encode()) == 16 * 1024
+    assert target_validator.policy_budget_errors(name, at_limit) == []
+
+    errors = target_validator.policy_budget_errors(name, f"{at_limit} ")
+
+    assert errors == [f"{name} exceeds its bytes budget of {16 * 1024}"]
+    assert (
+        target_validator.policy_budget_errors("tests.instructions.md", "x" * 10**6)
+        == []
+    )
+
+
+def _memory_search_rule(text: str) -> str:
+    """Return the collapsed line or list entry that says how to search MEMORY."""
+    matches = [
+        entry
+        for entry in _list_entries(text)
+        if ".claude/MEMORY.md" in entry and "area tags" in entry
+    ]
+    assert len(matches) >= 1, "the MEMORY search rule is missing"
+    return matches[0]
+
+
+@pytest.mark.parametrize("target", ("claude-code", "openai-codex", "multi-agent"))
+def test_root_guidance_memory_sentence_searches_with_a_literal_match(
+    target: str,
+) -> None:
+    """R7: the area-tag example `[LEARN:installer]` is a regular-expression
+    character class when pasted into `grep` or `rg`, so the generated root
+    guidance says to search with `rg -F`."""
+    rule = _memory_search_rule(render_root_guidance(target))
+
+    assert "[LEARN:installer]" in rule
+    assert "rg -F" in rule
+
+
+def test_root_guidance_memory_rule_in_the_workflow_core_is_one_literal_search() -> None:
+    """R7: the core holds one full copy of the rule, in Plan-First step 1. It
+    says to search with a literal match and shows the command that lists the
+    tags in use; Context Management points to it instead of repeating it."""
+    workflow = _shared_text("policies/workflow.instructions.md")
+    rule = _memory_search_rule(workflow)
+
+    assert "rg -F" in rule
+    assert "grep -oE" in rule
+    assert workflow.count("[LEARN:installer]") == 1
+    assert workflow.count("grep -oE") == 1
 
 
 @pytest.mark.parametrize(
@@ -599,6 +749,721 @@ def test_workspace_guidance_preserves_shared_git_hook_inventory() -> None:
     )
 
 
+def _shared_text(relative_path: str) -> str:
+    """Read one file under `shared/`."""
+    return (REPO_ROOT / "shared" / relative_path).read_text(encoding="utf-8")
+
+
+def test_task_lane_control_plane_lists_name_every_inventory_path() -> None:
+    """The Task Lanes lists hold exactly the paths of the shared inventory, so no
+    lane list is narrower than the root guidance."""
+    inventory_paths = set(re.findall(r"`([^`]+)`", CONTROL_PLANE_INVENTORY))
+    lane_paths = set(target_validator.TASK_LANE_CONTROL_PLANE_PATHS) | set(
+        target_validator.TASK_LANE_CONTROL_PLANE_FILES
+    )
+
+    assert lane_paths == inventory_paths
+    assert {".agents/", ".vscode/mcp.json"} <= lane_paths
+
+
+@pytest.mark.parametrize("target", ("claude-code", "openai-codex", "multi-agent"))
+def test_root_guidance_carries_the_shared_control_plane_inventory(target: str) -> None:
+    """Every root file names the same inventory. Each keeps exactly one
+    `.github/hooks/` mention, which is all the Copilot-leak exemption allows."""
+    guidance = render_root_guidance(target)
+
+    assert CONTROL_PLANE_INVENTORY in guidance
+    assert guidance.count(".github/hooks/") == 1
+
+
+def test_workspace_policy_carries_the_shared_control_plane_inventory() -> None:
+    """The generated workspace policy holds the same inventory text."""
+    workspace = _shared_text("policies/workspace.instructions.md")
+    for target in ("claude-code", "openai-codex"):
+        rendered = transform_target_paths(
+            workspace, target, preserve_shared_git_hooks=True
+        )
+        assert _collapsed(CONTROL_PLANE_INVENTORY) in _collapsed(rendered)
+        assert workspace_guidance_errors(rendered) == []
+
+
+def test_control_plane_inventory_check_rejects_a_narrower_list() -> None:
+    """Dropping one path from the root or workspace inventory is reported."""
+    guidance = render_root_guidance("claude-code")
+    narrower_root = guidance.replace("`.agents/`, ", "", 1)
+    assert narrower_root != guidance
+    assert any(
+        "shared control-plane inventory" in error
+        for error in root_guidance_errors("CLAUDE.md", narrower_root)
+    )
+
+    workspace = _shared_text("policies/workspace.instructions.md")
+    narrower_workspace = re.sub(r"`\.vscode/mcp\.json`,\s+", "", workspace, count=1)
+    assert narrower_workspace != workspace
+    assert any(
+        "shared control-plane inventory" in error
+        for error in workspace_guidance_errors(narrower_workspace)
+    )
+
+
+# A policy of the shape the closeout pin accepts. The steps carry numbered
+# `*Why N:*` markers so one test can drop a single reason.
+CLOSEOUT_FIXTURE_STEPS = (
+    "1. **Documentation.** Update the docs. *Why 1:* findings bind the final docs.",
+    "2. **Final AI state.** Read `.claude/skills/learn/SKILL.md`, then write the "
+    "lessons. *Why 2:* later steps hash this state.",
+    "3. **First nested checkpoint.** Commit nested state. *Why 3:* closeout needs "
+    "the plan bytes in nested Git.",
+    "4. **Stage, findings, receipts.** In one Bash command with no `git commit`:\n"
+    "   - Stage the files. *Why 4:* receipts bind the index.\n"
+    "   - Record the findings.",
+    "5. **Second nested checkpoint.** *Why 5:* the receipt hashes the log.",
+    "6. **Closeout receipt.** Persist it. *Why 6:* the commit gate reads it.",
+    "7. **Commit.** Run `git commit` alone. *Why 7:* the gate judges command text.",
+    "8. **Push.** One normal push. *Why 8:* only a commit is worth publishing.",
+)
+CLOSEOUT_FIXTURE_TAIL = (
+    "Two hard rules:\n\n"
+    "- **Never put `git commit` in the same Bash command as steps 4 or 6.**\n"
+    "- **Never checkpoint, publish, or push nested state between step 6 and "
+    "step 7.**\n\n"
+    "## Recovering from a stale receipt\n\n"
+    "**`closeout receipt final tracked state is stale`**\n\n"
+    "**`closeout receipt governing control-plane provenance is stale`**\n\n"
+    "**`findings report content_hash is stale`**\n"
+)
+
+
+def _closeout_fixture(
+    steps: tuple[str, ...] = CLOSEOUT_FIXTURE_STEPS,
+    heading: str = "## CLOSEOUT procedure",
+    separator: str = "\n",
+) -> str:
+    return (
+        f"# Closeout\n\n{heading}\n\nDo these steps in this order.\n\n"
+        f"{separator.join(steps)}\n\n{CLOSEOUT_FIXTURE_TAIL}"
+    )
+
+
+def _closeout_without_learn_path_in_step_2() -> str:
+    text = _closeout_fixture()
+    return text.replace(
+        "Read `.claude/skills/learn/SKILL.md`, then write", "Write", 1
+    ).replace(
+        "3. **First nested checkpoint.** Commit",
+        "3. **First nested checkpoint.** Read `.claude/skills/learn/SKILL.md`. Commit",
+        1,
+    )
+
+
+RECOVERY_HEADING = "## Recovering from a stale receipt"
+
+
+def _closeout_with_message_moved_out_of_the_recovery_section() -> str:
+    """The fixture, with the first stale-receipt message in step 6 only."""
+    message = target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES[0]
+    text = _closeout_fixture()
+    moved = text.replace(f"**`{message}`**", "**`receipt is stale`**", 1)
+    return moved.replace("Persist it.", f"Persist it. It can print `{message}`.", 1)
+
+
+def _closeout_without_the_recovery_section() -> str:
+    """The fixture with every stale-receipt message kept outside the recovery
+    section (the first in step 6, the rest in a hard rule) and the section
+    itself removed."""
+    first, *rest = target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES
+    head = _closeout_fixture().partition(RECOVERY_HEADING)[0]
+    text = head.replace("Persist it.", f"Persist it. It prints `{first}`.", 1)
+    printed = " or ".join(f"`{message}`" for message in rest)
+    return text.replace("step 7.**\n", f"step 7.** It prints {printed}.\n", 1)
+
+
+def test_closeout_procedure_pin_accepts_a_complete_policy() -> None:
+    """One positive case: the fixture satisfies every rule, tight or loose list."""
+    assert target_validator.closeout_procedure_errors(_closeout_fixture()) == []
+    loose = _closeout_fixture(separator="\n\n")
+    assert target_validator.closeout_procedure_errors(loose) == []
+
+
+def test_closeout_procedure_pin_accepts_the_shared_closeout_policy() -> None:
+    """The real policy passes, after the generator's path rewrite."""
+    text = transform_target_paths(
+        _shared_text("policies/closeout.instructions.md"), "claude-code"
+    )
+
+    assert target_validator.closeout_procedure_errors(text) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    (
+        pytest.param(
+            _closeout_fixture(heading="## Steps"),
+            "exactly one CLOSEOUT procedure heading, found 0",
+            id="missing-heading",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "## Recovering", "## CLOSEOUT procedure\n\n## Recovering", 1
+            ),
+            "exactly one CLOSEOUT procedure heading, found 2",
+            id="duplicate-heading",
+        ),
+        pytest.param(
+            _closeout_fixture(
+                steps=(
+                    *CLOSEOUT_FIXTURE_STEPS[:4],
+                    CLOSEOUT_FIXTURE_STEPS[4].replace("5.", "4.", 1),
+                    *CLOSEOUT_FIXTURE_STEPS[5:],
+                )
+            ),
+            "must number its steps 1 to 8 in order",
+            id="steps-out-of-order",
+        ),
+        pytest.param(
+            _closeout_fixture(steps=CLOSEOUT_FIXTURE_STEPS[:7]),
+            "must number its steps 1 to 8 in order",
+            id="missing-step-8",
+        ),
+        pytest.param(
+            _closeout_fixture(
+                steps=(*CLOSEOUT_FIXTURE_STEPS, "9. **Extra.** *Why 9:*")
+            ),
+            "must number its steps 1 to 8 in order",
+            id="extra-step-9",
+        ),
+        *(
+            pytest.param(
+                _closeout_fixture().replace(f"*Why {number}:*", "Reason:", 1),
+                f"closeout step {number} must state its reason",
+                id=f"step-{number}-without-why",
+            )
+            for number in range(1, 9)
+        ),
+        pytest.param(
+            _closeout_without_learn_path_in_step_2(),
+            "closeout step 2 must read .claude/skills/learn/SKILL.md",
+            id="learn-path-outside-step-2",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "Never put `git commit` in the same Bash command", "Avoid chaining", 1
+            ),
+            "missing hard rule: Never put `git commit` in the same Bash command",
+            id="hard-rule-commit-chain",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "Never checkpoint, publish, or push nested state between step 6 and "
+                "step 7",
+                "Avoid checkpoints",
+                1,
+            ),
+            "missing hard rule: Never checkpoint, publish, or push nested state "
+            "between step 6 and step 7",
+            id="hard-rule-nested-state",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "closeout receipt final tracked state is stale", "receipt is stale", 1
+            ),
+            "missing stale-receipt message: "
+            "closeout receipt final tracked state is stale",
+            id="stale-message-final-state",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "closeout receipt governing control-plane provenance is stale",
+                "receipt is stale",
+                1,
+            ),
+            "missing stale-receipt message: "
+            "closeout receipt governing control-plane provenance is stale",
+            id="stale-message-provenance",
+        ),
+        pytest.param(
+            _closeout_fixture().replace(
+                "findings report content_hash is stale", "findings are stale", 1
+            ),
+            "missing stale-receipt message: findings report content_hash is stale",
+            id="stale-message-findings-hash",
+        ),
+        pytest.param(
+            _closeout_with_message_moved_out_of_the_recovery_section(),
+            "missing stale-receipt message: "
+            "closeout receipt final tracked state is stale",
+            id="stale-message-only-outside-the-recovery-section",
+        ),
+    ),
+)
+def test_closeout_procedure_pin_rejects_each_broken_rule(
+    text: str, expected: str
+) -> None:
+    """One negative case per rule: each mutation of the valid fixture is named."""
+    assert text != _closeout_fixture()
+    errors = target_validator.closeout_procedure_errors(text)
+
+    assert any(expected in error for error in errors), errors
+
+
+def test_closeout_procedure_pin_does_not_credit_a_reason_written_after_step_8() -> None:
+    """A `*Why` in the paragraph after the list does not belong to step 8."""
+    text = (
+        _closeout_fixture()
+        .replace("*Why 8:*", "Reason:", 1)
+        .replace("Two hard rules:", "*Why 8:* two hard rules:", 1)
+    )
+
+    errors = target_validator.closeout_procedure_errors(text)
+
+    assert any("closeout step 8 must state its reason" in error for error in errors)
+
+
+def test_closeout_procedure_pin_needs_the_messages_inside_the_recovery_section() -> (
+    None
+):
+    """R6: the three stale-receipt messages count only inside the "Recovering
+    from a stale receipt" section. A policy that prints them in step 6 and in a
+    hard rule, with no recovery section, is rejected."""
+    text = _closeout_without_the_recovery_section()
+
+    for message in target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES:
+        assert message in text
+    assert RECOVERY_HEADING not in text
+    errors = target_validator.closeout_procedure_errors(text)
+
+    assert any("Recovering from a stale receipt" in error for error in errors), errors
+
+
+def test_closeout_procedure_pin_matches_the_messages_the_verifier_prints() -> None:
+    """The pinned strings are the verifier's own, word for word."""
+    assert target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES == (
+        "closeout receipt final tracked state is stale",
+        "closeout receipt governing control-plane provenance is stale",
+        "findings report content_hash is stale",
+    )
+    assert target_validator.CLOSEOUT_HARD_RULE_FRAGMENTS == (
+        "Never put `git commit` in the same Bash command",
+        "Never checkpoint, publish, or push nested state between step 6 and step 7",
+    )
+    verifier = _shared_text("scripts/verify.py")
+    for message in target_validator.CLOSEOUT_STALE_RECEIPT_MESSAGES[:2]:
+        assert f'"{message}"' in verifier
+    # The findings message is built from the report label, so pin both parts.
+    assert 'label = "findings report"' in verifier
+    assert 'f"{label} content_hash is stale"' in verifier
+
+
+CLOSEOUT_POINTER_SURFACES = {
+    "workflow policy": "policies/workflow.instructions.md",
+    "orchestrator prompt": "agents/orchestrator/prompt.md",
+    "commit skill": "skills/commit/SKILL.md",
+    "plan-small template": "templates/plan-small.md",
+}
+
+
+def test_closeout_procedure_pointers_hold_in_the_shared_surfaces() -> None:
+    """The workflow core, orchestrator prompt, commit skill, and plan-small
+    template name the closeout policy and no longer call the procedure a section
+    of the workflow policy."""
+    surfaces = {
+        label: _shared_text(path) for label, path in CLOSEOUT_POINTER_SURFACES.items()
+    }
+
+    assert target_validator.closeout_pointer_errors(surfaces) == []
+
+
+def test_closeout_procedure_pointers_reject_a_missing_or_stale_reference() -> None:
+    """A surface without the pointer, or with the old wording (even rewrapped),
+    is named in the error."""
+    pointer = "Follow `.claude/instructions/closeout.instructions.md`."
+    check = target_validator.closeout_pointer_errors
+
+    assert check({"surface": pointer}) == []
+    no_pointer = check({"surface": "Follow the numbered steps."})
+    assert no_pointer == ["surface must point to closeout.instructions.md"]
+    below = check({"surface": f"{pointer} See the CLOSEOUT sequence below."})
+    assert len(below) == 1 and "CLOSEOUT sequence below" in below[0]
+    rewrapped = check({"surface": f"{pointer} See the CLOSEOUT\nsequence below."})
+    assert len(rewrapped) == 1 and "CLOSEOUT sequence below" in rewrapped[0]
+    workflow_section = check(
+        {
+            "surface": f"{pointer} The CLOSEOUT sequence in "
+            "`.claude/instructions/workflow.instructions.md` lists them."
+        }
+    )
+    assert len(workflow_section) == 1
+    assert "workflow.instructions.md" in workflow_section[0]
+
+
+@pytest.mark.parametrize(
+    ("name", "target"),
+    (
+        ("CLAUDE.md", "claude-code"),
+        ("AGENTS.md", "openai-codex"),
+        ("AGENTS.md", "multi-agent"),
+    ),
+)
+def test_closeout_procedure_pointer_is_required_in_root_guidance(
+    name: str, target: str
+) -> None:
+    """Every root file names the closeout policy, and the validator requires it."""
+    guidance = render_root_guidance(target)
+
+    assert "closeout.instructions.md" in guidance
+    errors = root_guidance_errors(
+        name, guidance.replace("closeout.instructions.md", "closeout.md")
+    )
+    assert any(
+        "missing mandatory root-guidance invariant: closeout.instructions.md" in error
+        for error in errors
+    )
+
+
+CODEX_FALLBACK_CASES = sorted(target_validator.CODEX_POLICY_SKILL_FALLBACKS.items())
+
+
+@pytest.mark.parametrize(("policy", "skill"), CODEX_FALLBACK_CASES)
+def test_codex_fallback_skill_must_name_its_mapped_policy(
+    policy: str, skill: str
+) -> None:
+    """R8: Codex has no path rules, so a fallback skill is the only route to its
+    policy. A skill that does not name the policy file fails; naming it passes."""
+    silent = f"---\nname: {skill}\n---\n\nWrite good code in every case.\n"
+    named = f"{silent}Read `.claude/instructions/{policy}` first.\n"
+
+    errors = target_validator.codex_fallback_skill_errors(policy, skill, silent)
+
+    assert errors == [f"Codex scoped-policy fallback skill {skill} must name {policy}"]
+    assert target_validator.codex_fallback_skill_errors(policy, skill, named) == []
+
+
+@pytest.mark.parametrize(("policy", "skill"), CODEX_FALLBACK_CASES)
+def test_codex_fallback_real_skill_names_its_mapped_policy(
+    policy: str, skill: str
+) -> None:
+    """Each shipped fallback skill names its policy; `bentoml-service` is the
+    route for two policies and names both."""
+    text = _shared_text(f"skills/{skill}/SKILL.md")
+
+    assert target_validator.codex_fallback_skill_errors(policy, skill, text) == []
+    assert f".claude/instructions/{policy}" in text
+
+
+def test_codex_fallback_bentoml_service_routes_both_service_policies() -> None:
+    routed = {
+        policy for policy, skill in CODEX_FALLBACK_CASES if skill == "bentoml-service"
+    }
+
+    assert routed == {
+        "api-service-standards.instructions.md",
+        "deployment.instructions.md",
+    }
+
+
+@pytest.mark.parametrize("names_policy", (True, False))
+def test_codex_fallback_is_checked_on_the_generated_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, names_policy: bool
+) -> None:
+    """The policy-adapter validation reads each generated fallback skill's text,
+    not only its existence."""
+    dist = REPO_ROOT / "dist" / "multi-agent"
+    if not dist.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    copy = tmp_path / "multi-agent"
+    shutil.copytree(dist, copy, symlinks=True)
+    mention = (
+        "Read `.claude/instructions/config-first-design.instructions.md`.\n"
+        if names_policy
+        else ""
+    )
+    (copy / ".claude" / "skills" / "hydra-config" / "SKILL.md").write_text(
+        f"---\nname: hydra-config\n---\n\n{mention}", encoding="utf-8"
+    )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", copy)
+    errors: list[str] = []
+
+    target_validator.validate_policy_adapters(errors)
+
+    hydra_errors = [error for error in errors if "hydra-config" in error]
+    assert bool(hydra_errors) is not names_policy, hydra_errors
+
+
+def test_record_findings_out_pattern_clears_the_canonical_invocations() -> None:
+    """R-AGENTS-08: the gap bound reaches `--out` in the command that the
+    closeout and quality-and-testing policies both document."""
+    prefix = "record_findings.py . --findings-json - --phase"
+    quality = _shared_text("policies/quality-and-testing.instructions.md")
+    closeout = _shared_text("policies/closeout.instructions.md")
+
+    assert quality.count(prefix) == 1
+    assert prefix in closeout
+    for text in (quality, closeout):
+        invocation = text[text.index(prefix) :]
+        assert target_validator.RECORD_FINDINGS_OUT_PATTERN.match(invocation)
+
+
+COPILOT_GUIDANCE_FIXTURE = (
+    "# GitHub Copilot Workspace Adapter\n\n"
+    "Load `.claude/skills/ponytail/SKILL.md` in `full` mode before coding.\n\n"
+    f"Lifecycle: `{ROOT_GUIDANCE_WORKFLOW}`. Follow "
+    "`.claude/instructions/closeout.instructions.md` before commit.\n\n"
+    "Report with `.claude/instructions/agent-reporting.instructions.md`. "
+    f"{PLAIN_LANGUAGE_RULE}\n"
+)
+
+
+def test_copilot_guidance_accepts_the_generated_adapter() -> None:
+    """The generated adapter and the fixture both satisfy the Copilot check. The
+    plain-language rule is the root guidance's sentence, and a rewrap passes."""
+    generated = target_generator.render_copilot_instructions()
+
+    assert (
+        target_validator.ROOT_GUIDANCE_USER_FACING_FRAGMENTS[0] in PLAIN_LANGUAGE_RULE
+    )
+    assert target_validator.copilot_guidance_errors(generated) == []
+    assert target_validator.copilot_guidance_errors(COPILOT_GUIDANCE_FIXTURE) == []
+    rewrapped = COPILOT_GUIDANCE_FIXTURE.replace("idioms. Define", "idioms.\nDefine")
+    assert rewrapped != COPILOT_GUIDANCE_FIXTURE
+    assert target_validator.copilot_guidance_errors(rewrapped) == []
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"),
+    (
+        pytest.param(
+            ".claude/skills/ponytail/SKILL.md",
+            "the skill",
+            "canonical Ponytail skill",
+            id="ponytail-skill",
+        ),
+        pytest.param(
+            ".claude/instructions/agent-reporting.instructions.md",
+            ".claude/instructions/reporting.md",
+            "canonical reporting policy",
+            id="reporting-pointer",
+        ),
+        pytest.param(
+            "closeout.instructions.md",
+            "closeout.md",
+            "closeout procedure",
+            id="closeout-pointer",
+        ),
+        pytest.param(
+            f" {PLAIN_LANGUAGE_RULE}",
+            "",
+            "plain-language rule",
+            id="plain-language-missing",
+        ),
+        pytest.param(
+            "Avoid unnecessary jargon, buzzwords, and idioms. ",
+            "",
+            "plain-language rule",
+            id="plain-language-weakened",
+        ),
+        pytest.param(
+            ROOT_GUIDANCE_WORKFLOW,
+            "pre-flight -> branch -> plan -> implement -> verify -> review -> "
+            "document -> learn -> session-log -> commit",
+            "exactly one canonical lifecycle",
+            id="old-lifecycle",
+        ),
+        pytest.param(
+            ROOT_GUIDANCE_WORKFLOW,
+            ROOT_GUIDANCE_WORKFLOW.replace(
+                "BRANCH -> PLAN WHEN NEEDED", "PLAN WHEN NEEDED -> BRANCH"
+            ),
+            "exactly one canonical lifecycle",
+            id="reordered-lifecycle",
+        ),
+        pytest.param(
+            "before commit.\n",
+            "before commit.\n\nLoad files, especially `workflow.instructions.md`,\n"
+            "`quality-and-testing.instructions.md`, and "
+            "`tool-routing.instructions.md`.\n",
+            "stale preload list",
+            id="preload-list-rewrapped",
+        ),
+        pytest.param(
+            "before commit.\n",
+            f"before commit.\n\nAgain: {ROOT_GUIDANCE_WORKFLOW}.\n",
+            "exactly one canonical lifecycle",
+            id="duplicate-lifecycle",
+        ),
+    ),
+)
+def test_copilot_guidance_rejects_each_broken_rule(
+    old: str, new: str, expected: str
+) -> None:
+    """Each mutation of the valid fixture is named in the error."""
+    mutated = COPILOT_GUIDANCE_FIXTURE.replace(old, new, 1)
+
+    assert mutated != COPILOT_GUIDANCE_FIXTURE
+    errors = target_validator.copilot_guidance_errors(mutated)
+    assert any(expected in error for error in errors), errors
+
+
+def _closeout_checklist_errors(template: str) -> list[str]:
+    """List the ways a plan-small Closeout Checklist breaks the new contract."""
+    section = _section(template, "## Closeout Checklist")
+    errors: list[str] = []
+    boxes = re.findall(r"^- \[ \]", section, re.MULTILINE)
+    if len(boxes) != 2:
+        errors.append(f"expected exactly two boxes, found {len(boxes)}")
+    if "closeout.instructions.md" not in section:
+        errors.append("does not name closeout.instructions.md")
+    errors.extend(
+        f"still contains {stale!r}"
+        for stale in ("mirrors it", "**Status:** COMPLETED")
+        if stale in section
+    )
+    return errors
+
+
+def test_plan_small_closeout_checklist_has_two_boxes_and_a_pointer() -> None:
+    """The plan-small checklist stops short of the later CLOSEOUT steps: two
+    boxes, a pointer, and none of the old mirrored list."""
+    template = _shared_text("templates/plan-small.md")
+
+    assert _closeout_checklist_errors(template) == []
+
+    extra_box = template.replace(
+        "## Closeout Checklist\n", "## Closeout Checklist\n\n- [ ] Extra\n", 1
+    )
+    assert _closeout_checklist_errors(extra_box) == [
+        "expected exactly two boxes, found 3"
+    ]
+    old_style = template.replace(
+        "closeout.instructions.md",
+        "workflow.instructions.md; the order below mirrors it",
+    ).replace(
+        "- [ ] Step 2:", "- [ ] Closeout log has `**Status:** COMPLETED`; step 2:"
+    )
+    assert _closeout_checklist_errors(old_style) == [
+        "does not name closeout.instructions.md",
+        "still contains 'mirrors it'",
+        "still contains '**Status:** COMPLETED'",
+    ]
+
+
+def _core_workflow_errors(orchestrator: str) -> list[str]:
+    """List numbering faults in the orchestrator's `## Core Workflow` list."""
+    lines = _section(orchestrator, "## Core Workflow").splitlines()
+    items = [
+        (index, int(item[1]))
+        for index, line in enumerate(lines)
+        if (item := re.match(r"(\d+)\. ", line))
+    ]
+    if not items:
+        return ["Core Workflow has no numbered items"]
+    errors = [
+        f"heading inside the numbered list: {line}"
+        for line in lines[items[0][0] : items[-1][0]]
+        if re.match(r"#{1,6} ", line)
+    ]
+    numbers = [number for _index, number in items]
+    if numbers != list(range(1, numbers[-1] + 1)):
+        errors.append(f"items must run from 1 to the last number, found {numbers}")
+    return errors
+
+
+def test_orchestrator_core_workflow_numbering_has_no_headings_between_items() -> None:
+    """Defect 2: subsections inside the numbered list broke its numbering. The
+    items run from 1 to the last number with no heading between them."""
+    orchestrator = _planning_source_texts()["orchestrator"]
+
+    assert _core_workflow_errors(orchestrator) == []
+
+    body = _section(orchestrator, "## Core Workflow")
+    item_five = next(line for line in body.splitlines() if line.startswith("5. "))
+    item_six = next(line for line in body.splitlines() if line.startswith("6. "))
+    with_heading = orchestrator.replace(item_five, f"### Aside\n\n{item_five}", 1)
+    assert [e for e in _core_workflow_errors(with_heading) if "heading" in e]
+    without_six = orchestrator.replace(f"{item_six}\n", "", 1)
+    assert without_six != orchestrator
+    assert any("1 to the last number" in e for e in _core_workflow_errors(without_six))
+
+
+def test_antigravity_default_agent_contract_requires_the_orchestrator_pointer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The AGENTS.md bridge points to the generated orchestrator adapter. The
+    pointer rule holds even when the rendered contract text drops it."""
+    contract = render_antigravity_default_agent_contract()
+    assert ".agents/agents/orchestrator/agent.md" in contract
+    assert antigravity_default_agent_contract_errors(contract) == []
+
+    monkeypatch.setattr(
+        target_validator,
+        "render_antigravity_default_agent_contract",
+        lambda: "## Contract\n\nNo pointer here.\n",
+    )
+    errors = antigravity_default_agent_contract_errors(
+        "## Contract\n\nNo pointer here.\n"
+    )
+    assert len(errors) == 1
+    assert ".agents/agents/orchestrator/agent.md" in errors[0]
+
+
+def test_antigravity_supplement_lives_in_the_orchestrator_adapter_only() -> None:
+    """AGENTS.md only points to the orchestrator adapter; the supplement text is
+    carried by `.agents/agents/orchestrator/agent.md` alone."""
+    orchestrator, _dir = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }["orchestrator"]
+    delimiter = target_generator.ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(
+        agent_id="orchestrator"
+    )
+    body = target_generator.provider_agent_prompt_body(
+        orchestrator, "google-antigravity"
+    )
+    _base, separator, supplement = body.partition(f"\n\n{delimiter}\n\n")
+    assert separator and supplement.strip()
+
+    multi_agent = render_root_guidance("multi-agent")
+    assert delimiter not in multi_agent
+    assert supplement.strip() not in multi_agent
+    assert supplement.strip().splitlines()[0] not in multi_agent
+    adapter = render_antigravity_agent_adapter(orchestrator)
+    assert delimiter in adapter
+    assert supplement.strip() in adapter
+
+
+def test_antigravity_orchestrator_adapter_validation_requires_the_role_supplement(
+    tmp_path: Path,
+) -> None:
+    """The generated orchestrator adapter must keep its supplement delimiter."""
+    orchestrator, _dir = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }["orchestrator"]
+    delimiter = target_generator.ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(
+        agent_id="orchestrator"
+    )
+    rendered = render_antigravity_agent_adapter(orchestrator)
+    path = tmp_path / "agent.md"
+
+    path.write_text(rendered)
+    assert antigravity_agent_adapter_errors(path, orchestrator) == []
+
+    path.write_text(rendered.replace(delimiter, "--- removed ---"))
+    errors = antigravity_agent_adapter_errors(path, orchestrator)
+    assert len(errors) == 1
+    assert "orchestrator must carry its role supplement" in errors[0]
+
+
+@pytest.mark.parametrize("profile", ("skills", "workflow"))
+@pytest.mark.parametrize("policy", ("closeout", "plan-lifecycle"))
+def test_sidecar_text_rejects_the_closeout_and_plan_lifecycle_policy_paths(
+    profile: str, policy: str
+) -> None:
+    """No sidecar unit may name either new full-install policy file."""
+    text = f"Read `.claude/instructions/{policy}.instructions.md` first.\n"
+
+    errors = sidecar_text_errors(PurePosixPath("unit.md"), text, profile)
+
+    assert any(".claude/instructions/" in error for error in errors)
+
+
 @pytest.mark.parametrize(
     ("case", "inputs", "expected"),
     (
@@ -652,6 +1517,26 @@ def test_workspace_guidance_preserves_shared_git_hook_inventory() -> None:
                 "change_requested": True,
                 "explicit": True,
                 "affected_paths": (".codex/config.toml",),
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "Antigravity skill mirror change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".agents/skills/learn/SKILL.md",),
+                "low_risk": True,
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "VS Code MCP config change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".vscode/mcp.json",),
+                "low_risk": True,
             },
             "control-plane/high-risk",
         ),
@@ -3048,8 +3933,7 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
 #     for TARGET_ROOT-scoped tests), and (2) the Phase A/B content
 #     corrections, which are prose facts re-verified by targeted textual or
 #     structural assertions - not runtime behavior - except where an existing
-#     executable helper already provides real execution coverage (noted
-#     below).
+#     executable helper already provides real execution coverage.
 
 
 def test_shared_skill_integrity_errors_accepts_the_real_skill_library() -> None:
@@ -3086,6 +3970,91 @@ def test_skill_frontmatter_yaml_errors_accepts_well_formed_frontmatter() -> None
     assert (
         skill_frontmatter_yaml_errors(Path("shared/skills/ok/SKILL.md"), raw_text) == []
     )
+
+
+LONG_TEXT = " ".join(["word"] * 80)  # 399 characters, over the 300 cap
+
+
+def _listing_frontmatter(key: str, value: str) -> str:
+    """A skill frontmatter whose `key` holds `value`; `when_to_use` needs a
+    short description beside it."""
+    short = "description: Short text.\n" if key == "when_to_use" else ""
+    return (
+        f"---\nname: broken\nvisibility: public\n{short}{key}: {value}\n---\n\nBody\n"
+    )
+
+
+# YAML forms the cap cannot measure by joining the block lines: each is over
+# 300 characters, and the check must reject it instead of undercounting it.
+UNMEASURABLE_LISTING_FORMS = (
+    pytest.param(f"|+\n  {LONG_TEXT}\n", "|+", id="keep-block-header"),
+    pytest.param(f">2\n  {LONG_TEXT}\n", ">2", id="indent-indicator-header"),
+    pytest.param(f"| # comment\n  {LONG_TEXT}\n", "| # comment", id="header-comment"),
+    pytest.param(f"First line.\n  {LONG_TEXT}\n", "plain value", id="plain-continued"),
+    pytest.param(
+        f"First line.\n\n  {LONG_TEXT}\n", "plain value", id="plain-after-blank-line"
+    ),
+    pytest.param(
+        f'"First line.\n  {LONG_TEXT}"\n', "quoted value", id="double-quoted-continued"
+    ),
+    pytest.param(
+        f"'First line.\n  {LONG_TEXT}'\n", "quoted value", id="single-quoted-continued"
+    ),
+)
+
+
+@pytest.mark.parametrize("key", ("description", "when_to_use"))
+@pytest.mark.parametrize(("value", "form"), UNMEASURABLE_LISTING_FORMS)
+def test_frontmatter_yaml_rejects_a_listing_form_the_cap_cannot_measure(
+    key: str, value: str, form: str
+) -> None:
+    """R9: `description` and `when_to_use` must use a form whose length the cap
+    measures. The error names the key and the form."""
+    assert len(value) > SKILL_DESCRIPTION_MAX_CHARS
+
+    errors = skill_frontmatter_yaml_errors(
+        Path("shared/skills/broken/SKILL.md"), _listing_frontmatter(key, value)
+    )
+
+    assert len(errors) == 1, errors
+    assert "SKILL_FRONTMATTER_INVALID" in errors[0]
+    assert f"'{key}'" in errors[0]
+    assert form in errors[0]
+
+
+@pytest.mark.parametrize("key", ("description", "when_to_use"))
+@pytest.mark.parametrize(
+    "value",
+    (
+        pytest.param(f"|\n  {LONG_TEXT}\n", id="literal-block"),
+        pytest.param(f">\n  {LONG_TEXT}\n", id="folded-block"),
+        pytest.param(f"|-\n  {LONG_TEXT}\n", id="literal-strip-block"),
+        pytest.param(f">-\n  {LONG_TEXT}\n", id="folded-strip-block"),
+        pytest.param(f"{LONG_TEXT}\n", id="plain-one-line"),
+        pytest.param(f'"{LONG_TEXT}"\n', id="double-quoted-one-line"),
+        pytest.param(f"'{LONG_TEXT}'\n", id="single-quoted-one-line"),
+        pytest.param(f'"{LONG_TEXT}" # note\n', id="quoted-with-trailing-comment"),
+        pytest.param(f"{LONG_TEXT}\n  # indented comment\n", id="plain-then-comment"),
+    ),
+)
+def test_frontmatter_yaml_accepts_the_listing_forms_the_cap_measures(
+    key: str, value: str
+) -> None:
+    errors = skill_frontmatter_yaml_errors(
+        Path("shared/skills/ok/SKILL.md"), _listing_frontmatter(key, value)
+    )
+
+    assert errors == []
+
+
+def test_frontmatter_yaml_accepts_every_real_skill() -> None:
+    """The 37 shipped skills use only the measurable forms."""
+    skills = sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md"))
+
+    assert len(skills) >= 37
+    for skill in skills:
+        errors = skill_frontmatter_yaml_errors(skill, skill.read_text(encoding="utf-8"))
+        assert errors == [], skill
 
 
 @pytest.mark.parametrize(
@@ -3199,6 +4168,266 @@ def test_shared_skill_integrity_errors_rejects_duplicate_descriptions(
     errors = shared_skill_integrity_errors(skill_library_root)
 
     assert any("duplicate skill description" in error for error in errors)
+
+
+def _write_listing_skill(
+    library: Path, name: str, description: str, when_to_use: str | None = None
+) -> Path:
+    """Write one skill whose frontmatter carries exactly the given listing text."""
+    skill_dir = library / name
+    skill_dir.mkdir(parents=True)
+    extra = f"when_to_use: {when_to_use}\n" if when_to_use is not None else ""
+    (skill_dir / "SKILL.md").write_text(
+        f"---\nname: {name}\nvisibility: public\n"
+        f"description: {description}\n{extra}---\n\nBody\n",
+        encoding="utf-8",
+    )
+    return skill_dir / "SKILL.md"
+
+
+def test_description_cap_accepts_exactly_the_limit(tmp_path: Path) -> None:
+    library = tmp_path / "skills"
+    _write_listing_skill(library, "example", "x" * SKILL_DESCRIPTION_MAX_CHARS)
+
+    assert SKILL_DESCRIPTION_MAX_CHARS == 300
+    assert shared_skill_integrity_errors(library) == []
+
+
+def test_description_cap_rejects_one_character_over(tmp_path: Path) -> None:
+    library = tmp_path / "skills"
+    skill_path = _write_listing_skill(
+        library, "example", "x" * (SKILL_DESCRIPTION_MAX_CHARS + 1)
+    )
+
+    errors = shared_skill_integrity_errors(library)
+
+    assert len(errors) == 1
+    assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
+    assert str(skill_path) in errors[0]
+    assert "301" in errors[0]
+
+
+@pytest.mark.parametrize("name", sorted(SKILL_DESCRIPTION_CAP_EXEMPT))
+def test_description_cap_exempts_only_the_two_pinned_skills(
+    tmp_path: Path, name: str
+) -> None:
+    library = tmp_path / "skills"
+    _write_listing_skill(library, name, "x" * 500)
+    # An exempt name is not a prefix match: a sibling name still fails.
+    _write_listing_skill(library, f"{name}-extra", "y" * 500)
+
+    errors = shared_skill_integrity_errors(library)
+
+    assert SKILL_DESCRIPTION_CAP_EXEMPT == {"ponytail", "ponytail-review"}
+    assert len(errors) == 1
+    assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
+    assert f"{name}-extra" in errors[0]
+
+
+@pytest.mark.parametrize(
+    ("frontmatter", "expected"),
+    (
+        pytest.param("name: a\ndescription: abc\n", 3, id="inline-description"),
+        pytest.param('name: a\ndescription: "abc"\n', 3, id="quoted-description"),
+        pytest.param(
+            "name: a\ndescription: |\n  abc\n  de\nvisibility: public\n",
+            6,
+            id="block-description-joins-lines",
+        ),
+        pytest.param(
+            "name: a\ndescription: abc\nwhen_to_use: de\n", 5, id="when_to_use-adds"
+        ),
+        pytest.param(
+            "name: a\ndescription: abc\nwhen_to_use: >\n  de\n  f\n",
+            7,
+            id="block-when_to_use-adds",
+        ),
+        pytest.param("name: a\n", 0, id="no-listing-text"),
+    ),
+)
+def test_description_cap_listing_length_definition(
+    frontmatter: str, expected: int
+) -> None:
+    assert skill_listing_length(frontmatter) == expected
+
+
+def test_description_cap_counts_when_to_use_toward_the_limit(tmp_path: Path) -> None:
+    library = tmp_path / "skills"
+    _write_listing_skill(library, "at-limit", "a" * 200, "b" * 100)
+    over = _write_listing_skill(library, "over-limit", "c" * 200, "d" * 101)
+
+    errors = shared_skill_integrity_errors(library)
+
+    assert len(errors) == 1
+    assert "SKILL_DESCRIPTION_TOO_LONG" in errors[0]
+    assert str(over) in errors[0]
+    assert "301" in errors[0]
+
+
+def test_project_skill_marker_in_a_shared_skill_fails_the_integrity_check(
+    tmp_path: Path,
+) -> None:
+    """R19: a stray `.project-skill` inside a shipped skill would make every
+    consumer's next-but-one refresh refuse a name clash."""
+    library = tmp_path / "skills"
+    shutil.copytree(REPO_ROOT / "shared" / "skills", library)
+    assert not [
+        error
+        for error in shared_skill_integrity_errors(library)
+        if "SKILL_PROJECT_MARKER_SHIPPED" in error
+    ]
+    marker = library / "haystack" / ".project-skill"
+    marker.write_bytes(b"")
+
+    errors = [
+        error
+        for error in shared_skill_integrity_errors(library)
+        if "SKILL_PROJECT_MARKER_SHIPPED" in error
+    ]
+
+    assert len(errors) == 1
+    assert str(marker) in errors[0]
+
+
+def _write_skill_surfaces(
+    root: Path, claude: tuple[str, ...], agents: tuple[str, ...]
+) -> None:
+    for surface, names in ((".claude", claude), (".agents", agents)):
+        for name in names:
+            skill = root / surface / "skills" / name / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("surface", (".claude", ".agents"))
+def test_project_skill_marker_in_a_generated_skill_folder_fails(
+    tmp_path: Path, surface: str
+) -> None:
+    _write_skill_surfaces(tmp_path, ("alpha", "beta"), ("alpha", "beta"))
+    assert generated_skill_surface_errors(tmp_path) == []
+    marker = tmp_path / surface / "skills" / "beta" / ".project-skill"
+    marker.write_bytes(b"")
+
+    errors = generated_skill_surface_errors(tmp_path)
+
+    assert len(errors) == 1
+    assert "SKILL_PROJECT_MARKER_SHIPPED" in errors[0]
+    assert str(marker) in errors[0]
+
+
+def test_project_skill_generated_surfaces_must_hold_the_same_skill_names(
+    tmp_path: Path,
+) -> None:
+    """R14 assumes every shipped skill is in both folders, so the installer's
+    record (the `.agents/skills` copy) lists exactly what `.claude/skills`
+    ships."""
+    _write_skill_surfaces(tmp_path, ("alpha", "beta"), ("alpha", "gamma"))
+
+    errors = generated_skill_surface_errors(tmp_path)
+
+    assert len(errors) == 1
+    assert "SKILL_SURFACE_MISMATCH" in errors[0]
+    assert "only in .claude/skills: beta" in errors[0]
+    assert "only in .agents/skills: gamma" in errors[0]
+
+
+def test_project_skill_checks_accept_every_real_generated_skill_tree() -> None:
+    roots = [
+        REPO_ROOT / "dist" / "multi-agent",
+        *(REPO_ROOT / "dist" / "sidecar" / profile for profile in SIDECAR_PROFILES),
+    ]
+    if not all(root.exists() for root in roots):
+        pytest.skip("dist not generated in this checkout")
+
+    for root in roots:
+        assert generated_skill_surface_errors(root) == []
+
+
+def test_project_skill_marker_in_the_generated_target_fails_the_validator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dist = REPO_ROOT / "dist" / "multi-agent"
+    if not dist.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    copy = tmp_path / "multi-agent"
+    shutil.copytree(dist, copy, symlinks=True)
+    marker = copy / ".claude" / "skills" / "learn" / ".project-skill"
+    marker.write_bytes(b"")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", copy)
+    errors: list[str] = []
+
+    target_validator.validate_skills_and_paths(errors)
+
+    assert any(
+        "SKILL_PROJECT_MARKER_SHIPPED" in error and str(marker) in error
+        for error in errors
+    )
+
+
+def test_project_skill_marker_in_a_generated_sidecar_fails_the_validator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sidecar = REPO_ROOT / "dist" / "sidecar"
+    if not sidecar.exists():
+        pytest.skip("dist/sidecar not generated in this checkout")
+    shutil.copytree(sidecar, tmp_path / "sidecar", symlinks=True)
+    marker = tmp_path / "sidecar" / "skills" / ".agents" / "skills" / "ponytail"
+    marker = marker / ".project-skill"
+    marker.write_bytes(b"")
+    monkeypatch.setattr(target_validator, "DIST_ROOT", tmp_path)
+    errors: list[str] = []
+
+    target_validator.validate_sidecar_target(errors)
+
+    assert any(
+        "SKILL_PROJECT_MARKER_SHIPPED" in error and str(marker) in error
+        for error in errors
+    )
+
+
+MERGED_SKILL_REFERENCES = (
+    pytest.param(
+        "haystack",
+        {"pipelines", "conditional-router", "docling", "ollama-chat"},
+        id="haystack",
+    ),
+    pytest.param(
+        "data-and-graph-pitfalls",
+        {
+            "pandas-nan-bool",
+            "graphml-interop",
+            "pyvis-xss",
+            "csv-driven-tests",
+            "csv-case-study",
+        },
+        id="data-and-graph-pitfalls",
+    ),
+)
+
+
+@pytest.mark.parametrize(("skill", "reference_stems"), MERGED_SKILL_REFERENCES)
+def test_merged_skills_have_their_references(
+    skill: str, reference_stems: set[str]
+) -> None:
+    """Each merged skill exists, ships its reference files, and every
+    `references/` file its SKILL.md names resolves. Absence of the retired
+    skill names is checked in the plan's Verification block, not here."""
+    skill_dir = REPO_ROOT / "shared" / "skills" / skill
+    skill_md = skill_dir / "SKILL.md"
+    assert skill_md.is_file()
+
+    named = set(re.findall(r"references/[\w.-]+\.md", skill_md.read_text("utf-8")))
+
+    assert named, f"{skill}/SKILL.md names no references/ file"
+    assert sorted(p for p in named if not (skill_dir / p).is_file()) == []
+    assert (
+        sorted(
+            stem
+            for stem in reference_stems
+            if not (skill_dir / f"references/{stem}.md").is_file()
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize(
@@ -3347,38 +4576,18 @@ def test_pandas_nan_bool_coercion_documents_the_corrected_isinstance_claim() -> 
     explicit note accepting this limitation.
     """
     text = (
-        REPO_ROOT / "shared" / "skills" / "pandas-nan-bool-coercion" / "SKILL.md"
+        REPO_ROOT
+        / "shared"
+        / "skills"
+        / "data-and-graph-pitfalls"
+        / "references"
+        / "pandas-nan-bool.md"
     ).read_text(encoding="utf-8")
     assert "isinstance(np.bool_(True), bool)  # False" in text
     assert "isinstance(np.bool_(True), bool)  # True" not in text
 
 
-def test_run_tests_e2e_step_propagates_failure_instead_of_masking_it() -> None:
-    """Phase A correction: a failing example command under `examples/run_*.py`
-    must surface as a failure, never be reported as though no scripts existed.
-
-    Structural/textual assertion on the embedded shell snippet, not an
-    execution test: `run-tests/SKILL.md` is prose with an illustrative code
-    fence, and this repository only executes a skill's shell logic where a
-    real standalone helper script exists (as it does for
-    `caveman-compress/scripts/detect.py`, covered by
-    tests/test_caveman_compress_detect.py).
-    """
-    text = (REPO_ROOT / "shared" / "skills" / "run-tests" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-    assert "status=0" in text
-    assert "status=1" in text
-    assert '"E2E scripts FAILED"' in text
-    assert re.search(r"exit 1\b", text)
-    # The "no scripts" message must stay distinct from the failure message -
-    # a real failure must never be reported as an absent script.
-    assert "No E2E scripts" in text
-    assert '"No E2E scripts FAILED"' not in text
-
-
 DEPRECATION_CHECK_STEPS = (
-    pytest.param("run-tests", "## Step 5: Deprecation Check", id="run-tests"),
     pytest.param("add-dependency", "## Step 5: Check for Issues", id="add-dependency"),
 )
 DEPRECATION_LINE = "DeprecationWarning: old_call is deprecated"
@@ -3604,7 +4813,12 @@ def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
 def test_pyvis_xss_skill_assigns_html_escaping_to_the_application() -> None:
     """Textual assertion only: the skill must not claim pyvis escapes HTML."""
     text = (
-        REPO_ROOT / "shared" / "skills" / "pyvis-xss-testing" / "SKILL.md"
+        REPO_ROOT
+        / "shared"
+        / "skills"
+        / "data-and-graph-pitfalls"
+        / "references"
+        / "pyvis-xss.md"
     ).read_text(encoding="utf-8")
     normalized = " ".join(
         line.lstrip().removeprefix("# ").strip() for line in text.splitlines()
@@ -3638,11 +4852,13 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
 # shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
 # changes this hash and needs the same re-capture, as does the vendored
 # Ponytail LICENSE (copied into both shipped ponytail skills); the last one
-# was the backlog-followups Phase E merging Ponytail v5.3.2 into both shipped
-# Ponytail skills (the earlier one, Phase A step 8, restored that LICENSE
-# verbatim from upstream: `DietrichGebert`, one trailing newline).
+# was Phase C of skills-and-instructions-trim, which shortened the
+# `debug-investigator` description to fit the 300-character listing cap. Before
+# it came the backlog-followups Phase E merging Ponytail v5.3.2 into both
+# shipped Ponytail skills (the earlier one, Phase A step 8, restored that
+# LICENSE verbatim from upstream: `DietrichGebert`, one trailing newline).
 SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
-    "1cb7a738bd4e3b7c331949134b91a5f37b11dfa0efb204cffb6de4fc763979c7"
+    "a486e1983e85d55eb948cc2da2124ff2f6358966f7df4c6f565b37b329d4b1c6"
 )
 
 
@@ -4340,7 +5556,7 @@ FULL_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     (
         "orchestrator",
-        "## Completion Protocol (Mandatory)",
+        "## Phase-Boundary Summary",
         ("agent-reporting.instructions.md",),
     ),
     (
@@ -4495,6 +5711,121 @@ def test_planning_guidance_check_fails_when_text_is_removed_or_moved() -> None:
         f"planner {PLANNER_PHASE_1!r} lacks {phrase!r}",
         f"learn '## Phase 1: Evaluate' lacks {removed!r}",
     ]
+
+
+SKILLS_FIRST_RULE = "## Mandatory Skills-First Rule"
+PLANNER_MICRO_PLAN_MODE = "### Micro-Plan Mode (`--mode micro-plan`)"
+PLANNER_FULL_PLAN_MODE = "### Full-Plan Mode (`--mode full-plan`)"
+
+
+def test_loading_rules_planner_micro_plan_reads_templates_not_plan_decomposition() -> (
+    None
+):
+    """Phase C: a micro-plan has one phase, so it reads the two plan templates
+    and does not load the multi-phase `plan-decomposition` skill."""
+    planner = _read_shared({"planner": "agents/planner/prompt.md"})["planner"]
+    micro_plan = _collapsed(_section(planner, PLANNER_MICRO_PLAN_MODE))
+
+    assert micro_plan, "the micro-plan section is missing"
+    assert ".claude/templates/plan-big.md" in micro_plan
+    assert ".claude/templates/plan-small.md" in micro_plan
+    assert "plan-decomposition/SKILL.md" not in micro_plan
+
+
+def _list_entries(text: str) -> list[str]:
+    """One whitespace-collapsed entry per list item or paragraph, so a wrapped
+    sentence stays whole."""
+    return [
+        _collapsed(entry)
+        for entry in re.split(r"\n(?=\s*(?:\d+\.|[-*])\s)|\n\s*\n", text)
+    ]
+
+
+def _plan_decomposition_scope_errors(planner: str) -> list[str]:
+    """List how the planner prompt fails to limit `plan-decomposition` to
+    full-plan mode: not named on the full-plan path, or named in the skills-first
+    rule by an entry that does not say `--mode full-plan`."""
+    skill = "plan-decomposition/SKILL.md"
+    named = [
+        entry
+        for entry in _list_entries(_section(planner, SKILLS_FIRST_RULE))
+        if skill in entry
+    ]
+    if not named and skill not in _section(planner, PLANNER_FULL_PLAN_MODE):
+        return [f"{skill} is named on neither the skills-first nor the full-plan path"]
+    return [
+        f"entry names {skill} without --mode full-plan: {entry!r}"
+        for entry in named
+        if "--mode full-plan" not in entry
+    ]
+
+
+def test_loading_rules_planner_reads_plan_decomposition_in_full_plan_mode_only() -> (
+    None
+):
+    planner = _read_shared({"planner": "agents/planner/prompt.md"})["planner"]
+
+    assert _plan_decomposition_scope_errors(planner) == []
+
+
+def test_loading_rules_planner_scope_check_rejects_an_unconditional_read() -> None:
+    """Negative control: dropping the mode condition from the skills-first
+    item is reported, so the check above does fail when the scope is lost."""
+    planner = _read_shared({"planner": "agents/planner/prompt.md"})["planner"]
+    unconditional = _drop(planner, "In `--mode full-plan` only,")
+
+    assert unconditional != planner, "the negative-control anchor moved"
+    errors = _plan_decomposition_scope_errors(unconditional)
+    assert len(errors) == 1
+    assert "without --mode full-plan" in errors[0]
+
+
+def test_loading_rules_coder_tier_one_is_ponytail_and_a_conditional_tests_read() -> (
+    None
+):
+    """Phase C: only Ponytail loads on every task; the tests policy is read
+    when the task adds or changes a test file or fixes a bug (R8)."""
+    coder = _read_shared({"coder": "agents/coder/prompt.md"})["coder"]
+    tier_one = re.search(
+        r"\*\*Tier 1[^\n]*\n(.*?)\*\*Tier 2",
+        _section(coder, SKILLS_FIRST_RULE),
+        re.DOTALL,
+    )
+
+    assert tier_one is not None, "the coder's Tier 1 block is missing"
+    assert re.findall(r"[\w-]+/SKILL\.md", tier_one.group(1)) == ["ponytail/SKILL.md"]
+    tests_reads = [
+        entry
+        for entry in _list_entries(tier_one.group(1))
+        if "tests.instructions.md" in entry
+    ]
+    assert len(tests_reads) == 1
+    assert ".claude/instructions/tests.instructions.md" in tests_reads[0]
+    assert re.search(r"\b(when|if)\b", tests_reads[0], re.IGNORECASE)
+    assert re.search(r"\bbug\b", tests_reads[0], re.IGNORECASE), tests_reads[0]
+
+
+def test_loading_rules_coder_reads_code_standards_when_editing_python_source() -> None:
+    """R8: Codex has no path rules, so the coder reads the code-standards policy
+    itself when the task edits Python source. It stays out of Tier 1's skills."""
+    coder = _read_shared({"coder": "agents/coder/prompt.md"})["coder"]
+    tier_one = re.search(
+        r"\*\*Tier 1[^\n]*\n(.*?)\*\*Tier 2",
+        _section(coder, SKILLS_FIRST_RULE),
+        re.DOTALL,
+    )
+
+    assert tier_one is not None, "the coder's Tier 1 block is missing"
+    standards_reads = [
+        entry
+        for entry in _list_entries(tier_one.group(1))
+        if "code-standards.instructions.md" in entry
+    ]
+    assert len(standards_reads) == 1
+    assert ".claude/instructions/code-standards.instructions.md" in standards_reads[0]
+    assert re.search(r"\b(when|if)\b", standards_reads[0], re.IGNORECASE)
+    assert "Python" in standards_reads[0]
+    assert not re.search(r"[\w-]+/SKILL\.md", standards_reads[0])
 
 
 @pytest.mark.parametrize("surface", ["claude", "codex"])

@@ -2,15 +2,10 @@
 name: debug-investigator
 visibility: public
 description: |
-  Hypothesis-driven debugging methodology: ranked hypotheses with
-  confirming/refuting tests, git bisect strategy, log analysis,
-  instrumentation point planning, and minimal reproduction design. Use when:
-  - "debug this systematically", "root cause analysis"
-  - "bisect this bug", "rank hypotheses for this error"
-  - "help me isolate this issue", "create a minimal reproduction"
-  - "instrumentation plan for this bug", "why does this keep failing"
-  Use for non-obvious bugs that need systematic investigation, not simple
-  errors the model diagnoses directly.
+  Systematic debugging: "debug this systematically", "root cause analysis",
+  "bisect this bug", "rank hypotheses", "minimal reproduction", "instrumentation
+  plan", "why does this keep failing". For non-obvious bugs, not simple errors
+  the model can diagnose directly.
 ---
 
 # Debug Investigator

@@ -650,6 +650,35 @@ def test_one_file_changed_after_good_install_then_rerun_reports_locally_modified
     assert "copy your edits elsewhere" in out
 
 
+def test_project_skill_marker_in_a_team_skill_changes_nothing_in_sidecar_mode(
+    team_repo: Path,
+) -> None:
+    """The full install treats a `.project-skill` folder as the project's own
+    and mirrors it. The sidecar never touches team skills, so the marker must
+    be inert here: byte-identical through the install and a refresh, and no
+    mirror under `.agents/skills/`."""
+    skill = team_repo / ".claude" / "skills" / "team-skill"
+    _write(skill / "SKILL.md", "---\nname: team-skill\n---\nTEAM-SKILL\n")
+    _write(skill / ".project-skill", "")
+    _commit(team_repo, "team project skill", ".claude/skills/team-skill")
+
+    def snapshot() -> dict[str, bytes]:
+        return {
+            path.relative_to(skill).as_posix(): path.read_bytes()
+            for path in skill.rglob("*")
+            if path.is_file()
+        }
+
+    before = snapshot()
+    assert set(before) == {"SKILL.md", ".project-skill"}
+
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert snapshot() == before
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert snapshot() == before
+    assert not (team_repo / ".agents" / "skills" / "team-skill").exists()
+
+
 def test_rerun_with_no_upstream_change_writes_nothing(team_repo: Path) -> None:
     assert install_sidecar(team_repo, SOURCE) == 0
     exclude_path = _exclude_path(team_repo)

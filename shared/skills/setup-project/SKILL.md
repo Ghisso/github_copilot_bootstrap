@@ -29,7 +29,7 @@ Add directories only for what this project actually needs:
 | Library / package | none beyond `src/<package>/` |
 | CLI tool | `scripts/`, if it needs standalone entrypoints |
 | Hydra-config ML pipeline | `src/configs/`, `src/pipelines/` — only when Hydra is actually in scope (see `create-feature`'s config-pattern check) |
-| API/service | `src/api/` — see `bentoml-service`/`deploy-service` for service-specific layout |
+| API/service | `src/api/` — see `bentoml-service` for service-specific layout |
 | Any type, if requested | `docs/`, `examples/`, `data/`, `output/` |
 
 ## Step 2: Initialize Git and Python

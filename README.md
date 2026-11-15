@@ -237,6 +237,24 @@ uv run python scripts/update_consumers.py \
   /path/to/repo3
 ```
 
+Before you refresh a full consumer, list its project-written skills. List the
+folders under `.claude/skills/` that hold a `SKILL.md`, that the new
+`dist/multi-agent/.claude/skills/` does not ship, that are not in the
+consumer's `.claude/bootstrap-root/.agents/skills/`, and that have no
+`.project-skill` file. Mark or move each one first; the installer refuses
+them. It also refuses an unmarked folder whose name the new source ships but
+no shipped-before record lists: if the project wrote it, rename the folder and
+its `name:` line, then mark it; otherwise move it out of `.claude/skills/`.
+A name in that record was shipped before and is retired on purpose,
+so do not mark it, unless the record's copy holds `.project-skill`: that
+folder is a project skill that lost its marker, so restore the marker. A
+legacy consumer whose `.claude/skills/` holds old copies of bootstrap skills
+and has no shipped-before record is refused once, and the refusal
+lists each folder. To fix many folders at once, move every listed folder into
+one backup folder outside `.claude/`, refresh, then copy back the project's own
+skills and mark them (rename one first when the bootstrap ships its name). See
+[Project-owned skills](#project-owned-skills).
+
 The script regenerates `dist/` automatically, then delegates each consumer to
 `install_bootstrap.py`. The installer owns legacy migration: when `.claude/`
 predates git-backed state, it first creates `migrate: import pre-git state`
@@ -291,8 +309,8 @@ schema-v2/schema-v3 receipts, but those receipts cannot authorize current
 schema-v4 gates: `verify.py` fails closed on a schema mismatch (a clear
 "unsupported schema_version" error, never a silent pass or a crash) rather
 than accepting or bypassing them. Recovery needs no manual receipt edit or
-gate bypass — step 1 below regenerates a valid current-schema phase receipt
-at its normal deterministic path.
+gate bypass — CLOSEOUT step 4 in `.claude/instructions/closeout.instructions.md`
+regenerates a valid current-schema phase receipt at its normal deterministic path.
 
 Phases completed before 2026-08-29 need no backfilled closeout receipts. The
 commit, push, and PR gates skip a plan's leading run of complete phases whose slug
@@ -301,36 +319,9 @@ later phase still needs one, and a receipt file that exists is always checked.
 
 After the refresh, verify the consumer's nested `.claude` repository has a
 valid `HEAD` and a clean worktree. Then regenerate evidence with the current
-runtime, in order:
-
-1. Run focused/fast verification and complete review.
-2. Update documentation, final small-plan state, `[LEARN]` evidence, and the
-   completed session closeout log.
-3. Checkpoint nested plan state, so the closeout receipt binds big-plan
-   bytes that Git already holds. From an agent use
-   `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`;
-   `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the
-   editor task and the lifecycle hooks.
-4. Explicitly stage intended outer files, inspect the staged diff, and persist
-   the converged findings.
-5. Run `verify phase --persist`, then `verify closeout --persist`. Closeout
-   first runs every command in the plan's `## Verification` block itself and
-   records each result in the receipt; one failing command means no receipt
-   (see the Verification Evidence Contract in
-   `.claude/instructions/workflow.instructions.md`).
-6. Run `git commit` in its own command, after the receipts exist. The commit
-   gate hook judges a command's text before it runs, so a chain that ends in
-   `git commit` is denied on the old receipts and nothing in it executes. The
-   orchestrator then attempts the permitted outer-repository push. The
-   step-by-step version of this list, with the reason each step precedes the
-   next, is the CLOSEOUT sequence in
-   `.claude/instructions/workflow.instructions.md`.
-
-Step 3's position is exact. `closeout --persist` refuses, writes nothing, and
-names the remediation when the big plan is not yet retrievable from nested
-Git, because a receipt bound to uncommitted big-plan bytes can never satisfy
-the terminal push gate. Never checkpoint after step 5: that stales the
-receipts and fails the commit closed.
+runtime by following the numbered CLOSEOUT sequence in
+`.claude/instructions/closeout.instructions.md`. It gives the order, the
+reason for each step, and the recovery path for stale receipts.
 
 Evidence-only checkpoints do not make current evidence stale. Changes to the
 governing plan or runtime do make it stale and require the affected evidence
@@ -338,7 +329,7 @@ to be regenerated before continuing. If a governing plan or runtime change
 occurs during the upgrade, rerun the verification and closeout sequence.
 
 Re-record the current phase's findings report with `--gate-result` before
-closeout (step 4); a report written before the upgrade has no `gate_result`
+closeout; a report written before the upgrade has no `gate_result`
 and blocks the commit gate. A re-record is not always enough: the commit gate
 applies the path-based profile rule to any report. If the branch diff from the
 merge-base, including earlier phases, includes a test file and the report
@@ -949,19 +940,113 @@ this project's existing Copilot claim.
   but that proof does not stop the team from changing their own ignore rules
   later.
 
+### Project-owned skills
+
+A full refresh deletes every file under `.claude/` it does not generate. To
+keep a skill your project wrote, create an empty file
+`.claude/skills/<name>/.project-skill` in a real folder. A refresh then never
+deletes or overwrites that folder. It copies the folder, marker included, to
+`.agents/skills/<name>/`. The marker there grants no ownership; it records
+that the name is a project skill, so a later refresh refuses, instead of
+deleting, a folder whose `.claude` marker went missing. The mirror leaves out
+`.git`, `__pycache__/`, and `*.pyc` entries; it does not copy the folder
+whole. A symlink or other
+non-regular entry inside the folder makes the refresh skip the mirror for
+that folder with a warning; Claude Code still sees the skill.
+
+| Client | Sees a project skill | Notes |
+| --- | --- | --- |
+| Claude Code | Directly from `.claude/skills/` | Sees edits at once |
+| Codex | Through `.agents/skills/` | Sees edits after the next refresh; Codex 0.147.0 lists it once |
+| Google Antigravity | Through `.agents/skills/` | Sees edits after the next refresh; documented, not observed |
+| Copilot in VS Code | Reads `.claude/skills/` too, so it finds a new skill without a refresh; once a mirror copy exists in `.agents/skills/`, it lists that copy | Sees edits after the next refresh |
+
+The shipped-before record is `.claude/bootstrap-root/.agents/skills`, the copy
+of what the last install shipped. When that copy is missing, the live
+`.agents/skills/` stands in for every check.
+
+Never create or edit `.agents/skills/<name>/` by hand: the next refresh refuses
+through the `.agents` takeover check, and the receipt fingerprint breaks. The
+one exception: when a refused refresh lists folders as stale (another clone
+refreshed and this clone's restore never deletes), move them out of
+`.agents/skills/` and rerun. Delete them only once you have confirmed they are
+old bootstrap copies. A name that a shipped or third-party skill uses blocks
+that refresh until you rename the project skill. A refresh also refuses an
+unmarked folder whose name the bootstrap neither ships nor shipped before. It
+refuses an unmarked folder whose name the bootstrap ships and the
+shipped-before record does not list, whether a record exists or not, because
+the refresh would overwrite it. If the project wrote that folder, rename the
+folder and its `name:` line, then add `.project-skill`; otherwise move it out
+of `.claude/skills/`. A project with no unmarked skill folder of that kind
+installs normally with no record. Mark every project skill when you create it.
+Create or edit a project skill no later than
+CLOSEOUT step 2, because receipts bind `.claude/` runtime files. This covers
+the full install only. In a sidecar repository, team skills are never touched,
+the marker has no effect, and nothing is mirrored.
+
 ### What a full install changes in a team repository
 
 The full installer is a takeover, and its protection is narrower than it
 looks — this is why the sidecar exists as a separate mode instead of a
 gentler full install. Checked against `scripts/install_bootstrap.py`:
 
-- Its only refusal about existing content is for an `.agents/` tree it
-  cannot prove it generated.
+- It refuses to run in these cases: an `.agents/` tree it cannot prove it
+  generated; an unmarked skill folder whose name the bootstrap neither ships
+  nor shipped before; an unmarked skill folder whose name the bootstrap ships
+  and the shipped-before record does not list (with or without a record); and
+  an unsafe write destination. A destination is unsafe when a link sits at any
+  part of the path, when a part above the written path exists and is not a
+  real folder, when a path written as a file is a folder or a special file such
+  as a FIFO, or when a path written as a folder is not a real folder. The
+  check reads each part with `lstat` and never follows a link. It covers the
+  copy step's paths (with the copy's own skips: existing consumer state,
+  preserved tracked adapters, and claimed third-party bundles), the
+  project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
+  workspace instruction files), `.gitignore`, `.claude/bootstrap-ownership.env`,
+  every `.claude/bootstrap-root/` adapter path, and
+  `.devcontainer/devcontainer.json` when a state remote is set, through
+  `--state-remote` or an exported `AI_STATE_REMOTE`. It checks the
+  project-name files and `.gitignore` even when no rewrite would happen, so a
+  symlinked `AGENTS.md -> CLAUDE.md` is refused. This runs before the first
+  write, also under `--dry-run`, and refuses once with every problem listed in
+  two sections: `Refusing to write through symlinks:` (replace each link with a
+  regular file or folder, or remove it) and
+  `Refusing to write over a path of the wrong kind:` (each path with its
+  reason; move or rename it). Kinds that the obsolete-file cleanup once
+  resolved silently are now refused too, for example a regular file at
+  `.claude/templates` or a folder holding an untracked link at `CLAUDE.md`; a
+  bootstrap version that turns a generated file into a folder, or the reverse,
+  makes each refresh refuse until you move the old item by hand.
+- A second check runs at copy time. Every file copy of a full refresh and
+  every folder the copy creates is checked first, and an unsafe destination
+  stops the run (`Refusing to write <path>: ...`). That stop can leave a
+  partial refresh. When a legacy migration ran (pre-Git `.claude/` content, not
+  a dry run), the `.agents` takeover, project-skill, and unsafe-destination
+  checks run again before the copy, so a refusal there comes after the
+  migration's own writes. An unsafe state-folder README (`.claude/plans/README.md`
+  and the three others) is consumer state: it is skipped with a warning, not
+  refused.
+- These are not checked: the nested state sync's own writes (it may append to
+  `.claude/.gitignore` and `.claude/.gitattributes`, and it restores
+  `settings.local.json`); Git's own writes (`git config core.hooksPath` in the
+  outer repository, and the nested state commit in `.claude/`); hard links;
+  whether the macOS quarantine strip
+  (`xattr -rc` over whole folders, consumer state included) follows links;
+  and reads through links, for example a preserved, tracked root adapter that
+  is a link, which the record copy reads into the AI state, which can then be
+  pushed. The installer does not guarantee that it never writes outside the
+  project.
 - A non-empty `.claude/` with no `.git` is treated as legacy state and
   turned into a nested Git repository.
 - Under `.claude/`, it overwrites every file it generates and deletes every
   other file that is not consumer state, tracked or not; a copy survives
-  only in the new nested repository's history.
+  only in the new nested repository's history. The exceptions are consumer
+  state, third-party bundles such as `openwiki`, and a skill folder marked
+  with `.project-skill` (see [Project-owned skills](#project-owned-skills)).
+- Before it writes anything, it also refuses a project skill that clashes
+  with a shipped skill or a third-party name, an invalid or mismatched name,
+  any symlink at the skill-folder level, and a project skill whose marker
+  went missing.
 - Inside the root adapter paths, it deletes every untracked file it does not
   generate as an "obsolete generated file". Tracked root adapter files such
   as `CLAUDE.md` and `AGENTS.md` are preserved, except the Copilot surface
@@ -1175,9 +1260,13 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, implementation, verification, review, documentation, learn, session-log, commit protocol; coder-time Ponytail discipline and conditional review routing are defined here
-  - Branch lifecycle and commit/PR gates
-  - Session logging and recovery reminders
+  - Pre-flight, branch, plan, implementation, verification, review, documentation, learn, session-log, commit protocol (the CLOSEOUT sequence itself lives in `closeout.instructions.md`); coder-time Ponytail discipline and conditional review routing are defined here
+  - Branch lifecycle and bypass policy (the commit and PR gates are in `closeout.instructions.md`)
+  - Session logging and context management
+- [closeout.instructions.md](shared/policies/closeout.instructions.md)
+  - The numbered CLOSEOUT sequence, the completion-commit gate, the final-phase audit, and stale-receipt recovery
+- [plan-lifecycle.instructions.md](shared/policies/plan-lifecycle.instructions.md)
+  - Declaring, pausing, cancelling, and reopening plans; the conditional checkpoint branch; the Knowledge-Refresh Final Phase rule
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
   - Verification commands and required testing order
   - Deterministic PASS/FAIL verification detail and severity-gated findings contract (CRITICAL/MAJOR block phase completion, MINOR needs an explicit disposition and reason) — there is no numeric score
@@ -1233,7 +1322,7 @@ guidance. Codex discovers `AGENTS.md` from the repository root to the current
 working directory; closer files take precedence, and the combined project
 guidance limit defaults to 32 KiB. Generate nested `AGENTS.md` only where a
 policy owns one stable concrete directory. Mixed, file-specific, or glob scopes
-use the corresponding `.claude/skills/` workflow instead, so the root guidance
+use the corresponding fallback skill instead (Codex reads its `.agents/skills/` copy), so the root guidance
 budget is not widened speculatively. See [Codex AGENTS.md
 guidance](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
@@ -1245,9 +1334,9 @@ Authenticated VS Code loading remains separate native evidence.
 
 ## Most Important Skills
 
-Skills have machine-readable `visibility: public|background` frontmatter. **Public** skills are intended for direct use; **background** skills are hidden helpers loaded by description match or by agents.
+Skills have machine-readable `visibility: public|background` frontmatter. Both values are listed to the model with their descriptions. `visibility` marks only the intended use: **public** skills are meant for direct use, and **background** skills are meant to be loaded by description match or by agents.
 
-There are many skills; these are the high-leverage ones I rely on most:
+The bootstrap ships 37 skills. Each one's listing text (description plus `when_to_use`) is capped at 300 characters, with `ponytail` and `ponytail-review` exempt, to keep the list Claude Code loads each turn small. These are the high-leverage ones I rely on most:
 
 Core workflow:
 
@@ -1255,30 +1344,30 @@ Core workflow:
 - [ponytail-review](shared/skills/ponytail-review/SKILL.md)
 - [plan-decomposition](shared/skills/plan-decomposition/SKILL.md)
 - [create-feature](shared/skills/create-feature/SKILL.md)
-- [run-tests](shared/skills/run-tests/SKILL.md)
-- [refactor](shared/skills/refactor/SKILL.md)
 - [code-review](shared/skills/code-review/SKILL.md)
 
 Quality and architecture:
 
 - [code-style](shared/skills/code-style/SKILL.md)
 - [testing-patterns](shared/skills/testing-patterns/SKILL.md)
-- [review-api](shared/skills/review-api/SKILL.md)
 - [text-to-sql-safety](shared/skills/text-to-sql-safety/SKILL.md)
 - [debug-investigator](shared/skills/debug-investigator/SKILL.md)
 
-Communication and context control:
+Communication:
 
 - [caveman](shared/skills/caveman/SKILL.md)
-- [caveman-compress](shared/skills/caveman-compress/SKILL.md)
 
 Project acceleration:
 
 - [setup-project](shared/skills/setup-project/SKILL.md)
 - [add-dependency](shared/skills/add-dependency/SKILL.md)
-- [deploy-service](shared/skills/deploy-service/SKILL.md)
 - [hydra-config](shared/skills/hydra-config/SKILL.md)
-- [bentoml-service](shared/skills/bentoml-service/SKILL.md)
+- [bentoml-service](shared/skills/bentoml-service/SKILL.md) (service code and deployment)
+
+Domain skills (each one holds several topics, one reference file per topic):
+
+- [haystack](shared/skills/haystack/SKILL.md): pipelines, `ConditionalRouter`, Docling, `OllamaChatGenerator`
+- [data-and-graph-pitfalls](shared/skills/data-and-graph-pitfalls/SKILL.md): pandas NaN and bool, GraphML interop, pyvis XSS, CSV-driven tests
 
 These skills encode battle-tested workflows and reduce ad-hoc execution.
 
@@ -1510,6 +1599,6 @@ If you customize it, prioritize:
 - preserving the PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
-- treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
+- treating terse-mode as an opt-in guardrailed tool, not blanket rewrites of source-of-truth customization files
 
 See [plans/adr-001-multi-target-lcd.md](plans/adr-001-multi-target-lcd.md) for the recorded decision behind supporting Copilot, Claude, and Codex from one shared basis instead of native Claude plugin packaging, and [plans/adr-002-git-backed-state-sync.md](plans/adr-002-git-backed-state-sync.md) for why AI state syncs through a nested git repository instead of a Hugging Face bucket.

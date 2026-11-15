@@ -20,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "shared" / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import record_findings  # noqa: E402
 import validate_plan_frontmatter as lint  # noqa: E402
 import verify  # noqa: E402
 from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
@@ -3534,6 +3535,43 @@ def test_unknown_source_and_build_paths_fail_closed(path: str) -> None:
 def test_ordinary_documentation_remains_reusable() -> None:
     """Only narrow ordinary documentation paths are excluded from code evidence."""
     assert verify.classify_path("docs/guide.md") == "documentation-only"
+
+
+def test_docs_only_recovery_stales_the_findings_hash_but_not_the_phase_hash(
+    tmp_path: Path,
+) -> None:
+    """R1: a documentation edit after review changes the findings report's
+    ``content_hash`` (every tracked change, the one the commit gate recomputes)
+    but not the phase receipt's scoped ``content_hash``. The closeout file's
+    recovery re-records findings and keeps the phase receipt."""
+    _init_repo(tmp_path)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    (tmp_path / "work.py").write_text("VALUE = 0\n", encoding="utf-8")
+    _commit_all(tmp_path, "base")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "work.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(["add", "work.py"], tmp_path)
+    merge_base = _git(["merge-base", "dev", "HEAD"], tmp_path)
+    findings_before = verify.content_hash_for(tmp_path, merge_base, "")
+    metadata_before = verify.state_metadata(tmp_path, "dev", "phase-one")
+
+    assert findings_before
+    assert findings_before == record_findings._content_hash(merge_base, tmp_path)
+
+    (tmp_path / "README.md").write_text("late documentation edit\n", encoding="utf-8")
+    _git(["add", "README.md"], tmp_path)
+    metadata_after = verify.state_metadata(tmp_path, "dev", "phase-one")
+
+    assert metadata_after["changed_paths"] == ["README.md", "work.py"]
+    assert metadata_after["relevant_paths"] == ["work.py"]
+    assert verify.content_hash_for(tmp_path, merge_base, "") != findings_before
+    assert metadata_after["content_hash"] == metadata_before["content_hash"]
+
+    # Control: an edit to code moves the phase hash too, so the equality above
+    # is a real finding about documentation and not a hash that never changes.
+    (tmp_path / "work.py").write_text("VALUE = 2\n", encoding="utf-8")
+    metadata_code = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert metadata_code["content_hash"] != metadata_before["content_hash"]
 
 
 def test_errata_sibling_file_binds_under_the_normal_receipt_mechanism() -> None:

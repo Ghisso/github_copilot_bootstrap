@@ -36,8 +36,8 @@ here fails closeout.
 Paste the required items' `PASS <duration> <item>` summary lines that
 `verify closeout --format text` printed. Then record every optional item's
 outcome, one line per item: `- optional <n>: PASS|FAIL|NOT RUN — <detail>`;
-a `NOT RUN` line needs a non-empty `<detail>`. See the Verification Evidence
-Contract in `.claude/instructions/workflow.instructions.md` for the full rules.
+a `NOT RUN` line needs a non-empty `<detail>`. See the closeout session log
+rules in `.claude/instructions/closeout.instructions.md`.
 
 ```text
 # verify closeout --format text summary lines
