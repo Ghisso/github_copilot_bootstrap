@@ -24,7 +24,24 @@ Fix second-review findings R24 to R28 (`.claude/quality_reports/merges/2026-11-1
   - `status: in-progress`, with `current_phase` set to Phase H;
   - Done Criteria, Requirement Map, and Completion Evidence updated;
   - `validate_plan_frontmatter.py` exit 0.
-- Devil's-advocate round on Phases H and I started: a separate read-only Opus subagent at `xhigh` effort with the devils-advocate skill.
+- Devil's-advocate round on Phases H and I: a separate read-only Opus subagent at `xhigh` effort with the devils-advocate skill. Verdict: hold until items 1 to 4 change.
+  - **HIGH.**
+    - (1) The fixture guidance would lose test intent: `_project_skill_world` needs a `record` argument (`bootstrap-root`, `live`, `none`), and one lost-marker fixture would silently move branches.
+    - (2) The kind check missed non-folder parts above a written path, and FIFOs. One walker that never follows links replaces `_first_symlink`.
+    - (3) A `copy_function` guard does not cover `copytree`'s own `makedirs`. Each level's destination folder is now checked in the `ignore` callback, and the guard raises `SystemExit`.
+  - **MEDIUM.**
+    - (4) `migrate_pre_existing_state` runs after both preflights and can merge remote state into `.claude/`. The pre-write checks now run again after it. The main agent added `validate_agents_takeover` to that rerun, because the migration can change the `.agents` record copy.
+    - (5) Add direct-call guard tests per call site, and pins on `shutil.copy2(` and `copy_function=`.
+    - (6) The reverse-kind test moves to `.devcontainer`, because the cleanup deletes a file at `.claude/templates`.
+    - (7) Missing absence checks, the exact wrong-kind heading, and Phase I checks that already passed.
+  - **LOW.**
+    - (8) Keep the live-record stand-in; its pass case becomes a unit test.
+    - (9) Keep the guard; it is uniform across copies.
+    - (10) Doc exactness: the "always overwrites these four files" line, the R25 folder layouts, the message pins, and the quickstart page.
+    - (11) Add hard links, `strip_quarantine`, and reads through links to "not checked".
+    - (12) The `update_consumers.py` docstring, and the bulk remedy for legacy consumers.
+    - (13) The third-party bundle exception in the change to Decision 9.
+  - All 13 were folded into the plans; Phase I's verification now uses absence checks plus the new heading. Every new absence check was confirmed to fail on today's text.
 
 ## [LEARN] Entries
 

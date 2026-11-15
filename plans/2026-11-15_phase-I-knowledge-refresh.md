@@ -40,12 +40,12 @@ Risk notes:
   - Owner: orchestrator, in the main session. Required Skills: `.claude/skills/knowledge-refresh/SKILL.md`, `.claude/skills/openwiki/SKILL.md`.
   - Call `openwiki_begin` with `mode: "update"`. Plan these pages plus every page OpenWiki flags:
     - `operations/install-ownership-and-runtime-checks.md` (R29):
-      - the kind refusal next to the symlink refusal, and the copy-time guard;
-      - the state-README skip for a folder;
+      - the wrong-kind refusal (`Refusing to write over a path of the wrong kind:`) next to the symlink refusal, the copy-time guard, the recheck after the legacy migration, and the exact "not checked" list;
+      - the state-README skip for an unsafe path or folder;
       - option A: an unmarked skill folder with a shipped name that no record lists is refused, with or without a record, and a project with no skill folders installs normally;
       - the stale `.agents/skills/` advice to move the folders aside;
       - the devcontainer write with `--state-remote` or an exported `AI_STATE_REMOTE`;
-    - `quickstart.md`, only if a refusal it names changed.
+    - `quickstart.md`: its refusal list (line 66) names the refusal headings, so add the wrong-kind heading.
   - Right after `openwiki_begin`, run `git status --porcelain -- AGENTS.md CLAUDE.md` (the skill's restore check).
   - Reconcile every flagged claim, and require `openwiki_finish` to return `complete`.
   - Never hand-edit a generated page, a `.claims` file, or the root snippet.
@@ -87,9 +87,10 @@ Risk notes:
 
 ```bash
 uv run python scripts/generate_targets.py --all
-uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/operations/install-ownership-and-runtime-checks.md 'is still overwritten' 'delete the listed folders if you did not create them' 'when `--state-remote` is given.'
+uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' openwiki/operations/install-ownership-and-runtime-checks.md 'is still overwritten' 'delete the listed folders if you did not create them' 'when `--state-remote` is given.' 'without `--state-remote` it writes nothing' 'which needs the `bootstrap-root` copy'
 grep -q -F 'Refusing to write through symlinks:' openwiki/operations/install-ownership-and-runtime-checks.md
-grep -q -F 'AI_STATE_REMOTE' openwiki/operations/install-ownership-and-runtime-checks.md
+grep -q -F 'Refusing to write over a path of the wrong kind:' openwiki/operations/install-ownership-and-runtime-checks.md
+grep -q -F 'Refusing to write over a path of the wrong kind:' openwiki/quickstart.md
 test ! -e openwiki/.run.json
 test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
 test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"
