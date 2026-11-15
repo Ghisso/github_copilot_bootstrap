@@ -2,7 +2,7 @@
 name: skills-and-instructions-trim
 type: big-plan
 # status must occur exactly once: planning | in-progress | complete | cancelled
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: skills-and-instructions-trim_implementation
 started_at: 2026-11-13T11:54:23Z
@@ -16,7 +16,7 @@ phases:
   - 2026-11-14_phase-G-knowledge-refresh
   - 2026-11-15_phase-H-installer-copy-safety
   - 2026-11-15_phase-I-knowledge-refresh
-current_phase: 2026-11-15_phase-I-knowledge-refresh
+current_phase: 
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
