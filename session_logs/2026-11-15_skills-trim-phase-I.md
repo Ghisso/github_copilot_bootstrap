@@ -33,6 +33,25 @@ Fix finding R29 in the wiki: the install page repeated the claims R24 to R28 cor
   - Every evidence range starts and ends on a non-blank line. The submission was accepted on the first try.
 - **`quickstart.md`.** The install routing row now names `Refusing to write over a path of the wrong kind:`. Two claims were revised: the target-mapping range is now L88-L154, and the refusal claim names both headings (L1149-L1170).
 - `openwiki_next_page` returned `complete`, and `openwiki_finish` returned `complete`. Afterwards: no `openwiki/.run.json`, no `<!-- OPENWIKI:START -->` block in `AGENTS.md` or `CLAUDE.md`, and only the two pages, their `.claims` files, `.last-update.json`, and `.page-manifest.json` changed.
+- **Step 3.** `generate_targets.py --all` exit 0. The self-refresh exited 0 and changed no installed runtime file. `validate_targets.py` PASS, `check_runtime.py` exit 0, `validate_plan_frontmatter.py` exit 0, and every quick Verification line PASS.
+- **Review round 1** (`reviewer`, six profiles, the acceptance bar stated up front). Gate FAIL, with one MAJOR, four MINORs, and one open request (a `verify.py phase` result after the fixes).
+  - **MAJOR (bar item 3, a false statement about what is checked).** The install page said `validate_no_symlink_writes` "checks every path a full refresh writes". Step 6 said "at any path the refresh writes", and claim `claim_7846…` said the same. But the page's own "These writes are not checked" list names writes it does not check. This is the overclaim pattern from `[LEARN:documentation]` again.
+  - **MINORs.**
+    - (1) "other than a claimed third-party bundle" is wrong. `_skill_folder_problems` exempts by path shape alone (`is_third_party_skill_path`), claimed or not.
+    - (2) The page left out two coverage notes that `docs/target-mapping.md` records: some writes have the preflight only, and an unmarked shipped-name folder without `SKILL.md` is not refused.
+    - (3) Two new statements had no claim: the reads-through-links limit with the "no guarantee" sentence, and the legacy-consumer sequence.
+    - (4) The audit missed project-context lines 271-275.
+- **Round-1 fixes.**
+  - A second OpenWiki run (`3961c1e0-323b-4f14-91ee-2254803dda08`; root adapters clean right after `openwiki_begin`; one-page plan) fixed the install page:
+    - the lead sentence now says "checks each path in the coverage list below", and step 6 says "at each path its coverage list names";
+    - the bundle exemption is now "a folder shaped like a third-party bundle (`skills/openwiki`), claimed or not";
+    - new sentences name the preflight-only writes and the no-`SKILL.md` folder.
+  - Claims: `claim_7846…` revised to "the paths it covers"; `claim_570b…` revised to the shape wording; four new claims added (reads through links and no guarantee; the legacy sequence; the preflight-only writes; the no-`SKILL.md` folder). Every evidence range starts and ends on a non-blank line.
+  - `openwiki_finish` returned `complete`, with no `openwiki/.run.json` left. A grep found no remaining "every path" or "any path" claim on the page. The only "claimed third-party bundle" left is the drift exemption in `check_runtime.py`, which does need the marker.
+  - Project-context lines 271-275 were corrected in place.
+  - The big plan's Decision 9 change note said "not a claimed third-party bundle". It was corrected to "not shaped like a third-party bundle such as `skills/openwiki`, claimed or not", and `validate_plan_frontmatter.py` exit 0.
+  - The README, `docs/runtime-checks.md`, and the refresh skill keep "claimed third-party bundles" for the copy step's skips. That is accurate, because `copy_ignore` skips only marker-claimed bundles.
+  - Reran: `generate_targets.py --all` exit 0, self-refresh exit 0, quick Verification lines all PASS. The full `verify.py phase` run was started for the open request.
 - **Step 2, audit.** `rg` across every surface in the standing list, using the six claim patterns from the plan plus variants: "is still overwritten", "overwrites the folder", "delete the listed folders", "delete them and rerun", "if you did not create", `hash-object`, `rev-list --all --objects`, "any path it would write", "preflight is complete", "with/without `--state-remote`", "Decisions 8", "confirm or overturn", "symlink preflight", "except the newly-shipped", "Decision 9", and "newly shipped name". The results are under the heading below.
 
 ## [LEARN] Entries
