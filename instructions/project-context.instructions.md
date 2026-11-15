@@ -218,7 +218,7 @@ Onboarding was refreshed on `dev` at `2e8c7bb` (the merge of PR #56) on
 scripts/check_runtime.py` exited 0 with 22 PASS lines and one expected WARN: the
 global `context-mode` on this host is still 1.0.169, so the dispatcher
 refuses it and uses `npx -y context-mode@2.1.8`. `uv run pytest tests/ -q`
-gave TEST_RESULT_PLACEHOLDER.
+gave 5243 passed, 1 skipped (about 6 minutes).
 
 Pull requests merged into `dev` since the 2026-11-12 refresh:
 
