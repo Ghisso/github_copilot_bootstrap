@@ -82,6 +82,27 @@ Fix second-review findings R24 to R28 (`.claude/quality_reports/merges/2026-11-1
   - industrial-inspection: exit 0.
   - img-classification: exit 1, listing 52 unmarked folders: the 30 with shipped names under option A, with "no shipped-before record was found", and the 22 never-shipped ones. `move_listed_skills.py` then moved all 52 into one backup folder outside `.claude/`. The rerun exited 0, wrote the record (37 names), and installed the 37 shipped skills.
 - **`verify.py phase --format text`** before review: PASS. Ruff 0, mypy 0, pytest 5235 passed and 1 skipped, freshness and generation PASS.
+- **Review round 1** (`reviewer`; six profiles; the acceptance bar stated up front): gate PASS, no CRITICAL, no MAJOR, no open request.
+  - **What it confirmed.**
+    - Every write is covered by the preflight, the guard, or the documented list.
+    - Ordering holds in every mode, and the post-migration recheck has the right condition and position.
+    - Nothing got looser. The removed `Unsafe bootstrap-root adapter destination` branch is fully covered by the folder check before `rmtree`.
+    - Option A blocks only uncertain folders, and the live stand-in is consistent with `validate_agents_takeover`.
+    - The stubbed wiring tests are meaningful.
+    - No ponytail finding survived.
+  - **Five MINORs, all fixed in round 2 instead of only recorded.**
+    - (1) The symlinked-record fixture's link target held no skill folders, so a link that was read could not be told from one that was ignored.
+    - (2) No test exports `AI_STATE_REMOTE`.
+    - (3) The two documented stricter cases (a regular file at `.claude/templates`, and a folder with an untracked link at `CLAUDE.md`) had no in-suite test.
+    - (4) The "not checked" lists left out Git's own writes (`git config core.hooksPath`, the nested state commit).
+    - (5) A linked record was reported as "does not list it", although it was never read.
+- **Round-2 fixes.**
+  - The `coder` (same agent, context kept) took items 1, 2, 3, and 5, plus the docstring part of 4.
+  - The main agent, text only:
+    - added Git's own writes to the "not checked" lists in the README, `docs/runtime-checks.md`, and the refresh skill;
+    - in the README's consumer-refresh paragraph, "refuses the same set" now also names the newly shipped refusal, and "copy back ... and mark them" says to rename first on a name clash;
+    - `update_consumers.py` now says "no shipped-before record";
+    - added two reviewer-suggested follow-ups to `docs/target-mapping.md`: removals and `write_text` calls have the preflight only, and an unmarked shipped-name folder without `SKILL.md` is not refused.
 
 ## [LEARN] Entries
 
