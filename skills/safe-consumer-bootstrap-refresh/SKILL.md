@@ -51,31 +51,74 @@ Use this workflow when:
    record was shipped before and is retired on purpose, so do not mark it,
    unless the record's copy holds `.project-skill`: that folder is a project
    skill that lost its marker, so restore the marker. Also list unmarked
-   folders whose name the new source ships but that
-   `.claude/bootstrap-root/.agents/skills` does not list. Rename each one and
-   its `name:` line, then mark it, or remove it. The installer refuses both
-   kinds.
+   folders whose name the new source ships and that the shipped-before record
+   does not list. The record is the `.claude/bootstrap-root/.agents/skills`
+   copy, or the live `.agents/skills/` when that copy is missing. The
+   installer refuses such a folder whether a record exists or not, because it
+   would overwrite the folder. If the project wrote it, rename the folder and
+   its `name:` line, then add `.project-skill`. Otherwise move it out of
+   `.claude/skills/`. Rename only when the name clashes with a shipped skill.
+   A project with no unmarked skill folder of that kind installs normally,
+   even with no record.
 7. With no shipped-before record, the installer cannot tell a retired
    bootstrap skill from a project skill. Run the installer with `--dry-run`
-   and read the folders it lists. For each one, check whether every file is
-   an unmodified bootstrap copy: the file's `git hash-object` must appear in
-   `git rev-list --all --objects` of a bootstrap checkout. Remove unmodified
-   copies. Mark the project's own folders with `.project-skill`.
+   and read the folders it lists. Delete a folder only when its complete
+   file list and contents equal that skill's folder at one bootstrap commit.
+   That folder is `shared/skills/<name>/` in current history and
+   `skills/<name>/` in older commits; `dist/` is not in Git. One way: run
+   `git archive` on that folder at the commit, then `diff -r` it against the
+   consumer's folder. Otherwise, move the folder out of `.claude/skills/`,
+   refresh, and compare the backup with the new copies. For many folders,
+   move every listed folder into one backup folder outside `.claude/`,
+   refresh, then copy back the project's own skills. To keep a project's own
+   skill, keep its name and add `.project-skill`. Rename the folder and its
+   `name:` line first only when the bootstrap ships that name.
 8. A refresh refuses when the live `.agents/skills/` holds folders that the
    shipped-before record no longer lists. This happens when another clone
    refreshed, because this clone's restore copies files but never deletes
-   them. Delete the listed folders if you did not create them, then rerun.
-9. A refresh refuses before any write (message starts
-   `Refusing to write through symlinks:`) on a link at a path it writes or may write: the copy step's paths, the
-   project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
-   workspace instruction files), `.gitignore`, `.claude/bootstrap-root/`,
-   `.claude/bootstrap-ownership.env`, and `.devcontainer/devcontainer.json` with
-   `--state-remote`. It refuses a link at a substitution file or `.gitignore`
-   even when no rewrite would happen, so a symlinked `AGENTS.md -> CLAUDE.md` is
-   refused. The nested state sync's own writes are not checked: it may append to
+   them. Move the listed folders out of `.agents/skills/` and rerun. Delete
+   them only once you have confirmed they are old bootstrap copies.
+9. A refresh refuses before any write on an unsafe destination. A path it
+   writes is unsafe when any of these holds: a link sits at any part of it; a
+   part above the written path exists and is not a real folder; the written
+   path is a file that exists and is not a regular file (a folder, or a
+   special file such as a FIFO); or the written path is a folder that exists
+   and is not a real folder. The check reads each part with `lstat` from the
+   project root down and never follows a link. It covers every path the copy
+   step writes (with the copy's own skips: existing consumer state, preserved
+   tracked adapters, and claimed third-party bundles), the project-name and
+   Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two workspace
+   instruction files), `.gitignore`, `.claude/bootstrap-ownership.env`, every
+   `.claude/bootstrap-root/` adapter path, and `.devcontainer/devcontainer.json`
+   when a state remote is set, through `--state-remote` or an exported
+   `AI_STATE_REMOTE`. It checks the project-name files and `.gitignore`
+   even when no rewrite would happen, so a symlinked `AGENTS.md -> CLAUDE.md`
+   is refused. The run refuses once and lists every problem in up to two
+   sections. A link is listed under `Refusing to write through symlinks:`;
+   replace each link with a regular file or folder, or remove it, then rerun.
+   Every other case is listed under
+   `Refusing to write over a path of the wrong kind:`, each path with its
+   reason; move or rename each listed path, then rerun.
+   A second check runs at copy time. Every file copy of a full refresh and
+   every folder the copy creates is checked first. If the first check missed
+   a path, the run stops with `Refusing to write <path>: ...`. That run may
+   be partial. After a legacy migration (pre-Git `.claude/` content, not a
+   dry run), the agents takeover, project-skill, and unsafe-destination
+   checks run again before the copy; a refusal there comes after the
+   migration's own writes. The state-folder READMEs (`.claude/plans/README.md`
+   and the three others) are consumer state: an unsafe one is skipped with a
+   warning instead of refused. The checks are stricter than the old cleanup:
+   a regular file at `.claude/templates`, or a folder holding an untracked
+   link at `CLAUDE.md`, used to be resolved silently and is now refused. A
+   bootstrap version that turns a generated file into a folder, or the
+   reverse, makes each refresh refuse until you move the old item by hand.
+   Not checked: the nested state sync's own writes (it may append to
    `.claude/.gitignore` and `.claude/.gitattributes`, and it restores
-   `settings.local.json`.
-   Replace each link with a regular file or folder, or remove it.
+   `settings.local.json`); hard links; whether the macOS quarantine strip
+   (`xattr -rc` over whole folders, consumer state included) follows links;
+   and reads through links, for example a preserved, tracked root adapter
+   that is a link, which the record copy reads into the AI state, which can
+   then be pushed.
 10. Preserve the normal human-operated update-and-push behavior when
    local-only mode is absent.
 
