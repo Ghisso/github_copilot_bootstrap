@@ -72,6 +72,16 @@ Fix second-review findings R24 to R28 (`.claude/quality_reports/merges/2026-11-1
   - Refused with exit 1: `.devcontainer/Dockerfile`, `.claude/bootstrap-root/CLAUDE.md`, the tracked `CLAUDE.md` link, and, under the stricter rule, both former controls (`.claude/agents/coder.md`, and `CLAUDE.md` with an untracked link).
 - **Scratch consumer copies** for optional check 2 were made by `prep_consumer_copies.py` in the scratchpad: `git clone` plus the git-ignored bootstrap paths, links preserved, every outer and nested remote removed. RAG and industrial-inspection have the record; img-classification has none.
 - Step 4 went to the `documenter`: the files listed in the plan, with the exact message texts and coverage lists taken from the verified diff.
+- **Documenter result.**
+  - Edits landed in all seven files. The project-context edit was committed into the nested repository by the automatic `session:` checkpoint.
+  - The main agent read each new claim against the code: the refresh skill's steps 6 to 9, the README, `docs/runtime-checks.md`, `learn`, and the target-mapping follow-ups.
+  - One README fix: a legacy consumer is refused when it has "no shipped-before record", not "no `.claude/bootstrap-root/` record". A live `.agents/skills/` can stand in.
+- **Step 5.** `generate_targets.py --all` exit 0. `install_bootstrap.py . --allow-self --local-only` exit 0: this repository passes the new preflight and option A. The only warning is the usual one about tracked authoring adapters. `validate_targets.py` PASS, `check_runtime.py` exit 0, `validate_plan_frontmatter.py` exit 0, and every quick Verification line PASS.
+- **Optional check 2** (scratch copies, no remotes; refreshed with `--local-only` from `dist/multi-agent`):
+  - RAG: exit 0.
+  - industrial-inspection: exit 0.
+  - img-classification: exit 1, listing 52 unmarked folders: the 30 with shipped names under option A, with "no shipped-before record was found", and the 22 never-shipped ones. `move_listed_skills.py` then moved all 52 into one backup folder outside `.claude/`. The rerun exited 0, wrote the record (37 names), and installed the 37 shipped skills.
+- **`verify.py phase --format text`** before review: PASS. Ruff 0, mypy 0, pytest 5235 passed and 1 skipped, freshness and generation PASS.
 
 ## [LEARN] Entries
 
