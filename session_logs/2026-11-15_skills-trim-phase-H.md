@@ -153,8 +153,8 @@ PASS      373.2s  uv run python .claude/scripts/verify.py phase --format text
 
 - Findings: `.claude/quality_reports/findings-2026-11-15_phase-H-installer-copy-safety.json` (1 MINOR, disposition `fixed`; gate PASS; six profiles; round 1 PASS with five MINORs, all fixed in round 2; round 2 PASS with one comment-only MINOR, fixed).
 - Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation).
-- optional 1: PASS. The round-2 reproduction was rerun on the fixed installer. In all six cases the sentinel was unchanged: `.claude/plans/README.md` was skipped with a warning (exit 0), and the other five were refused before any write (exit 1).
-- optional 2: PASS. Scratch copies of real consumers, with no remotes, refreshed with `--local-only` from `dist/multi-agent`:
+- optional 1: PASS — the round-2 reproduction was rerun on the fixed installer; in all six cases the sentinel was unchanged: `.claude/plans/README.md` was skipped with a warning (exit 0), and the other five were refused before any write (exit 1).
+- optional 2: PASS — scratch copies of real consumers, with no remotes, refreshed with `--local-only` from `dist/multi-agent`:
   - RAG: exit 0.
   - industrial-inspection: exit 0.
   - img-classification: exit 1, listing 52 unmarked folders with the new wording. After all 52 were moved to one backup folder outside `.claude/`, the rerun exited 0 and wrote the 37-name record.
