@@ -6,7 +6,7 @@ phase_index: 9
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: planned
+status: in-progress
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
