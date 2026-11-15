@@ -1,6 +1,6 @@
 # Agent Guidance
 
-This repository is a reusable multi-agent bootstrap. Preserve the pre-flight -> branch -> plan when needed -> implement -> verify -> review -> closeout -> commit -> push workflow and keep hook guardrails intact.
+This repository is a reusable multi-agent bootstrap. Preserve the pre-flight -> branch -> plan when needed -> implement -> verify -> review -> closeout -> commit -> push workflow and keep hook guardrails intact. At CLOSEOUT, follow `.claude/instructions/closeout.instructions.md` step by step.
 
 Use `shared/policies/workspace.instructions.md` for the main workspace guidance. When choosing retrieval tools, treat `shared/policies/tool-routing.instructions.md` as the single source of truth.
 
@@ -11,7 +11,7 @@ An optional OpenWiki knowledge layer, enabled when `openwiki/INSTRUCTIONS.md` ex
 Semble and context-mode are optional helpers:
 
 - Use Semble for semantic repository discovery and related-code lookup.
-- Use context-mode (`ctx_index`, `ctx_search`) to index and search large content such as logs and long markdown. Session continuity comes from its lifecycle hooks, which Antigravity does not wire.
+- Use context-mode (`ctx_index`, `ctx_search`) to index and search large content such as logs and long markdown, one file or text at a time. Antigravity has no Context Mode server.
 - Use `rg` for exact literals and direct file reads for known paths.
 
 For every user-facing message, use clear, direct language with short sentences

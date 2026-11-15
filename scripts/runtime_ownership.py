@@ -7,6 +7,7 @@ bootstrap refreshes; it is not a manifest of every generated file.
 
 from __future__ import annotations
 
+import stat
 from collections.abc import Set as AbstractSet
 from pathlib import Path, PurePath, PurePosixPath
 
@@ -89,6 +90,14 @@ THIRD_PARTY_SKILL_PATHS = ("skills/openwiki",)
 # bootstrap from generating, drift-checking, or refreshing that directory.
 THIRD_PARTY_SKILL_MARKER = ".openwiki-install.json"
 
+# The file that marks `.claude/skills/<name>/` as the project's own skill. A
+# full-install refresh deletes every `.claude/` file it does not generate, and
+# the learn skill once told consumers to save new skills under
+# `.claude/skills/`, where the next refresh would delete them. The marker sits
+# inside the skill folder because no client reads skills from any other
+# repository folder.
+PROJECT_SKILL_MARKER = ".project-skill"
+
 INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"
 
 # Every root path a full install writes. A repository that tracks one of them
@@ -138,33 +147,30 @@ SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
 # and state only; no ``.github/agents`` or ``.codex/agents`` unit ships.
 SIDECAR_PROFILES = ("skills", "workflow")
 SIDECAR_DEFAULT_PROFILE = "skills"
-# The 25 public skills whose text names nothing the profile does not ship;
+# The 22 public skills whose text names nothing the profile does not ship;
 # shared/sidecar/workflow/skills.txt records why the others are denied.
 SIDECAR_WORKFLOW_SKILLS = (
     "add-dependency",
     "caveman",
-    "caveman-compress",
     "concept-to-image",
-    "csv-driven-integration-tests",
     "data-analysis",
+    "data-and-graph-pitfalls",
     "debug-investigator",
     "devils-advocate",
     "draw-io",
     "gradio-streamlit",
+    "haystack",
     "html-presentation",
     "humanize",
     "hydra-config",
     "literature-review",
     "md-to-pdf",
     "onboard",
-    "pdf",
-    "pipeline-patterns",
     "ponytail",
     "ponytail-review",
     "prompt-lab",
     "rag-auditor",
     "research-critique",
-    "review-api",
     "text-to-sql-safety",
 )
 SIDECAR_PROFILE_SKILLS: dict[str, tuple[str, ...]] = {
@@ -418,6 +424,34 @@ def is_third_party_skill_dir(dir_path: Path) -> bool:
     posix_dir = PurePosixPath(dir_path.as_posix())
     is_owned_shape = any(posix_dir.match(owner) for owner in THIRD_PARTY_SKILL_PATHS)
     return is_owned_shape and (dir_path / THIRD_PARTY_SKILL_MARKER).is_file()
+
+
+def _lstat_mode(path: Path) -> int | None:
+    """Return ``path``'s mode without following a link, or ``None``."""
+    try:
+        return path.lstat().st_mode
+    except OSError:
+        return None
+
+
+def is_project_skill_dir(dir_path: Path) -> bool:
+    """Return whether a live directory is a project-owned skill folder.
+
+    True only for a real directory ``.claude/skills/<name>`` (the folder, its
+    ``skills`` parent, and its ``.claude`` grandparent are all real, not
+    links) that holds ``PROJECT_SKILL_MARKER`` as a regular file. Every check
+    uses ``lstat``; no link is followed and no file content is read.
+    """
+    skills_dir = dir_path.parent
+    claude_dir = skills_dir.parent
+    if skills_dir.name != "skills" or claude_dir.name != ".claude":
+        return False
+    for directory in (dir_path, skills_dir, claude_dir):
+        mode = _lstat_mode(directory)
+        if mode is None or not stat.S_ISDIR(mode):
+            return False
+    marker_mode = _lstat_mode(dir_path / PROJECT_SKILL_MARKER)
+    return marker_mode is not None and stat.S_ISREG(marker_mode)
 
 
 def is_root_adapter_path(relative_path: str | PurePath) -> bool:

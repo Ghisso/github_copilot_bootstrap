@@ -1541,7 +1541,9 @@ assert_closeout_invariants() {
   # earlier completed phase in the big plan's declared order is additionally
   # walked by historical_chain_errors (verify.py), which requires its own
   # valid receipt with ancestor/tree/artifact-hash integrity - a completed
-  # phase can no longer silently skip the receipt chain.
+  # phase can no longer silently skip the receipt chain. The one exception is
+  # a plan's leading run of phases completed before closeout receipts existed
+  # (2026-08-29), which that walk skips.
   if [[ "$completed_count" -gt 0 ]]; then
     local require_ponytail="false"
     if diff_requires_ponytail "$repo_root" "$local_sha"; then

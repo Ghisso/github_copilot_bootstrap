@@ -22,52 +22,9 @@ only when the repository already uses Hydra. In a repository that does not, the
 Core Rule above is the whole policy: write the config dataclass first, then wire
 it the way that repository already loads configuration.
 
-All config variants live as Python dataclass instances registered with ConfigStore.
-
-### Pattern
-
-```python
-from dataclasses import dataclass, field
-from typing import Any
-from hydra.core.config_store import ConfigStore
-
-
-@dataclass
-class ModelConfig:
-    """Model configuration.
-
-    Attributes:
-        name: Model identifier.
-        hidden_size: Hidden layer dimension.
-    """
-    name: str = "bert-base-uncased"
-    hidden_size: int = 768
-    num_layers: int = 12
-
-    def __post_init__(self) -> None:
-        if self.hidden_size <= 0:
-            raise ValueError(f"hidden_size must be positive, got {self.hidden_size}")
-
-
-cs = ConfigStore.instance()
-cs.store(group="model", name="bert_base", node=ModelConfig)
-cs.store(group="model", name="gpt2",
-            node=ModelConfig(name="gpt2", hidden_size=768, num_layers=12))
-```
-
-```python
-from dataclasses import dataclass
-from hydra.core.config_store import ConfigStore
-
-@dataclass
-class RunConfig:
-    """Runtime configuration."""
-    experiment_name: str = "my_experiment"
-    seed: int = 42
-
-cs = ConfigStore.instance()
-cs.store(group="run", name="default", node=RunConfig)
-```
+All config variants live as Python dataclass instances registered with
+ConfigStore. Code examples for the group dataclass, top-level config, entry
+point, and builder are in the `hydra-config` skill (`.claude/skills/hydra-config/SKILL.md`).
 
 ### Top-Level Config
 
@@ -76,45 +33,9 @@ cs.store(group="run", name="default", node=RunConfig)
 > Never put bare primitive fields (`str`, `int`, `bool`) directly on the top-level config class.
 > Encapsulate all primitives in a category-specific dataclass first.
 
-```python
-# WRONG — bare primitives on top-level config
-@dataclass
-class TrainingConfig:
-    experiment_name: str = "my_experiment"  # ✗ bare primitive
-    seed: int = 42                          # ✗ bare primitive
-    model: ModelConfig = field(default_factory=ModelConfig)
-```
-
-```python
-# CORRECT — all fields are composed dataclasses
-@dataclass
-class TrainingConfig:
-    run: RunConfig = field(default_factory=RunConfig)
-    model: ModelConfig = field(default_factory=ModelConfig)
-
-    defaults: list[Any] = field(
-        default_factory=lambda: [
-            "_self_",           # MUST be first — group variants override dataclass defaults
-            {"model": "bert_base"},
-        ]
-    )
-
-    hydra: Any = field(
-        default_factory=lambda: {
-            "run": {"dir": "."},
-            "output_subdir": None,
-            "mode": "RUN",      # CRITICAL: always include
-        }
-    )
-```
-
-### Entry Point
-
-```python
-@hydra.main(config_path=None, config_name="training_config", version_base="1.3")
-def main(cfg: TrainingConfig) -> None:
-    ...
-```
+- `defaults` lists `"_self_"` first, so group variants override dataclass defaults.
+- The `hydra` dict always includes `"mode": "RUN"`.
+- The entry point uses `@hydra.main(config_path=None, ...)`.
 
 ## Anti-Patterns
 

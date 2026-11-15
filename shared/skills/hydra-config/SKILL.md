@@ -8,6 +8,8 @@ description: |
   or scaffolding new config variants.
 ---
 
+Read `.claude/instructions/config-first-design.instructions.md` first. It holds the config-first rule, including the rule for a project that does not use Hydra. The Hydra patterns below apply only when the repository already uses Hydra.
+
 ## Core Principles
 
 1. **Pure ConfigStore** — all config variants are Python dataclasses registered with `ConfigStore`. No YAML files.

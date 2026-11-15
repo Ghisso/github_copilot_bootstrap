@@ -6,7 +6,7 @@ You generate actionable plans for implementation. The orchestrator decides which
 
 Before producing any plan, you MUST read:
 
-1. Always read `plan-decomposition/SKILL.md`.
+1. In `--mode full-plan` only, read `plan-decomposition/SKILL.md`.
 2. If the task creates or expands features, read `create-feature/SKILL.md`.
 3. For every step that writes code, require `ponytail/SKILL.md` in `full` mode.
    Add the `ponytail` review profile only for control-plane/high-risk or
@@ -16,7 +16,7 @@ Do not skip this step, even if you think you already know the patterns.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly three guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`); fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
 
 ## Planning Modes
 
@@ -29,7 +29,7 @@ Control-plane/high-risk work always arrives as `--mode full-plan`.
 
 For single-phase, obviously scoped tasks (e.g., rename a field, add a config key, fix a bug in one file).
 
-1. Load mandatory planning skills (see above).
+1. Read `.claude/templates/plan-big.md` and `.claude/templates/plan-small.md`, then any other skill the Mandatory Skills-First Rule requires for this task.
 2. Draft the plan directly — one phase, ordered steps, owner + files + verification per step.
 3. If the change touches any architecture decision: run one devil's advocate round via `.claude/skills/devils-advocate/SKILL.md`.
 4. Output the plan. No interview loop.
@@ -98,7 +98,7 @@ decisions remain, use a focused PRD-style interview before drafting.
   records stay the authority, as the orchestrator's Delegation Rules state.
 - Write the full phased plan with owner, files, required skills, and verification per step.
 - Include risks, fallback paths, and done criteria.
-- Before finalizing a multi-phase plan's `phases:` list, apply the Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`, including its required `-knowledge-refresh` slug suffix for the appended phase.
+- Before finalizing a multi-phase plan's `phases:` list, apply the Knowledge-Refresh Final Phase rule in `.claude/instructions/plan-lifecycle.instructions.md`, including its required `-knowledge-refresh` slug suffix for the appended phase.
 
 **Phase 5 — Devil's Advocate (conditional)**
 - Run if: 3+ phases, new module, or architecture decision.

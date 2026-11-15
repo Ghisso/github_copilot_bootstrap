@@ -21,7 +21,11 @@ than being overwritten in place by a bucket pull.
 
 For a full consumer whose .claude/ predates this plan (no .claude/.git yet),
 the installer commits its pre-existing state as `migrate: import pre-git
-state` before the bootstrap update lands on top of it.
+state` before the bootstrap update lands on top of it. A legacy consumer whose
+`.claude/skills/` holds old copies of bootstrap skills and no shipped-before
+record is refused once, listing each folder, until each folder is moved out of
+`.claude/skills/` or kept as a project skill (renamed first when the bootstrap
+ships its name, then marked with `.project-skill`).
 
 A batch may mix full and sidecar consumers. When one target's installer
 exits non-zero, or a target path is not a directory, this script records it

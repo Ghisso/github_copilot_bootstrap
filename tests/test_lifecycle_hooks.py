@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -381,12 +382,12 @@ def test_rendered_codex_lifecycle_keeps_stop_local_with_the_openwiki_guard(
     assert len(posttool) == 2
     bash_group, openwiki_group = posttool
     assert bash_group["matcher"] == "Bash"
-    assert [
-        "record-branch-state.sh" in handler["command"]
-        or "context-mode-dispatch.sh" in handler["command"]
-        or "reporting-reminder.sh late-report openai-codex" in handler["command"]
-        for handler in bash_group["hooks"]
-    ] == [True, True, True]
+    assert len(bash_group["hooks"]) == 2
+    assert "record-branch-state.sh" in bash_group["hooks"][0]["command"]
+    assert (
+        "reporting-reminder.sh late-report openai-codex"
+        in bash_group["hooks"][1]["command"]
+    )
     assert openwiki_group["matcher"] == OPENWIKI_BEGIN_MATCHER
     assert len(openwiki_group["hooks"]) == 1
     assert "openwiki-guard.sh" in openwiki_group["hooks"][0]["command"]
@@ -435,6 +436,75 @@ def test_rendered_antigravity_hook_uses_only_proven_pretool_safety(
     assert json.loads(result.stdout)["decision"] == "deny"
 
 
+def _handler_scripts(group: dict[str, Any]) -> list[str]:
+    """Return `script args` for each handler, dropping the shared launcher prefix."""
+    return [
+        handler["command"].split("run-hook.sh", 1)[1].lstrip('" ')
+        for handler in group["hooks"]
+    ]
+
+
+def test_rendered_claude_and_codex_hooks_run_no_context_mode_handler(
+    tmp_path: Path,
+) -> None:
+    """Context Mode is MCP-only: no event of any client runs its dispatcher,
+    `PreCompact` (which held only that handler) is gone, and every safety and
+    lifecycle handler around it is unchanged."""
+    claude_path = tmp_path / "settings.json"
+    codex_path = tmp_path / "hooks.json"
+    render_claude_settings(claude_path)
+    render_codex_hooks(codex_path)
+
+    for path, target in ((claude_path, "claude-code"), (codex_path, "openai-codex")):
+        text = path.read_text(encoding="utf-8")
+        hooks = json.loads(text)["hooks"]
+        assert "context-mode-dispatch.sh" not in text
+        assert "PreCompact" not in hooks
+        session_start = hooks["SessionStart"]
+        assert len(session_start) == 1
+        assert _handler_scripts(session_start[0]) == [
+            "state-sync.sh pull",
+            f"session-log.sh {target}",
+            f"session-start-state.sh {target}",
+        ]
+        assert [group["matcher"] for group in hooks["PreToolUse"]] == [
+            "Edit|Write",
+            "Bash",
+            OPENWIKI_BEGIN_MATCHER,
+        ]
+        assert [_handler_scripts(group) for group in hooks["PreToolUse"]] == [
+            [f"protect-files.sh {target}"],
+            [f"pretool-bash-guard.sh {target}"],
+            ["openwiki-guard.sh pre"],
+        ]
+        assert [group["matcher"] for group in hooks["PostToolUse"]] == [
+            "Bash",
+            OPENWIKI_BEGIN_MATCHER,
+        ]
+        assert _handler_scripts(hooks["PostToolUse"][0]) == [
+            f"record-branch-state.sh {target}",
+            f"reporting-reminder.sh late-report {target}",
+        ]
+    assert (
+        json.loads(codex_path.read_text(encoding="utf-8"))["hooks"]["SessionStart"][0][
+            "matcher"
+        ]
+        == "startup|resume|clear"
+    )
+
+
+def test_shared_copilot_hooks_run_no_context_mode_handler() -> None:
+    hooks_path = REPO_ROOT / "shared" / "hooks" / "hooks.json"
+    text = hooks_path.read_text(encoding="utf-8")
+    hooks = json.loads(text)["hooks"]
+
+    assert "context-mode-dispatch.sh" not in text
+    assert set(hooks) == {"SessionStart", "PreToolUse", "PostToolUse", "Stop"}
+    assert [len(hooks[event]) for event in ("SessionStart", "PreToolUse")] == [3, 5]
+    assert len(hooks["PostToolUse"]) == 1
+    assert "record-branch-state.sh" in hooks["PostToolUse"][0]["bash"]
+
+
 def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     tmp_path: Path,
 ) -> None:
@@ -468,12 +538,12 @@ def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     assert len(posttool) == 2
     bash_group, openwiki_group = posttool
     assert bash_group["matcher"] == "Bash"
-    assert [
-        "record-branch-state.sh" in handler["command"]
-        or "context-mode-dispatch.sh" in handler["command"]
-        or "reporting-reminder.sh late-report claude-code" in handler["command"]
-        for handler in bash_group["hooks"]
-    ] == [True, True, True]
+    assert len(bash_group["hooks"]) == 2
+    assert "record-branch-state.sh" in bash_group["hooks"][0]["command"]
+    assert (
+        "reporting-reminder.sh late-report claude-code"
+        in bash_group["hooks"][1]["command"]
+    )
     assert openwiki_group["matcher"] == OPENWIKI_BEGIN_MATCHER
     assert len(openwiki_group["hooks"]) == 1
     assert "openwiki-guard.sh" in openwiki_group["hooks"][0]["command"]

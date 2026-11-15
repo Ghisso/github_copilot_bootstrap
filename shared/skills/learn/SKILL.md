@@ -55,17 +55,55 @@ ls shared/skills/ && grep -r -i "KEYWORD" shared/skills/
 # Installed consumer project:
 ls .claude/skills/ && grep -r -i "KEYWORD" .claude/skills/
 ```
-- Nothing related → create new skill
-- Same trigger & fix → update existing skill
-- Partial overlap → add variant to existing
+- Nothing related → create a new skill.
+- Same trigger and fix, or partial overlap → extend the existing skill, but
+  only where you own it:
+  - In this bootstrap's authoring repository, update `shared/skills/<name>`.
+  - In a consumer project, update a skill only when its folder holds
+    `.project-skill`.
+- Never edit a shipped skill in a consumer. A refresh overwrites it, and
+  marking it is a name clash. Create a new marked project skill with its own
+  name, or write a `.claude/MEMORY.md` entry instead.
 
 ## Phase 3: Create Skill
 
 Create the skill in the canonical location for the repository you are in:
 `shared/skills/[skill-name]/SKILL.md` in this bootstrap's authoring
 repository, so it regenerates into every target; `.claude/skills/[skill-name]/SKILL.md`
-in an installed consumer project, which has no `shared/skills/`. A skill left
-only in the generated overlay is deleted by the next refresh.
+in an installed consumer project, which has no `shared/skills/`.
+
+In a consumer project, also create an empty `.project-skill` file in the
+skill folder (`.claude/skills/[skill-name]/.project-skill`). Mark every
+project skill when you create it. The shipped-before record is
+`.claude/bootstrap-root/.agents/skills`, the copy of what the last install
+shipped. When that copy is missing, the live `.agents/skills/` stands in for
+every check. What a refresh does with an unmarked folder depends on its name:
+
+- The bootstrap neither ships the name nor shipped it before: the refresh
+  refuses to run until you mark or remove the folder.
+- The bootstrap ships the name and the shipped-before record does not list it,
+  or no record exists: the refresh refuses and does not overwrite the folder.
+  If the project wrote it, rename the folder and its `name:` line, then add
+  `.project-skill`; otherwise move it out of `.claude/skills/`. A project
+  with no unmarked skill folder of that kind installs normally with no record.
+- The name is a retired bootstrap name: the refresh deletes the folder.
+
+Rules:
+
+- Use a lowercase kebab-case name equal to `name:`, and one no bootstrap or
+  third-party skill uses.
+- Put no symlinks in the folder.
+- Keep `description` plus `when_to_use` to at most 300 characters, trigger
+  words first. The validator enforces this in the authoring repository; keep
+  to it in consumers too.
+- Codex and Antigravity read only `.agents/skills/`, so they see the skill
+  after the next refresh copies it to `.agents/skills/[skill-name]/`. Copilot
+  also reads `.claude/skills/`, so it can find a new project skill without a
+  refresh. Once a mirror copy exists in `.agents/skills/`, Copilot lists that
+  copy, so edits show after the next refresh. Never create or edit that
+  folder by hand.
+- Create or edit the skill no later than CLOSEOUT step 2, because receipts
+  bind `.claude/` runtime files.
 
 `name` must match the skill's directory name, and `visibility` is required
 under `shared/skills/`; `scripts/validate_targets.py` fails the run otherwise.
@@ -119,4 +157,5 @@ Skill created: <shared/skills or .claude/skills>/[name]/SKILL.md
   Trigger: [when to use]
   Problem: [what it solves]
   .claude/MEMORY.md: Updated
+  Marker (consumer project): .claude/skills/[name]/.project-skill
 ```

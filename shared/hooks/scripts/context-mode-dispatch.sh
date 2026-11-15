@@ -8,24 +8,28 @@ warn() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 DEFAULT_CONTEXT_MODE_DIR="$REPO_ROOT/.claude/.cache/context-mode"
-PINNED_CONTEXT_MODE_VERSION="1.0.169"
-FILTER_CONTRACT="ctx-index-file-content-v1"
+PINNED_CONTEXT_MODE_VERSION="2.1.8"
+# Context Mode 2.x needs Node.js 24.15.0 or newer. Checked in server mode and
+# --self-check only: legacy hook calls start nothing.
+MIN_NODE_VERSION="24.15.0"
+FILTER_CONTRACT="ctx-index-files-only-v2"
 FILTER_SCRIPT="$SCRIPT_DIR/context-mode-mcp-filter.mjs"
-# Outside the ai-state working tree (.claude/) on purpose: state-sync.sh never
-# adds, commits, or restores anything at $REPO_ROOT other than under .claude/,
-# so a hostile/compromised ai-state remote can never read or overwrite this
-# file. See configure_storage below.
+# Outside the ai-state working tree (.claude/) on purpose: state-sync.sh adds
+# and commits only under .claude/, so this file never enters ai-state history,
+# and the root restore it runs copies only allowlisted adapter files, never this
+# one. This gives no protection against a remote that replaces the synced
+# scripts themselves. See configure_storage below.
 PROVENANCE_SECRET_FILE="$REPO_ROOT/.context-mode-provenance.secret"
 
 # Prints the installed package version of a direct `context-mode` executable.
 #
-# Context Mode 1.0.169 has no `--version`/`-v`/`version` flag (all three exit 0
-# printing nothing), and `doctor` is slow, ANSI-decorated, and performs a network
-# npm check, so neither is usable as a per-hook-event gate. The executable is an
-# npm bin symlink into the installed package directory, so resolve it and read
-# the owning package.json: offline, deterministic, and independent of the
-# bundle's internals. The name is checked too, so a nested dependency manifest
-# can never be mistaken for Context Mode's own.
+# The server cannot prove its own version: Context Mode 2.x reports
+# `serverInfo.version` "dev" over the wire. Running `context-mode --version`
+# would prove it, but it starts a full Node.js process on every check. The
+# executable is an npm bin symlink into the installed package directory, so
+# resolve it and read the owning package.json instead: offline, no Node.js
+# start, and independent of the bundle's internals. The name is checked too, so
+# a nested dependency manifest can never be mistaken for Context Mode's own.
 direct_context_mode_version() {
   local exe="$1" resolved dir manifest
   resolved="$(readlink -f "$exe" 2>/dev/null)" || return 1
@@ -61,6 +65,21 @@ resolve_context_mode() {
     return 0
   fi
   return 1
+}
+
+# Succeeds when "$1" (the output of `node --version`, for example v24.15.0) is
+# at least $MIN_NODE_VERSION. Only major and minor are compared; the floor's
+# patch is 0. Anything that is not a version fails, so a broken `node` is
+# refused rather than assumed fine.
+node_meets_floor() {
+  local pattern='^v?([0-9]+)\.([0-9]+)\.' floor_major floor_minor have_major have_minor
+  [[ "$1" =~ $pattern ]] || return 1
+  have_major=$((10#${BASH_REMATCH[1]}))
+  have_minor=$((10#${BASH_REMATCH[2]}))
+  floor_major="${MIN_NODE_VERSION%%.*}"
+  floor_minor="${MIN_NODE_VERSION#*.}"
+  floor_minor="${floor_minor%%.*}"
+  ((have_major > floor_major || (have_major == floor_major && have_minor >= floor_minor)))
 }
 
 # Walk up from $1 until an existing path is found and print it. Shared by
@@ -130,12 +149,13 @@ select_storage_root() {
 }
 
 # Generates (once) and returns a random secret stored at
-# $PROVENANCE_SECRET_FILE, outside the nested ai-state repository. Comparing
-# this value is what makes the on-disk provenance marker unforgeable by a
-# hostile ai-state remote: the three plaintext fields it also checks
-# (repository, pinned version, filter contract) are public/predictable, but
-# the remote can never read or write this file, so it cannot learn or plant
-# a matching secret.
+# $PROVENANCE_SECRET_FILE, outside the nested ai-state repository. The marker
+# also checks three plaintext fields (repository, pinned version, filter
+# contract) that are public or predictable, so a marker planted without the
+# secret does not match. state-sync.sh adds and commits only under .claude/, so
+# this file never enters ai-state history, and the root restore copies only
+# allowlisted adapter files, never this one. This gives no protection against a
+# remote that replaces the synced scripts themselves.
 read_or_create_provenance_secret() {
   if [[ ! -s "$PROVENANCE_SECRET_FILE" ]]; then
     local secret="" tmp_secret
@@ -174,7 +194,7 @@ read_or_create_provenance_secret() {
 
 configure_storage() {
   CONTEXT_MODE_DIR="$(select_storage_root)"
-  local provenance="$CONTEXT_MODE_DIR/.bootstrap-provenance" quarantine secret
+  local provenance="$CONTEXT_MODE_DIR/.bootstrap-provenance" quarantine secret move_error
   if ! secret="$(read_or_create_provenance_secret)"; then
     warn "unable to establish a local Context Mode provenance secret"
     return 1
@@ -186,10 +206,19 @@ configure_storage() {
       && grep -Fqx "secret=$secret" "$provenance" 2>/dev/null
   }; then
     quarantine="$CONTEXT_MODE_DIR.untrusted.$(date -u +%Y%m%dT%H%M%SZ).$$"
-    if ! mv "$CONTEXT_MODE_DIR" "$quarantine"; then
+    if move_error="$(mv "$CONTEXT_MODE_DIR" "$quarantine" 2>&1)"; then
+      warn "preserved unaudited Context Mode cache at $quarantine"
+    elif [[ ! -e "$CONTEXT_MODE_DIR" && ! -L "$CONTEXT_MODE_DIR" ]]; then
+      # Another dispatcher quarantined the same folder between the check above
+      # and this move, so the folder is simply gone. Nothing was trusted, and
+      # nothing is deleted: the other dispatcher's move preserved the bytes.
+      warn "Context Mode cache at $CONTEXT_MODE_DIR was already moved aside by another dispatcher; starting with a fresh one"
+    else
+      # The unaudited folder is still there. It is never trusted, never
+      # deleted, and never stamped: fail and keep mv's own diagnostic.
+      [[ -z "$move_error" ]] || printf '%s\n' "$move_error" >&2
       return 1
     fi
-    warn "preserved unaudited Context Mode cache at $quarantine"
   fi
   if ! mkdir -p "$CONTEXT_MODE_DIR" 2>/dev/null; then
     return 1
@@ -203,6 +232,11 @@ configure_storage() {
     fi
   fi
   export CONTEXT_MODE_DIR
+  # Context Mode 2.x ignores CONTEXT_MODE_DIR and keeps everything it writes
+  # under CONTEXT_MODE_DATA_DIR. Overwrite whatever the caller exported, so no
+  # inherited value can move data out of the guarded root.
+  CONTEXT_MODE_DATA_DIR="$CONTEXT_MODE_DIR"
+  export CONTEXT_MODE_DATA_DIR
   CONTEXT_MODE_PROJECT_ROOT="$REPO_ROOT"
   export CONTEXT_MODE_PROJECT_ROOT
 }
@@ -228,8 +262,17 @@ probe_storage() {
 }
 
 self_check() {
-  local command_path="" exe="" observed=""
+  local command_path="" exe="" observed="" observed_node=""
+  # Look the launcher up from the same folder `server` mode runs in.
+  cd "$REPO_ROOT" || warn "unable to enter $REPO_ROOT; launcher lookups use the current folder"
   printf 'PASS context-mode-dispatch: required-version=%s\n' "$PINNED_CONTEXT_MODE_VERSION"
+  printf 'PASS context-mode-dispatch: required-node=%s\n' "$MIN_NODE_VERSION"
+  if command -v node >/dev/null 2>&1; then
+    observed_node="$(node --version 2>/dev/null || true)"
+  fi
+  printf 'PASS context-mode-dispatch: observed-node=%s\n' "${observed_node:-none-on-PATH}"
+  node_meets_floor "$observed_node" \
+    || warn "Node.js $MIN_NODE_VERSION or newer is required (observed ${observed_node:-none}); the MCP server cannot start"
 
   # Report the observed version of whatever is actually on PATH before deciding
   # anything, so the self-check proves the version contract instead of merely
@@ -259,9 +302,9 @@ self_check() {
     fi
   else
     if [[ -n "$exe" ]]; then
-      warn "version-contract=FAIL; context-mode on PATH is ${observed:-undeterminable}, npx is unavailable, so hook events will be skipped"
+      warn "version-contract=FAIL; context-mode on PATH is ${observed:-undeterminable}, npx is unavailable, so the MCP server cannot start"
     else
-      warn "context-mode and npx are unavailable; hook events will be skipped"
+      warn "context-mode and npx are unavailable; the MCP server cannot start"
     fi
   fi
   printf 'PASS context-mode-dispatch: filter=%s\n' "$FILTER_SCRIPT"
@@ -286,73 +329,48 @@ if [[ "${1:-}" == "--self-check" ]]; then
 fi
 
 MODE="${1:-}"
-shift || true
+
+# Context Mode has no hook route any more. Stale hook wiring in an adapter that
+# the installer keeps on refresh must stay harmless: read the event payload,
+# print nothing, and exit 0 before any storage setup.
+[[ "$MODE" == "server" ]] || { cat > /dev/null || true; exit 0; }
+
+# Context Mode 2.x with `--agent codex` keys its project to the working folder's
+# Git repository, so a server started inside the nested `.claude` repository
+# would index into a separate project. Start from the outer repository root
+# (computed from this script's own location), before any launcher lookup, so the
+# version proof, the filter, and the server all search PATH from the same
+# folder. The filter also checks `ctx_index` paths against this folder.
+if ! cd "$REPO_ROOT"; then
+  printf 'ERROR context-mode-dispatch: unable to enter the repository root %s\n' "$REPO_ROOT" >&2
+  exit 1
+fi
 
 if ! configure_storage; then
-  if [[ "$MODE" == "server" ]]; then
-    printf 'ERROR context-mode-dispatch: guarded storage/provenance unavailable\n' >&2
-    exit 1
-  fi
-  warn "storage unavailable; skipping optional hook event"
-  exit 0
+  printf 'ERROR context-mode-dispatch: guarded storage/provenance unavailable\n' >&2
+  exit 1
 fi
 
 if ! command_path="$(resolve_context_mode)"; then
-  if [[ "$MODE" == "server" ]]; then
-    printf 'ERROR context-mode-dispatch: context-mode and npx are unavailable; MCP server cannot start\n' >&2
-    exit 127
-  fi
-  warn "context-mode and npx are unavailable; skipping optional hook event: $MODE $*"
-  exit 0
+  printf 'ERROR context-mode-dispatch: context-mode and npx are unavailable; MCP server cannot start\n' >&2
+  exit 127
 fi
-
-if [[ "$MODE" == "server" ]]; then
-  if [[ ! -f "$FILTER_SCRIPT" ]] || ! command -v node >/dev/null 2>&1; then
-    printf 'ERROR context-mode-dispatch: MCP filter or Node runtime unavailable\n' >&2
-    exit 127
-  fi
-  if [[ "$command_path" == "npx" ]]; then
-    exec node "$FILTER_SCRIPT" -- npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION"
-  fi
-  exec node "$FILTER_SCRIPT" -- "$command_path"
-fi
-
-case "$MODE" in
-  github-copilot) CONTEXT_MODE_TARGET="vscode-copilot" ;;
-  claude-code) CONTEXT_MODE_TARGET="claude-code" ;;
-  openai-codex) CONTEXT_MODE_TARGET="codex" ;;
-  *) CONTEXT_MODE_TARGET="$MODE" ;;
-esac
-
-run_upstream_hook() {
-  if [[ "$command_path" == "npx" ]]; then
-    npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION" hook "$CONTEXT_MODE_TARGET" "$@"
-  else
-    "$command_path" hook "$CONTEXT_MODE_TARGET" "$@"
-  fi
-}
-
-# The hook lane is advisory only: run upstream (its own side effects, such as
-# event capture and the compaction snapshot, are unchanged), keep only its
-# stdout, and forward just the filtered advice text. Upstream decisions, input
-# rewrites, and blocked-tool advice never reach the client, and hook modes
-# always exit 0. No timeout is added; the client's hook timeout still applies.
-upstream_status=0
-upstream_output="$(run_upstream_hook "$@")" || upstream_status=$?
-if ((upstream_status != 0)); then
-  warn "upstream hook $CONTEXT_MODE_TARGET exited with status $upstream_status; its output is still filtered"
-fi
-[[ -n "$upstream_output" ]] || exit 0
 
 if [[ ! -f "$FILTER_SCRIPT" ]] || ! command -v node >/dev/null 2>&1; then
-  warn "MCP filter or Node runtime unavailable; dropping hook output"
-  exit 0
+  printf 'ERROR context-mode-dispatch: MCP filter or Node runtime unavailable\n' >&2
+  exit 127
 fi
-# The filter output is captured first so a failed filter can never leave a
-# partial object on stdout.
-if ! filtered_output="$(printf '%s' "$upstream_output" | node "$FILTER_SCRIPT" --hook-output)"; then
-  warn "hook output filter failed; dropping hook output"
-  exit 0
+observed_node="$(node --version 2>/dev/null || true)"
+if ! node_meets_floor "$observed_node"; then
+  printf 'ERROR context-mode-dispatch: Node.js %s or newer is required (observed %s); MCP server cannot start\n' \
+    "$MIN_NODE_VERSION" "${observed_node:-none}" >&2
+  exit 1
 fi
-[[ -z "$filtered_output" ]] || printf '%s\n' "$filtered_output"
-exit 0
+
+# One server identity for every client: `--agent codex` needs no
+# CLAUDE_PROJECT_DIR and no --workspace-folder, because the working folder
+# (above) is what keys the project.
+if [[ "$command_path" == "npx" ]]; then
+  exec node "$FILTER_SCRIPT" -- npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION" server --agent codex
+fi
+exec node "$FILTER_SCRIPT" -- "$command_path" server --agent codex

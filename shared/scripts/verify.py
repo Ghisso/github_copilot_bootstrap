@@ -76,6 +76,10 @@ COMMAND_TIMEOUT_SECONDS = 480
 VERIFICATION_ITEM_TIMEOUT_SECONDS = 600
 PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase-{phase}.json")
 CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout-{phase}.json")
+# Closeout receipts exist only since commit b3c6bec (2026-08-29).
+# ``historical_chain_errors`` skips only a plan's leading run of phases dated
+# before this day (user decision 2026-10-23).
+RECEIPT_CHAIN_SINCE = "2026-08-29"
 ARTIFACT_KEYS = (
     "phase_receipt",
     "findings",
@@ -1781,6 +1785,41 @@ def artifact_reference_errors(
     return [], path
 
 
+def leading_pre_receipt_count(root: Path, phases: list[str], parent_plan: str) -> int:
+    """Count the leading ``phases`` that were completed before receipts existed.
+
+    A phase counts when it is cancelled, or when all of these hold: its slug
+    starts with a date before ``RECEIPT_CHAIN_SINCE``, its small plan is
+    complete, its ``closeout_session_log`` names a file dated before
+    ``RECEIPT_CHAIN_SINCE``, and nothing at all is on disk at its closeout
+    receipt path (``lexists``, so even a broken symlink counts as a receipt).
+    Counting stops at the first phase that is not counted.
+    """
+    for count, phase in enumerate(phases):
+        try:
+            source = (root / ".claude/plans" / f"{phase}.md").read_bytes()
+        except OSError:
+            return count
+        if is_cancelled_small_plan(root, source, phase, parent_plan):
+            continue
+        values = small_plan_frontmatter(source) or {}
+        slug_date = re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}(?=_)", phase)
+        log_date = re.match(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}",
+            Path(values.get("closeout_session_log", "")).name,
+        )
+        if not (
+            slug_date
+            and log_date
+            and slug_date.group() < RECEIPT_CHAIN_SINCE
+            and log_date.group() < RECEIPT_CHAIN_SINCE
+            and is_complete_small_plan(source, phase, parent_plan)
+            and not os.path.lexists(receipt_path(root, "closeout", phase))
+        ):
+            return count
+    return len(phases)
+
+
 def historical_chain_errors(
     root: Path, *, branch: str, phase: str, receipt_head: str
 ) -> list[str]:
@@ -1799,6 +1838,13 @@ def historical_chain_errors(
     treated as having no historical chain to validate, since the caller
     already fails closed on that condition through its own required-file
     checks.
+
+    Closeout receipts exist only since ``RECEIPT_CHAIN_SINCE``, so a plan's
+    leading run of phases completed before then has none to check. That run
+    (see ``leading_pre_receipt_count``) is skipped and nothing else is: a
+    receipt file on disk is always validated, an undated or later-dated phase
+    is always checked, and the skip ends at the first phase that does not
+    qualify, so deleting a receipt cannot exempt a phase listed after it.
     """
     if not branch.endswith("_implementation"):
         return []
@@ -1812,9 +1858,11 @@ def historical_chain_errors(
     if phases is None or phase not in phases:
         return ["historical receipt chain needs a valid big-plan phase order"]
 
+    prior = phases[: phases.index(phase)]
+    skipped = leading_pre_receipt_count(root, prior, slug)
     errors: list[str] = []
     chain_head = receipt_head
-    for earlier in reversed(phases[: phases.index(phase)]):
+    for earlier in reversed(prior[skipped:]):
         try:
             source = (root / ".claude/plans" / f"{earlier}.md").read_bytes()
         except OSError:

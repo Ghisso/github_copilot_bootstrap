@@ -14,18 +14,22 @@ sources:
     resource: repo://scripts/runtime_ownership.py
   - id: openwiki-source-472dd9a20a81e8f5a312971f
     resource: repo://scripts/sidecar_overlay.py
+  - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
+    resource: repo://scripts/validate_targets.py
   - id: openwiki-source-1c38db574c5e411bfd8c36ea
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-2d0d5ea9c4029722239233b8
     resource: repo://tests/test_sidecar_install.py
   - id: openwiki-source-0b6f8c38a312ee46c4820997
     resource: repo://tests/test_sidecar_uninstall.py
+  - id: openwiki-source-3917eaf8fd9f30e25e7198d1
+    resource: repo://tests/test_sidecar_update.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
+generated: { by: "claude-code", at: "2026-11-14T17:16:32.491Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-22T18:10:39.614Z
+    at: 2026-11-14T17:16:32.491Z
 ---
 
 
@@ -50,7 +54,7 @@ A unit is one skill directory at one write root, one single-file unit (a bridge,
 
 | Unit | Profile | Paths |
 | --- | --- | --- |
-| Skills | both | `skills`: `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`; `workflow`: 25 eligible skills including its own `onboard`; each under both `.claude/skills/` and `.agents/skills/`, copied whole |
+| Skills | both | `skills`: `debug-investigator`, `humanize`, `ponytail`, `ponytail-review`; `workflow`: 22 eligible public skills (`SIDECAR_WORKFLOW_SKILLS`, including `haystack`, `data-and-graph-pitfalls`, and its own `onboard`); each under both `.claude/skills/` and `.agents/skills/`, copied whole |
 | Ponytail license | both | `LICENSE` (MIT) inside `ponytail/` and `ponytail-review/` at both roots |
 | Claude Code bridge | `skills` | `.claude/rules/ai-bootstrap-sidecar.md`, no frontmatter |
 | Copilot in VS Code bridge | `skills` | `.github/instructions/ai-bootstrap-sidecar.instructions.md`, with `applyTo: "**"` |
@@ -64,6 +68,8 @@ A unit is one skill directory at one write root, one single-file unit (a bridge,
 Both bridges carry the same short body from `shared/sidecar/bridge.md`: tracked repository guidance wins over the sidecar, and `ponytail` applies to coding tasks in `full` mode. The workflow rules describe a relaxed loop (read memory, plan when a task spans several files, implement, run the project's own checks, review a non-trivial diff, log the session) that nothing enforces. No `.github/agents` or `.codex/agents` file ships in either profile, because neither Copilot nor Codex has a config-free way to discover a custom agent from an ignored file; `docs/sidecar-provider-contract.md` records the native runs behind that.
 
 The workflow-only `onboard` skill comes from `shared/sidecar/workflow/skills/onboard/`, rather than the full-install skill. It reads tracked team guidance, representative code and tests, and a bounded set of commit subjects. After checking that the private state paths are ignored, untracked, and free of symlinks, it writes `.ai-bootstrap/project-context.instructions.md` and one pointer in `.ai-bootstrap/MEMORY.md`. Its `## Team conventions` section distinguishes written rules from patterns inferred from repeated examples, cites paths or commits, and calls out thin evidence. The resulting context is derived advice beneath tracked team guidance. The `skills` profile has no `onboard` or state folder.
+
+The workflow profile ships no `.claude/instructions/` folder. `SIDECAR_WORKFLOW_PATH_REPLACEMENTS` in `scripts/generate_targets.py` handles the pointers it lists: it rewrites the workspace and workflow policy paths to the profile's own rule file, and it deletes the one `hydra-config` sentence that points to `config-first-design.instructions.md`. It removes no other pointer. Instead, the target validator's forbidden-token check fails a workflow tree that still names `.claude/instructions/`, so a new pointer needs its own entry in that list.
 
 The sidecar also keeps six things in the Git directory, where they can never be tracked:
 
@@ -333,6 +339,7 @@ Every run ends by printing `preserved copies are in <folder>; the sidecar never 
 ## Representative tests
 
 - `tests/test_sidecar_overlay.py` covers the planner: every classification row, team precedence as a property test with real `adopt` and `unchanged` fixtures, preserve and conflicts, block parsing, manifest validation, escaping against real `git check-ignore`, and plan-apply-plan idempotency.
+- A team skill folder that carries the full install's `.project-skill` marker gets no special treatment: the sidecar never touches team skills, and nothing is mirrored. `test_project_skill_marker_in_a_team_skill_changes_nothing_in_sidecar_mode` in `tests/test_sidecar_install.py` and `test_project_skill_marker_on_a_modified_sidecar_skill_gets_the_unmarked_outcome` in `tests/test_sidecar_update.py` pin that.
 - `tests/test_sidecar_install.py` covers preflight aborts, index-based ownership (sparse checkout, `skip-worktree`, gitlinks, deleted tracked files), repository boundaries at skill folders, incomplete units (pipes, sockets, empty subfolders, inner symlinks, a plain file), symlinked read folders, aliases, and case variants, frontmatter names, the gate (directory-only rules, symlink units, unfinished units, fatal Git errors), line splitting, non-UTF-8 names, dry-run, fault recovery, and reruns.
 - `tests/test_sidecar_update.py` covers upgrades and mixed full and sidecar batches.
 - `tests/test_sidecar_uninstall.py` covers uninstall, dropped skills and retired units, preserve conflicts with the gate, team rules that never block, crash convergence, and refusals.

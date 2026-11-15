@@ -11,6 +11,7 @@
     "--cap-add=SYS_ADMIN",
     "--security-opt=seccomp=unconfined"
   ],
+  "initializeCommand": ["mkdir", "-p", "${localEnv:HOME}/.openwiki", "${localEnv:HOME}/.cache/huggingface"],
   "mounts": [
     "source=${localEnv:HOME}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.openwiki,target=/home/vscode/.openwiki,type=bind,consistency=cached"

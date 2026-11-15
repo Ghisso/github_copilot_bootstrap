@@ -13,15 +13,15 @@ and an already-installed dependency before writing new code.
 
 Then read any task-matched skill actually shipped in this profile:
 `hydra-config` for a configuration or dataclass change, `gradio-streamlit`
-for a Gradio or Streamlit interface, `csv-driven-integration-tests` or
-`data-analysis` for a data-handling task, `text-to-sql-safety` for
-generated SQL, or another shipped skill whose description matches the
-task: `add-dependency`, `caveman`, `caveman-compress`, `concept-to-image`,
-`debug-investigator`, `devils-advocate`, `draw-io`, `html-presentation`,
-`humanize`, `literature-review`, `md-to-pdf`, `onboard`, `pdf`,
-`pipeline-patterns`, `ponytail-review`, `prompt-lab`, `rag-auditor`,
-`research-critique`, or `review-api`. If a plan named a required skill,
-load it regardless of the above.
+for a Gradio or Streamlit interface, `haystack` for a Haystack pipeline,
+`data-and-graph-pitfalls` or `data-analysis` for a data-handling task,
+`text-to-sql-safety` for generated SQL, or another shipped skill whose
+description matches the task: `add-dependency`, `caveman`,
+`concept-to-image`, `debug-investigator`, `devils-advocate`, `draw-io`,
+`html-presentation`, `humanize`, `literature-review`, `md-to-pdf`,
+`onboard`, `ponytail-review`, `prompt-lab`, `rag-auditor`, or
+`research-critique`. If a plan named a required skill, load it regardless
+of the above.
 
 ## Implementing
 

@@ -33,7 +33,68 @@ Never hand-copy `dist/` into place; always regenerate and install.
 ### What a self-refresh removes
 
 Files under `.claude/` that the generated target does not contain are removed as
-obsolete owned files. Consumer state (`MEMORY.md`, `plans`, `explorations`,
+obsolete owned files. The exception is a project skill: a folder under
+`.claude/skills/` that holds `.project-skill` is never removed or overwritten.
+
+Before any write, the refresh refuses, among other cases (the README lists
+the project-skill refusals):
+
+- an `.agents/` tree it cannot prove it generated;
+- an unmarked skill folder it cannot account for: one the new source does not
+  ship and the shipped-before record does not list, or one whose name the new
+  source ships and the shipped-before record does not list. The second
+  refusal applies with or without a record, because the refresh would
+  overwrite the folder;
+- an unsafe write destination. A destination is unsafe when a link sits at
+  any part of the path, when a part above the written path exists and is not a
+  real folder, when a path written as a file is a folder or a special file
+  such as a FIFO, or when a path written as a folder is not a real folder. The
+  check reads each part with `lstat` and never follows a link. It covers the
+  copy step's paths (with the copy's own skips: existing consumer state,
+  preserved tracked adapters, and claimed third-party bundles), the
+  project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
+  workspace instruction files), `.gitignore`,
+  `.claude/bootstrap-ownership.env`, every `.claude/bootstrap-root/` adapter
+  path, and `.devcontainer/devcontainer.json` when a state remote is set,
+  through `--state-remote` or an exported `AI_STATE_REMOTE`. A path at a
+  substitution file or `.gitignore` is checked even when no rewrite would
+  happen, so a symlinked `AGENTS.md -> CLAUDE.md` is refused. The check also
+  runs under `--dry-run`. One refusal lists every problem in two sections:
+  `Refusing to write through symlinks:` (replace each link with a regular
+  file or folder, or remove it) and
+  `Refusing to write over a path of the wrong kind:` (each path with its
+  reason; move or rename it). Kinds that the obsolete-file cleanup once
+  resolved silently are now refused too, for example a regular file at
+  `.claude/templates` or a folder holding an untracked link at `CLAUDE.md`. A
+  bootstrap version that turns a generated file into a folder, or the reverse,
+  makes each refresh refuse until you move the old item by hand.
+
+A second check runs at copy time. Every file copy of a full refresh and every
+folder the copy creates is checked first, and an unsafe destination stops the
+run (`Refusing to write <path>: ...`). That stop can leave a partial refresh.
+When a legacy migration ran (pre-Git `.claude/` content, not a dry run), the
+`.agents` takeover, project-skill, and unsafe-destination checks run again
+before the copy, so a refusal there comes after the migration's own writes. An
+unsafe state-folder README is skipped with a warning, not refused.
+
+These are not checked: the nested state sync's own writes (it may append to
+`.claude/.gitignore` and `.claude/.gitattributes`, and it restores
+`settings.local.json`); Git's own writes (`git config core.hooksPath` in the
+outer repository, and the nested state commit in `.claude/`); hard links;
+whether the macOS quarantine strip
+(`xattr -rc` over whole folders, consumer state included) follows links; and
+reads through links, for example a preserved, tracked root adapter that is a
+link, which the record copy reads into the AI state, which can then be pushed.
+
+The shipped-before record is `.claude/bootstrap-root/.agents/skills`, the copy
+of what the last install shipped. When that copy is missing, the live
+`.agents/skills/` stands in for every check. A legacy consumer with old
+bootstrap skill copies and no record is refused once, and the refusal lists
+each folder. Move every listed folder into one backup folder outside
+`.claude/`, refresh, then copy back the project's own skills and mark them
+with `.project-skill`.
+
+Consumer state (`MEMORY.md`, `plans`, `explorations`,
 `session_logs`, `quality_reports`, `project-context.instructions.md`,
 `settings.local.json`, and the nested `.gitignore` and `.gitattributes`) is
 preserved, as are tracked authoring adapters such as `.codex/config.toml` and
@@ -52,9 +113,10 @@ treated as bootstrap-owned.
 
 A file that exists under `.claude/` but not in the generated target is still
 removed as obsolete. `check_runtime.py` reports such orphans before a refresh
-does anything, so read its output first. An authored skill living only in the
-overlay should be promoted into `shared/skills/` so it regenerates, rather than
-being left to be deleted by the next refresh.
+does anything, so read its output first. In this authoring repository, an authored skill
+living only in the overlay should be promoted into `shared/skills/` so it
+regenerates. In a consumer, mark the folder with `.project-skill` so the next
+refresh keeps it.
 
 ### Expected side effects
 
@@ -91,26 +153,45 @@ regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
-  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
+- `context-mode` (optional filtered `ctx_index`/`ctx_search`/`ctx_stats` MCP server, routed through `context-mode-dispatch.sh` and pinned to `2.1.8`). The kit wires no Context Mode hooks on any client; a hook call from stale wiring reads its input, prints nothing, and exits 0. The filter accepts the server only when `serverInfo.name` is exactly `context-mode`. The 2.x server reports `serverInfo.version` as `"dev"`, so the version is never proved over the wire. The dispatcher alone proves it: for a direct `context-mode` executable it resolves the file and reads the owning package manifest's `name`/`version` before running it; for the `npx` route it pins the version in the command (`npx -y context-mode@2.1.8`). A binary that is not provably exactly `2.1.8`, including one whose version cannot be determined, is never executed; the pinned `npx` fallback is used instead when available, and otherwise the server warns and exits nonzero. The 2.x binary has a working `context-mode --version`, and the Dockerfile checks it. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, a `version-contract` result, and `required-node`/`observed-node`.
+  - **Node.js floor.** Context Mode 2.x needs Node.js 24.15.0 or newer (`engines.node`). In server mode and `--self-check`, the dispatcher reads `node --version`. Server mode exits 1 with one error line when Node.js is older; `--self-check` warns. Legacy hook calls run no Node.js check. The devcontainer image is `node:24.22.3-bookworm-slim`.
+  - **One server identity.** Every client starts `context-mode server --agent codex` (or `npx -y context-mode@2.1.8 server --agent codex`) through the filter. The dispatcher changes to the outer repository root first, and sets no `CLAUDE_PROJECT_DIR` and no `--workspace-folder`. Under `--agent codex` the server keys its project to the working folder's Git repository, so a server started inside the nested `.claude` repository would use a separate project. Starting from the root also lets the server and the filter resolve a relative `ctx_index` path from the same folder.
+  - **Storage.** The dispatcher exports `CONTEXT_MODE_DATA_DIR` as the guarded root `.claude/.cache/context-mode/`, overwriting any inherited value. 2.x ignores `CONTEXT_MODE_DIR`; the dispatcher still reads it as the kit's own override, subject to the same guard. Everything the three tools write is under that root (spike S4 saw no network calls and no writes elsewhere).
+  - **Adapters and override guard.** The root adapters (`.mcp.json`, `.vscode/mcp.json`, and `.codex/config.toml`) start the server only through the guarded dispatcher, and `validate_targets.py` checks each adapter's `context-mode` entry. The dispatcher exports the absolute project-local cache root `<repo>/.claude/.cache/context-mode` by default. An override that resolves anywhere else, inside or outside the repository, is ignored with a warning and the project-local cache is used. The cache is derived local state: never commit, sync, restore, or cite it as lifecycle evidence.
+  - **Older caches.** A cache the dispatcher did not produce for this exact pin is moved aside as `<cache>.untrusted.<timestamp>.<pid>`, never migrated and never deleted. Provenance includes the exact version, so every pin bump starts with an empty cache, and the 1.x cache is not imported. The moved folders use disk space; delete them by hand when you no longer need them.
+  - **Lost race.** Two servers that start together may both try to move the old cache. When the move fails and the cache folder no longer exists, the dispatcher treats the other server as the winner, warns once, and continues with a fresh root. When the folder still exists, the move fails as before and the server exits nonzero.
 
-  1. Run `uv run python tests/fixtures/context_mode_hook/capture.py [--out-root DIR]`. It records raw upstream output, not filtered output, by running the pinned `context-mode hook <target> <event>` directly with the `CONTEXT_MODE_DIR` and `CONTEXT_MODE_PROJECT_ROOT` the dispatcher passes, in a temporary Git repository with a temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and a private `TMPDIR` (upstream keeps once-per-session tip files in the OS temp directory). It copies the hook scripts there only to run `--self-check` first, which asserts the direct pinned launcher. It reads the pinned version and client-to-target mapping from `shared/hooks/scripts/context-mode-dispatch.sh`, so run it in this authoring repository. It uses one session id per client, redacts temporary paths as `<TMP>`, and writes `<out-root>/<PINNED_CONTEXT_MODE_VERSION>/<client-id>/<event>-<case>.json` (default out-root: the fixture directory).
-  2. Review the new outputs for decisions, input rewrites, and advice blocks. Update the filter if a new shape appears.
-  3. Run the hook tests, including the real-binary test:
+  The client sees only `protocolVersion`, `capabilities.tools`, and `serverInfo` from `initialize`, with short kit tool descriptions. The filter answers `server/discover`, the probe of the 2026-07-28 MCP revision, itself with `-32601` and never forwards it, so a client that speaks both revisions falls back to `initialize` and never receives the upstream `instructions` that the probe's answer would carry. `ctx_index` accepts raw text (`content`) or one regular file inside the repository; it rejects folders, links, and URLs.
 
-  ```bash
-  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
-  ```
+  To bump `PINNED_CONTEXT_MODE_VERSION`:
+
+  1. Install the candidate into a private prefix: `npm install -g --prefix "$HOME/.cache/context-mode-pin" --ignore-scripts "context-mode@<candidate>"`.
+  2. Set `PINNED_CONTEXT_MODE_VERSION` in `shared/hooks/scripts/context-mode-dispatch.sh` to the candidate. The real-binary test in the next step runs the dispatcher, which accepts a direct binary only when its version equals the pin and never falls back to `npx` there.
+  3. Run the real-binary server test with the private prefix first on `PATH`:
+
+     ```bash
+     PATH="$HOME/.cache/context-mode-pin/bin:$PATH" CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_mcp_filter.py -q -k real_upstream
+     ```
+
+  4. Compare the candidate's `tools/list` (schemas and property descriptions) with the kit descriptions and `INDEX_ARGS` in the filter.
+  5. Run the two slim-image checks: the Node.js engine check on the Dockerfile's `FROM` image, and `npm install -g --ignore-scripts context-mode@<candidate>` followed by `context-mode --version` in that image.
+  6. Optionally build the full devcontainer image.
+  7. Bump the pin in the Dockerfile and `CONTEXT_MODE_PINNED_VERSION` in the validator to match the dispatcher, then update every doc that names the pin, found with `rg -F '<old pin>'`.
 
   Known limits:
 
-  - A restored-data block that mentions any non-allowlisted `ctx_` name is dropped whole (fail-closed).
-  - Unclosed, nested, or differently cased advice tags are not stripped. For such text only the name safety net applies: the whole field is dropped if it still names a plugin-prefixed or non-allowlisted `ctx_` tool, otherwise the leftover text is forwarded.
-  - The event name must be a plain word (letters only), or nothing is forwarded.
-  - Codex and Copilot restore shapes were not observed.
+  - Tool-result text can name another client's tool prefix, because one identity serves every client and the filter does not rewrite results. The routing policy names the real tools.
+  - Upstream 2.x folder indexing has no bound on files, depth, or size, follows symbolic links inside the repository's parent folder, and ignores a `.gitignore` above the folder. That is why the filter accepts only content or one regular file.
   - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
-  - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - Antigravity gets no Context Mode server entry, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - The filter speaks only the `initialize`-based MCP revisions (2025-11-25 and earlier). A client that speaks both revisions falls back to them; a client that only speaks 2026-07-28 gets no Context Mode tools.
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
+
+  Rollback: reverting the merge brings back the previous pin.
+  Its dispatcher moves the 2.x cache aside on the first run, but it does not restore the older cache.
+  To get the old index back, do this by hand before that first run:
+  move the current `.claude/.cache/context-mode` folder out of the way (a fresh one exists after 2.x started),
+  then rename the `.untrusted.*` folder that holds the 1.x index (moved aside when 2.x first started) to `context-mode`.
 - `openwiki` (the OpenWiki command-line tool and MCP server, installed globally and pinned in `shared/devcontainer/Dockerfile`; `OPENWIKI_PINNED_VERSION` in `scripts/validate_targets.py` names the same version). OpenWiki has no `openwiki --version`, so the Dockerfile reads the version from the installed package's own `package.json`, then runs `openwiki integrations list </dev/null`. `tests/test_openwiki_cli_smoke.py` requires the binary on `PATH` to report exactly the pinned version. It fails when the version differs or the binary is missing, and it never downloads anything. To move to a new pin:
 
   1. Diff the contents of `npm pack openwiki@<old>` and `npm pack openwiki@<new>`, and read the release notes between them. Look for changes to the tool names, `openwiki_begin`'s input, the managed-block markers, which paths a begin call writes, and the host integrations.
@@ -205,7 +286,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `openwiki-guard.sh`
 - `pretool-bash-guard.sh`
 - `git-protection.sh`
-- `context-mode-dispatch.sh`
+- `context-mode-dispatch.sh` (MCP server mode only)
 - `session-log.sh`
 - `state-sync.sh`
 - `claude-stop.sh`
@@ -243,10 +324,11 @@ every-N-tool reminders, `Stop` rewriting, or
 Gemini CLI is out of scope.
 
 For the primary targets, generated `PreToolUse` routing must remain split into
-three groups: native file mutations (`Edit|Write` for both Claude and Codex)
-call `protect-files.sh`; `Bash` calls the single ordered
-`pretool-bash-guard.sh`; and `*` calls only best-effort
-`context-mode-dispatch.sh`. `Read` and MCP tools must have no mutation handler.
+groups: native file mutations (`Edit|Write` for both Claude and Codex)
+call `protect-files.sh`, and `Bash` calls the single ordered
+`pretool-bash-guard.sh`. No group runs `context-mode-dispatch.sh`; the
+validator rejects any hook handler that does. `Read` and MCP tools must have
+no mutation handler.
 The Bash wrapper must preserve the guard order: protected files, dangerous Git,
 branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
 outside that lane and retain their existing sequencing.
@@ -499,7 +581,47 @@ separate file and stays tracked and union-merged like every other
 - `could not restore ... its bytes are kept at <path>`: copy the bytes back yourself.
 - `settings.local.json was written while state sync ran; kept the newer file. The copy taken before sync is kept at <path>.`: compare the two files and delete the copy when you no longer need it.
 
-If a sync is killed (for example by the hook timeout), the copy can be left under `.claude/.git/`. Copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
+A run stopped by `INT`, `TERM`, or `HUP` puts the copy back itself. If a rebase or merge is unfinished, it keeps the copy and names it in a warning. A run ended any other way (for example `SIGKILL`, `SIGQUIT`, or a power loss), or by a signal that lands while the copy is being put back, can still leave the copy under `.claude/.git/`. In that case, copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
+
+State sync never commits while a rebase or merge is unfinished in `.claude`, or
+while `git ls-files -u` lists unmerged paths (for example a conflicted
+cherry-pick, revert, or `stash pop`). It warns `... not committing over it.
+Inspect with: git -C <.claude> status.` A rebase or merge already in progress
+when a mutating mode starts is left alone: the mode exits 0, changes nothing,
+and logs one warning to `.claude/session_logs/hooks-errors.log`. The one
+exception is the orphaned autostash leftover (a `rebase-merge` folder that holds
+only an `autostash` file), which state sync clears with `rebase --quit` before
+it continues. The warning advises `rebase --continue` or `rebase --abort`, or
+`merge --continue` after fixing conflicts or `merge --abort`. If state sync's
+own pull conflicts and `rebase --abort` fails, it does not fall back to
+`rebase --quit`. It leaves the rebase in place and does not write
+`settings.local.json` back. The warning names the copy kept under
+`.claude/.git/`; copy it back after you resolve the rebase. The
+unrelated-history merge behaves the same when a started merge cannot be
+aborted, and `setup` then stops before restoring root adapters or committing.
+Before merging an unrelated `origin/ai-state` history, state sync commits local
+changes first. `status` prints `merge: none` or `merge: in-progress` right
+after the `rebase:` line, then `lock: free`, `lock: held`, or
+`lock: unavailable`. A `lock: held` that stays while no sync is running means a
+stuck process holds the lock, for example a Git call over SSH, which has no
+stall limit. Every sync skips until it ends. Find it with `lsof <repository
+root>` and end it.
+
+Only one mutating state-sync run works on a checkout at a time. It takes an
+exclusive `flock` on the repository root folder. There is no lock file, and the
+system releases the lock when the holder ends. A run that finds the lock busy
+prints a notice on stderr and skips; the next sync catches up. `setup` and
+`migrate-from-hf`, which no hook calls, wait up to 60 seconds, then log a
+warning and skip; run them again later. `status` never waits. Where `flock` is
+missing (stock macOS), sync runs unlocked. The lock covers state-sync runs only:
+direct `git -C .claude` commands by people or agents do not take it.
+
+State sync also exports `GIT_TERMINAL_PROMPT=0`, so Git never waits for a typed
+password. Stored credentials and credential helpers still work, including in
+the manual **AI state: push** task. It defaults `GIT_HTTP_LOW_SPEED_LIMIT` to
+`1000` and `GIT_HTTP_LOW_SPEED_TIME` to `60`: an HTTPS transfer slower than
+1,000 bytes per second for 60 seconds is cancelled. Values you already set for
+those two variables win. SSH remotes are not covered.
 
 For generated Codex and Claude hooks, verify one runtime-specific Stop wrapper
 runs sequentially for each turn: session log, session-log check, `checkpoint`,
@@ -511,8 +633,8 @@ local `checkpoint`, while Claude `SessionEnd` invokes `push` with timeout `60`.
 No lifecycle event may split checkpoint and publication into concurrent handlers.
 Timeout or network failure must preserve the local commit for a later retry;
 use `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` to
-inspect recovery state. Post-commit and the manual VS Code **AI state: push**
-task remain the durable checkpoint-and-publish paths.
+inspect recovery state (including the `lock:` line). Post-commit and the manual
+VS Code **AI state: push** task remain the durable checkpoint-and-publish paths.
 
 An install or update can change `.codex/hooks.json`, whose Codex for VS Code
 project trust is content/hash-bound. Verify the installer and batch updater
@@ -522,7 +644,7 @@ without claiming that it changed hooks. If sync is not progressing after you
 approve updated hooks, run `state-sync.sh status` and inspect
 `.claude/session_logs/hooks-errors.log`.
 
-Findings reports must be written as `.claude/quality_reports/findings-<phase>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records the exact phase-receipt and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; every bound report must be `dirty: false` (no unstaged changes) and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
+Findings reports must be written as `.claude/quality_reports/findings-<phase>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records the exact phase-receipt and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. A plan's leading phases whose slug and closeout log are both dated before 2026-08-29 may have no closeout receipt, because receipts did not exist yet; see the historical receipt-chain paragraphs below. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; every bound report must be `dirty: false` (no unstaged changes) and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
 
 Phase and closeout receipts also bind the governing nested control plane. Their
 `control_plane_provenance` records the nested `.claude` HEAD, relevant nested
@@ -540,9 +662,11 @@ The relevant nested tracked/dirty state that provenance binds to is not
 informational the way the nested HEAD is, and its ordering is exact in both
 directions.
 
-Checkpoint nested plan state once every plan, log, and memory edit is
-final and before
-`verify.py phase --persist`/`closeout --persist`. `control_plane_provenance`
+The order of the two nested checkpoints and the receipts is CLOSEOUT steps 3
+to 6 in `.claude/instructions/closeout.instructions.md`; this section explains
+why. Checkpoint nested plan state once every plan and memory edit is final and
+before `verify.py phase --persist`, then again once the session log is final
+and before `closeout --persist`. `control_plane_provenance`
 records `big_plan_digest` from the big plan's working-tree bytes, while the two
 predicates that authorize a terminal push
 (`has_only_terminal_big_plan_change`, `has_only_checkpointed_terminal_big_plan_change`)
@@ -557,8 +681,8 @@ condition before writing anything, and names the checkpoint command.
 `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the canonical operation, used by the
 editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies running it from an agent's Bash tool (any command outside the guard's read-only list that names a `.claude/hooks/` path); the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
 
-Never checkpoint or publish nested state *after* the receipts are persisted.
-That changes what they are bound to and fails the next commit closed with
+Never checkpoint or publish nested state between the closeout receipt (step 6)
+and the commit (step 7). That changes what the receipts are bound to and fails the next commit closed with
 `closeout receipt governing control-plane provenance is stale`. Findings and
 receipt files are not provenance-bound paths, so writing them after the
 checkpoint is expected. Leave nested publication itself to the native
@@ -678,7 +802,8 @@ exists. The commit gate passes a phase only when `gate_result` is `PASS` with
 no open request. The gates also require review profiles by changed path (test
 surfaces need `tests`; control-plane, generator, and dependency-file paths need
 `code`, `architecture`, `security`, `tests`, and `ponytail`), computed from the
-closeout receipt's `changed_paths`, cumulative from the merge-base. See
+closeout receipt's `changed_paths`, cumulative from the merge-base. See the
+Review Profiles section of `shared/policies/workspace.instructions.md` and
 `shared/policies/quality-and-testing.instructions.md`.
 
 When routing selects the `ponytail` profile, `record_findings.py --profile
@@ -701,13 +826,13 @@ of this changes what a gate checks, only what an operator should expect.
 | Gate | Effect on a refreshed consumer | Recovery |
 | --- | --- | --- |
 | Plan-frontmatter validation (`.claude/scripts/validate_plan_frontmatter.py`) runs at commit time | An existing plan with an invalid `status` blocks the next commit | Fix the plan's `status`. Valid small-plan values: `planned`, `in-progress`, `paused`, `complete`, `cancelled`. Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled` |
-| A big plan's `phases:` list may carry at most one unfinished dedicated final knowledge-refresh phase, and it must be last; an earlier knowledge-refresh phase is exempt once it has settled its identity — the big plan's own `name` is non-empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, whose frontmatter declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`; a plan that has any knowledge-refresh phase must still end with one | `at most one knowledge-refresh phase is allowed` blocks validation when two or more phases end in `-knowledge-refresh` and are not settled; `the knowledge-refresh phase must be the last phase in phases` blocks validation when an unsettled knowledge-refresh phase is not the last entry, or when every knowledge-refresh phase is settled but the plan's last phase does not itself end in `-knowledge-refresh` | Remove the duplicate `-knowledge-refresh` phase, or move the remaining one to the end of `phases:`. To reopen a completed big plan, append one new `-knowledge-refresh` phase at the end of `phases:` (see "Reopening a completed big plan" in `shared/policies/workflow.instructions.md`) |
+| A big plan's `phases:` list may carry at most one unfinished dedicated final knowledge-refresh phase, and it must be last; an earlier knowledge-refresh phase is exempt once it has settled its identity — the big plan's own `name` is non-empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, whose frontmatter declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`; a plan that has any knowledge-refresh phase must still end with one | `at most one knowledge-refresh phase is allowed` blocks validation when two or more phases end in `-knowledge-refresh` and are not settled; `the knowledge-refresh phase must be the last phase in phases` blocks validation when an unsettled knowledge-refresh phase is not the last entry, or when every knowledge-refresh phase is settled but the plan's last phase does not itself end in `-knowledge-refresh` | Remove the duplicate `-knowledge-refresh` phase, or move the remaining one to the end of `phases:`. To reopen a completed big plan, append one new `-knowledge-refresh` phase at the end of `phases:` (see "Reopening a completed big plan" in `shared/policies/plan-lifecycle.instructions.md`) |
 | A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
 | `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
 | `gate_result` and path-based review profiles (`record_findings.py`, commit gate; push gates only for `schema_version >= 2` reports) | The phase-completion commit blocks unless the findings report has `gate_result: PASS` and no open request. It also blocks when the report lacks a profile the changed paths require: `tests` for test files; `code`, `architecture`, `security`, `tests`, and `ponytail` for control-plane, generator, and dependency paths | Re-record with `record_findings.py ... --gate-result PASS\|WARN\|FAIL`, resolving or listing each open request (`PASS` is refused while one is open). If a required profile is missing, run a new review with the missing profiles; a re-record cannot add them |
 | An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
 | `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
-| `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |
+| `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh overwrites these four files, even a hand-edited one, unless the README path or its folder is a link or the wrong kind; then it skips that README with a warning | None needed — treat them as generated, not editable |
 | Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks implementation-branch creation (the big plan and its listed phases) and the next commit when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
 | `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
 | Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
@@ -806,7 +931,22 @@ artifact hash against the current file bytes. Only the terminal completed
 phase receives current-tree/current-runtime freshness checks; every earlier
 phase gets this ancestor/tree/artifact-hash chain instead.
 
-The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested.
+Closeout receipts exist only since commit `b3c6bec` (2026-08-29), so a plan
+that began earlier would otherwise never be able to commit again. The walk
+therefore skips a plan's leading run of earlier phases, and only that run. A
+phase is in the run when it is cancelled, or when all of these hold: it is
+complete, its slug is dated before 2026-08-29 (`RECEIPT_CHAIN_SINCE` in
+`verify.py`), its `closeout_session_log` file name is dated before 2026-08-29,
+and nothing exists at its closeout receipt path. The run ends at the first
+phase that does not qualify. Every phase after that point is checked in full,
+so deleting a receipt cannot exempt a phase listed after it. A receipt file on
+disk is always validated, so a malformed or tampered one still fails, and an
+undated or later-dated phase is always checked. The closeout log's date is
+required because slug dates are planning dates, not completion dates. The user
+approved this on 2026-10-23 as a narrow reversal of the 2026-09-02 rule
+(commit `8ed2c9e`) that a phase predating receipts gets no implicit pass.
+
+The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested. When the native post-commit hook completes the final big-plan transition, a normal push uses that terminal receipt path and needs no manual receipt refresh; the inactive-plan diagnostic's `--phase <slug>` command is optional recovery advice only.
 
 **Closed session logs are immutable.** Because a closeout log's bytes are
 hashed into its phase's receipt, editing a log after its phase closes breaks
@@ -843,9 +983,9 @@ Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit
 
 Generated output includes `.devcontainer/`:
 
-- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
+- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container. Its list-form `initializeCommand` (`mkdir -p`, no shell) creates the two bind-mount sources, `~/.openwiki` and `~/.cache/huggingface`, on the host as the host user before the container starts, because Docker's `--mount` refuses a missing source folder.
 - `Dockerfile` installs Python, uv, git, sudo, `context-mode`, `openwiki`, `mermaid`, `jsdom`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
-- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere) and `state-sync.sh pull`. `setup` configures `core.hooksPath` to `.claude/hooks/git-hooks` itself, inside `restore_root_adapters`, immediately after the checkout populates the hook directory, so the commit-msg gate is wired the instant `.claude/hooks/git-hooks/` exists; `post-start.sh` carries no separate `core.hooksPath` step of its own. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere) and `state-sync.sh pull`. `setup` configures `core.hooksPath` to `.claude/hooks/git-hooks` itself, inside `restore_root_adapters`, immediately after the checkout populates the hook directory, so the commit-msg gate is wired the instant `.claude/hooks/git-hooks/` exists; `post-start.sh` carries no separate `core.hooksPath` step of its own. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs. The restorer exits 0 when there is nothing to restore, and refuses (exit 1) a symlinked `.claude` or `.claude/bootstrap-root`, which `state-sync.sh` logs as `restoring root adapters failed; continuing.`
 
 There is **no separate credential to configure** — by default the nested `.claude/`
 repo's remote is the outer repo's own `origin`, so it authenticates the same way the
@@ -871,9 +1011,8 @@ Codex-specific runtime notes:
 - `.codex/config.toml` leaves the interactive session model and reasoning effort unpinned; generated custom agents carry their explicit model intent.
 - `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
 - `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
-- `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
-- `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
-- `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
+- `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`). Codex lists repository skills from `.agents/skills/`; these entries add no skill of their own (2026-11-13 client spike, codex-cli 0.147.0).
+- `.codex/hooks.json` uses the narrow native-edit and ordered-Bash matcher groups; it must not send every tool through the mutation guard.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define
   `name`, `description`, `model`, `model_reasoning_effort`, and
   `developer_instructions`; model and effort must match canonical `agent.yaml`
@@ -899,11 +1038,11 @@ Codex-specific runtime notes:
   implementation-attributable Terra failure advances automatically to Sol.
   Environment and baseline failures stop escalation; indeterminate evidence
   returns to orchestrator judgment.
-- `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
+- `.claude/skills/*/SKILL.md` stores the shared skills. Claude Code reads them there; Codex reads the generated copy in `.agents/skills/`, and Copilot lists one copy per name, preferring the `.agents/skills/` copy.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
-- Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.
+- Codex project trust is required before `.codex/config.toml` and hooks are loaded. Repository skills in `.agents/skills/` are listed with or without trust (2026-11-13 client spike).
 - Because Codex `PreToolUse` cannot request approval, hook-config mutations are denied instead of downgraded to an approval prompt. Claude asks for approval. Both allow a read-only inspection of a protected configuration when the command classifier can prove it has no mutation target; redirects, in-place edits, and ambiguous commands fail closed.
 
 The generated consumer `.codex/config.toml` is carried in

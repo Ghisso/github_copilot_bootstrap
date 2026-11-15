@@ -5,7 +5,7 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-22T17:57:02.699Z
+    at: 2026-11-14T16:56:38.985Z
 sources:
   - id: openwiki-source-5939cd6c98209174dac35ee6
     resource: repo://docs/2026-10-06-behavioral-pilot-evidence.md
@@ -15,8 +15,14 @@ sources:
     resource: repo://docs/native-client-acceptance.md
   - id: openwiki-source-7aaa88e66a4141ea24c14706
     resource: repo://docs/target-mapping.md
+  - id: openwiki-source-23775c3de52f3ab95a13cb8b
+    resource: repo://README.md
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
+  - id: openwiki-source-7c162969a98fb2f3fa853ffc
+    resource: repo://scripts/install_bootstrap.py
+  - id: openwiki-source-cae9260f89e696dbf3ed5310
+    resource: repo://scripts/runtime_ownership.py
   - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-ec8523003261d0fba9ffc89a
@@ -63,8 +69,16 @@ sources:
     resource: repo://shared/scripts/verify.py
   - id: openwiki-source-1c38db574c5e411bfd8c36ea
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
+  - id: openwiki-source-fbd2cebdf3c12be4e39b6fb6
+    resource: repo://shared/skills/bentoml-service/SKILL.md
+  - id: openwiki-source-c834b25968d66b61717e651d
+    resource: repo://shared/skills/data-and-graph-pitfalls/SKILL.md
   - id: openwiki-source-a931d0171c8876319a735abf
     resource: repo://shared/skills/debug-investigator/SKILL.md
+  - id: openwiki-source-20871c154858048e2b4d9a58
+    resource: repo://shared/skills/haystack/SKILL.md
+  - id: openwiki-source-6916750d758b2f1be338c93a
+    resource: repo://shared/skills/hydra-config/SKILL.md
   - id: openwiki-source-ba0e2920665785c3ef2e2f6f
     resource: repo://shared/skills/ponytail-review/SKILL.md
   - id: openwiki-source-2c0f61425eb3886a50c8779c
@@ -75,7 +89,7 @@ sources:
     resource: repo://shared/third_party/ponytail/UPSTREAM.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "codex", at: "2026-10-22T17:57:02.699Z" }
+generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -179,7 +193,7 @@ The approved plan or spec, its non-goals, and its approved scope-change records 
 
 - **Orchestrator.** Every delegation packet carries the approved requirements, non-goals, and scope-change records. The reviewer packet also carries the verification results already obtained, such as the coder's rerun of the original reproduction.
 - **Reviewer.** Pass 1 checks that every in-scope behavior has an implementation and evidence, and that nothing unapproved was added. An approved scope change replaces the requirement it changes, and a valid alternative implementation is not a deviation. Missing material behavior is an ordinary finding at the existing severity; the reviewer never invents a requirement.
-- **Reading outside the diff.** The reviewer reads the code the change touches, not only the diff. That covers the callers of every changed function, signature, or return value. It also covers the tests and fixtures that exercise it, and the config or exports that name it. A caller, test, fixture, or config entry outside the diff that the change breaks or leaves stale is an ordinary finding. The coder prompt and the workspace Ponytail rule ask for the same scope before the first edit. They say to map every place the change must reach: callers, tests, fixtures, and config.
+- **Reading outside the diff.** The reviewer reads the code the change touches, not only the diff. That covers the callers of every changed function, signature, or return value. It also covers the tests and fixtures that exercise it, and the config or exports that name it. A caller, test, fixture, or config entry outside the diff that the change breaks or leaves stale is an ordinary finding. The coder prompt and the `ponytail` skill's `## Before you write` step ask for the same scope before the first edit. They say to map every place the change must reach: callers, tests, fixtures, and config.
 - **Open requests.** The reviewer cannot pause to ask a question. It lists missing requirements or execution evidence under an optional `### Open Requests` section and answers `WARN` instead of `PASS`. The orchestrator answers each request with the result or the plain reason it cannot be produced, then reruns the review; a request answered with a reason closes as an unverified limitation. Open requests never enter the findings JSON, and an empty `[]` means a clean review only when no request is open.
 - **Gate result.** The reviewer ends with `FAIL` when a CRITICAL or MAJOR finding survives, `WARN` when a request is open, and otherwise `PASS`. The orchestrator records that value with `record_findings.py --gate-result` and each open request with `--open-request`. The commit gate refuses a phase-completion commit unless the recorded result is `PASS` with no open request.
 - **Planner.** In full-plan mode, Phase 1 lists each decisive assumption (one that would invalidate the design if false) and settles it from code, docs, or a bounded experiment before phases are split. An experiment never authorizes production changes, and an unresolved assumption stays explicit or blocked. Phase 2 asks the user only about preferences, and Phase 4 cites the existing contracts and the test strategy.
@@ -191,13 +205,27 @@ The [2026-10-06 behavioral pilot](../../docs/2026-10-06-behavioral-pilot-evidenc
 
 ## The skill library
 
-Skills live under `shared/skills/<name>/SKILL.md`. At the time of writing there are 55: 40 with `visibility: public` and 15 with `visibility: background`.
+Skills live under `shared/skills/<name>/SKILL.md`. There are 37: 34 with `visibility: public` and 3 with `visibility: background`.
+
+The set shrank from 55 to 37 in November 2026:
+
+- four Haystack skills merged into `haystack`, and four data and graph skills merged into `data-and-graph-pitfalls`; each old body moved into a `references/` file that the merged `SKILL.md` names, with its frontmatter removed and, for the CSV pair, its internal links renamed;
+- `deploy-service` became the `## Deploy` section of `bentoml-service`;
+- the context-manager and test-helper lessons became rules in the tests policy;
+- nine other skills were removed;
+- `code-style` and `testing-patterns` are now short pointers that read their policy and then run the fast verifier.
 
 The sidecar workflow `onboard` text lives separately under `shared/sidecar/workflow/skills/onboard/`. The generator selects it only for the workflow profile, so the full-install skill keeps its own state and lifecycle instructions.
 
-- Public skills are invoked by name.
-- Background skills are loaded by matching their `description`, which is why two skills may not share a description.
+- Both visibility values are listed to the model with their descriptions. `visibility` marks only the intended use: `public` for direct or slash-menu use, `background` for loading by description match or from agents.
+- Two skills may not share a description, because description-match loading could not tell them apart.
 - `shared/templates/skill-template.md` is the starting shape: `name`, `visibility`, `description`, an optional `argument-hint`, then Problem, Trigger Conditions, and Solution sections. Its path guidance distinguishes authoring under `shared/skills/` from installed skills under `.claude/skills/`.
+
+Each skill's listing text, its `description` plus any `when_to_use`, is at most 300 characters, with the trigger words a user would say first. Claude Code lists every skill's text on each turn and cuts descriptions past a budget, and Codex shortens long descriptions as its list grows. `skill_listing_length` in `scripts/validate_targets.py` is the one length definition, and `shared_skill_integrity_errors` reports `SKILL_DESCRIPTION_TOO_LONG` for any skill over the cap. Only the folders `ponytail` and `ponytail-review` are exempt, because their text is hash-pinned to upstream. So the length can be measured, `description` and `when_to_use` must be a one-line plain or quoted value or a `|`, `>`, `|-`, or `>-` block; `listing_scalar_form_error` rejects any other block header, or a value continued on the following lines, as `SKILL_FRONTMATTER_INVALID`.
+
+Agents load few skills on every task. The coder's always-load tier is `ponytail` only. It reads `.claude/instructions/tests.instructions.md` when a task adds or changes a test file or fixes a bug (a bug fix needs a regression test), and `.claude/instructions/code-standards.instructions.md` when it edits Python source. Claude Code loads both policies through `.claude/rules/`; Codex has no path-scoped rules, so the explicit reads are its route. The coder loads a domain skill such as `haystack` by task type. The planner reads `plan-decomposition` only in `--mode full-plan`; a micro-plan reads the two plan templates instead. The `loading_rules` tests in `tests/test_validate_targets.py` pin these rules, including a negative control that drops the full-plan condition.
+
+A consumer project can keep skills it writes itself. A `.claude/skills/<name>/` folder that holds an empty `.project-skill` file belongs to the project: a refresh keeps it and mirrors it to `.agents/skills/<name>/`. The [install ownership page](../operations/install-ownership-and-runtime-checks.md) covers the marker and the installer's refusals.
 
 Two skills are special:
 
@@ -210,8 +238,8 @@ Two skills are special:
 ### How skills reach each host
 
 - Claude Code: `copy_skills` copies `shared/skills/` into `.claude/skills/` and rewrites target paths inside `.md`, `.py`, and `.sh` files.
-- Codex: `.codex/config.toml` gains one `[[skills.config]]` entry per skill, each pointing at `../.claude/skills/<name>/SKILL.md`.
-- Antigravity: a plain copy of the tree under `.agents/skills/`.
+- Codex: Codex lists repository skills from `.agents/skills/`. `.codex/config.toml` still carries one `[[skills.config]]` entry per skill, each pointing at `../.claude/skills/<name>/SKILL.md`, but a 2026-11-13 probe with codex-cli 0.147.0 showed those entries add no skill of their own; the comment in `render_codex_config` records this. Codex has no path-scoped rules, so `CODEX_POLICY_SKILL_FALLBACKS` maps each path-scoped policy to the skill that carries it (for example `deployment.instructions.md` to `bentoml-service`). The validator requires each fallback skill's `SKILL.md` to name its mapped policy file (`codex_fallback_skill_errors`), so `hydra-config` opens by pointing to `config-first-design.instructions.md`.
+- Antigravity: a plain copy of the tree under `.agents/skills/`. Copilot reads the same folders and lists one copy per name.
 
 There is one library, rendered three ways.
 
@@ -220,15 +248,18 @@ There is one library, rendered three ways.
 `shared_skill_integrity_errors` in `scripts/validate_targets.py` treats these as hard failures:
 
 - every skill directory has a root `SKILL.md` (`SKILL_MISSING_ROOT`);
-- frontmatter is flat YAML with matched `---` delimiters, no tabs, and no duplicate keys (`SKILL_FRONTMATTER_INVALID`);
+- frontmatter is flat YAML with matched `---` delimiters, no tabs, no duplicate keys, and a measurable form for `description` and `when_to_use` (`SKILL_FRONTMATTER_INVALID`);
 - frontmatter `name` equals the directory name (`SKILL_NAME_MISMATCH`);
 - `visibility` is `public` or `background`, and `description` is non-empty and unique across the library;
-- a backtick-quoted path naming a known repository root or a `references/` path must resolve to a real file (`SKILL_BROKEN_REFERENCE`). Bare filenames and glob patterns are not checked.
+- the listing text is at most 300 characters unless the folder is `ponytail` or `ponytail-review` (`SKILL_DESCRIPTION_TOO_LONG`);
+- a backtick-quoted path naming a known repository root or a `references/` path must resolve to a real file (`SKILL_BROKEN_REFERENCE`). Bare filenames and glob patterns are not checked;
+- no skill folder holds a `.project-skill` file, the consumer's own-skill marker (`SKILL_PROJECT_MARKER_SHIPPED`). A stray marker in a shipped skill would make every consumer's later refresh refuse a name clash.
 
 `validate_skills_and_paths` adds the target-level checks:
 
 - shipped shell blocks may not hide a test, lint, or verify failure behind `|| true`, `|| :`, or `|| echo`;
 - the generated skill count equals the shared count;
+- `generated_skill_surface_errors` finds no `.project-skill` marker in the generated `.claude/skills/` or `.agents/skills/`, and requires both folders to hold the same skill names (`SKILL_SURFACE_MISMATCH`), because the installer's shipped-before record is the `.agents/skills/` copy. The same check runs on each sidecar profile tree;
 - the Ponytail and humanize contracts hold;
 - the generated documenter prompt still references `humanize`.
 
@@ -241,7 +272,11 @@ Semantic skill quality is left to the `deep-audit` skill on purpose.
 - the agent loader's refusals: invalid target scope, non-object metadata, prompt-base cycles, copied base prompts, and supplements on ineligible providers;
 - target-scoped rendering: a Codex-only agent renders only to Codex, and a GitHub-only agent embeds its prompt;
 - the exact Codex coder specialist metadata;
-- the stale-skill contract checks.
+- the stale-skill contract checks;
+- the skill listing cap (`description_cap`), the measurable frontmatter forms (`frontmatter_yaml`), the merged skills' reference files (`merged_skills`), and the coder and planner loading rules (`loading_rules`);
+- the Codex fallback skills naming their policies (`codex_fallback`) and the shipped-marker and surface checks (tests named `project_skill`).
+
+`tests/test_install_bootstrap.py` covers project-owned skills in tests named `project_skill`.
 
 ## Related pages
 
@@ -249,3 +284,4 @@ Semantic skill quality is left to the `deep-audit` skill on purpose.
 - [Task lanes and the enforced lifecycle](../workflows/lifecycle-and-task-lanes.md)
 - [Sidecar overlay](../operations/sidecar-overlay.md)
 - [Deterministic verification](../operations/deterministic-verification.md)
+- [Install ownership and runtime checks](../operations/install-ownership-and-runtime-checks.md)

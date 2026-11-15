@@ -69,7 +69,7 @@ Google Antigravity:
 
 - `AGENTS.md` — provider-neutral root guidance shared with Codex.
 - `.agents/agents/` — six static Markdown custom-agent adapters (the five universal agents plus `antigravity_flash_coder`; Codex-only `luna_coder`/`sol_coder` are not emitted here).
-- `.agents/skills/` — the shared skill tree.
+- `.agents/skills/` — the shared skill tree. A full install also mirrors each project-owned skill (a `.claude/skills/<name>/` folder with a `.project-skill` marker) here, marker included, so Codex and Antigravity see it after the next refresh. Copilot also reads `.claude/skills/`, so it finds a new project skill without a refresh; once a mirror copy exists, Copilot lists that copy and sees edits after the next refresh.
 - `.agents/mcp_config.json` — the shared MCP servers under Antigravity's `mcpServers` schema.
 - `.agents/hooks.json` — the named `bootstrap-safety` configuration.
 
@@ -91,15 +91,15 @@ Per-client status for the `gate-repair` changes. Clients are listed in the order
 
 | Change | Claude Code (`claude-code`) | Codex (`openai-codex`) | GitHub Copilot (`github-copilot`) | Antigravity | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| Context Mode hook lane is advisory only | Filtered | Filtered | Filtered | Context Mode hooks not wired, so no session continuity (recorded gap) | `tests/test_context_mode_dispatch.py`, `tests/fixtures/context_mode_hook/1.0.169/` |
-| Guarded Context Mode MCP server | Root `.mcp.json` guarded; generated targets guarded | Root and generated Codex config guarded | Root `.vscode/mcp.json` guarded; generated targets guarded | Installed and generated guarded, but the PreToolUse bridge denies MCP calls (gap) | `tests/test_validate_targets.py` |
+| No Context Mode hooks | None wired | None wired | None wired | None wired | `tests/test_context_mode_dispatch.py`, `tests/test_validate_targets.py` |
+| Guarded Context Mode MCP server (three tools) | Root `.mcp.json` guarded; generated targets guarded | Root and generated Codex config guarded | Root `.vscode/mcp.json` guarded; generated targets guarded | No Context Mode entry; the PreToolUse bridge denies MCP calls anyway | `tests/test_validate_targets.py` |
 | Hook- and server-config protection (ask on Claude and Copilot, deny on Codex and Antigravity) | `.claude/settings.json`, `.claude/settings.local.json`, `.claude/hooks/`, `.mcp.json` | `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` | `.github/hooks/`, `.vscode/mcp.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json`. Local harness: `run_in_terminal`/`send_to_terminal` gated; read tools allowed | `.agents/hooks.json`, `.agents/mcp_config.json` | `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`, `tests/test_state_sync.py` |
 | Plan checks at branch creation | Shared guard | Shared guard | Shared guard. Local harness: `run_in_terminal`/`send_to_terminal` gated | Antigravity bridge | `tests/test_branch_state.py` |
 | Review result and profile gate | Shared `verify.py` gate through `pretool-bash-guard.sh` and the installed Git hooks | Shared `verify.py` gate through `pretool-bash-guard.sh` and the installed Git hooks | `enforce-commit-gate.sh` listed directly; terminal commands covered since the `run_in_terminal`/`send_to_terminal` fix | Through the `antigravity-pretool.py` bridge; native deny never observed | `tests/test_verify.py`, `tests/test_commit_closeout.py`, `scripts/validate_targets.py` installed-hook smoke |
 | Shipped commands cannot hide test failures | Shared skills and a `validate_targets.py` check | Same | Same | Same | `tests/test_validate_targets.py` |
 | Context7 for subagents | Generated agents with the `search` capability list `mcp__context7` | Inherits session MCP servers ([official Codex subagents docs](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [`openai/codex` source `codex-rs/core/src/agent/role.rs`](https://github.com/openai/codex/blob/7ac954ea24116700632906d89715f7755cd3523e/codex-rs/core/src/agent/role.rs), read 2026-10-17; no native run) | `context7/*` | Unverified: `inheritMcp` is not a documented field | `tests/test_validate_targets.py` |
 
-"Filtered" means `context-mode-dispatch.sh` passes upstream hook output through `context-mode-mcp-filter.mjs --hook-output`. See [runtime-checks.md](runtime-checks.md) for the pin and known limits.
+A hook call from stale wiring (for example a committed `.codex/` or `.github/hooks`) reaches `context-mode-dispatch.sh`, which reads its input, prints nothing, and exits 0. See [runtime-checks.md](runtime-checks.md) for the pin and known limits.
 
 The root `.mcp.json` and `.vscode/mcp.json` start Context Mode through `context-mode-dispatch.sh server`, like the root Codex config, and `scripts/validate_targets.py` fails if a root adapter's `context-mode` entry is not the shared guarded route. The root adapters do not carry Context7 (an authoring-repository choice); generated targets do.
 
@@ -117,10 +117,24 @@ Recorded follow-ups:
 - Plain Git commands that the guard does not model and that name a protected path (for example `git restore .claude/hooks` or `git stash push -- .claude/agents/coder.md`) stay denied on all four clients instead of asking. The guard did not loosen any earlier decision. Forms that go through `-C` or `cd` (for example `git -C .claude rm -r -q hooks`) ask on Claude Code and GitHub Copilot and deny on Codex and Antigravity, but only when no path in the command is also protected as written from the repository root. An absolute path (for example `git -C .claude restore <repo>/.claude/hooks/x`), or a command that also names the same file plainly (`git restore .claude/hooks/x && git -C .claude restore hooks/x`), is denied on all four clients.
 - The fail-closed rule (big plan `backlog-followups`, decision 6) denies on all four clients some mixed commands that asked on Claude Code and GitHub Copilot before that plan, for example `git restore .claude/settings.json && rm .claude/settings.json`, or `cat > .claude/settings.json <<EOF` whose body names another protected path. Split the command, or write the file with the native Write or Edit tool. Evidence: `tests/test_hook_gates.py`.
 - The OpenWiki guard has not been run on Codex against the real OpenWiki server. The 2026-09-19 spike saw Codex honor a `PreToolUse` deny on a test MCP server ([spike](2026-09-19-openwiki-hook-mechanics-spike.md)), but the re-probe in this checkout (deny `mode: "init"`, `noop` on a current wiki, root adapters clean after the turn) was optional evidence and recorded `NOT RUN` in `backlog-followups` Phase F because no Codex session was available. Offline evidence: `tests/test_openwiki_guard.py` and `tests/test_openwiki_cli_smoke.py`.
-- Upstream Context Mode ships `antigravity-cli` hooks, but the bootstrap does not wire them, so Antigravity has no hook lane and no session continuity.
+- The bootstrap wires no Context Mode hooks on any client and gives Antigravity no Context Mode server entry, so Antigravity has no Context Mode lane at all.
+- Priority follow-up: the unsafe-destination check does not cover `state-sync.sh`'s own writes: the nested `.gitignore` and `.gitattributes` appends, and the `settings.local.json` restore. A link at one of those paths can still send a write outside the project.
+- The unsafe-destination check does not cover hard links.
+- Unverified: whether the macOS `strip_quarantine` step (`xattr -rc` over whole folders, consumer state included) follows links.
+- The check on substitution files fires even when no rewrite would happen. Narrow it to when a rewrite would fire. A symlinked `AGENTS.md -> CLAUDE.md` is refused today.
+- `populate_bootstrap_root` follows links inside the `.codex` and `.github/*` source adapters, and a preserved, tracked adapter that is a link, when it copies them. That is a read, not a write, but the content lands in the AI state, which can then be pushed to the AI-state remote.
+- The wrong-kind refusal also refuses kind changes that the obsolete-file cleanup could resolve, for example a regular file at `.claude/templates` or a folder holding an untracked link at `CLAUDE.md`. Narrowing it to unsafe cases is a possible later change. Until then, a bootstrap version that turns a generated file into a folder, or the reverse, makes each refresh refuse until the old item is moved by hand.
+- The inactive-adapter removal in `populate_bootstrap_root` and the plain `write_text` calls (the project-name and Python-version files, `.gitignore`, the devcontainer file, and `.claude/bootstrap-ownership.env`) are checked by the preflight only, with no copy-time second line.
+- An unmarked folder under `.claude/skills/` whose name the bootstrap ships but that holds no `SKILL.md` is not refused: the refresh overwrites its shipped files and the obsolete-file cleanup deletes its other files as obsolete generated files.
 - The commit gate enforces the Task Lanes five-profile review for control-plane, generator, and dependency paths, but not for every multi-file diff. A multi-file diff requires the Ponytail profile only.
 - Antigravity needs a logged native run for two open questions. The MCP tool-name format inside a PreToolUse `toolCall.name` is undocumented ([hooks](https://antigravity.google/docs/hooks)), so the bridge keeps denying MCP calls. Subagent MCP access is unverified: the docs describe `mcpServers: object[]` ([subagents](https://antigravity.google/docs/subagents)), not the `inheritMcp: true` the bootstrap writes. A 2026-08 native run reported `agy mcp list` as "No MCP servers configured", and the docs do not explain it. The documented workspace config is `.agents/mcp_config.json` ([MCP](https://antigravity.google/docs/mcp)).
 - Bash reads of secret-shaped files such as `cat .env` are allowed, while native read tools on them are denied. This is kept by user decision (2026-10-21) for a later policy choice.
+- The 37 `[[skills.config]]` entries are inert. Removing or keeping them is a user decision, and their on/off effect is untested.
+- A clone that already exists gets no automatic cleanup of stale `.agents/` content (big plan `skills-and-instructions-trim`, Decision 10).
+- The skill listing still overflows on 200K-context models.
+- Consumer MEMORY entries that name removed skills (RAG 14, industrial-inspection 1) need an update at each consumer's refresh.
+- Consumers installed at `76887a8` (2026-08-22) cannot refresh because of an older takeover rule.
+- The typo-bypass allowlist in `shared/hooks/scripts/_lib-frontmatter.sh` does not exclude `.agents/*.md`.
 
 ## Backlog-Followups Client Parity
 
@@ -174,8 +188,8 @@ default (`dist/sidecar/<profile>/`); an explicit `--source` overrides that.
 The `skills` profile ships the four skills — `debug-investigator`,
 `humanize`, `ponytail`, and `ponytail-review` — plus the two bridges above.
 The `workflow` profile ships every eligible public skill (a fixed denylist
-in `scripts/runtime_ownership.py` excludes skills that need the full
-install) plus the agent, rule, instructions, review-profile, template, and
+in `shared/sidecar/workflow/skills.txt` excludes skills that need the full
+install; `scripts/runtime_ownership.py` holds the allowlist) plus the agent, rule, instructions, review-profile, template, and
 state rows above. No `.github/agents` or `.codex/agents` file ships in
 either profile: neither Copilot nor Codex has a config-free way to discover
 a custom agent from an ignored file, so those two clients get the workflow

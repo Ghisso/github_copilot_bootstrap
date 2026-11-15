@@ -2,11 +2,10 @@
 name: caveman
 visibility: public
 description: |
-  Ultra-terse communication mode for token-efficient technical work. Use when:
-  - User asks for "caveman mode", "less tokens", "be brief", "be terse",
-    "shorter answers", or "less verbose"
-  - Implementation or review output should stay accurate but cut filler
-  - You need terse findings, terse coding updates, or terse rewrite passes
+  Caveman mode: ultra-terse, token-efficient replies. Use when the user says
+  "caveman mode", "less tokens", "be brief", "be terse", "shorter answers", or
+  "less verbose", or when findings, coding updates, or rewrites should stay
+  accurate but cut filler.
 argument-hint: "[lite|full|ultra]"
 ---
 

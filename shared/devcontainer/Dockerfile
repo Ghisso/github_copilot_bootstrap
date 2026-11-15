@@ -1,4 +1,4 @@
-FROM node:22.22.0-bookworm-slim AS nodejs
+FROM node:24.22.3-bookworm-slim AS nodejs
 
 FROM nvcr.io/nvidia/cuda-dl-base:26.03-cuda13.2-devel-ubuntu24.04
 
@@ -27,12 +27,12 @@ RUN apt-get update \
         sudo \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g context-mode@1.0.169 \
+RUN npm install -g context-mode@2.1.8 \
         openwiki@0.7.2 \
         mermaid@11.16.0 \
         jsdom@29.1.1 \
     && command -v context-mode \
-    && context-mode --help >/dev/null \
+    && test "$(context-mode --version)" = "2.1.8" \
     && command -v openwiki \
     && test "$(node -p "require('$(npm root -g)/openwiki/package.json').version")" = "0.7.2" \
     && openwiki integrations list </dev/null >/dev/null

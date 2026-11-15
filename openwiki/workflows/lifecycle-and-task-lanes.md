@@ -6,6 +6,8 @@ tags: [workflow, lifecycle, task-lanes, plans, closeout, verification, pause, ca
 sources:
   - id: openwiki-source-cdb6e91f0fa049994704c487
     resource: repo://scripts/validate_plan_frontmatter.py
+  - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
+    resource: repo://scripts/validate_targets.py
   - id: openwiki-source-fd43a5fc69056375b46b4386
     resource: repo://shared/agents/reviewer/prompt.md
   - id: openwiki-source-6aab0600aa722da66b818111
@@ -14,23 +16,29 @@ sources:
     resource: repo://shared/hooks/scripts/record-branch-state.sh
   - id: openwiki-source-3bb98e65d9ade30d41bb39f0
     resource: repo://shared/policies/agent-reporting.instructions.md
+  - id: openwiki-source-9fd0a35cebe588e6f39e1d28
+    resource: repo://shared/policies/closeout.instructions.md
+  - id: openwiki-source-d7818695b5f298cbcabc4568
+    resource: repo://shared/policies/plan-lifecycle.instructions.md
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
+  - id: openwiki-source-b7cd6d01f37550e855f61bdc
+    resource: repo://shared/scripts/verify.py
   - id: openwiki-source-4a96f2f176ecd3fcc4f95f18
     resource: repo://shared/templates/plan-big.md
   - id: openwiki-source-588c1b68a254d094494d64f9
     resource: repo://shared/templates/plan-small.md
   - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
     resource: repo://tests/test_validate_plan_frontmatter.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-11-14T16:56:38.985Z
 ---
 
 # Task lanes and the enforced lifecycle
 
-Source, tests, and the policies under `shared/policies/` outrank this page. The normative text is `shared/policies/workflow.instructions.md`, installed as `.claude/instructions/workflow.instructions.md`.
+Source, tests, and the policies under `shared/policies/` outrank this page. The normative text is split across three policies, installed under `.claude/instructions/`: `workflow.instructions.md` (task lanes, plan first, branches, the orchestrator loop, the verification evidence contract), `closeout.instructions.md` (the CLOSEOUT steps through commit and push), and `plan-lifecycle.instructions.md` (future phases, pause, cancel, reopen, and the knowledge-refresh final phase).
 
 Every change follows one lifecycle on one branch per big plan, and most of its rules are enforced by a hook, the plan validator, or the verifier rather than by policy text alone. Each rule below says which.
 
@@ -55,7 +63,7 @@ Any commit on an implementation branch must satisfy the full ceremony, whichever
 
 `scripts/validate_plan_frontmatter.py`, shipped verbatim into consumers, enforces the frontmatter contract: valid statuses, exact pause and cancellation fields, the body phase inventory matching `phases:`, at most one unfinished `-knowledge-refresh` phase and only as the last phase, and the verification lints below. An earlier knowledge-refresh phase is exempt from that count only once it has settled, but a plan that has any knowledge-refresh phase must still end with one. Settled means the big plan's own `name` is not empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, that declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`. `check_runtime.py` and the `commit-msg` Git hook both run it.
 
-Plan-first, as policy text: check `.claude/MEMORY.md` for lessons, clarify user preferences on ambiguous work, settle decisive technical assumptions with evidence in planner Phase 1, draft into `.claude/plans/` (or `.claude/explorations/` for proofs of concept), get approval, then implement. Before each new phase the orchestrator checks whether earlier outcomes materially change the remaining work and, only then, invokes one planner to revise affected future phases.
+Plan-first, as policy text: search `.claude/MEMORY.md` with a literal match (`rg -F` or `grep -F`, since `[LEARN:installer]` is a character class to a plain `grep`) for the task's area tags and keywords and read only the matching entries; `grep -oE '\[LEARN:[a-z-]+\]' .claude/MEMORY.md | sort | uniq -c` lists the tags in use, and the whole file is read only for a memory audit. Then clarify user preferences on ambiguous work, settle decisive technical assumptions with evidence in planner Phase 1, draft into `.claude/plans/` (or `.claude/explorations/` for proofs of concept), get approval, then implement. Before each new phase the orchestrator checks whether earlier outcomes materially change the remaining work and, only then, invokes one planner to revise affected future phases.
 
 A separate spec and requirement IDs are optional, and equivalent approved content in the plan is enough. The big-plan template offers an optional non-goals section and an optional requirement map for requirements that span several phases; IDs such as `REQ-001` are prose references, not frontmatter fields, so the plan validator neither requires nor reads them.
 
@@ -76,43 +84,53 @@ flowchart LR
 
 - **PRE-FLIGHT and BRANCH.** Work starts from a clean `dev`; each big plan gets exactly one branch named `<plan_name>_implementation`. `enforce-branch-state.sh` denies a misnamed branch, a dirty or non-`dev` start, or a missing big plan with the wrong type or status, and then runs `validate_plan_frontmatter.py` on the big plan and its listed phase files, denying on any frontmatter or verification-contract error. `record-branch-state.sh` then writes the branch metadata and flips the first `planned` phase to `in-progress`.
 - **IMPLEMENT.** Delegated to `coder`, which applies the `ponytail` skill once in `full` mode. Policy text.
-- **VERIFY.** `verify.py fast` during implementation and `verify.py phase --persist` before review. The verifier is code.
+- **VERIFY.** Focused checks and `verify.py fast` during implementation. The persisted phase check (`verify.py phase --persist`) runs later, at CLOSEOUT step 4. The verifier is code.
 - **REVIEW.** Delegated to `reviewer` with profiles from the routing table; findings return as JSON and are not yet persisted. Policy text, but the commit gate later requires the persisted report.
-- **CLOSEOUT.** The fixed sequence below.
-- **FIX LOOP.** Any failure returns to IMPLEMENT; a later code change restarts verification and review.
+- **CLOSEOUT.** On entering CLOSEOUT, read and follow `.claude/instructions/closeout.instructions.md` step by step (summarized below).
+- **FIX LOOP.** Any failure returns to IMPLEMENT; a later code change restarts verification and review. When only receipt state went stale and no code changed, the closeout file's stale-receipt recoveries apply instead.
 - **COMMIT.** One explicitly staged commit per completed small plan, gated by `enforce-commit-gate.sh` and the `commit-msg` Git hook.
 - **PUSH.** One normal non-force push with `GIT_TERMINAL_PROMPT=0`; a missing remote or authentication failure is a warning. `enforce-pr-gate.sh` and the `pre-push` Git hook gate it. A PR to `dev` is opened only when the user asks and only after every phase is complete or cancelled.
 
 ## The closeout sequence
 
-The policy fixes eight steps because each reads what the previous one produced.
+`closeout.instructions.md` is the only place that lists the CLOSEOUT order; the orchestrator prompt, the `commit` and `code-review` skills, README, and the small-plan and session-log templates point to it. Each of its eight numbered steps carries a `*Why` reason, because each step reads what the one before produced:
 
-1. **Documentation.** Update `README.md` and `docs/` for changed public behavior; on the big plan's last phase, also run the stale-claims audit.
-2. **Final AI state.** Small plan `status: complete` with `closeout_session_log` filled and steps ticked; big-plan phase ticked; `[LEARN]` entries or the no-lessons marker in the log and `MEMORY.md`.
-3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit`. The verifier refuses to run closeout while the big plan is not retrievable from nested Git.
-4. **Stage, findings, phase receipt, closeout dry run**, in one Bash command with no `git commit`: explicit `git add` of the intended files, a `disposition` and `reason` on every surviving MINOR, `record_findings.py` with one `--profile` per reviewed profile (every profile the changed paths require, including `ponytail` for any multi-file diff), the reviewer's `--gate-result`, and one `--open-request` per open request, `verify.py phase --persist`, then `verify.py closeout --format text`, whose summary lines go into the log with `**Status:** COMPLETED`. When the findings text names a protected path, the findings JSON is written with the Write tool to a scratch file and passed as `--findings-json <file>`, because `protect-files` denies heredoc text that names a protected path.
-5. **Second nested checkpoint**, because the closeout receipt hashes the session log.
-6. **Closeout receipt.** `verify.py closeout --format json --persist`.
-7. **Commit**, in its own Bash command. The `post-commit` Git hook advances `current_phase` and publishes nested state.
-8. **Push.**
+1. documentation;
+2. final AI state, which starts by reading the `learn` skill and routing each lesson to a project skill, a `MEMORY.md` entry, or none;
+3. a first nested checkpoint (`git -C .claude add -A && git -C .claude commit`);
+4. staging, findings, the phase receipt, and a closeout dry run, in one Bash command with no `git commit`;
+5. a second nested checkpoint, because the closeout receipt hashes the session log;
+6. the closeout receipt;
+7. the commit, in its own Bash command;
+8. one non-force push.
+
+When the findings text names a protected path, step 4 writes the findings JSON with the Write tool to a scratch file and passes it as `--findings-json <file>`, because `protect-files` denies heredoc text that names a protected path. The plan-small template's Closeout Checklist has two boxes, both ticked at step 2; the sequence, not the checklist, gates the commit.
 
 Two hard rules are enforced by the hooks:
 
 - A Bash command that chains `git commit` after the findings or receipt steps is judged on the receipts that existed before it ran and is denied whole.
 - Touching nested state between the receipt and the commit changes what the receipt binds and fails the commit with `closeout receipt governing control-plane provenance is stale`.
 
+The file also says how to recover from three stale-receipt errors. These recoveries are the exception to the fix loop when only receipt state went stale and no code changed:
+
+- After `closeout receipt final tracked state is stale`, restage. For a documentation-only change the phase receipt stays valid, because its hash skips ordinary documentation, but the findings report's `content_hash` covers every tracked change, documentation and unstaged edits included. So re-record the findings, repeat step 5 only if the session log changed, then repeat step 6. For anything else, go back through the fix loop and steps 4 to 6.
+- After `closeout receipt governing control-plane provenance is stale`, make the change final and repeat steps 3 to 6. The provenance covers the big plan and every small plan listed in its `phases:`, so a future phase's plan is revised before step 3 or after the commit.
+- After `findings report content_hash is stale`, inspect `git diff`. An unintended edit is undone and nothing needs redoing; an intended one follows the documentation-only or the code branch above.
+
+`validate_targets.py` pins the step numbers, the reasons, the learn-skill read, both hard rules, and all three messages inside the recovery section of the generated file. A closed session log never changes; a correction goes in a sibling `<log-name>.errata.md`, whether or not a receipt binds the log.
+
 ## What gates a completion commit
 
-The commit gate requires, for an ordinary commit on an implementation branch:
+The commit gate requires, for an ordinary commit on an implementation branch (the written form is the `## Completion-commit gate` section of `closeout.instructions.md`):
 
 - a passing closeout receipt whose `head_sha` and `tree_sha` match HEAD and the index;
 - a findings report for the same phase with `counts.critical == 0` and `counts.major == 0` and a disposition on every MINOR;
 - every review profile the changed paths require in that report (test surfaces need `tests`; control-plane, generator, and dependency paths need `code`, `architecture`, `security`, `tests`, and `ponytail`; any multi-file diff needs `ponytail`);
 - at phase completion, the reviewer's recorded `gate_result` of `PASS` with no open request (the reviewer answers `FAIL` when a CRITICAL or MAJOR survives and `WARN` while a request is open);
-- the closeout session log with LEARN evidence;
-- a small plan whose frontmatter validates.
+- the closeout session log with LEARN evidence, and, for the big plan's last phase, the final-phase audit section;
+- a small plan set to `complete` with its `closeout_session_log`, whose frontmatter validates.
 
-CRITICAL and MAJOR findings block the completion commit itself, not only the push. The push and PR gates re-check the same contract across every completed phase through the historical receipt chain, and a PR must target `dev`.
+CRITICAL and MAJOR findings block the completion commit itself, not only the push. The push and PR gates re-check the same contract across every completed phase through the historical receipt chain, and a PR must target `dev`. The one exception is a plan's leading run of phases dated before 2026-08-29 that have no receipt file: closeout receipts did not exist then, so `verify.py` skips that run (`RECEIPT_CHAIN_SINCE`), and the skip ends at the first phase that does not qualify.
 
 ## The verification evidence contract
 
@@ -121,6 +139,8 @@ CRITICAL and MAJOR findings block the completion commit itself, not only the pus
 - When an implementation branch is created, and again at commit, `validate_plan_frontmatter.py` refuses a live plan (status `planned`, `in-progress`, or `paused`, dated on or after 2026-09-19) with no fenced block (`L1 verification-block-missing:`), hedged prose that makes a check conditional (`L2 hedged-verification:`), an item that cannot fail such as `|| true` (`L3 unfailable-verification:`), or an item that lists `verify.py closeout` (`L4 self-listed-closeout:`). Completed and cancelled plans are never re-judged.
 
 ## Pause and cancel
+
+These rules, and the two sections after them, live in `.claude/instructions/plan-lifecycle.instructions.md`.
 
 - **Pause** is small-plan-only and non-terminal, entered only on an explicit user request. It requires `paused_at` in exact UTC `YYYY-MM-DDTHH:MM:SSZ` form, a single-line `paused_reason`, and a `pause_session_log` containing `**Status:** PAUSED`. A checkpoint commit may then preserve tracked work without full closeout; it does not advance `current_phase` and still blocks PR creation. On resume the same plan returns to `in-progress`.
 - **Cancel** means an authorized decision that a plan or phase will never run. It requires `cancelled_at`, a single-line `cancelled_reason`, and a `cancelled_evidence` artifact containing `**Status:** CANCELLED`. A cancelled phase needs no commit, findings, or closeout log; a cancelled big plan cannot start a branch; commit-count checks count completed phases only.
@@ -133,7 +153,7 @@ New small plans default to `status: planned`. Branch creation activates the firs
 
 ## Reopening a completed big plan
 
-A `complete` big plan can take new phases while its implementation branch still exists and is not merged; after a merge, a new big plan starts instead. The numbered procedure lives under "Reopening a completed big plan" in `shared/policies/workflow.instructions.md`. In short:
+A `complete` big plan can take new phases while its implementation branch still exists and is not merged; after a merge, a new big plan starts instead. The numbered procedure lives under "Reopening a completed big plan" in `shared/policies/plan-lifecycle.instructions.md`. In short:
 
 1. Record the new findings, then draft the new small plans as `planned`. Only a knowledge-refresh phase's slug may end in `-knowledge-refresh`, because the validator counts any slug with that suffix.
 2. If any listed phase is a knowledge-refresh phase, append one new `-knowledge-refresh` phase after the new phases. The validator requires this, so the final refresh and the stale-claims audit always follow the final code.
@@ -147,6 +167,7 @@ Reopening defers the strict terminal gates to the new final phase; it never esca
 - `tests/test_validate_plan_frontmatter.py` covers every pause and cancellation field, the block-scalar and near-miss marker rejections, and the knowledge-refresh position rule, including a completed or cancelled earlier refresh phase, appending after a finished refresh, a slug that fails the slug pattern, and a sibling that fails the identity check (a symlink, an unrelated `parent_plan`, the wrong `type` or `name`, or an empty big-plan `name`).
 - `tests/test_commit_closeout.py` covers the post-commit phase advance across commit-message sources and its refusals.
 - `tests/test_hook_gates.py` covers the commit and push gate assertions against real temporary repositories.
+- `tests/test_validate_targets.py` covers the closeout procedure pin (`closeout_procedure` tests, one negative case per rule) and the plan-small checklist shape.
 
 ## Related pages
 

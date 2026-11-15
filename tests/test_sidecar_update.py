@@ -286,6 +286,44 @@ def test_user_modified_projection_is_kept_and_reported_every_run(
     assert "has local edits" in out_2
 
 
+def test_project_skill_marker_on_a_modified_sidecar_skill_gets_the_unmarked_outcome(
+    tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A recorded sidecar skill with local edits is kept and reported. Adding
+    the full-install `.project-skill` marker to it must change none of that:
+    the sidecar reads no marker and its code is unchanged."""
+    outcomes = []
+    for marked in (False, True):
+        repo = tmp_path / f"repo-{marked}"
+        _init_repo(repo)
+        v1 = tmp_path / f"v1-{marked}"
+        _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+        assert install_sidecar_with_profile(repo, v1, monkeypatch) == 0
+        capsys.readouterr()
+
+        skill_dir = repo / ".claude" / "skills" / "ponytail"
+        (skill_dir / "SKILL.md").write_text("content v1\nEDITED\n", encoding="utf-8")
+        if marked:
+            (skill_dir / ".project-skill").write_bytes(b"")
+        exit_code = install_sidecar_with_profile(repo, v1, monkeypatch)
+        out = capsys.readouterr().out
+
+        assert (skill_dir / ".project-skill").exists() is marked
+        outcomes.append(
+            (
+                exit_code,
+                "has local edits" in out,
+                "copy your edits elsewhere" in out,
+                (skill_dir / "SKILL.md").read_bytes(),
+                (repo / ".agents" / "skills" / "ponytail" / "SKILL.md").read_bytes(),
+                _read_manifest(repo)["units"],
+            )
+        )
+
+    assert outcomes[0] == outcomes[1]
+    assert outcomes[1][:4] == (0, True, True, b"content v1\nEDITED\n")
+
+
 def test_projection_replaced_by_tracked_team_file_drops_record_and_line(
     repo: Path, tmp_path: Path, monkeypatch
 ) -> None:

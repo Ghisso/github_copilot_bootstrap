@@ -2,13 +2,10 @@
 name: onboard
 visibility: public
 description: |
-  Build or refresh this session's understanding of the project: read the
-  README, index docs/ and retrieve targeted content from it, cross-check
-  claims against the real code with direct reads, exact search, and Semble,
-  then persist the findings so future agents don't have to redo the
-  discovery. Use when asked to "get oriented", "understand this project",
-  "refresh project context", or after README/docs/architecture changed
-  significantly.
+  Get oriented in a project: "understand this project", "refresh project
+  context", or after the README, docs, or architecture changed. Reads the
+  README, indexes docs, checks claims against the real code, and persists the
+  findings so later agents skip the discovery.
 ---
 
 # onboard — Project Understanding + Persistence
@@ -55,10 +52,8 @@ synced to the `ai-state` branch by session hooks).
 Per `.claude/instructions/tool-routing.instructions.md`: use direct reads for
 known files, `rg` for exact claims, and Semble for semantic "where is X
 actually implemented" discovery. The Context Mode MCP server exposes exactly
-four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`);
-`ctx_index` accepts content, a contained regular file, or a contained real
-directory. Directory indexing uses the pinned upstream defaults and does not
-accept directory-policy overrides.
+three guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`); `ctx_index`
+accepts content or one contained regular file.
 
 ```
 mcp__semble__search(repo=<project root>, query="<key behavior claimed in the docs>")
