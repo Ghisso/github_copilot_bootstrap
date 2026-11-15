@@ -19,17 +19,27 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 
 ## Layout
 
-- `README.md`: product intent, full and sidecar install/update, architecture,
-  hooks, and gates.
+- `README.md`: product intent, full and sidecar install/update, project-owned
+  skills, architecture, hooks, and gates.
 - `docs/`: architecture, deterministic commit gate, runtime checks, smoke
   tests, sidecar provider contract, native-client acceptance, dated evidence
   notes, and `target-mapping.md` (per-client adapters, the gate-repair and
-  backlog-followups parity tables, and the recorded follow-ups list).
+  backlog-followups parity tables, and the "Recorded follow-ups" list).
 - `openwiki/`: generated OpenWiki knowledge layer (descriptive, never
   authority; refresh only through the `knowledge-refresh` skill).
-- `shared/policies/`: source instruction files (workflow, closeout,
-  plan-lifecycle, quality, tool-routing, workspace, agent reporting).
-- `shared/skills/`: 37 reusable skills; `onboard` is one of them.
+- `shared/policies/`: twelve source policy files. Seven apply always
+  (`workspace`, `workflow`, `closeout`, `plan-lifecycle`,
+  `quality-and-testing`, `tool-routing`, `agent-reporting`). Five apply only
+  to matching paths (`code-standards`, `tests`, `config-first-design`,
+  `api-service-standards`, `deployment`); they become Claude Code
+  `.claude/rules/` files, Copilot `applyTo` adapters, and Codex fallback
+  skills. The CLOSEOUT steps live in `closeout`, and the plan pause, cancel,
+  and reopen rules in `plan-lifecycle`, not in `workflow`.
+- `shared/skills/`: 37 reusable skills (cut from 55 on 2026-11-14). Each
+  skill's listing text (description plus `when_to_use`) is capped at 300
+  characters, except `ponytail` and `ponytail-review`, whose text is pinned
+  to upstream by hash. Niche library lessons live as `references/` files
+  inside `haystack` and `data-and-graph-pitfalls`. `onboard` is one of the 37.
 - `shared/agents/`: canonical agent metadata and target-neutral prompts.
 - `shared/review-profiles/`: profile checklists used by the unified reviewer.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
@@ -38,17 +48,16 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   (Context Mode is filtered to exactly three tools: `ctx_index`,
   `ctx_search`, `ctx_stats`; Antigravity gets no Context Mode entry).
 - `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader
-  (pins OpenWiki `0.7.2`). Its `initializeCommand` creates `~/.openwiki` and
-  `~/.cache/huggingface` on the host, because Docker refuses a bind mount
-  whose source folder is missing.
+  (pins OpenWiki `0.7.2`; Node.js stage `node:24.22.3-bookworm-slim`). Its
+  `initializeCommand` creates `~/.openwiki` and `~/.cache/huggingface` on the
+  host, because Docker refuses a bind mount whose source folder is missing.
 - `shared/third_party/ponytail/`: vendored Ponytail (a local fork, partially
   merged from upstream `v5.3.2`) with provenance.
 - `shared/sidecar/`: sources for the personal sidecar overlay. The `workflow`
   profile ships its own `onboard` skill
   (`shared/sidecar/workflow/skills/onboard/`), which writes
   `.ai-bootstrap/project-context.instructions.md` instead of this file.
-- `shared/schemas/`: only `native-client-observation.schema.json` (the stale
-  agent schema was removed by gate-repair).
+- `shared/schemas/`: only `native-client-observation.schema.json`.
 - `shared/scripts/` and `shared/templates/`: `verify.py`,
   `record_findings.py`, plan templates, and other rendered workflow artifacts.
 - `shared/vscode/tasks.json`: the "AI state: pull" and "AI state: push" VS
@@ -66,20 +75,22 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   repository) or `sidecar` mode (a private overlay inside a team-owned
   harness), chosen by `--mode` or auto-detected. It fills each generated
   `**Project:**` placeholder line (`CLAUDE.md`, `AGENTS.md`, and the installed
-  workspace instructions) with the target directory name.
+  workspace instructions) with the target directory name. Before the first
+  write, `validate_project_skills` and `validate_no_symlink_writes` refuse
+  unsafe states (see Design decisions); a copy-time guard checks every file
+  copy again.
 - `scripts/runtime_ownership.py`: which installed paths the bootstrap owns and
   which are consumer state (`CONSUMER_STATE_PATHS`); anything else under
   `.claude/` that the target lacks is deleted on refresh, except a
   marker-claimed third-party bundle and a `.claude/skills/<name>/` folder
-  marked with `.project-skill`. An unmarked skill folder the bootstrap never
-  shipped, or whose newly shipped name the shipped-before record does not list
-  (with or without a record), makes the refresh refuse before any write
-  (`validate_project_skills`).
+  marked with `.project-skill` (`PROJECT_SKILL_MARKER`).
 - `scripts/sidecar_overlay.py`: sidecar install, update, and uninstall engine.
 - `scripts/update_consumers.py`: batch regenerate/update of mixed full and
   sidecar consumers; it finishes every target even when one fails.
 - `scripts/validate_targets.py`: structural and behavioral target validator,
-  including installed Git-hook smoke runs.
+  including installed Git-hook smoke runs, byte budgets for root guidance and
+  policies, and the 300-character skill listing cap
+  (`SKILL_DESCRIPTION_MAX_CHARS`).
 - `scripts/validate_plan_frontmatter.py`: plan frontmatter and L1–L4
   Verification-block checks (run at branch creation and at commit).
 - `scripts/check_runtime.py`: runtime-file drift and optional-helper checker.
@@ -119,33 +130,56 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
   keeps native wiring. Client priority for parity work is Claude Code, Codex,
   GitHub Copilot, Antigravity; a gap in a lower client is recorded in
   `docs/target-mapping.md`, not hidden.
+- Small always-loaded context. Claude Code lists every skill's listing text
+  each turn and cuts the list when it grows too long, and every always-apply
+  policy loads at session start. So the shipped set is 37 skills with a
+  300-character listing cap, procedures that only some steps need live in
+  their own files (`closeout`, `plan-lifecycle`), and `validate_targets.py`
+  enforces byte budgets (generated `CLAUDE.md` is about 4.4 KB, `AGENTS.md`
+  about 4.8 KB). Section 6 of
+  `.claude/explorations/2026-11-12_skills-and-instructions-review.md` lists
+  cuts that were proposed and rejected; do not propose them again without
+  new evidence.
 - Ponytail is vendored as portable skills so coding/review behavior does not
   depend on a per-user plugin or network availability.
 - Guardrails are shared shell scripts, while commit/push invariants also run as
   real Git hooks; this closes tool-layer and human/IDE bypasses where possible.
 - The commit gate trusts only what it checks: the findings report records the
   reviewer's `gate_result` and open requests (schema version 2), and the gate
-  requires the review profiles the branch's changed paths call for. Reports
-  written before schema version 2 stay valid at push. The push and PR gates'
-  receipt-chain check skips only a plan's leading run of phases dated before
-  2026-08-29 that have no receipt file (`RECEIPT_CHAIN_SINCE` in
-  `shared/scripts/verify.py`), because closeout receipts did not exist then.
-- Context Mode is MCP-only (since the `context-mode-2x-migration` Phase A,
-  branch `context-mode-2x-migration_implementation`): no client wires a
-  Context Mode hook, and a hook call from stale wiring reads its input,
-  prints nothing, and exits 0. The filter exposes three tools, sends the
-  client only `protocolVersion`, `capabilities.tools`, and `serverInfo`
-  from `initialize`, replaces tool descriptions with kit text, and gates on
-  `serverInfo.name == "context-mode"` (Context Mode 1.x and 2.x report the same
-  name, so the dispatcher's manifest or `npx` pin is the only version
-  proof). The filter answers the MCP 2026-07-28 `server/discover` probe
-  itself with `-32601` and never forwards it (reopened Phase D), so clients
-  use `initialize`: the 2.1.8 answer to the probe carries upstream
-  `instructions`, and a client that accepts it skips `initialize`, so the
-  filter would refuse its `tools/list` and `tools/call` with `-32001` and the
-  session would get no tools. `ctx_index` takes raw text or one regular file inside the
-  repository, never a folder: 2.x folder indexing has no bound and follows
-  symlinks into sibling projects (2026-11-12 spike S3).
+  requires the review profiles the branch's changed paths call for. The
+  report's `content_hash` covers every tracked change from the merge base,
+  documentation and unstaged edits included, so a late documentation edit
+  needs findings recorded again. Reports written before schema version 2
+  stay valid at push. The push and PR gates' receipt-chain check skips only a
+  plan's leading run of phases dated before 2026-08-29 that have no receipt
+  file (`RECEIPT_CHAIN_SINCE` in `shared/scripts/verify.py`), because closeout
+  receipts did not exist then.
+- A full refresh deletes every `.claude/` file the bootstrap does not
+  generate, so a project-owned skill survives only in a real folder holding a
+  `.project-skill` file. When the installer cannot tell a project skill from
+  an old bootstrap copy, it refuses before any write instead of guessing.
+  This includes an unmarked folder whose name the new bootstrap ships but the
+  shipped-before record (`.claude/bootstrap-root/.agents/skills`) does not
+  list, with or without a record (option A, the user's decision on
+  2026-11-15).
+- A full refresh never writes through a symbolic link or over a path of the
+  wrong kind (for example a folder where a file goes). The preflight refuses
+  both before the first write, runs again after a legacy state migration,
+  and a copy-time guard checks each copy as a second line. The gaps it does
+  not cover are listed in `docs/target-mapping.md` ("Recorded follow-ups").
+- Context Mode is MCP-only: no client wires a Context Mode hook, and a hook
+  call from stale wiring reads its input, prints nothing, and exits 0. The
+  filter exposes three tools, sends the client only `protocolVersion`,
+  `capabilities.tools`, and `serverInfo` from `initialize`, replaces tool
+  descriptions with kit text, and gates on `serverInfo.name ==
+  "context-mode"` (1.x and 2.x report the same name, so the dispatcher's
+  manifest or `npx` pin is the only version proof). The filter answers the
+  MCP 2026-07-28 `server/discover` probe itself with `-32601` and never
+  forwards it, so clients use `initialize`: the 2.1.8 answer to the probe
+  carries upstream `instructions`, and a client that accepted it would skip
+  `initialize` and get no tools. `ctx_index` takes raw text or one regular
+  file inside the repository, never a folder: 2.x folder indexing has no
+  bound and follows symlinks into sibling projects (2026-11-12 spike S3).
   `FILTER_CONTRACT="ctx-index-files-only-v2"` moves older caches aside.
 - Consumer `.claude/` state is a nested `ai-state` Git repository so mutable
   plans, memory, logs, and bootstrap files have an auditable history.
@@ -179,70 +213,67 @@ When adding new hook Python code, verify it compiles under Python 3.9 with `pyth
 
 ## Current status and verification
 
-Onboarding was refreshed on `dev` at `9be6955` on 2026-11-12. `dev` matched
-`origin/dev`. `uv run python scripts/check_runtime.py` printed 20 lines, all
-PASS, and `uv run pytest tests/ -q` gave 5014 passed, 1 skipped (about
-5 minutes).
+Onboarding was refreshed on `dev` at `2e8c7bb` (the merge of PR #56) on
+2026-11-15. `dev` matched `origin/dev`. `uv run python
+scripts/check_runtime.py` exited 0 with 22 PASS lines and one expected WARN: the
+global `context-mode` on this host is still 1.0.169, so the dispatcher
+refuses it and uses `npx -y context-mode@2.1.8`. `uv run pytest tests/ -q`
+gave TEST_RESULT_PLACEHOLDER.
 
-Pull requests merged into `dev` since the 2026-10-20 refresh:
+Pull requests merged into `dev` since the 2026-11-12 refresh:
 
-- #47 `backlog-followups` (Phases A to J). Phases H and I replaced `shlex`
-  in the file-protection guard (`shared/hooks/scripts/protect-files.py`)
-  with a Bash-rules scanner; `docs/runtime-checks.md` lists the forms it
-  still does not check, and a recorded follow-up in
-  `docs/target-mapping.md` asks to split or shrink the hook.
-- #49 `sidecar-onboard-and-validator`: the sidecar `workflow` profile's
-  `onboard` skill, and a validator that explains a missing pytest.
-- #51 `state-sync-safety-fixes`: one state sync at a time, bounded network
-  calls, no commit over an unfinished rebase or merge, and a root-adapter
-  restore that refuses a symlinked `.claude` or `.claude/bootstrap-root`.
-- #52 `pre-receipt-phase-exemption`: the receipt-chain skip described above.
-- #53 `context-mode-agent-matcher`: an anchored Claude Code matcher for
-  the Context Mode PreToolUse hook (gone again since the 2.x migration's
-  Phase A removed every Context Mode hook).
-- #54 `readme-and-wiki-drift-fixes` (2026-11-12): README wording for Context
-  Mode routing and the "Verification Defaults" scope, and an OpenWiki refresh
-  for PRs #52 and #53.
+- #55 `context-mode-2x-migration` (2026-11-12): MCP-only Context Mode with
+  three tools, the 2.1.8 pin with one server identity, and the local answer
+  to the `server/discover` probe.
+- #56 `skills-and-instructions-trim` (Phases A to I, 2026-11-13 to
+  2026-11-15): project-owned skills (`.project-skill`); the workflow policy
+  split into `closeout` and `plan-lifecycle` with byte budgets; skills cut
+  from 55 to 37 with the 300-character cap; and the installer's link and
+  wrong-kind refusals (Phases F and H).
 
 `origin/main` was last updated on 2026-10-23 by PR #50 (`dev` into `main`);
-`dev` is 18 commits ahead of it (`cfde280`, the merge of PR #55,
-`context-mode-2x-migration_implementation`). Releasing `dev` to `main` is the
-user's call. The one unmerged branch is `skills-and-instructions-trim_implementation`.
+`dev` is 28 commits ahead of it. Releasing `dev` to `main` is the user's
+call. No implementation branch is unmerged.
 
-On 2026-11-12 none of the four local full consumers (`~/work/RAG`,
+Open follow-ups to start from:
+
+- Low severity, open: the `workflow` sidecar profile seeds a missing state
+  `README.md` through a linked `.ai-bootstrap/` subfolder, which can create
+  the file outside the project. Details and the proposed fix:
+  `.claude/quality_reports/2026-11-15_sidecar-state-seed-link-followup.md`.
+  It is not yet in the `docs/target-mapping.md` follow-ups list; add it when
+  the fix plan starts.
+- Priority follow-up in `docs/target-mapping.md`: the unsafe-destination
+  check does not cover `state-sync.sh`'s own writes (the nested `.gitignore`
+  and `.gitattributes` appends, and the `settings.local.json` restore). The
+  sidecar note suggests one small plan for both.
+
+On 2026-11-15 none of the four local full consumers (`~/work/RAG`,
 `~/work/git_projects/img-classification`, `industrial-inspection`, and
-`schema-bootstrap-llm-wiki`) had PR #53's matcher in `.claude/settings.json`.
-A refresh through `scripts/update_consumers.py`
-brings them MCP-only Context Mode 2.1.8 (no hooks; Node.js 24.15.0 or newer
-needed on the host or in a rebuilt devcontainer). Refreshing is the user's
+`schema-bootstrap-llm-wiki`) had been refreshed since October: each still
+had 52 to 58 skill folders under `.claude/skills/` (the pre-trim set). The
+user has other consumers on other computers, so this list is not complete.
+A refresh through `scripts/update_consumers.py` brings MCP-only Context Mode
+2.1.8 (Node.js 24.15.0 or newer on the host or in a rebuilt devcontainer),
+the 37-skill set, and the new refusals. The `safe-consumer-bootstrap-refresh`
+skill maps the 20 retired skills and explains the refusals. Consumer MEMORY
+entries that name removed skills (RAG 14, industrial-inspection 1) need an
+update at that refresh, and consumers installed at `76887a8` (2026-08-22)
+cannot refresh because of an older takeover rule. Refreshing is the user's
 call.
 
-Pinned versions: Context Mode `2.1.8` (pinned on `dev` by PR #55;
-`PINNED_CONTEXT_MODE_VERSION` in `shared/hooks/scripts/context-mode-dispatch.sh`), OpenWiki
-`0.7.2` (the guard allows only `mode: "update"`), and Ponytail partially
-merged from upstream `v5.3.2` (`ponytail-review` stays complexity-only).
-Context Mode 2.x is a full rewrite: it needs Node.js 24.15.0 or newer (the
-dispatcher enforces it in server mode and `--self-check`; the devcontainer
-image is `node:24.22.3-bookworm-slim`), always reports server version
-`"dev"` (so the dispatcher's manifest or `npx` pin is the only version
-proof), needs `--agent` (the kit uses `codex` for every client, started from
-the outer repository root), ignores `CONTEXT_MODE_DIR` (the dispatcher
-exports `CONTEXT_MODE_DATA_DIR` to the guarded root), and has no Antigravity
-id. Evidence: `.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md`
-and `.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`.
-The global `context-mode` on this host is still the 1.x release, so the
-dispatcher refuses it and uses `npx -y context-mode@2.1.8`; tests use a
-private copy in `$HOME/.cache/context-mode-pin`.
-The migration plan `.claude/plans/context-mode-2x-migration.md` was approved
-on 2026-11-12 with every recommended option (MCP-only, drop `ctx_doctor`,
-drop Antigravity's entry, one server identity). Later that day the user
-waived its 14-day settle check ("start now, bump it up later"). The
-pre-branch spike (`.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`)
-chose pin 2.1.8, image `node:24.22.3-bookworm-slim`, and
-`context-mode server --agent codex` started from the outer repository root.
-The branch `context-mode-2x-migration_implementation` started on
-2026-11-12: Phase A (MCP-only surface on Context Mode 1.x), then Phase B (2.1.8
-switch), then Phase C (OpenWiki refresh).
+Pinned versions: Context Mode `2.1.8` (`PINNED_CONTEXT_MODE_VERSION` in
+`shared/hooks/scripts/context-mode-dispatch.sh`), OpenWiki `0.7.2` (the guard
+allows only `mode: "update"`), and Ponytail partially merged from upstream
+`v5.3.2` (`ponytail-review` stays complexity-only). Context Mode 2.x needs
+Node.js 24.15.0 or newer (the dispatcher enforces it in server mode and
+`--self-check`), always reports server version `"dev"`, needs `--agent` (the
+kit uses `codex` for every client, started from the outer repository root),
+ignores `CONTEXT_MODE_DIR` (the dispatcher exports `CONTEXT_MODE_DATA_DIR` to
+the guarded root), and has no Antigravity id. Tests use a private copy in
+`$HOME/.cache/context-mode-pin`. Evidence:
+`.claude/explorations/2026-11-11_context-mode-2x-evidence/REPORT.md` and
+`.claude/explorations/2026-11-12_context-mode-2x-recheck/REPORT.md`.
 
 Before merging bootstrap changes, run:
 
@@ -251,7 +282,7 @@ Before merging bootstrap changes, run:
 3. `uv run python scripts/check_runtime.py`
 4. relevant tests/lint/type checks and the profile-driven review
 5. findings gate, documentation updates, `[LEARN]` capture, and a session
-   closeout before commit/PR
+   closeout before commit/PR (`closeout.instructions.md`)
 
 After a `shared/` change, refresh the installed copy here with
 `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
@@ -271,16 +302,13 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
 - A new file under `.claude/` survives a self-refresh only inside a
   `CONSUMER_STATE_PATHS` entry, a marker-claimed third-party bundle, or a
   `.claude/skills/<name>/` folder marked with `.project-skill`; elsewhere the
-  installer deletes it. An unmarked skill folder the bootstrap never shipped,
-  or one whose shipped name no shipped-before record lists, makes it refuse
-  instead.
+  installer deletes it. An unmarked skill folder it cannot classify makes it
+  refuse instead.
 
 ## Known documentation/status caveats
 
 - Some older files under root `plans/` still say `Proposed`. Treat code and
-  target validation as the source of truth. (The stale July plan statuses and
-  the 2026-10-02 exploration statuses were closed by `backlog-followups`
-  Phase A on 2026-10-20.)
+  target validation as the source of truth.
 - Root `CLAUDE.md` and `AGENTS.md` are tracked, hand-maintained maintainer
   guides here, not gitignored generated files; `AGENTS.md` has no
   `**Project:**` line and must not get one. Never fill the `**Project:**`
@@ -288,19 +316,12 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   consumer template, and the installer fills the line per target. The
   installed workspace copy reads `**Project:** github_copilot_bootstrap`, and
   `check_runtime.py` accepts only that exact substitution, so a longer
-  one-liner there would show as drift. The `onboard`, `setup-project`, and
-  `create-feature` skills say this since Phase A.
+  one-liner there would show as drift.
 - While tracked root `CLAUDE.md` or `AGENTS.md` differs from its mirror in
   `.claude/bootstrap-root/`, `verify.py` cannot build a receipt and stops with
   `receipt metadata control-plane provenance is invalid`. Run
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after editing either file.
-- The 2026-11-11 onboarding found two README sentences and three OpenWiki
-  statements out of date (Context Mode routing for "three" targets, the
-  consumer `src/` scope of "Verification Defaults", the Claude Code Context
-  Mode matcher from PR #53, and the receipt-chain skip from PR #52). The big
-  plan `readme-and-wiki-drift-fixes` fixed all five, merged into `dev` as
-  PR #54 on 2026-11-12.
 - A one-phase plan gets no knowledge-refresh phase, so the wiki drifts until
-  the next refresh (PRs #52 and #53 were the latest case). Refresh pages only
-  through the `knowledge-refresh` skill, never by hand.
+  the next refresh. Refresh pages only through the `knowledge-refresh` skill,
+  never by hand. PR #56 ended with a knowledge-refresh phase (Phase I).

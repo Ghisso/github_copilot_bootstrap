@@ -13,10 +13,11 @@
   not establish a fail-closed operation classifier.
 
 - [LEARN:domain] `github_copilot_bootstrap` generates a multi-target coding
-  agent workflow bootstrap from `shared/` into `dist/multi-agent/` (full) and
-  `dist/sidecar/` (personal overlay); it is not a Hydra/BentoML/Haystack/Gradio
-  application. Durable project context:
-  `.claude/instructions/project-context.instructions.md`.
+  agent workflow bootstrap from `shared/` into `dist/multi-agent/` (full; Claude
+  Code, Codex, Copilot, Antigravity) and `dist/sidecar/` (personal overlay); it
+  is not a Hydra/BentoML/Haystack/Gradio application and has no `src/` or
+  `pyproject.toml`. Durable project context (refreshed 2026-11-15 at
+  `2e8c7bb`): `.claude/instructions/project-context.instructions.md`.
 - [LEARN:domain] Context Mode 1.x (pinned until the 2026-11-12
   `context-mode-2x-migration`) checks the npm registry at startup and every
   hour (the "outdated → v… available" notice; no setting turns it off), and
