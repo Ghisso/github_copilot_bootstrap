@@ -1867,3 +1867,17 @@
   range's edge line became blank after the source changed. Revise the Claim
   with the same `id` and a range whose first and last lines hold text.
 
+- [LEARN:security] A link-only write preflight misses the commonest
+  link-follow in a copy: `shutil.copy2(src, dst)` writes `dst/<name>` when
+  `dst` is a real folder, and opening that path follows a link there (Phase H
+  reproduced four outside writes past Phase F's check). Check each written
+  path's kind and every part above it with `lstat`, guard every copy at write
+  time too (`copytree` calls its `ignore` callback before each level's
+  `makedirs`; `copy_function` covers files), and rerun the pre-write checks
+  after any step that can change the tree, such as a state migration.
+- [LEARN:testing] A fixture that proves "a link is never read" must make
+  reading it change the result: point the link at a folder holding what the
+  code would find (Phase H's first symlinked-record fixture passed with the
+  link followed). A subprocess helper that copies `os.environ` also passes
+  variables the code reads as input (`AI_STATE_REMOTE` acts like
+  `--state-remote`); drop them in the helper and set them per test.

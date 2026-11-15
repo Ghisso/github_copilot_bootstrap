@@ -116,8 +116,31 @@ Fix second-review findings R24 to R28 (`.claude/quality_reports/merges/2026-11-1
   - Reran: `generate_targets.py --all` exit 0, self-refresh exit 0 (the nested repository unchanged), `validate_targets.py` PASS, `tests/test_install_bootstrap.py` 268 passed, ruff clean.
 - Review round 2 requested from the same reviewer, with the new diff and its delta from round 1.
 
+- **Review round 2** (same reviewer). Gate PASS, no open request.
+  - All five round-1 findings were confirmed fixed, and nothing else broke.
+  - One new MINOR: `_file_over_a_generated_folder`'s docstring still said a test on `.claude/templates` "could not fail", but the new `generated-claude-folder-is-a-file` entry tests exactly that. Fixed by the main agent with the reviewer's suggested wording (comment only). Ruff is clean, and the 13 `wrong_kind` tests pass. It is recorded in the findings report with disposition `fixed`.
+
 ## [LEARN] Entries
+
+- [LEARN:security] A link-only write preflight misses the commonest link-follow in a copy: `shutil.copy2(src, dst)` writes `dst/<name>` when `dst` is a real folder, and opening that path follows a link there. Check each written path's kind and every part above it with `lstat`, guard every copy at write time too (`copytree`'s `ignore` runs before each level's `makedirs`; `copy_function` covers files), and rerun the pre-write checks after any step that can change the tree. Routed to `.claude/MEMORY.md`. The code and tests now enforce the fix, but the pitfall is not visible from them.
+- [LEARN:testing] A fixture that proves "a link is never read" must make reading it change the result. A subprocess helper that copies `os.environ` passes variables the code reads as input (`AI_STATE_REMOTE`); drop them in the helper. Routed to `.claude/MEMORY.md`.
 
 ## Verification
 
+- optional 1: PASS. The round-2 reproduction was rerun on the fixed installer. In all six cases the sentinel was unchanged: `.claude/plans/README.md` was skipped with a warning (exit 0), and the other five were refused before any write (exit 1).
+- optional 2: PASS. Scratch copies of real consumers, with no remotes, refreshed with `--local-only` from `dist/multi-agent`:
+  - RAG: exit 0.
+  - industrial-inspection: exit 0.
+  - img-classification: exit 1, listing 52 unmarked folders with the new wording. After all 52 were moved to one backup folder outside `.claude/`, the rerun exited 0 and wrote the 37-name record.
+
 ## Open Questions / Next Steps
+
+- Next: Phase I (`2026-11-15_phase-I-knowledge-refresh`), the OpenWiki refresh and final audit.
+- Recorded follow-ups added by this phase are in `docs/target-mapping.md`:
+  - the `state-sync.sh` gap, now marked the priority follow-up;
+  - hard links;
+  - the macOS `strip_quarantine` question;
+  - the read-through-link push;
+  - narrowing the wrong-kind refusal;
+  - removals and `write_text` calls checked by the preflight only;
+  - an unmarked shipped-name folder without `SKILL.md`.

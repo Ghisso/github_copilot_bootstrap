@@ -380,7 +380,7 @@ Each probe runs at most twice. A failing command is recorded with its error, not
 - [x] `2026-11-14_phase-E-closeout-and-guidance-fixes` — closeout recovery, guidance, validator, and docs fixes (review findings R1 to R12)
 - [x] `2026-11-14_phase-F-installer-safety` — installer safety and project-skill guidance (review findings R13 to R22)
 - [x] `2026-11-14_phase-G-knowledge-refresh` — OpenWiki refresh and final stale-claims audit (review finding R23)
-- [ ] `2026-11-15_phase-H-installer-copy-safety` — copy safety, option A, recovery guidance, and installer docs (second-review findings R24 to R28)
+- [x] `2026-11-15_phase-H-installer-copy-safety` — copy safety, option A, recovery guidance, and installer docs (second-review findings R24 to R28)
 - [ ] `2026-11-15_phase-I-knowledge-refresh` — OpenWiki refresh and final stale-claims audit (second-review finding R29)
 
 ## Verification
