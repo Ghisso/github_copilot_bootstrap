@@ -2,7 +2,7 @@
 name: skills-and-instructions-trim
 type: big-plan
 # status must occur exactly once: planning | in-progress | complete | cancelled
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: skills-and-instructions-trim_implementation
 started_at: 2026-11-13T11:54:23Z
@@ -14,7 +14,9 @@ phases:
   - 2026-11-14_phase-E-closeout-and-guidance-fixes
   - 2026-11-14_phase-F-installer-safety
   - 2026-11-14_phase-G-knowledge-refresh
-current_phase: 
+  - 2026-11-15_phase-H-installer-copy-safety
+  - 2026-11-15_phase-I-knowledge-refresh
+current_phase: 2026-11-15_phase-H-installer-copy-safety
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -94,13 +96,35 @@ Corrections recorded at the reopen:
 - **The incident behind Phase A was misread.** RAG's `retrieval-routing` and `iterative-plan-review` were bootstrap skills (shipped 2026-05-14, retired 2026-07-03 by R-DEBLOAT-02), byte-identical to the bootstrap's copies, so the 2026-08-09 refresh removed them correctly. Phase A still addresses a real risk: the learn skill told consumers to save skills where a refresh deletes them.
 - **The skill-listing evidence covers large-context models only.** On `claude-haiku-4-5` (200K context, 8,000-character budget), the listing overflows before (25,999 characters) and after (15,900) the trim. On `claude-opus-5` and `claude-sonnet-5` it fits. The 300-character cap halves the per-turn listing, but it does not prevent truncation on 200K-context models. That stays a recorded follow-up.
 
+### Reopened again on 2026-11-15
+
+Phases E to G were complete and pushed (`4aa49d4`, `ea8b475`, `e1bf94f`), with no PR. A second independent review then held the PR again. The findings are R24 to R29 in `.claude/quality_reports/merges/2026-11-15_skills-and-instructions-trim-review-2.md`.
+- **R24.** A full refresh still writes outside the project through a link inside a folder that sits where it copies a file. The main agent reproduced this on four write paths.
+- **R25.** The no-record recovery's proof is too weak.
+- **R26.** Decision 9's no-record overwrite can delete a project's files.
+
+On 2026-11-15 the user chose option A for Decision 9, with the second reviewer's three refinements. The user confirmed Decisions 8, 10, 11, and 12, and asked to repair the branch through two new phases before any PR, with verification, review, commit, and push. The two phases were appended per "Reopening a completed big plan":
+- H fixes the copy safety, applies option A, and corrects the recovery guidance and docs (R24 to R28).
+- I is the final knowledge refresh and audit (R29).
+
+Completed phases, their logs, findings, and receipts stay unchanged.
+
 ### Decisions for the reopen (2026-11-14, recommended options taken while the user was away; the user may overturn them)
+
+On 2026-11-15 the user confirmed Decisions 8, 10, 11, and 12 and overturned Decision 9. The changes are listed after Decision 12; the original text below stays as the record.
 
 8. **Symlinked destinations (R13).** A full refresh refuses, before any write, every path it would write that is a symlink or sits under a symlinked folder. That covers the copy step, the substitution files, `.gitignore`, `.claude/bootstrap-root/`, and the devcontainer file. It lists each path; the operator replaces the link with a regular file or removes it. A state-folder README under a symlinked consumer-state folder is skipped with a warning, because that folder is consumer state. Rejected option: silently replace the link, which would hide a change the user made.
 9. **Unmarked folder with a newly shipped name (R14).** When the `bootstrap-root` record exists and lacks the name, the refresh refuses instead of overwriting. With no such record, an unmarked folder with a shipped name is still treated as an old bootstrap copy and overwritten. So a consumer with no record can still lose an unmarked project skill whose name the bootstrap later ships; the learn skill therefore tells consumers to mark every project skill when they create it.
 10. **Stale `.agents/` on an existing second clone (R17).** The refusal explains the cause and the safe recovery (delete the listed folders). The docs allow that one manual deletion. Rejected for now: automatic deletion in the restore hook or the installer, which would need proof that each file is an old record copy. It stays a recorded follow-up.
 11. **Consumers with no record (R15).** The refusal says what is known and names both remedies. The refresh skill documents how to check that a folder is an unmodified bootstrap copy. Rejected: having the installer read the bootstrap's Git history, which needs a full clone.
 12. **Byte budgets (R10).** Add `workspace` 7.5 KiB (7,680 bytes), `quality-and-testing` 3 KiB, `tool-routing` 3 KiB, `closeout` 16 KiB, and `plan-lifecycle` 11 KiB to `POLICY_BYTE_BUDGETS`. The Phase B size targets (workflow core 16,000; generated `CLAUDE.md` 4,500 and `AGENTS.md` 4,800; workspace 7,500) stay the acceptance line for Phase E, and its verification block checks them with `wc -c`.
+
+Changes the user made on 2026-11-15:
+- **8 (confirmed, completed by R24).** The refresh also refuses, before any write, a folder where it writes a file and a regular file where it writes a folder. Every file copy also refuses a link or a folder at its destination, as a second line of defense. A state-folder README path that is a folder is skipped with a warning. The `state-sync.sh` gap stays the priority follow-up.
+- **9 (overturned: option A).** An unmarked skill folder (holding `SKILL.md`) whose name the new source ships is refused when no shipped-before record lists it. The record is the `bootstrap-root` copy, or the live `.agents/skills/` when that copy is absent. A missing record never blocks an install by itself: a project with no skill folders installs normally. To keep its own skill, a project keeps the name and adds `.project-skill`; it renames the folder and its `name:` line first only when the name clashes with a shipped skill.
+- **10 (confirmed, wording changed).** The stale `.agents/skills/` recovery moves the listed folders aside. Delete them only once they are confirmed as old bootstrap copies.
+- **11 (confirmed, procedure corrected).** The installer still reads no Git history. The manual proof before deleting a folder is that its complete file list and contents equal that skill's folder at one bootstrap commit. Otherwise, move the folder out of `.claude/skills/`.
+- **12 (confirmed).** The budgets are ceilings; raising one needs a stated reason.
 
 ### Measured baseline (2026-11-12, re-checked 2026-11-13)
 
@@ -151,6 +175,8 @@ Corrections recorded at the reopen:
 | E (reopen) | `2026-11-14_phase-E-closeout-and-guidance-fixes` | Closeout recovery and wording, MEMORY search rule, Codex routes, validator gaps and budgets, lost triggers, docs (R1 to R12) |
 | F (reopen) | `2026-11-14_phase-F-installer-safety` | No write through links, newly-shipped-name refusal, honest no-record message, mirror robustness, learn and refresh-skill guidance, installer docs (R13 to R22) |
 | G (reopen) | `2026-11-14_phase-G-knowledge-refresh` | OpenWiki refresh and the final stale-claims audit (R23) |
+| H (second reopen) | `2026-11-15_phase-H-installer-copy-safety` | Kind refusal and copy-time guard, option A for unrecorded shipped names, recovery guidance and installer docs (R24 to R28) |
+| I (second reopen) | `2026-11-15_phase-I-knowledge-refresh` | OpenWiki refresh and the final stale-claims audit (R29) |
 
 Why this order:
 - A comes first by user decision.
@@ -166,7 +192,8 @@ Split fallback: if Phase B is too large to review as one commit, split it into B
 - B2: the size trims (root guidance, workspace, quality, tool-routing, config-first, documenter).
 
 Done criteria:
-- Phases A to G are `complete`, with passing receipts and findings that show zero CRITICAL and MAJOR and gate result `PASS`.
+- Phases A to I are `complete`, with passing receipts and findings that show zero CRITICAL and MAJOR and gate result `PASS`.
+- (Second reopen) Three things are refused before any write: a folder where a full refresh writes a file, a regular file where it writes a folder, and a link at a written path. Every file copy refuses a link or a folder at its destination. With no shipped-before record that lists it, an unmarked skill folder with a shipped name is refused, and a project with no skill folders installs normally. The refresh skill's deletion proof is an exact whole-folder match at one bootstrap commit; otherwise the folder is moved aside. The OpenWiki install page states these, and the final audit is recorded in Phase I's closeout log.
 - (Reopen) The closeout recovery for a late documentation change re-records findings, and the validator pins the recovery section itself. A full refresh never writes through a symlink and refuses before any write. An unmarked folder with a newly shipped name that the record lacks is refused. The no-record refusal no longer says "never shipped". The learn skill never sends consumer lessons into a shipped skill. Each Codex fallback skill names its policy. The OpenWiki pages carry no R23 statement, and the final audit is recorded in Phase G's closeout log.
 - A marked project skill survives a real install and refresh and is mirrored to `.agents/skills/`. These are refused before any write:
   - a name clash with a shipped skill;
@@ -337,6 +364,8 @@ Each probe runs at most twice. A failing command is recorded with its error, not
 | REQ-011 | Review findings R1 to R12 fixed: closeout recovery and wording, MEMORY literal search, Codex routes and the regression-test rule, YAML-form and budget validator gaps, lost triggers, outdated docs | `2026-11-14_phase-E-closeout-and-guidance-fixes` | `-k "closeout_procedure or codex_fallback or frontmatter_yaml or policy_budget or root_guidance"`; grep checks |
 | REQ-012 | Review findings R13 to R22 fixed: no write through links, newly-shipped-name refusal, honest no-record wording, mirror robustness, stray-marker check, stale `.agents` explanation, learn and refresh-skill guidance, installer docs, mirror-update test | `2026-11-14_phase-F-installer-safety` | `-k "project_skill or destination_link or stale_agents"`; real installer runs; grep checks |
 | REQ-013 | Finding R23 fixed in the wiki; final stale-claims audit recorded | `2026-11-14_phase-G-knowledge-refresh` | page-specific wiki checks; closeout log heading |
+| REQ-014 | Second-review findings R24 to R28 fixed: kind refusal before any write, copy-time guard on every file copy, README skip for a folder, option A for unrecorded shipped names, exact deletion proof, move-aside wording, `AI_STATE_REMOTE` wording | `2026-11-15_phase-H-installer-copy-safety` | `-k "destination_link or project_skill or stale_agents"`; real installer runs; grep checks |
+| REQ-015 | Finding R29 fixed in the wiki; final stale-claims audit recorded | `2026-11-15_phase-I-knowledge-refresh` | page-specific wiki checks; closeout log heading |
 
 ## Phases
 
@@ -347,6 +376,8 @@ Each probe runs at most twice. A failing command is recorded with its error, not
 - [x] `2026-11-14_phase-E-closeout-and-guidance-fixes` — closeout recovery, guidance, validator, and docs fixes (review findings R1 to R12)
 - [x] `2026-11-14_phase-F-installer-safety` — installer safety and project-skill guidance (review findings R13 to R22)
 - [x] `2026-11-14_phase-G-knowledge-refresh` — OpenWiki refresh and final stale-claims audit (review finding R23)
+- [ ] `2026-11-15_phase-H-installer-copy-safety` — copy safety, option A, recovery guidance, and installer docs (second-review findings R24 to R28)
+- [ ] `2026-11-15_phase-I-knowledge-refresh` — OpenWiki refresh and final stale-claims audit (second-review finding R29)
 
 ## Verification
 
@@ -356,7 +387,7 @@ uv run python .claude/scripts/verify.py fast --format json
 
 ## Completion Evidence
 
-The final phase listed under `phases:` (`2026-11-14_phase-G-knowledge-refresh` since the 2026-11-14 reopen; Phase D ran this audit for the first four phases) must also run a documentation, memory, and LEARN audit:
+The final phase listed under `phases:` (`2026-11-15_phase-I-knowledge-refresh` since the 2026-11-15 reopen; Phase D ran this audit for the first four phases and Phase G for E and F) must also run a documentation, memory, and LEARN audit:
 - sweep every live-advice surface for claims that this plan or earlier work invalidated;
 - correct or supersede each one;
 - leave dated records (archived plans, dated design narratives, closed session logs) unchanged;
