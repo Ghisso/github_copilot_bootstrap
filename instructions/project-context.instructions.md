@@ -72,7 +72,9 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   `.claude/` that the target lacks is deleted on refresh, except a
   marker-claimed third-party bundle and a `.claude/skills/<name>/` folder
   marked with `.project-skill`. An unmarked skill folder the bootstrap never
-  shipped makes the refresh refuse before any write (`validate_project_skills`).
+  shipped, or whose newly shipped name the shipped-before record does not list
+  (with or without a record), makes the refresh refuse before any write
+  (`validate_project_skills`).
 - `scripts/sidecar_overlay.py`: sidecar install, update, and uninstall engine.
 - `scripts/update_consumers.py`: batch regenerate/update of mixed full and
   sidecar consumers; it finishes every target even when one fails.
