@@ -114,7 +114,9 @@ Use this workflow when:
    reverse, makes each refresh refuse until you move the old item by hand.
    Not checked: the nested state sync's own writes (it may append to
    `.claude/.gitignore` and `.claude/.gitattributes`, and it restores
-   `settings.local.json`); hard links; whether the macOS quarantine strip
+   `settings.local.json`); Git's own writes (`git config core.hooksPath` in
+   the outer repository, and the nested state commit in `.claude/`); hard
+   links; whether the macOS quarantine strip
    (`xattr -rc` over whole folders, consumer state included) follows links;
    and reads through links, for example a preserved, tracked root adapter
    that is a link, which the record copy reads into the AI state, which can
