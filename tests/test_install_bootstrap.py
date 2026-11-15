@@ -11,6 +11,8 @@ import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Literal
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -69,8 +71,10 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _actor_env() -> dict[str, str]:
+    # `main` treats an exported AI_STATE_REMOTE like `--state-remote`, and a
+    # devcontainer may export it; a test sets it only through `extra_env`.
     return {
-        **os.environ,
+        **{key: value for key, value in os.environ.items() if key != "AI_STATE_REMOTE"},
         "GIT_AUTHOR_NAME": "Installer Test",
         "GIT_AUTHOR_EMAIL": "installer@example.com",
         "GIT_COMMITTER_NAME": "Installer Test",
@@ -1541,13 +1545,26 @@ def _make_outside(tmp_path: Path) -> Path:
     return outside
 
 
-def _project_skill_world(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """Return ``(source, target, outside)``: a source and a target that both
-    hold the shipped skill ``shipped``, and the outside sentinel folder."""
+def _project_skill_world(
+    tmp_path: Path, record: Literal["bootstrap-root", "live", "none"] = "bootstrap-root"
+) -> tuple[Path, Path, Path]:
+    """Return ``(source, target, outside)``: a source that ships the skill
+    ``shipped``, the outside sentinel folder, and a target that models an
+    installed consumer. The target holds an unmarked ``shipped`` folder and the
+    shipped-before record an earlier install left, so option A (R26) has no
+    reason to refuse it. ``record`` says where that record sits: the
+    ``bootstrap-root`` copy of ``.agents/skills`` (the default), only the live
+    ``.agents/skills``, or nowhere (``none``: the target has no ``shipped``
+    folder either, so a test adds the folder it wants refused or kept)."""
     source = tmp_path / "source"
     target = tmp_path / "consumer"
     _write_project_skill(source, "shipped", marked=False)
-    _write_project_skill(target, "shipped", marked=False)
+    if record == "bootstrap-root":
+        _write_project_skill(target, "shipped", marked=False)
+        _write_shipped_before_record(target, "shipped")
+    elif record == "live":
+        _write_project_skill(target, "shipped", marked=False)
+        (target / ".agents/skills/shipped").mkdir(parents=True)
     return source, target, _make_outside(tmp_path)
 
 
@@ -1722,7 +1739,13 @@ def _refuse_marked_without_skill_md(target: Path, outside: Path) -> tuple[str, .
 
 def _refuse_unmarked_never_shipped(target: Path, outside: Path) -> tuple[str, ...]:
     _write_project_skill(target, "stray", marked=False)
-    return ("stray", ".claude/skills/stray/.project-skill")
+    return (
+        "stray",
+        ".claude/skills/stray/.project-skill",
+        "The new bootstrap does not ship it",
+        "the shipped-before record (.claude/bootstrap-root/.agents/skills) "
+        "does not list it",
+    )
 
 
 def _refuse_live_record_when_copy_exists(
@@ -1734,7 +1757,20 @@ def _refuse_live_record_when_copy_exists(
     (target / ".agents/skills/old").mkdir(parents=True)
     (target / ".agents/skills/old/SKILL.md").write_text("old\n", encoding="utf-8")
     (target / ".claude/bootstrap-root/.agents/skills/other").mkdir(parents=True)
-    return ("old",)
+    return (
+        ".claude/skills/old",
+        "The new bootstrap does not ship it",
+        "the shipped-before record (.claude/bootstrap-root/.agents/skills) "
+        "does not list it",
+    )
+
+
+# The marker-lost branch's own message; the never-shipped message also names
+# `.project-skill`, so naming it alone would not tell the two branches apart.
+_MARKER_LOST = (
+    ".claude/skills/demo was a project skill and its marker is missing",
+    "restore .claude/skills/demo/.project-skill to keep it",
+)
 
 
 def _write_former_project_skill_record(target: Path, name: str, *, live: bool) -> None:
@@ -1755,7 +1791,7 @@ def _refuse_marker_lost_former_project_skill(
     was a project skill, so a refresh must not delete it as a retired one."""
     _write_project_skill(target, "demo", marked=False)
     _write_former_project_skill_record(target, "demo", live=False)
-    return ("demo", ".claude/skills/demo/.project-skill")
+    return (*_MARKER_LOST, "demo")
 
 
 def _refuse_marker_lost_former_project_skill_in_live_agents_only(
@@ -1763,7 +1799,7 @@ def _refuse_marker_lost_former_project_skill_in_live_agents_only(
 ) -> tuple[str, ...]:
     _write_project_skill(target, "demo", marked=False)
     _write_former_project_skill_record(target, "demo", live=True)
-    return ("demo", ".claude/skills/demo/.project-skill")
+    return (*_MARKER_LOST, "demo")
 
 
 def _refuse_marker_lost_former_project_skill_the_source_now_ships(
@@ -1774,7 +1810,7 @@ def _refuse_marker_lost_former_project_skill_the_source_now_ships(
     _write_project_skill(target.parent / "source", "demo", marked=False)
     _write_project_skill(target, "demo", marked=False)
     _write_former_project_skill_record(target, "demo", live=False)
-    return ("demo", ".claude/skills/demo/.project-skill")
+    return (*_MARKER_LOST, "demo")
 
 
 def _write_shipped_before_record(target: Path, *names: str) -> None:
@@ -1782,8 +1818,30 @@ def _write_shipped_before_record(target: Path, *names: str) -> None:
     install left, holding exactly ``names``."""
     for name in names:
         record = target / ".claude/bootstrap-root/.agents/skills" / name
-        record.mkdir(parents=True)
+        record.mkdir(parents=True, exist_ok=True)
         (record / "SKILL.md").write_text("old\n", encoding="utf-8")
+
+
+def _newly_shipped_unmarked_folder(target: Path) -> None:
+    """The new source ships `fresh`; the project holds an unmarked `fresh`."""
+    _write_project_skill(target.parent / "source", "fresh", marked=False)
+    _write_project_skill(target, "fresh", marked=False)
+
+
+# What option A (R26) says about an unmarked folder whose name the new source
+# ships and the record does not list. The remedies are the same whatever the
+# record is, and neither message is the never-shipped one ("does not ship it").
+_LINKED_RECORD = (
+    "the shipped-before record (.claude/bootstrap-root/.agents/skills) "
+    "is a symlink and was not read"
+)
+_NEWLY_SHIPPED_REMEDIES = (
+    ".claude/skills/fresh",
+    "would overwrite it",
+    "rename the folder and its `name:` line",
+    "add .project-skill to it",
+    "otherwise move it out of .claude/skills/",
+)
 
 
 def _refuse_unmarked_newly_shipped_name_the_record_lacks(
@@ -1792,15 +1850,77 @@ def _refuse_unmarked_newly_shipped_name_the_record_lacks(
     """R14: the `bootstrap-root` record shows the last install did not ship
     `fresh`, and the new source ships it, so a refresh would overwrite the
     project's folder."""
-    _write_project_skill(target.parent / "source", "fresh", marked=False)
-    _write_project_skill(target, "fresh", marked=False)
-    _write_shipped_before_record(target, "shipped")
-    return (".claude/skills/fresh", "would overwrite it", "does not list it")
+    _newly_shipped_unmarked_folder(target)
+    return (
+        *_NEWLY_SHIPPED_REMEDIES,
+        "the shipped-before record (.claude/bootstrap-root/.agents/skills) "
+        "does not list it",
+    )
+
+
+def _refuse_newly_shipped_name_with_no_record(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """R26, option A: with no record at all the installer cannot tell an old
+    bootstrap copy from the project's own folder, so it refuses instead of
+    overwriting. The message says only what is known."""
+    _newly_shipped_unmarked_folder(target)
+    return (*_NEWLY_SHIPPED_REMEDIES, "no shipped-before record was found")
+
+
+def _refuse_newly_shipped_name_with_only_the_live_agents_record(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """The live `.agents/skills` is the record when no `bootstrap-root` copy
+    exists, and it does not list `fresh`."""
+    _newly_shipped_unmarked_folder(target)
+    return (
+        *_NEWLY_SHIPPED_REMEDIES,
+        "the shipped-before record (.agents/skills) does not list it",
+    )
+
+
+def _refuse_newly_shipped_name_with_a_symlinked_record(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """A record that is a link is never read, so it lists nothing. The link
+    leads to a folder that lists `fresh`: a followed link would let the refresh
+    pass, so a refusal proves the link was not read. The message says so."""
+    _newly_shipped_unmarked_folder(target)
+    listing = outside / "linked-record"
+    (listing / "fresh").mkdir(parents=True)
+    (listing / "fresh/SKILL.md").write_text("old\n", encoding="utf-8")
+    skills = target / ".claude/bootstrap-root/.agents/skills"
+    shutil.rmtree(skills, ignore_errors=True)
+    skills.parent.mkdir(parents=True, exist_ok=True)
+    skills.symlink_to(listing, target_is_directory=True)
+    return (*_NEWLY_SHIPPED_REMEDIES, _LINKED_RECORD)
+
+
+def _refuse_newly_shipped_name_with_a_dangling_symlinked_record(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """A dangling link is a record that exists but cannot be read."""
+    _newly_shipped_unmarked_folder(target)
+    skills = target / ".claude/bootstrap-root/.agents/skills"
+    skills.parent.mkdir(parents=True, exist_ok=True)
+    skills.symlink_to(outside / "gone", target_is_directory=True)
+    return (*_NEWLY_SHIPPED_REMEDIES, _LINKED_RECORD)
 
 
 PROJECT_SKILL_REFUSALS = {
     "unmarked-newly-shipped-name-the-record-lacks": (
         _refuse_unmarked_newly_shipped_name_the_record_lacks
+    ),
+    "newly-shipped-name-with-no-record": _refuse_newly_shipped_name_with_no_record,
+    "newly-shipped-name-with-only-the-live-agents-record": (
+        _refuse_newly_shipped_name_with_only_the_live_agents_record
+    ),
+    "newly-shipped-name-with-a-symlinked-record": (
+        _refuse_newly_shipped_name_with_a_symlinked_record
+    ),
+    "newly-shipped-name-with-a-dangling-symlinked-record": (
+        _refuse_newly_shipped_name_with_a_dangling_symlinked_record
     ),
     "marker-in-shipped-folder": _refuse_marker_in_shipped_folder,
     "declared-name-differs": _refuse_declared_name_differs,
@@ -1829,14 +1949,28 @@ PROJECT_SKILL_REFUSALS = {
 }
 
 
-@pytest.mark.parametrize(
-    "scenario", PROJECT_SKILL_REFUSALS.values(), ids=PROJECT_SKILL_REFUSALS.keys()
-)
+# Where each scenario's shipped-before record sits, when it is not the default
+# `bootstrap-root` copy. A scenario that moves the world to another refusal
+# branch must fail: each one also asserts its own branch's message.
+PROJECT_SKILL_RECORDS: dict[str, Literal["live", "none"]] = {
+    "newly-shipped-name-with-no-record": "none",
+    "newly-shipped-name-with-only-the-live-agents-record": "live",
+    "newly-shipped-name-with-a-symlinked-record": "none",
+    "newly-shipped-name-with-a-dangling-symlinked-record": "none",
+    "marker-lost-former-project-skill-in-live-agents-only": "live",
+    "retired-skill-in-live-agents-only": "live",
+    "newly-shipped-name-listed-by-the-live-agents-record": "live",
+}
+
+
+@pytest.mark.parametrize("name", PROJECT_SKILL_REFUSALS)
 def test_validate_project_skills_refuses_before_any_write(
-    tmp_path: Path, scenario: Callable[[Path, Path], tuple[str, ...]]
+    tmp_path: Path, name: str
 ) -> None:
-    source, target, outside = _project_skill_world(tmp_path)
-    expected = scenario(target, outside)
+    source, target, outside = _project_skill_world(
+        tmp_path, PROJECT_SKILL_RECORDS.get(name, "bootstrap-root")
+    )
+    expected = PROJECT_SKILL_REFUSALS[name](target, outside)
     target_before = _exact_snapshot(target)
     outside_before = _exact_snapshot(outside)
 
@@ -1846,6 +1980,10 @@ def test_validate_project_skills_refuses_before_any_write(
     assert refused.value.code not in (0, None)
     for fragment in expected:
         assert fragment in str(refused.value.code)
+    if "shipped" not in expected:
+        # The world's own `shipped` folder is listed in the record: no refusal
+        # may name it, or a scenario fell into another branch.
+        assert ".claude/skills/shipped" not in str(refused.value.code)
     assert _exact_snapshot(target) == target_before
     assert _exact_snapshot(outside) == outside_before
 
@@ -1866,9 +2004,9 @@ def test_validate_project_skills_lists_every_problem_in_one_refusal(
 
 
 def _pass_retired_skill_in_bootstrap_root_record(target: Path) -> None:
-    # The record lists `shipped` too: it is what the last install shipped.
+    # The world's record lists `shipped`; the retired `old` joins it.
     _write_project_skill(target, "old", marked=False)
-    _write_shipped_before_record(target, "old", "shipped")
+    _write_shipped_before_record(target, "old")
 
 
 def _pass_retired_skill_in_live_agents_only(target: Path) -> None:
@@ -1893,40 +2031,16 @@ def _pass_openwiki_claimed_bundle(target: Path) -> None:
     (bundle / ".openwiki-install.json").write_text("{}", encoding="utf-8")
 
 
-def _newly_shipped_unmarked_folder(target: Path) -> None:
-    """The new source ships `fresh`; the project holds an unmarked `fresh`."""
-    _write_project_skill(target.parent / "source", "fresh", marked=False)
-    _write_project_skill(target, "fresh", marked=False)
-
-
-def _pass_newly_shipped_name_with_no_record(target: Path) -> None:
-    """Decision 9: with no record, an unmarked folder with a shipped name is an
-    old bootstrap copy that the refresh overwrites, as before."""
+def _pass_newly_shipped_name_listed_by_the_live_agents_record(target: Path) -> None:
+    """The live `.agents/skills` is the record when no `bootstrap-root` copy
+    exists, and here it lists `fresh`: the folder is an old bootstrap copy."""
     _newly_shipped_unmarked_folder(target)
-
-
-def _pass_newly_shipped_name_with_only_the_live_agents_record(target: Path) -> None:
-    """The live `.agents/skills` is a fallback, not a trusted record."""
-    _newly_shipped_unmarked_folder(target)
-    (target / ".agents/skills/shipped").mkdir(parents=True)
-
-
-def _pass_newly_shipped_name_with_a_symlinked_record(target: Path) -> None:
-    """The record copy must be a real directory to be trusted."""
-    _newly_shipped_unmarked_folder(target)
-    (target / ".claude/bootstrap-root/.agents").mkdir(parents=True)
-    (target / ".claude/bootstrap-root/.agents/skills").symlink_to(
-        target.parent / "outside", target_is_directory=True
-    )
+    (target / ".agents/skills/fresh").mkdir(parents=True)
 
 
 PROJECT_SKILL_PASSES = {
-    "newly-shipped-name-with-no-record": _pass_newly_shipped_name_with_no_record,
-    "newly-shipped-name-with-only-the-live-agents-record": (
-        _pass_newly_shipped_name_with_only_the_live_agents_record
-    ),
-    "newly-shipped-name-with-a-symlinked-record": (
-        _pass_newly_shipped_name_with_a_symlinked_record
+    "newly-shipped-name-listed-by-the-live-agents-record": (
+        _pass_newly_shipped_name_listed_by_the_live_agents_record
     ),
     "retired-skill-in-bootstrap-root-record": (
         _pass_retired_skill_in_bootstrap_root_record
@@ -1938,14 +2052,14 @@ PROJECT_SKILL_PASSES = {
 }
 
 
-@pytest.mark.parametrize(
-    "scenario", PROJECT_SKILL_PASSES.values(), ids=PROJECT_SKILL_PASSES.keys()
-)
+@pytest.mark.parametrize("name", PROJECT_SKILL_PASSES)
 def test_validate_project_skills_accepts_and_writes_nothing(
-    tmp_path: Path, scenario: Callable[[Path], None]
+    tmp_path: Path, name: str
 ) -> None:
-    source, target, _ = _project_skill_world(tmp_path)
-    scenario(target)
+    source, target, _ = _project_skill_world(
+        tmp_path, PROJECT_SKILL_RECORDS.get(name, "bootstrap-root")
+    )
+    PROJECT_SKILL_PASSES[name](target)
     before = _exact_snapshot(target)
 
     install_bootstrap.validate_project_skills(source, target)
@@ -1967,27 +2081,60 @@ def test_validate_project_skills_accepts_and_writes_nothing(
     ids=["no-record", "bootstrap-root-record", "live-agents-record"],
 )
 def test_validate_project_skills_names_what_is_known_about_an_unlisted_folder(
-    tmp_path: Path, record: str, known: str
+    tmp_path: Path, record: Literal["bootstrap-root", "live", "none"], known: str
 ) -> None:
     """R15: an absent record proves nothing, so the refusal says what the
     installer knows and offers both remedies."""
-    source, target, _ = _project_skill_world(tmp_path)
+    source, target, _ = _project_skill_world(tmp_path, record)
     _write_project_skill(target, "stray", marked=False)
-    if record == "bootstrap-root":
-        _write_shipped_before_record(target, "shipped")
-    elif record == "live":
-        (target / ".agents/skills/shipped").mkdir(parents=True)
 
     with pytest.raises(SystemExit) as refused:
         install_bootstrap.validate_project_skills(source, target)
 
     message = str(refused.value.code)
     assert "never shipped" not in message
+    assert ".claude/skills/shipped" not in message
     assert ".claude/skills/stray" in message
     assert "does not ship it" in message
     assert known in message
     assert "unmodified copy of an old bootstrap skill" in message
     assert ".claude/skills/stray/.project-skill" in message
+
+
+@pytest.mark.parametrize(
+    "record",
+    (".claude/bootstrap-root/.agents/skills", ".agents/skills"),
+    ids=("bootstrap-root-record", "live-agents-record"),
+)
+@pytest.mark.parametrize("link", ("folder-listing-the-name", "dangling"))
+def test_validate_project_skills_says_a_linked_record_was_not_read(
+    tmp_path: Path, record: str, link: str
+) -> None:
+    """Both messages that name the record say it is a link the installer did
+    not read, never that it "does not list" the folder. This one is the
+    never-shipped branch. The first link leads to a folder that lists `stray`,
+    so a followed link would let the refresh pass."""
+    source, target, outside = _project_skill_world(tmp_path, "none")
+    _write_project_skill(target, "stray", marked=False)
+    destination = outside / "gone"
+    if link == "folder-listing-the-name":
+        destination = outside / "linked-record"
+        (destination / "stray").mkdir(parents=True)
+    linked = target / record
+    linked.parent.mkdir(parents=True, exist_ok=True)
+    linked.symlink_to(destination, target_is_directory=True)
+
+    with pytest.raises(SystemExit) as refused:
+        install_bootstrap.validate_project_skills(source, target)
+
+    message = str(refused.value.code)
+    assert ".claude/skills/stray is an unmarked skill folder" in message
+    assert "The new bootstrap does not ship it" in message
+    assert f"the shipped-before record ({record}) is a symlink and was not read" in (
+        message
+    )
+    assert "does not list it" not in message
+    assert "no shipped-before record was found" not in message
 
 
 @pytest.mark.parametrize("marker_kind", ("regular-file", "symlink", "directory"))
@@ -2232,7 +2379,10 @@ def test_mirror_project_skills_refuses_a_file_where_agents_should_be(
 
 
 def _run_installer(
-    target: Path, source: Path, *extra_args: str
+    target: Path,
+    source: Path,
+    *extra_args: str,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -2245,7 +2395,7 @@ def _run_installer(
             *extra_args,
         ],
         cwd=REPO_ROOT,
-        env=_actor_env(),
+        env={**_actor_env(), **(extra_env or {})},
         text=True,
         capture_output=True,
         check=False,
@@ -2434,31 +2584,68 @@ def test_project_skill_unmarked_folder_with_a_newly_shipped_name_is_refused(
 
     after = (_exact_snapshot(target), _exact_snapshot(outside))
     _assert_run_refused(
-        result, before, after, ".claude/skills/haystack", "would overwrite it"
+        result,
+        before,
+        after,
+        ".claude/skills/haystack",
+        "would overwrite it",
+        "does not list it",
     )
+    assert "no shipped-before record was found" not in result.stderr
     assert notes.read_text(encoding="utf-8") == "the project's own notes\n"
 
 
-def test_project_skill_unmarked_shipped_name_without_a_record_is_still_overwritten(
+def test_project_skill_no_record_at_all_refuses_an_unmarked_shipped_name(
     tmp_path: Path,
 ) -> None:
-    """Decision 9: with no `bootstrap-root` record the installer cannot tell
-    an old bootstrap copy from the project's own folder, so an unmarked folder
-    with a shipped name is overwritten and its extra file is deleted, as
-    before."""
+    """R26, option A, end to end. With no `bootstrap-root` record and no live
+    `.agents/skills/`, the installer cannot tell an old bootstrap copy from the
+    project's own folder. It refuses before any write instead of overwriting,
+    says only what it knows, and names both remedies."""
     target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
     _init_repo(target)
     folder = _write_project_skill(
         target, "haystack", marked=False, extra={"my-notes.md": "mine\n"}
     )
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    result = _run_installer(target, GENERATED)
+
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(
+        result,
+        before,
+        after,
+        "Refusing project skills",
+        ".claude/skills/haystack is an unmarked skill folder",
+        "no shipped-before record was found",
+        "would overwrite it",
+        "rename the folder and its `name:` line",
+        "add .project-skill to it",
+        "otherwise move it out of .claude/skills/",
+    )
+    assert "does not list it" not in result.stderr
+    assert (folder / "my-notes.md").read_text(encoding="utf-8") == "mine\n"
+
+
+@pytest.mark.parametrize("kept", ("no-skill-folders", "only-a-marked-project-skill"))
+def test_project_skill_missing_record_alone_never_blocks_an_install(
+    tmp_path: Path, kept: str
+) -> None:
+    """Over-refusal guard for option A: a missing record only matters for an
+    existing unmarked folder whose name the bootstrap ships. A fresh project
+    with no skill folders, or with only a marked project skill, installs."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    if kept == "only-a-marked-project-skill":
+        _write_project_skill(target, "demo", marked=True)
 
     result = _run_installer(target, GENERATED)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert not (folder / "my-notes.md").exists()
-    assert (folder / "SKILL.md").read_bytes() == (
-        GENERATED / ".claude/skills/haystack/SKILL.md"
-    ).read_bytes()
+    assert "Refusing project skills" not in result.stderr
+    assert (target / ".claude/bootstrap-root/.agents/skills/haystack").is_dir()
 
 
 def test_project_skill_edit_and_deleted_file_reach_the_mirror_on_refresh(
@@ -2625,11 +2812,12 @@ def test_destination_link_dry_run_refuses_too(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.parametrize("state_remote", (True, False), ids=("given", "absent"))
+@pytest.mark.parametrize("remote", ("given", "exported", "absent"))
 def test_destination_link_devcontainer_file_is_checked_only_with_a_state_remote(
-    tmp_path: Path, state_remote: bool
+    tmp_path: Path, remote: str
 ) -> None:
-    """With `--state-remote` the installer rewrites the consumer's own
+    """With `--state-remote`, or an exported `AI_STATE_REMOTE` (R28: `main`
+    takes either), the installer rewrites the consumer's own
     `.devcontainer/devcontainer.json`. A source that does not ship that file
     never copies over it, so only that rewrite could write through a link."""
     source = _generated_copy(tmp_path / "generated")
@@ -2642,17 +2830,15 @@ def test_destination_link_devcontainer_file_is_checked_only_with_a_state_remote(
     link.symlink_to(outside / "sentinel.txt")
     before = (_exact_snapshot(target), _exact_snapshot(outside))
 
+    state_remote = "https://example.invalid/state.git"
     result = _run_installer(
         target,
         source,
-        *(
-            ("--state-remote", "https://example.invalid/state.git")
-            if state_remote
-            else ()
-        ),
+        *(("--state-remote", state_remote) if remote == "given" else ()),
+        extra_env={"AI_STATE_REMOTE": state_remote} if remote == "exported" else None,
     )
 
-    if state_remote:
+    if remote != "absent":
         after = (_exact_snapshot(target), _exact_snapshot(outside))
         _assert_run_refused(
             result,
@@ -2735,6 +2921,595 @@ def test_destination_link_chmod_skips_a_linked_script(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# R24: the same refusal covers a real folder or a special file where the
+# refresh writes a file, and a file where it writes a folder. `shutil.copy2`
+# writes to `<folder>/<name>` when the destination is a folder, so a link with
+# the file's own name inside that folder reaches a file outside the project.
+# ---------------------------------------------------------------------------
+
+LINK_HEADING = "Refusing to write through symlinks:"
+WRONG_KIND_HEADING = "Refusing to write over a path of the wrong kind:"
+WRONG_KIND_REMEDY = "Move or rename each listed path, then rerun."
+FOLDER_OVER_FILE = "a folder where the refresh writes a file"
+DestinationKind = Literal["file", "folder"]
+
+
+def _folder_with_link_over_file(path: Path, outside: Path) -> None:
+    """Replace the file at ``path`` with a real folder that holds a link of the
+    same name pointing at the outside sentinel."""
+    path.unlink()
+    path.mkdir()
+    (path / path.name).symlink_to(outside / "sentinel.txt")
+
+
+def _folder_over_a_main_copy_file(target: Path, outside: Path) -> tuple[str, ...]:
+    """`.devcontainer/Dockerfile` is generated, and outside the obsolete-file
+    cleanup that would unlink a planted link first."""
+    _folder_with_link_over_file(target / ".devcontainer/Dockerfile", outside)
+    return (".devcontainer/Dockerfile", FOLDER_OVER_FILE)
+
+
+def _folder_over_tracked_root_guidance(target: Path, outside: Path) -> tuple[str, ...]:
+    """The link inside the `CLAUDE.md` folder is tracked, so the obsolete-file
+    cleanup keeps it instead of unlinking it before the copy."""
+    _folder_with_link_over_file(target / "CLAUDE.md", outside)
+    assert _git(target, "add", "-f", "CLAUDE.md/CLAUDE.md").returncode == 0
+    _commit_tracked_paths(target, "track a folder over CLAUDE.md")
+    return ("CLAUDE.md", FOLDER_OVER_FILE)
+
+
+def _folder_over_the_install_record_copy(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    _folder_with_link_over_file(target / ".claude/bootstrap-root/CLAUDE.md", outside)
+    return (".claude/bootstrap-root/CLAUDE.md", FOLDER_OVER_FILE)
+
+
+def _file_over_a_generated_folder(target: Path, outside: Path) -> tuple[str, ...]:
+    """The reverse kind, at `.devcontainer`: the obsolete-file cleanup never
+    touches it, so the old installer failed partway there. The stricter
+    `.claude/templates` case, which the old cleanup resolved silently, is
+    `generated-claude-folder-is-a-file` below."""
+    shutil.rmtree(target / ".devcontainer")
+    (target / ".devcontainer").write_text("not a folder\n", encoding="utf-8")
+    return (".devcontainer", "a file where the refresh writes a folder")
+
+
+def _file_above_a_written_path(target: Path, outside: Path) -> tuple[str, ...]:
+    vscode = target / ".claude/bootstrap-root/.vscode"
+    shutil.rmtree(vscode)
+    vscode.write_text("not a folder\n", encoding="utf-8")
+    return (
+        ".claude/bootstrap-root/.vscode",
+        "a file where the refresh needs a folder",
+    )
+
+
+def _fifo_at_a_generated_file(target: Path, outside: Path) -> tuple[str, ...]:
+    path = target / ".devcontainer/Dockerfile"
+    path.unlink()
+    os.mkfifo(path)
+    return (
+        ".devcontainer/Dockerfile",
+        "a special file where the refresh writes a file",
+    )
+
+
+def _file_over_a_generated_claude_folder(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """Stricter than before: the obsolete-file cleanup used to delete a regular
+    file here, then copy the folder. Now the preflight refuses it first."""
+    shutil.rmtree(target / ".claude/templates")
+    (target / ".claude/templates").write_text("not a folder\n", encoding="utf-8")
+    return (".claude/templates", "a file where the refresh writes a folder")
+
+
+def _folder_over_untracked_root_guidance(
+    target: Path, outside: Path
+) -> tuple[str, ...]:
+    """Stricter than before: the cleanup used to unlink the untracked link
+    first, which left the copy safe. Now the preflight refuses the folder."""
+    _folder_with_link_over_file(target / "CLAUDE.md", outside)
+    return ("CLAUDE.md", FOLDER_OVER_FILE)
+
+
+WRONG_KIND_REFUSALS = {
+    "main-copy": _folder_over_a_main_copy_file,
+    "generated-claude-folder-is-a-file": _file_over_a_generated_claude_folder,
+    "untracked-root-guidance": _folder_over_untracked_root_guidance,
+    "tracked-root-guidance": _folder_over_tracked_root_guidance,
+    "install-record-copy": _folder_over_the_install_record_copy,
+    "reverse-kind": _file_over_a_generated_folder,
+    "non-folder-part-above-a-written-path": _file_above_a_written_path,
+    "not-a-regular-file": _fifo_at_a_generated_file,
+}
+
+
+@pytest.mark.parametrize("name", WRONG_KIND_REFUSALS)
+def test_destination_link_wrong_kind_refusal_happens_before_any_write(
+    tmp_path: Path, name: str
+) -> None:
+    target, outside = _installed_consumer(tmp_path)
+    expected = WRONG_KIND_REFUSALS[name](target, outside)
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    result = _run_installer(target, GENERATED)
+
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(
+        result, before, after, WRONG_KIND_HEADING, WRONG_KIND_REMEDY, *expected
+    )
+    assert LINK_HEADING not in result.stderr
+
+
+def test_destination_link_wrong_kind_and_link_are_listed_in_one_refusal(
+    tmp_path: Path,
+) -> None:
+    target, outside = _installed_consumer(tmp_path)
+    kind_expected = _file_over_a_generated_folder(target, outside)
+    link_expected = _link_gitignore(target, outside)
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    result = _run_installer(target, GENERATED)
+
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(
+        result,
+        before,
+        after,
+        LINK_HEADING,
+        WRONG_KIND_HEADING,
+        WRONG_KIND_REMEDY,
+        "Replace each link with a regular file or folder, or remove it, then rerun.",
+        *kind_expected,
+        *link_expected,
+    )
+    assert result.stderr.count(LINK_HEADING) == 1
+    assert result.stderr.count(WRONG_KIND_HEADING) == 1
+
+
+def test_destination_link_wrong_kind_record_copy_follows_a_preserved_adapter(
+    tmp_path: Path,
+) -> None:
+    """The copy step preserves a tracked adapter, so the record copy mirrors
+    what the target holds: here a tracked link to a folder, and the file the
+    last install left in the record is the wrong kind."""
+    target, outside = _installed_consumer(tmp_path)
+    (target / "docs").mkdir()
+    (target / "AGENTS.md").unlink()
+    (target / "AGENTS.md").symlink_to("docs", target_is_directory=True)
+    assert _git(target, "add", "-f", "AGENTS.md").returncode == 0
+    _commit_tracked_paths(target, "track AGENTS.md as a link to a folder")
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    result = _run_installer(target, GENERATED)
+
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(
+        result,
+        before,
+        after,
+        LINK_HEADING,
+        WRONG_KIND_HEADING,
+        "\n  AGENTS.md\n",
+        ".claude/bootstrap-root/AGENTS.md (a file where the refresh writes a folder)",
+    )
+
+
+def test_destination_link_wrong_kind_dry_run_refuses_too(tmp_path: Path) -> None:
+    target, outside = _installed_consumer(tmp_path)
+    expected = _file_over_a_generated_folder(target, outside)
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    result = _run_installer(target, GENERATED, "--dry-run")
+
+    after = (_exact_snapshot(target), _exact_snapshot(outside))
+    _assert_run_refused(result, before, after, WRONG_KIND_HEADING, *expected)
+
+
+def _folder_over_the_state_readme(target: Path, outside: Path) -> Path:
+    path = target / ".claude/plans/README.md"
+    _folder_with_link_over_file(path, outside)
+    return path
+
+
+def _file_over_the_state_folder(target: Path, outside: Path) -> Path:
+    path = target / ".claude/plans"
+    shutil.rmtree(path)
+    path.write_text("not a folder\n", encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    (_folder_over_the_state_readme, _file_over_the_state_folder),
+    ids=("folder-over-the-readme", "file-over-the-state-folder"),
+)
+def test_destination_link_state_readme_of_the_wrong_kind_is_skipped_never_written(
+    tmp_path: Path, scenario: Callable[[Path, Path], Path]
+) -> None:
+    """The README of a state folder is consumer state: a wrong kind at its
+    path or folder is skipped with a warning, never refused or written."""
+    target, outside = _installed_consumer(tmp_path)
+    path = scenario(target, outside)
+    path_before = _exact_snapshot(path) if path.is_dir() else path.read_bytes()
+    outside_before = _exact_snapshot(outside)
+
+    result = _run_installer(target, GENERATED)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (
+        "skip bootstrap-owned state directory README .claude/plans/README.md"
+        in result.stderr
+    )
+    path_after = _exact_snapshot(path) if path.is_dir() else path.read_bytes()
+    assert path_after == path_before
+    assert _exact_snapshot(outside) == outside_before
+
+
+def _build_walker_tree(root: Path, outside: Path, entries: dict[str, str]) -> None:
+    for relative, what in entries.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if what == "file":
+            path.write_text("x\n", encoding="utf-8")
+        elif what == "folder":
+            path.mkdir()
+        elif what == "fifo":
+            os.mkfifo(path)
+        elif what == "link-to-file":
+            path.symlink_to(outside / "sentinel.txt")
+        elif what == "link-to-folder":
+            path.symlink_to(outside, target_is_directory=True)
+        else:
+            path.symlink_to(root / "gone")
+
+
+@pytest.mark.parametrize(
+    ("entries", "relative", "kind", "expected"),
+    [
+        pytest.param({}, "a/b.txt", "file", None, id="missing"),
+        pytest.param(
+            {"a/b.txt": "file"}, "a/b.txt", "file", None, id="regular-file-for-a-file"
+        ),
+        pytest.param(
+            {"a/b": "folder"}, "a/b", "folder", None, id="real-folder-for-a-folder"
+        ),
+        pytest.param(
+            {"a/b.txt": "link-to-file"},
+            "a/b.txt",
+            "file",
+            ("a/b.txt", "a symlink"),
+            id="link-at-the-written-path",
+        ),
+        pytest.param(
+            {"a": "link-to-folder"},
+            "a/b.txt",
+            "file",
+            ("a", "a symlink"),
+            id="link-above-the-written-path",
+        ),
+        pytest.param(
+            {"a": "dangling-link"},
+            "a/b.txt",
+            "file",
+            ("a", "a symlink"),
+            id="dangling-link-above",
+        ),
+        pytest.param(
+            {"a": "file"},
+            "a/b.txt",
+            "file",
+            ("a", "a file where the refresh needs a folder"),
+            id="file-above",
+        ),
+        pytest.param(
+            {"a/b.txt": "folder"},
+            "a/b.txt",
+            "file",
+            ("a/b.txt", FOLDER_OVER_FILE),
+            id="folder-at-a-file-path",
+        ),
+        pytest.param(
+            {"a/b.txt": "fifo"},
+            "a/b.txt",
+            "file",
+            ("a/b.txt", "a special file where the refresh writes a file"),
+            id="fifo-at-a-file-path",
+        ),
+        pytest.param(
+            {"a/b": "file"},
+            "a/b",
+            "folder",
+            ("a/b", "a file where the refresh writes a folder"),
+            id="file-at-a-folder-path",
+        ),
+    ],
+)
+def test_destination_link_walker_reports_the_first_unsafe_part(
+    tmp_path: Path,
+    entries: dict[str, str],
+    relative: str,
+    kind: DestinationKind,
+    expected: tuple[str, str] | None,
+) -> None:
+    """One walker, never following a link, decides every unsafe destination:
+    a link anywhere on the path, a part above it that is not a folder, a file
+    path that is not a regular file, a folder path that is not a folder."""
+    root = tmp_path / "root"
+    root.mkdir()
+    _build_walker_tree(root, _make_outside(tmp_path), entries)
+
+    found = install_bootstrap._unsafe_destination(root, Path(relative), kind)
+
+    assert found == (None if expected is None else (root / expected[0], expected[1]))
+
+
+def test_destination_link_guard_top_level_file_copy(tmp_path: Path) -> None:
+    """Bypassing the preflight: a top-level file copy onto a real folder that
+    holds a link of the same name stops before it writes through the link."""
+    outside = _make_outside(tmp_path)
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "notes.txt").write_text("generated\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    (target / "notes.txt").mkdir(parents=True)
+    (target / "notes.txt/notes.txt").symlink_to(outside / "sentinel.txt")
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    with pytest.raises(
+        SystemExit,
+        match=r"Refusing to write notes\.txt: notes\.txt is a folder where the "
+        r"refresh writes a file",
+    ):
+        copy_generated_tree(source, target, dry_run=False)
+
+    assert (_exact_snapshot(target), _exact_snapshot(outside)) == before
+
+
+@pytest.mark.parametrize("shape", ("linked-subfolder", "folder-over-file"))
+def test_destination_link_guard_copytree(tmp_path: Path, shape: str) -> None:
+    """Bypassing the preflight. `copytree` runs the `ignore` callback before it
+    creates each level's folder, so a linked subfolder is refused before
+    anything is created outside; a file copy goes through the same guard."""
+    outside = _make_outside(tmp_path)
+    source = tmp_path / "source"
+    target = tmp_path / "consumer"
+    if shape == "linked-subfolder":
+        (source / "sub/inner/deeper").mkdir(parents=True)
+        (target / "sub").mkdir(parents=True)
+        (target / "sub/inner").symlink_to(outside, target_is_directory=True)
+        message = r"sub/inner is a symlink"
+    else:
+        (source / "sub").mkdir(parents=True)
+        (source / "sub/file.txt").write_text("generated\n", encoding="utf-8")
+        (target / "sub/file.txt").mkdir(parents=True)
+        (target / "sub/file.txt/file.txt").symlink_to(outside / "sentinel.txt")
+        message = FOLDER_OVER_FILE
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    with pytest.raises(SystemExit, match=message):
+        copy_generated_tree(source, target, dry_run=False)
+
+    assert (_exact_snapshot(target), _exact_snapshot(outside)) == before
+
+
+def test_destination_link_guard_state_readme_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The README refresh skips an unsafe README before it copies, so the
+    guard behind it is a second line. The first check of that README passes
+    here, as if the path changed after the check, and the guard stops it."""
+    outside = _make_outside(tmp_path)
+    source = tmp_path / "source"
+    (source / ".claude/plans").mkdir(parents=True)
+    (source / ".claude/plans/README.md").write_text("seed\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    (target / ".claude/plans/README.md").mkdir(parents=True)
+    (target / ".claude/plans/README.md/README.md").symlink_to(outside / "sentinel.txt")
+    readme = Path(".claude/plans/README.md")
+    checks: list[Path] = []
+    real_check = install_bootstrap._unsafe_destination
+
+    def pass_the_first_check_of_the_readme(
+        root: Path, relative: Path, kind: DestinationKind
+    ) -> tuple[Path, str] | None:
+        checks.append(relative)
+        if relative == readme and checks.count(readme) == 1:
+            return None
+        return real_check(root, relative, kind)
+
+    monkeypatch.setattr(
+        install_bootstrap, "_unsafe_destination", pass_the_first_check_of_the_readme
+    )
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    with pytest.raises(SystemExit, match=r"README\.md is a folder where the refresh"):
+        copy_generated_tree(source, target, dry_run=False)
+
+    assert checks.count(readme) == 2
+    assert (_exact_snapshot(target), _exact_snapshot(outside)) == before
+
+
+@pytest.mark.parametrize("adapter", ("file", "folder"))
+def test_destination_link_guard_bootstrap_root_record_copy(
+    tmp_path: Path, adapter: str
+) -> None:
+    """Bypassing the preflight, for a file adapter and for a folder adapter.
+    The folder case also holds an old copy of the adapter outside the project,
+    reachable through the linked record folder: it is removed before the new
+    copy is made, so the guard must stop the run before that removal."""
+    outside = _make_outside(tmp_path)
+    target = tmp_path / "consumer"
+    if adapter == "file":
+        target.mkdir()
+        (target / "CLAUDE.md").write_text("generated\n", encoding="utf-8")
+        record = target / ".claude/bootstrap-root/CLAUDE.md"
+        record.mkdir(parents=True)
+        (record / "CLAUDE.md").symlink_to(outside / "sentinel.txt")
+        message = r"bootstrap-root/CLAUDE\.md is a folder where the refresh writes"
+    else:
+        (target / ".codex").mkdir(parents=True)
+        (target / ".codex/notes.txt").write_text("generated\n", encoding="utf-8")
+        (outside / ".codex").mkdir()
+        (outside / ".codex/keep.txt").write_text("outside\n", encoding="utf-8")
+        (target / ".claude").mkdir()
+        (target / ".claude/bootstrap-root").symlink_to(
+            outside, target_is_directory=True
+        )
+        message = r"\.claude/bootstrap-root is a symlink"
+    before = (_exact_snapshot(target), _exact_snapshot(outside))
+
+    with pytest.raises(SystemExit, match=message):
+        populate_bootstrap_root(target, dry_run=False, commit_copilot_surface=True)
+
+    assert (_exact_snapshot(target), _exact_snapshot(outside)) == before
+
+
+@pytest.mark.parametrize("site", ("folder-level", "file-in-folder"))
+def test_destination_link_guard_bootstrap_root_record_copy_inside_a_folder_adapter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, site: str
+) -> None:
+    """The record folder is removed and made fresh before `copytree` fills it,
+    so no real file system state reaches the guards of that `copytree`. The
+    check is made to see a link at one site; the copy must stop there."""
+    target = tmp_path / "consumer"
+    (target / ".codex").mkdir(parents=True)
+    (target / ".codex/notes.txt").write_text("generated\n", encoding="utf-8")
+    folder = Path(".claude/bootstrap-root/.codex")
+    asked: list[Path] = []
+    real_check = install_bootstrap._unsafe_destination
+
+    def link_at_the_site(
+        root: Path, relative: Path, kind: DestinationKind
+    ) -> tuple[Path, str] | None:
+        asked.append(relative)
+        if (
+            site == "folder-level" and relative == folder and asked.count(folder) == 2
+        ) or (site == "file-in-folder" and relative == folder / "notes.txt"):
+            return root / relative, "a symlink"
+        return real_check(root, relative, kind)
+
+    monkeypatch.setattr(install_bootstrap, "_unsafe_destination", link_at_the_site)
+
+    with pytest.raises(SystemExit, match=r"bootstrap-root/\.codex"):
+        populate_bootstrap_root(target, dry_run=False, commit_copilot_surface=True)
+
+    assert not (target / folder / "notes.txt").exists()
+
+
+def test_destination_link_guard_project_skill_mirror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The mirror creates its own destination folder, so no real file system
+    state reaches this guard. The check is made to see a link under the
+    mirror; the copy must stop at the guard and mirror nothing."""
+    target = tmp_path / "consumer"
+    _write_project_skill(target, "demo", marked=True)
+    real_check = install_bootstrap._unsafe_destination
+
+    def link_under_the_mirror(
+        root: Path, relative: Path, kind: DestinationKind
+    ) -> tuple[Path, str] | None:
+        if relative.parts[:3] == (".agents", "skills", "demo"):
+            return root / relative, "a symlink"
+        return real_check(root, relative, kind)
+
+    monkeypatch.setattr(install_bootstrap, "_unsafe_destination", link_under_the_mirror)
+
+    with pytest.raises(SystemExit, match=r"Refusing to write \.agents/skills/demo/"):
+        install_bootstrap.mirror_project_skills(target, dry_run=False)
+
+    assert not (target / ".agents/skills/demo/SKILL.md").exists()
+
+
+def test_destination_link_guard_still_copies_to_a_regular_or_missing_destination(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    (source / "sub").mkdir(parents=True)
+    (source / "notes.txt").write_text("new notes\n", encoding="utf-8")
+    (source / "sub/inner.txt").write_text("new inner\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    target.mkdir()
+    (target / "notes.txt").write_text("old notes\n", encoding="utf-8")
+
+    copy_generated_tree(source, target, dry_run=False)
+
+    assert (target / "notes.txt").read_text(encoding="utf-8") == "new notes\n"
+    assert (target / "sub/inner.txt").read_text(encoding="utf-8") == "new inner\n"
+
+
+def _plant_a_link_at_a_written_path(target: Path, outside: Path) -> tuple[str, ...]:
+    (target / ".gitignore").symlink_to(outside / "sentinel.txt")
+    return (LINK_HEADING, ".gitignore")
+
+
+def _plant_an_unmarked_skill_folder(target: Path, outside: Path) -> tuple[str, ...]:
+    _write_project_skill(target, "stray", marked=False)
+    return ("Refusing project skills", ".claude/skills/stray")
+
+
+def _plant_unproved_agents_content(target: Path, outside: Path) -> tuple[str, ...]:
+    (target / ".agents").mkdir()
+    (target / ".agents/notes.txt").write_text("mine\n", encoding="utf-8")
+    return ("Refusing .agents takeover", ".agents/notes.txt")
+
+
+RECHECKS_AFTER_THE_MIGRATION = {
+    "link-at-a-written-path": _plant_a_link_at_a_written_path,
+    "unmarked-skill-folder": _plant_an_unmarked_skill_folder,
+    "unproved-agents-content": _plant_unproved_agents_content,
+}
+
+
+@pytest.mark.parametrize("name", RECHECKS_AFTER_THE_MIGRATION)
+def test_destination_link_recheck_after_the_legacy_migration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """`migrate_pre_existing_state` runs after the preflights and can change
+    `.claude/`. Whatever it leaves is checked again before the copy: a refusal
+    there comes after the migration's own writes but before the copy's."""
+    target = tmp_path / "consumer"
+    outside = _make_outside(tmp_path)
+    outside_before = _exact_snapshot(outside)
+    _init_repo(target)
+    (target / ".claude").mkdir()
+    (target / ".claude/MEMORY.md").write_text("legacy state\n", encoding="utf-8")
+    expected: list[str] = []
+    copy = MagicMock(side_effect=AssertionError("the copy ran before the recheck"))
+
+    def migrate_and_plant(*args: object) -> None:
+        expected.extend(RECHECKS_AFTER_THE_MIGRATION[name](target, outside))
+
+    monkeypatch.setattr(
+        install_bootstrap, "migrate_pre_existing_state", migrate_and_plant
+    )
+    monkeypatch.setattr(install_bootstrap, "copy_generated_tree", copy)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "install_bootstrap.py",
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as refused:
+        install_bootstrap.main()
+
+    assert expected
+    for fragment in expected:
+        assert fragment in str(refused.value.code)
+    copy.assert_not_called()
+    assert _exact_snapshot(outside) == outside_before
+
+
+# ---------------------------------------------------------------------------
 # R17: a second clone's restore copies the new record into `.agents/` but never
 # deletes the retired skill folders its earlier refresh left there.
 # ---------------------------------------------------------------------------
@@ -2750,7 +3525,7 @@ def _write_stale_agents_folders(target: Path) -> tuple[str, str]:
     return ".agents/skills/retired-a/", ".agents/skills/retired-b/"
 
 
-def test_stale_agents_refusal_lists_the_live_folders_and_recovers_when_deleted(
+def test_stale_agents_refusal_lists_the_live_folders_and_recovers_when_moved_aside(
     tmp_path: Path,
 ) -> None:
     target, outside = _installed_consumer(tmp_path)
@@ -2771,10 +3546,21 @@ def test_stale_agents_refusal_lists_the_live_folders_and_recovers_when_deleted(
     assert "not in the shipped-before record" in explanation
     assert "another clone refreshed" in explanation
     assert "never deletes them" in explanation
-    assert "If you did not create these folders, delete them and rerun" in explanation
+    # R27: moving the folders aside is the safe default; deleting them is for
+    # copies already confirmed as old bootstrap copies.
+    assert "Move the listed folders out of .agents/skills/ and rerun" in explanation
+    assert (
+        "Delete them only once you have confirmed they are old bootstrap copies"
+        in explanation
+    )
+    assert "delete them and rerun" not in explanation.lower()
+    assert "did not create" not in explanation
 
+    backup = tmp_path / "backup"
+    backup.mkdir()
     for folder in listed:
-        shutil.rmtree(target / folder)
+        shutil.move(target / folder, backup / Path(folder).name)
+    assert sorted(path.name for path in backup.iterdir()) == ["retired-a", "retired-b"]
     record = _exact_snapshot(target / ".claude/bootstrap-root/.agents")
     assert _exact_snapshot(target / ".agents") == record
     recovered = _run_installer(target, GENERATED)

@@ -241,10 +241,18 @@ Before you refresh a full consumer, list its project-written skills. List the
 folders under `.claude/skills/` that hold a `SKILL.md`, that the new
 `dist/multi-agent/.claude/skills/` does not ship, that are not in the
 consumer's `.claude/bootstrap-root/.agents/skills/`, and that have no
-`.project-skill` file. Mark or move each one first; the installer refuses the
-same set. A name in that record was shipped before and is retired on purpose,
+`.project-skill` file. Mark or move each one first; the installer refuses
+them. It also refuses an unmarked folder whose name the new source ships but
+no shipped-before record lists: if the project wrote it, rename the folder and
+its `name:` line, then mark it; otherwise move it out of `.claude/skills/`.
+A name in that record was shipped before and is retired on purpose,
 so do not mark it, unless the record's copy holds `.project-skill`: that
-folder is a project skill that lost its marker, so restore the marker. See
+folder is a project skill that lost its marker, so restore the marker. A
+legacy consumer whose `.claude/skills/` holds old copies of bootstrap skills
+and has no shipped-before record is refused once, and the refusal
+lists each folder. To fix many folders at once, move every listed folder into
+one backup folder outside `.claude/`, refresh, then copy back the project's own
+skills and mark them (rename one first when the bootstrap ships its name). See
 [Project-owned skills](#project-owned-skills).
 
 The script regenerates `dist/` automatically, then delegates each consumer to
@@ -955,20 +963,23 @@ that folder with a warning; Claude Code still sees the skill.
 
 The shipped-before record is `.claude/bootstrap-root/.agents/skills`, the copy
 of what the last install shipped. When that copy is missing, the live
-`.agents/skills/` stands in for every check except the newly-shipped-name
-refusal, which needs the `bootstrap-root` copy: with only the live
-`.agents/skills/` or no record, a newly shipped name is overwritten.
+`.agents/skills/` stands in for every check.
 
 Never create or edit `.agents/skills/<name>/` by hand: the next refresh refuses
 through the `.agents` takeover check, and the receipt fingerprint breaks. The
-one exception: delete folders that a refused refresh lists as stale (another
-clone refreshed and this clone's restore never deletes). A name that a shipped
-or third-party skill uses blocks that refresh until you rename the project
-skill. A refresh also refuses an unmarked folder whose name the bootstrap
-neither ships nor shipped before, and one whose name is newly shipped and
-missing from the shipped-before record. With no such record, an unmarked
-folder named like a shipped skill is overwritten, so mark every project skill
-when you create it. Create or edit a project skill no later than
+one exception: when a refused refresh lists folders as stale (another clone
+refreshed and this clone's restore never deletes), move them out of
+`.agents/skills/` and rerun. Delete them only once you have confirmed they are
+old bootstrap copies. A name that a shipped or third-party skill uses blocks
+that refresh until you rename the project skill. A refresh also refuses an
+unmarked folder whose name the bootstrap neither ships nor shipped before. It
+refuses an unmarked folder whose name the bootstrap ships and the
+shipped-before record does not list, whether a record exists or not, because
+the refresh would overwrite it. If the project wrote that folder, rename the
+folder and its `name:` line, then add `.project-skill`; otherwise move it out
+of `.claude/skills/`. A project with no unmarked skill folder of that kind
+installs normally with no record. Mark every project skill when you create it.
+Create or edit a project skill no later than
 CLOSEOUT step 2, because receipts bind `.claude/` runtime files. This covers
 the full install only. In a sidecar repository, team skills are never touched,
 the marker has no effect, and nothing is mirrored.
@@ -981,18 +992,50 @@ gentler full install. Checked against `scripts/install_bootstrap.py`:
 
 - It refuses to run in these cases: an `.agents/` tree it cannot prove it
   generated; an unmarked skill folder whose name the bootstrap neither ships
-  nor shipped before; an unmarked skill folder whose name is newly shipped
-  and not in the shipped-before record; and a symlink (the message starts
-  `Refusing to write through symlinks:`). The symlink refusal covers
-  a link at a path it writes or may write: the copy step's paths, the
+  nor shipped before; an unmarked skill folder whose name the bootstrap ships
+  and the shipped-before record does not list (with or without a record); and
+  an unsafe write destination. A destination is unsafe when a link sits at any
+  part of the path, when a part above the written path exists and is not a
+  real folder, when a path written as a file is a folder or a special file such
+  as a FIFO, or when a path written as a folder is not a real folder. The
+  check reads each part with `lstat` and never follows a link. It covers the
+  copy step's paths (with the copy's own skips: existing consumer state,
+  preserved tracked adapters, and claimed third-party bundles), the
   project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
-  workspace instruction files), `.gitignore`, `.claude/bootstrap-root/`,
-  `.claude/bootstrap-ownership.env`, and `.devcontainer/devcontainer.json` with
-  `--state-remote`. It refuses a link at a substitution file or `.gitignore`
-  even when no rewrite would happen, so a symlinked `AGENTS.md -> CLAUDE.md` is
-  refused. The nested state sync's own writes are not checked: it may append to
+  workspace instruction files), `.gitignore`, `.claude/bootstrap-ownership.env`,
+  every `.claude/bootstrap-root/` adapter path, and
+  `.devcontainer/devcontainer.json` when a state remote is set, through
+  `--state-remote` or an exported `AI_STATE_REMOTE`. It checks the
+  project-name files and `.gitignore` even when no rewrite would happen, so a
+  symlinked `AGENTS.md -> CLAUDE.md` is refused. This runs before the first
+  write, also under `--dry-run`, and refuses once with every problem listed in
+  two sections: `Refusing to write through symlinks:` (replace each link with a
+  regular file or folder, or remove it) and
+  `Refusing to write over a path of the wrong kind:` (each path with its
+  reason; move or rename it). Kinds that the obsolete-file cleanup once
+  resolved silently are now refused too, for example a regular file at
+  `.claude/templates` or a folder holding an untracked link at `CLAUDE.md`; a
+  bootstrap version that turns a generated file into a folder, or the reverse,
+  makes each refresh refuse until you move the old item by hand.
+- A second check runs at copy time. Every file copy of a full refresh and
+  every folder the copy creates is checked first, and an unsafe destination
+  stops the run (`Refusing to write <path>: ...`). That stop can leave a
+  partial refresh. When a legacy migration ran (pre-Git `.claude/` content, not
+  a dry run), the `.agents` takeover, project-skill, and unsafe-destination
+  checks run again before the copy, so a refusal there comes after the
+  migration's own writes. An unsafe state-folder README (`.claude/plans/README.md`
+  and the three others) is consumer state: it is skipped with a warning, not
+  refused.
+- These are not checked: the nested state sync's own writes (it may append to
   `.claude/.gitignore` and `.claude/.gitattributes`, and it restores
-  `settings.local.json`.
+  `settings.local.json`); Git's own writes (`git config core.hooksPath` in the
+  outer repository, and the nested state commit in `.claude/`); hard links;
+  whether the macOS quarantine strip
+  (`xattr -rc` over whole folders, consumer state included) follows links;
+  and reads through links, for example a preserved, tracked root adapter that
+  is a link, which the record copy reads into the AI state, which can then be
+  pushed. The installer does not guarantee that it never writes outside the
+  project.
 - A non-empty `.claude/` with no `.git` is treated as legacy state and
   turned into a nested Git repository.
 - Under `.claude/`, it overwrites every file it generates and deletes every

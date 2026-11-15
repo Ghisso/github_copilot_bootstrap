@@ -42,22 +42,57 @@ the project-skill refusals):
 - an `.agents/` tree it cannot prove it generated;
 - an unmarked skill folder it cannot account for: one the new source does not
   ship and the shipped-before record does not list, or one whose name the new
-  source newly ships while the `.claude/bootstrap-root/.agents/skills` copy
-  does not list it;
-- a link at a path it writes or may write (`Refusing to write through
-  symlinks:`): the copy step's paths, the project-name and Python-version files
-  (`CLAUDE.md`, `AGENTS.md`, and the two workspace instruction files),
-  `.gitignore`, `.claude/bootstrap-root/`, `.claude/bootstrap-ownership.env`,
-  and `.devcontainer/devcontainer.json` with `--state-remote`. A link at a
-  substitution file or `.gitignore` is refused even when no rewrite would
-  happen, so a symlinked `AGENTS.md -> CLAUDE.md` is refused. The nested state
-  sync's own writes are not checked: it may append to `.claude/.gitignore` and
-  `.claude/.gitattributes`, and it restores `settings.local.json`.
+  source ships and the shipped-before record does not list. The second
+  refusal applies with or without a record, because the refresh would
+  overwrite the folder;
+- an unsafe write destination. A destination is unsafe when a link sits at
+  any part of the path, when a part above the written path exists and is not a
+  real folder, when a path written as a file is a folder or a special file
+  such as a FIFO, or when a path written as a folder is not a real folder. The
+  check reads each part with `lstat` and never follows a link. It covers the
+  copy step's paths (with the copy's own skips: existing consumer state,
+  preserved tracked adapters, and claimed third-party bundles), the
+  project-name and Python-version files (`CLAUDE.md`, `AGENTS.md`, and the two
+  workspace instruction files), `.gitignore`,
+  `.claude/bootstrap-ownership.env`, every `.claude/bootstrap-root/` adapter
+  path, and `.devcontainer/devcontainer.json` when a state remote is set,
+  through `--state-remote` or an exported `AI_STATE_REMOTE`. A path at a
+  substitution file or `.gitignore` is checked even when no rewrite would
+  happen, so a symlinked `AGENTS.md -> CLAUDE.md` is refused. The check also
+  runs under `--dry-run`. One refusal lists every problem in two sections:
+  `Refusing to write through symlinks:` (replace each link with a regular
+  file or folder, or remove it) and
+  `Refusing to write over a path of the wrong kind:` (each path with its
+  reason; move or rename it). Kinds that the obsolete-file cleanup once
+  resolved silently are now refused too, for example a regular file at
+  `.claude/templates` or a folder holding an untracked link at `CLAUDE.md`. A
+  bootstrap version that turns a generated file into a folder, or the reverse,
+  makes each refresh refuse until you move the old item by hand.
+
+A second check runs at copy time. Every file copy of a full refresh and every
+folder the copy creates is checked first, and an unsafe destination stops the
+run (`Refusing to write <path>: ...`). That stop can leave a partial refresh.
+When a legacy migration ran (pre-Git `.claude/` content, not a dry run), the
+`.agents` takeover, project-skill, and unsafe-destination checks run again
+before the copy, so a refusal there comes after the migration's own writes. An
+unsafe state-folder README is skipped with a warning, not refused.
+
+These are not checked: the nested state sync's own writes (it may append to
+`.claude/.gitignore` and `.claude/.gitattributes`, and it restores
+`settings.local.json`); Git's own writes (`git config core.hooksPath` in the
+outer repository, and the nested state commit in `.claude/`); hard links;
+whether the macOS quarantine strip
+(`xattr -rc` over whole folders, consumer state included) follows links; and
+reads through links, for example a preserved, tracked root adapter that is a
+link, which the record copy reads into the AI state, which can then be pushed.
 
 The shipped-before record is `.claude/bootstrap-root/.agents/skills`, the copy
 of what the last install shipped. When that copy is missing, the live
-`.agents/skills/` stands in for every check except the newly-shipped-name
-refusal.
+`.agents/skills/` stands in for every check. A legacy consumer with old
+bootstrap skill copies and no record is refused once, and the refusal lists
+each folder. Move every listed folder into one backup folder outside
+`.claude/`, refresh, then copy back the project's own skills and mark them
+with `.project-skill`.
 
 Consumer state (`MEMORY.md`, `plans`, `explorations`,
 `session_logs`, `quality_reports`, `project-context.instructions.md`,
@@ -797,7 +832,7 @@ of this changes what a gate checks, only what an operator should expect.
 | `gate_result` and path-based review profiles (`record_findings.py`, commit gate; push gates only for `schema_version >= 2` reports) | The phase-completion commit blocks unless the findings report has `gate_result: PASS` and no open request. It also blocks when the report lacks a profile the changed paths require: `tests` for test files; `code`, `architecture`, `security`, `tests`, and `ponytail` for control-plane, generator, and dependency paths | Re-record with `record_findings.py ... --gate-result PASS\|WARN\|FAIL`, resolving or listing each open request (`PASS` is refused while one is open). If a required profile is missing, run a new review with the missing profiles; a re-record cannot add them |
 | An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
 | `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
-| `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |
+| `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh overwrites these four files, even a hand-edited one, unless the README path or its folder is a link or the wrong kind; then it skips that README with a warning | None needed — treat them as generated, not editable |
 | Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks implementation-branch creation (the big plan and its listed phases) and the next commit when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
 | `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
 | Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
