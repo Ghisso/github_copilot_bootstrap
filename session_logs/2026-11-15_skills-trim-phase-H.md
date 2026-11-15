@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-15
 **Plan:** `.claude/plans/2026-11-15_phase-H-installer-copy-safety.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -127,6 +127,32 @@ Fix second-review findings R24 to R28 (`.claude/quality_reports/merges/2026-11-1
 
 ## Verification
 
+```text
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS       71.7s  uv run pytest tests/test_install_bootstrap.py -q --tb=short -k "destination_link or project_skill or stale_agents"
+PASS      158.9s  uv run pytest tests/test_install_bootstrap.py tests/test_check_runtime.py tests/test_verify.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py -q --tb=short
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' README.md 'named like a shipped skill is overwritten' 'newly shipped name is overwritten' 'every check except the newly-shipped-name' 'one exception: delete folders'
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' docs/runtime-checks.md 'every check except the newly-shipped-name' 'devcontainer.json` with `--state-remote`' 'A refresh always overwrites these four files'
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' shared/skills/learn/SKILL.md 'refresh overwrites the folder' 'newly shipped name is overwritten' 'every check except the newly-shipped-name'
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' shared/skills/safe-consumer-bootstrap-refresh/SKILL.md 'rev-list --all --objects' 'Delete the listed folders if you did not create them'
+PASS        0.0s  test "$(grep -c -F 'delete them and rerun' scripts/install_bootstrap.py)" = "0"
+PASS        0.0s  test "$(grep -c -F 'triggers both too, because' docs/target-mapping.md)" = "0"
+PASS        0.0s  test "$(grep -c -F 'shutil.copy2(' scripts/install_bootstrap.py)" = "1"
+PASS        0.0s  test "$(grep -c -F 'shutil.copytree(' scripts/install_bootstrap.py)" = "$(grep -c -F 'copy_function=' scripts/install_bootstrap.py)"
+PASS        0.0s  grep -q -F 'Refusing to write over a path of the wrong kind:' scripts/install_bootstrap.py
+PASS        0.0s  grep -q -F 'Refusing to write over a path of the wrong kind:' README.md
+PASS        0.0s  grep -q -F 'Refusing to write over a path of the wrong kind:' docs/runtime-checks.md
+PASS        0.0s  grep -q -F 'Refusing to write over a path of the wrong kind:' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
+PASS        0.0s  grep -q -F 'AI_STATE_REMOTE' dist/multi-agent/.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md
+PASS        0.0s  grep -q -F 'Refusing to write through symlinks:' scripts/install_bootstrap.py
+PASS       46.4s  uv run python scripts/validate_targets.py
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      373.2s  uv run python .claude/scripts/verify.py phase --format text
+```
+
+- Findings: `.claude/quality_reports/findings-2026-11-15_phase-H-installer-copy-safety.json` (1 MINOR, disposition `fixed`; gate PASS; six profiles; round 1 PASS with five MINORs, all fixed in round 2; round 2 PASS with one comment-only MINOR, fixed).
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation).
 - optional 1: PASS. The round-2 reproduction was rerun on the fixed installer. In all six cases the sentinel was unchanged: `.claude/plans/README.md` was skipped with a warning (exit 0), and the other five were refused before any write (exit 1).
 - optional 2: PASS. Scratch copies of real consumers, with no remotes, refreshed with `--local-only` from `dist/multi-agent`:
   - RAG: exit 0.
