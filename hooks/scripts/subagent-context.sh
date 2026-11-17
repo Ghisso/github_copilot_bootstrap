@@ -89,7 +89,8 @@ def guidance(root):
 
 
 try:
-    payload = json.loads(sys.stdin.buffer.read())
+    # sys.stdin is None when the runtime closed standard input.
+    payload = json.loads(sys.stdin.buffer.read() if sys.stdin else b"")
 except (ValueError, RecursionError):
     payload = None
 if not isinstance(payload, dict):
