@@ -151,6 +151,36 @@ the PascalCase rule, which removes the output blocker for a later rename.
   - `uv run python scripts/validate_targets.py`;
   - `uv run python scripts/check_runtime.py`.
 
+  Scope-change record (approved by the orchestrator on 2026-11-17; each
+  item serves this phase's stated intent and changes no decision):
+  - Step 3: the combined answer is printed by `print_decision`, the one
+    output function Phase B added, and not only by `emit`. The deny of the
+    two workflow tools is a `github-copilot` answer and gets the top-level
+    fields too.
+  - Step 2: one helper, `pretool_decision`, carries both shapes for
+    `deny_pretool` and `ask_pretool`. `json_escape` uses `tr '\001-\037'
+    '[ *]'`; the second set is the padded form that POSIX defines, so GNU
+    and BSD `tr` give the same result.
+  - Row T3 holds for every client, as the big plan's table says: each
+    character 1 to 31 in a reason or context text becomes one space. A text
+    that ends in a newline now ends in a space. Kept: no caller passes such
+    a text (the byte-identity battery shows no difference), and removing it
+    would add code for no caller.
+  - Step 4: tests for the new validator check go into
+    `tests/test_validate_targets.py`.
+  - Step 6 also changes `tests/test_check_copilot_runtime.py` and the probe
+    section of `docs/runtime-checks.md`. Three setup checks are added to
+    the eight planned ones: `camel-hooks-source`, `camel-events-renamed`,
+    and `camel-mcp-none`. A run prints 43 lines. The rename is applied to
+    `.github/hooks/hooks.json` and to its restore copy under
+    `.claude/bootstrap-root/`, because the `SessionStart` hook puts the
+    restore copy back over the live file. The copy is made once, before
+    any session runs.
+  - Step 7 also adds a T3 row and an "Answer shape" paragraph to
+    `docs/target-mapping.md`, and records one new finding: under camelCase
+    event names the nested `ask` raised no question before this phase (F4
+    had left that case untested).
+
 - [ ] **9. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,

@@ -29,6 +29,21 @@ reason that holds a control character from producing invalid JSON.
     probe section of `docs/runtime-checks.md` change with it, as in Phase B.
   The user's test folder `~/copilot-harness-probe-20261117` was refreshed
   with the Phase B guard for the patch-tool check in the real VS Code.
+- **22:12** - Phase C delegated to a fresh `coder` with the evidence packet
+  and the known traps from Phases A and B (the restore of root adapters at
+  `SessionStart`, checks on lasting state, the 480-second run limit of the
+  probe).
+- **23:10** - `coder` finished steps 1 to 8. For `github-copilot`, every
+  guard prints the decision at the top level and nested; the other three
+  clients keep their bytes (19,918 comparisons against `5d229e5`, 0
+  differences). The probe has a third session, `camel-rename`, and prints
+  43 lines. With the earlier guards, 7 of the 43 failed: the five denies
+  and the two asks under camelCase event names. The asks are a new finding
+  (F4 had left them untested). Full suite: 5,714 passed, 1 skipped, 424 s.
+- **23:12** - Orchestrator checks: `verify.py fast` PASS; the probe PASS (0
+  of 43 failed). Scope-change record added to the small plan. Decision on
+  the one open point: a text that ends in a newline now ends in a space;
+  kept, because no caller passes such a text.
 
 ## [LEARN] Entries
 
