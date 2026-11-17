@@ -28,6 +28,15 @@
         "cwd": ".",
         "timeout": 10,
         "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh reporting-reminder.sh session github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh reporting-reminder.sh session github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh reporting-reminder.sh session github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
       }
     ],
     "PreToolUse": [
@@ -115,6 +124,17 @@
         "cwd": ".",
         "timeout": 180,
         "timeoutSec": 180
+      }
+    ],
+    "SubagentStart": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
       }
     ]
   }

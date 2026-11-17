@@ -255,6 +255,7 @@ REQUIRED_HOOK_SCRIPTS = (
     "claude-stop.sh",
     "codex-stop.sh",
     "reporting-reminder.sh",
+    "subagent-context.sh",
     "openwiki-guard.sh",
     "openwiki-guard.py",
 )
@@ -755,11 +756,21 @@ COPILOT_STALE_PRELOAD_FRAGMENT = (
     "especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, "
     "and `tool-routing.instructions.md`"
 )
+# The `SubagentStart` hook puts this file into every sub-agent's first message, so
+# it has a byte budget of its own, apart from ROOT_GUIDANCE_BUDGETS: that table
+# also applies the root-guidance header and lifecycle rules, which this file does
+# not follow. `subagent-context.sh` reads at most this many bytes.
+COPILOT_INSTRUCTIONS_MAX_BYTES = 2048
 
 
 def copilot_guidance_errors(text: str) -> list[str]:
     """Return failures for the generated Copilot workspace adapter."""
     errors: list[str] = []
+    if len(text.encode()) > COPILOT_INSTRUCTIONS_MAX_BYTES:
+        errors.append(
+            ".github/copilot-instructions.md exceeds its bytes budget of "
+            f"{COPILOT_INSTRUCTIONS_MAX_BYTES}"
+        )
     if ".claude/skills/ponytail/SKILL.md" not in text:
         errors.append(
             "Copilot guidance must activate the canonical Ponytail skill for coding"
@@ -1666,6 +1677,7 @@ COPILOT_EXPECTED_EVENTS = {
     "PreToolUse",
     "PostToolUse",
     "Stop",
+    "SubagentStart",
 }
 CLAUDE_LIFECYCLE_HOOKS = {
     "Stop": ("claude-stop.sh", (), 180),
@@ -1875,6 +1887,45 @@ def copilot_guard_target_errors(hooks: object) -> list[str]:
                     f"Copilot PreToolUse guard {script} must end its {field} "
                     "command with github-copilot"
                 )
+    return errors
+
+
+# The two context hooks of the Copilot hook file (Phase E): event, script, arguments.
+COPILOT_CONTEXT_HOOKS = (
+    ("SubagentStart", "subagent-context.sh", ("github-copilot",)),
+    ("SessionStart", "reporting-reminder.sh", ("session", "github-copilot")),
+)
+
+
+def copilot_context_hook_errors(hooks: object) -> list[str]:
+    """Return an error for each context hook the Copilot hook file does not wire.
+
+    Each hook needs exactly one handler whose `bash`, `linux`, and `osx` commands
+    end with `run-hook.sh <script> <arguments>`, with `timeout` and `timeoutSec`
+    10. Both are context hooks, so neither may stand down: the Copilot hook file
+    never carries the Claude-settings marker (`hook_source_marker_errors`).
+    """
+    errors: list[str] = []
+    for event, script, arguments in COPILOT_CONTEXT_HOOKS:
+        ending = "/" + " ".join(("run-hook.sh", script, *arguments))
+        handlers = hooks.get(event) if isinstance(hooks, dict) else None
+        found = [
+            handler
+            for handler in (handlers if isinstance(handlers, list) else [])
+            if isinstance(handler, dict)
+            and all(
+                str(handler.get(field, "")).endswith(ending)
+                for field in ("bash", "linux", "osx")
+            )
+        ]
+        if len(found) != 1:
+            errors.append(
+                f"Copilot {event} must have exactly one handler running {ending[1:]}"
+            )
+        elif found[0].get("timeout") != 10 or found[0].get("timeoutSec") != 10:
+            errors.append(
+                f"Copilot {event} handler {script} must have timeout and timeoutSec 10"
+            )
     return errors
 
 
@@ -3747,6 +3798,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     )
     github_hook_text = json.dumps(github_hooks)
     errors.extend(copilot_guard_target_errors(github_hooks.get("hooks")))
+    errors.extend(copilot_context_hook_errors(github_hooks.get("hooks")))
     check(
         ".claude/hooks/scripts/" in github_hook_text,
         "GitHub hooks should invoke shared .claude hook scripts",

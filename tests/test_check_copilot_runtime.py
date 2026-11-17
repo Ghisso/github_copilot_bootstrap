@@ -111,6 +111,9 @@ EXPECTED_STEPS: dict[str, dict[str, Any]] = {
     "sql-attach": {"tool": "sql", "success": False, "result": SQL_ATTACH},
     "sql-vacuum-into": {"tool": "sql", "success": False, "result": SQL_VACUUM},
     "subagent-start": {"tool": "task"},
+    # Phase E: the two custom sub-agents, started by the main model.
+    "subagent-coder": {"tool": "task"},
+    "subagent-reviewer": {"tool": "task"},
     "child-git-reset": {
         "tool": "bash",
         "reason": "Blocked dangerous git operation: git reset --hard",
@@ -157,6 +160,7 @@ EXPECTED_CHECK_NAMES = [
     "mcp-none",
     "single-session-log",
     "state-sync-once",
+    "session-reminder",
     "deny-git-reset",
     "deny-force-push",
     "deny-secret-rm",
@@ -177,6 +181,7 @@ EXPECTED_CHECK_NAMES = [
     "sql-no-file-write",
     "subagent-deny-git-reset",
     "subagent-store-sql-refused",
+    "subagent-context",
 ]
 
 
@@ -201,6 +206,48 @@ GOOD_ERRORS_LOG = [
     "2026-11-17T15:58:54.000Z state-sync: no state remote configured; local checkpoint remains unpublished.",
     "2026-11-17T15:58:55Z WARN stop-session-log-check: worktree changed but no session log was updated today",
 ]
+# Phase E. What the model received as user messages in a real run (evidence
+# raw/phase-E-probe-output.txt): the session reminder is a user message of its own
+# before the prompt, and each sub-agent's first user message holds the guidance, the
+# fixed line, and the task prompt. The literals are written out here from the plan.
+GUIDANCE_HEADING = "GitHub Copilot Workspace Adapter"
+SUBAGENT_LINE = (
+    "Agent files live in `.claude/agents/<id>.md` and skills live in "
+    "`.claude/skills/<name>/SKILL.md`. When your agent file lists a skill, read "
+    "its SKILL.md file with the read tool."
+)
+REMINDER = (
+    "For user-facing updates, use direct language; explain internal labels and "
+    "uncommon abbreviations, and avoid idioms. State what options mean in "
+    "practice. Preserve exact technical text."
+)
+CHILD_AGENTS = ("general", "coder", "reviewer")
+
+
+def good_main_user_messages() -> list[str]:
+    return [
+        REMINDER,
+        "<system_reminder>\n<environment_limitations>\n...\n</system_reminder>",
+        "<current_datetime>2026-11-18T03:30:36.560+09:00</current_datetime>\n\n"
+        "PROBE-MARKER Run the probe steps.",
+    ]
+
+
+def good_subagent_requests() -> dict[str, dict[str, Any]]:
+    return {
+        f"PROBE-CHILD-{agent}": {
+            "toolNames": ["view"],
+            "system": ["system prompt"],
+            "user": [
+                "<current_datetime>2026-11-18T03:30:42.496+09:00</current_datetime>"
+                f"\n\n# {GUIDANCE_HEADING}\n\nThis target is generated from `shared/`."
+                f"\n\n{SUBAGENT_LINE}\n\nPROBE-CHILD-{agent} say ok"
+            ],
+        }
+        for agent in CHILD_AGENTS
+    }
+
+
 # Projects of records the caller did not give one: they hold the good logs and
 # live in a folder made before any test patches `tempfile`.
 RECORD_PROJECTS = Path(tempfile.mkdtemp(prefix="probe-test-records-"))
@@ -362,6 +409,8 @@ def build_record(
             {"type": "custom", "custom": {"name": "apply_patch"}},
         ],
         "mcpFileAfterSession": False,
+        "mainFirstRequestUser": good_main_user_messages(),
+        "subagentFirstRequests": good_subagent_requests(),
         "errors": [],
     }
     return probe.SessionRecord(
@@ -1204,6 +1253,223 @@ def test_a_skipped_step_says_why_it_did_not_run() -> None:
     assert "tool session_store_sql not offered" in result.detail
 
 
+# --- Phase E: the sub-agent context and the session reminder -----------------
+
+
+def test_the_main_session_starts_the_coder_and_the_reviewer_sub_agents() -> None:
+    scenario = probe.baseline_scenario(Path("/work/project"))
+    steps: dict[str, dict[str, Any]] = {
+        step["label"]: step
+        for step in scenario["steps"]  # type: ignore[attr-defined]
+    }
+    labels = list(steps)
+
+    assert (
+        labels.index("subagent-start")
+        < labels.index("subagent-coder")
+        < labels.index("subagent-reviewer")
+    )
+    for agent in ("coder", "reviewer"):
+        task = steps[f"subagent-{agent}"]
+        assert task["tool"] == "task"
+        assert task["args"]["agent_type"] == agent
+        # The marker keys the first request the runner records for the sub-agent.
+        assert task["args"]["prompt"].startswith(f"PROBE-CHILD-{agent} ")
+    # They play no tool steps: the check reads the first message each received.
+    assert set(scenario["childSteps"]) == {probe.CHILD_MARKER}  # type: ignore[arg-type]
+
+
+def test_the_probe_constants_are_the_text_of_the_shipped_hooks(tmp_path: Path) -> None:
+    """The fixed line, the reminder, and the heading the checks look for are the
+    ones the scripts and the generator produce, so a change of one fails here."""
+    import generate_targets
+
+    scripts = tmp_path / ".claude" / "hooks" / "scripts"
+    scripts.parent.mkdir(parents=True)
+    scripts.symlink_to(REPO_ROOT / "shared" / "hooks" / "scripts", True)
+    done = subprocess.run(
+        ["bash", str(scripts / "subagent-context.sh"), "github-copilot"],
+        input="{}",
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=tmp_path,
+    )
+    reminder_script = (
+        REPO_ROOT / "shared" / "hooks" / "scripts" / "reporting-reminder.sh"
+    ).read_text(encoding="utf-8")
+
+    assert probe.SUBAGENT_LINE == SUBAGENT_LINE
+    assert probe.REMINDER_TEXT == REMINDER
+    assert probe.GUIDANCE_HEADING == GUIDANCE_HEADING
+    # No guidance file in the folder: the answer is the fixed line alone.
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout)["additionalContext"] == probe.SUBAGENT_LINE
+    assert f'REMINDER="{probe.REMINDER_TEXT}"' in reminder_script
+    guidance = generate_targets.render_copilot_instructions()
+    assert guidance.splitlines()[0] == f"# {probe.GUIDANCE_HEADING}"
+
+
+def test_the_session_reminder_check_passes_and_says_where_the_reminder_was() -> None:
+    result = results_by_name(build_record())["session-reminder"]
+
+    assert result.status == probe.PASS
+    assert "first user message" in result.detail
+
+
+@pytest.mark.parametrize(
+    ("messages", "expected_in_detail"),
+    [
+        pytest.param(None, "no user message", id="nothing-recorded"),
+        pytest.param([], "no user message", id="no-user-messages"),
+        pytest.param(
+            ["PROBE-MARKER Run the probe steps."],
+            "not in the first of the 1 user message",
+            id="the-hook-added-nothing",
+        ),
+        pytest.param(
+            ["<current_datetime>x</current_datetime>", REMINDER],
+            "not in the first of the 2 user message",
+            id="the-reminder-came-after-another-message",
+        ),
+        pytest.param(
+            [REMINDER[:-1]],
+            "not in the first of the 1 user message",
+            id="the-reminder-is-cut",
+        ),
+        pytest.param(
+            [REMINDER.replace("direct", "plain")],
+            "not in the first of the 1 user message",
+            id="another-reminder-text",
+        ),
+    ],
+)
+def test_the_session_reminder_check_fails_on_a_wrong_first_request(
+    messages: list[str] | None, expected_in_detail: str
+) -> None:
+    record = build_record()
+    if messages is None:
+        del record.summary["mainFirstRequestUser"]
+    else:
+        record.summary["mainFirstRequestUser"] = messages
+
+    results = results_by_name(record)
+
+    assert results["session-reminder"].status == probe.FAIL
+    assert expected_in_detail in results["session-reminder"].detail
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [
+        "session-reminder"
+    ]
+
+
+def test_the_sub_agent_check_passes_and_names_both_custom_agents() -> None:
+    result = results_by_name(build_record())["subagent-context"]
+
+    assert result.status == probe.PASS
+    assert "each of coder and reviewer" in result.detail
+
+
+def _drop_request(agent: str) -> Any:
+    return lambda requests: requests.pop(f"PROBE-CHILD-{agent}")
+
+
+def _set_first_message(agent: str, text: str) -> Any:
+    def edit(requests: dict[str, Any]) -> None:
+        requests[f"PROBE-CHILD-{agent}"]["user"] = [text]
+
+    return edit
+
+
+@pytest.mark.parametrize(
+    ("edit", "expected_in_detail"),
+    [
+        pytest.param(
+            lambda requests: requests.clear(),
+            "no first request was recorded for sub-agent coder",
+            id="no-sub-agent-started",
+        ),
+        pytest.param(
+            _drop_request("coder"),
+            "no first request was recorded for sub-agent coder",
+            id="the-coder-never-started",
+        ),
+        pytest.param(
+            _drop_request("reviewer"),
+            "no first request was recorded for sub-agent reviewer",
+            id="the-reviewer-never-started",
+        ),
+        pytest.param(
+            _set_first_message("coder", "PROBE-CHILD-coder say ok"),
+            "sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' "
+            "and the fixed line",
+            id="the-coder-got-only-its-task",
+        ),
+        pytest.param(
+            _set_first_message(
+                "reviewer", f"# {GUIDANCE_HEADING}\n\nPROBE-CHILD-reviewer say ok"
+            ),
+            "sub-agent reviewer lacks the fixed line",
+            id="the-reviewer-got-no-fixed-line",
+        ),
+        pytest.param(
+            _set_first_message("coder", f"{SUBAGENT_LINE}\n\nPROBE-CHILD-coder say ok"),
+            "sub-agent coder lacks the heading",
+            id="the-coder-got-no-guidance",
+        ),
+        pytest.param(
+            _set_first_message(
+                "coder",
+                f"# {GUIDANCE_HEADING}\n\n{SUBAGENT_LINE[:-1]}\n\nPROBE-CHILD-coder",
+            ),
+            "sub-agent coder lacks the fixed line",
+            id="the-fixed-line-is-cut",
+        ),
+        pytest.param(
+            lambda requests: requests["PROBE-CHILD-coder"].update(
+                user=["x", f"# {GUIDANCE_HEADING}\n\n{SUBAGENT_LINE}"]
+            ),
+            "sub-agent coder lacks the heading",
+            id="the-context-came-in-a-later-message",
+        ),
+        pytest.param(
+            lambda requests: requests["PROBE-CHILD-reviewer"].update(user=[]),
+            "no first request was recorded for sub-agent reviewer",
+            id="no-user-message",
+        ),
+    ],
+)
+def test_the_sub_agent_check_fails_on_a_wrong_first_request(
+    edit: Any, expected_in_detail: str
+) -> None:
+    record = build_record()
+    edit(record.summary["subagentFirstRequests"])
+
+    results = results_by_name(record)
+
+    assert results["subagent-context"].status == probe.FAIL
+    assert expected_in_detail in results["subagent-context"].detail
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [
+        "subagent-context"
+    ]
+
+
+def test_the_sub_agent_check_does_not_need_the_general_purpose_request() -> None:
+    record = build_record()
+    del record.summary["subagentFirstRequests"]["PROBE-CHILD-general"]
+
+    assert results_by_name(record)["subagent-context"].status == probe.PASS
+
+
+def test_the_sub_agent_check_fails_without_a_recorded_requests_object() -> None:
+    record = build_record()
+    del record.summary["subagentFirstRequests"]
+
+    result = results_by_name(record)["subagent-context"]
+
+    assert result.status == probe.FAIL
+    assert "no first request was recorded for sub-agent coder" in result.detail
+
+
 # --- the codex-patch session -------------------------------------------------
 
 PATCH_CHECK_STEPS = {
@@ -1541,6 +1807,7 @@ CAMEL_EVENT_NAMES = {
     "PreToolUse": "preToolUse",
     "PostToolUse": "postToolUse",
     "Stop": "agentStop",
+    "SubagentStart": "subagentStart",
 }
 # Each camel step has the same expected value as its twin in the baseline
 # (Phase A). With one hook source the runtime raises one question, not two.

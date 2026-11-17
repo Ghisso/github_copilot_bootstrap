@@ -19,7 +19,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_SRC = REPO_ROOT / "shared" / "hooks" / "scripts"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from generate_targets import ANTIGRAVITY_TOOL_MAP  # noqa: E402
+from generate_targets import (  # noqa: E402
+    ANTIGRAVITY_TOOL_MAP,
+    render_copilot_instructions,
+)
 
 
 def _run_antigravity_pretool(
@@ -5305,6 +5308,607 @@ def test_the_launcher_stands_the_session_log_down_and_a_guard_still_denies(
     )
 
 
+# --- Sub-agent context and the session reminder on the Copilot harness (Phase E) ---
+#
+# A custom sub-agent gets only its agent file (evidence F9). `subagent-context.sh`,
+# wired to `SubagentStart`, gives it the text of `.github/copilot-instructions.md`
+# plus one fixed line about where agent files and skills live. It is a context hook,
+# not a guard: it never denies and never exits non-zero. The runtime reads top-level
+# `additionalContext` for this event under both event spellings (probe P2), so the
+# answer carries the text at the top level and nested in `hookSpecificOutput`, with no
+# top-level `hookEventName`. Expected values are written out here from the plan, never
+# computed from the hook's own output.
+
+GUIDANCE_PATH = Path(".github") / "copilot-instructions.md"
+GUIDANCE_LIMIT = 2048
+SUBAGENT_FIXED_LINE = (
+    "Agent files live in `.claude/agents/<id>.md` and skills live in "
+    "`.claude/skills/<name>/SKILL.md`. When your agent file lists a skill, read "
+    "its SKILL.md file with the read tool."
+)
+# The two `SubagentStart` inputs recorded on runtime 1.0.108-0
+# (`raw/hook-inputs-subagent-events.txt`): the PascalCase event and the camelCase one.
+SUBAGENT_START_INPUTS: dict[str, dict[str, object]] = {
+    "pascal": {
+        "sessionId": "981ad464-9997-495a-9a0b-5790e550e1c1",
+        "timestamp": 1794899531630,
+        "cwd": "/work/project",
+        "transcriptPath": "/home/user/session-state/981ad464/events.jsonl",
+        "agentName": "coder",
+        "agentDisplayName": "coder",
+        "agentDescription": "Implementation specialist for Python AI engineering tasks.",
+        "traceparent": "00-f64c5b13d12f77617bf6ee8c66ff3d6d-e5dbf644c8303f25-01",
+        "agent_id": "734300d9-2a20-4cc7-8ca1-a02b745d54aa",
+        "agent_type": "coder",
+        "parent_agent_id": "981ad464-9997-495a-9a0b-5790e550e1c1",
+    },
+    "camel": {
+        "sessionId": "981ad464-9997-495a-9a0b-5790e550e1c1",
+        "timestamp": 1794899531630,
+        "cwd": "/work/project",
+        "transcriptPath": "/home/user/session-state/981ad464/events.jsonl",
+        "agentName": "reviewer",
+        "agentDisplayName": "reviewer",
+        "agentDescription": "Read-only reviewer.",
+        "traceparent": "00-f64c5b13d12f77617bf6ee8c66ff3d6d-e5dbf644c8303f25-01",
+        "agentId": "734300d9-2a20-4cc7-8ca1-a02b745d54aa",
+        "agentType": "reviewer",
+        "parentAgentId": "981ad464-9997-495a-9a0b-5790e550e1c1",
+    },
+}
+# One input of runtime 1.0.108-0 for the session reminder (`pascal-SessionStart`).
+SESSION_START_INPUT = json.dumps(
+    {
+        "hook_event_name": "SessionStart",
+        "session_id": "d21189b0-a31f-4a53-82fd-b5fff033ac63",
+        "timestamp": "2026-11-17T07:07:01.781Z",
+        "cwd": "/work/project",
+        "source": "new",
+        "initial_prompt": "PROBE-MARKER Run the probe steps.",
+    }
+)
+# What a hook the Copilot runtime starts from `.github/hooks/hooks.json` sees (A3):
+# no marker, and `COPILOT_HOOK_DIR` set.
+COPILOT_HOOK_ENV: dict[str, str | None] = {
+    "COPILOT_CLI": "1",
+    "COPILOT_HOOK_DEPTH": "1",
+    "COPILOT_HOOK_DIR": "/work/project/.github/hooks",
+    "COPILOT_PROJECT_DIR": "/work/project",
+    "CLAUDE_PROJECT_DIR": "/work/project",
+    "CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP": "1",
+}
+SUBAGENT_START_PASCAL = json.dumps(SUBAGENT_START_INPUTS["pascal"])
+
+
+def _subagent_repo(root: Path) -> Path:
+    """A repository whose hook scripts are the shipped ones, reached by a link.
+
+    Bash keeps the logical path, so the script still resolves `REPO_ROOT` to
+    `root`. Returns the path of `subagent-context.sh`.
+    """
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.parent.mkdir(parents=True)
+    scripts.symlink_to(SCRIPT_SRC, target_is_directory=True)
+    return scripts / "subagent-context.sh"
+
+
+def _write_guidance(root: Path, data: bytes) -> None:
+    (root / GUIDANCE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (root / GUIDANCE_PATH).write_bytes(data)
+
+
+def _run_subagent_context(
+    script: Path,
+    stdin: bytes | str = SUBAGENT_START_PASCAL,
+    *,
+    args: tuple[str, ...] = (COPILOT,),
+    env: Mapping[str, str] | None = None,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run the hook the way the hook file does (`github-copilot` is its argument).
+
+    The hook timeout of the hook file is 10 seconds; a hook that blocks (a named
+    pipe opened without `O_NONBLOCK`) fails its test here instead of hanging it.
+    """
+    return subprocess.run(
+        ["bash", str(script), *args],
+        timeout=30,
+        cwd=cwd or script.parents[3],
+        input=stdin.encode() if isinstance(stdin, str) else stdin,
+        capture_output=True,
+        check=False,
+        env=dict(env if env is not None else _host_env({})),
+    )
+
+
+def _answered_context(result: subprocess.CompletedProcess[bytes]) -> str:
+    """Check the answer is one line of valid JSON with only the two context keys.
+
+    Returns the context text. No decision field may appear, and the line is ASCII,
+    so no raw control character or invalid byte reaches the runtime.
+    """
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.endswith(b"\n")
+    assert result.stdout.count(b"\n") == 1
+    assert result.stdout.isascii()
+    answer = json.loads(result.stdout)
+    context = answer["additionalContext"]
+    assert answer == {
+        "additionalContext": context,
+        "hookSpecificOutput": {
+            "hookEventName": "SubagentStart",
+            "additionalContext": context,
+        },
+    }
+    assert isinstance(context, str)
+    return context
+
+
+def _assert_no_answer(result: subprocess.CompletedProcess[bytes]) -> None:
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == b""
+    assert b"WARN subagent-context:" in result.stderr
+
+
+@pytest.mark.parametrize("casing", SUBAGENT_START_INPUTS)
+def test_the_subagent_hook_gives_the_generated_guidance_and_the_fixed_line(
+    tmp_path: Path, casing: str
+) -> None:
+    guidance = render_copilot_instructions()
+    assert guidance.startswith("# GitHub Copilot Workspace Adapter\n")
+    assert len(guidance.encode()) <= GUIDANCE_LIMIT
+    script = _subagent_repo(tmp_path)
+    _write_guidance(tmp_path, guidance.encode())
+
+    result = _run_subagent_context(script, json.dumps(SUBAGENT_START_INPUTS[casing]))
+
+    context = _answered_context(result)
+    assert result.stderr == b""
+    assert context == guidance + "\n" + SUBAGENT_FIXED_LINE
+
+
+# One row per way the guidance text can be hard to carry in a JSON string.
+HARD_GUIDANCE = {
+    "quotes": b"He said \"hi\" and 'bye'\n",
+    "backslashes": b'C:\\temp\\new \\u0041 \\\\ \\"\n',
+    "tabs": b"a\tb\n\tc\t\n",
+    "control-characters": b"\x01\x02\x1f\x7f end\n",
+    "nul-byte": b"before\x00after\n",
+    "non-ascii": "caf\u00e9 \u2014 na\u00efve \u65e5\u672c\u8a9e \U0001f680\n".encode(),
+    "invalid-utf8": b"ok \xff\xfe \xc3( end\n",
+    "carriage-returns": b"one\r\ntwo\r\n",
+    "no-trailing-newline": b"# Title\nlast line",
+    "decision-looking-text": (
+        b'{"permissionDecision": "deny", "decision": "block", "continue": false}\n'
+    ),
+    "at-the-limit": b"x" * (GUIDANCE_LIMIT - 1) + b"\n",
+}
+
+
+@pytest.mark.parametrize("name", HARD_GUIDANCE)
+def test_the_subagent_hook_prints_valid_json_for_any_guidance_text(
+    tmp_path: Path, name: str
+) -> None:
+    data = HARD_GUIDANCE[name]
+    assert len(data) <= GUIDANCE_LIMIT
+    script = _subagent_repo(tmp_path)
+    _write_guidance(tmp_path, data)
+
+    result = _run_subagent_context(script)
+
+    context = _answered_context(result)
+    # Invalid UTF-8 becomes U+FFFD, so the line stays valid JSON.
+    assert (
+        context == data.decode("utf-8", errors="replace") + "\n" + SUBAGENT_FIXED_LINE
+    )
+    assert result.stderr == b""
+
+
+def _put_guidance(root: Path, state: str) -> None:
+    """Make `.github/copilot-instructions.md` in `root` as `state` says."""
+    outside = root.parent / "outside"
+    outside.mkdir(exist_ok=True)
+    path = root / GUIDANCE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if state == "missing":
+        return
+    if state == "empty-file":
+        path.write_bytes(b"")
+    elif state == "over-the-limit":
+        path.write_bytes(b"x" * (GUIDANCE_LIMIT + 1))
+    elif state == "link-to-a-file-in-the-repository":
+        (root / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
+        path.symlink_to("../AGENTS.md")
+    elif state == "link-to-a-file-outside-the-repository":
+        (outside / "guidance.md").write_text("# Outside\n", encoding="utf-8")
+        path.symlink_to(outside / "guidance.md")
+    elif state == "link-to-nothing":
+        path.symlink_to("no-such-file.md")
+    elif state == "folder-for-github-is-a-link":
+        path.parent.rmdir()
+        (outside / "github").mkdir()
+        (outside / "github" / "copilot-instructions.md").write_text(
+            "# Outside\n", encoding="utf-8"
+        )
+        path.parent.symlink_to(outside / "github")
+    elif state == "named-pipe":
+        os.mkfifo(path)
+    elif state == "folder":
+        path.mkdir()
+    else:
+        raise AssertionError(f"unknown state {state}")
+
+
+# state -> whether the hook warns about it (a missing or empty file is normal)
+UNUSABLE_GUIDANCE = {
+    "missing": False,
+    "empty-file": False,
+    "over-the-limit": True,
+    "link-to-a-file-in-the-repository": True,
+    "link-to-a-file-outside-the-repository": True,
+    "link-to-nothing": True,
+    "folder-for-github-is-a-link": True,
+    "named-pipe": True,
+    "folder": True,
+}
+
+
+@pytest.mark.parametrize("state", UNUSABLE_GUIDANCE)
+def test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file(
+    tmp_path: Path, state: str
+) -> None:
+    control = _subagent_repo(tmp_path / "control")
+    _write_guidance(tmp_path / "control", b"# Control guidance\n")
+    # A readable file in the same kind of repository is read, so the state is
+    # what changed the answer.
+    assert "# Control guidance\n" in _answered_context(_run_subagent_context(control))
+    repo = tmp_path / "repo"
+    script = _subagent_repo(repo)
+    _put_guidance(repo, state)
+
+    result = _run_subagent_context(script)
+
+    assert _answered_context(result) == SUBAGENT_FIXED_LINE
+    assert (b"WARN subagent-context:" in result.stderr) == UNUSABLE_GUIDANCE[state]
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root can read a mode 000 file")
+def test_the_subagent_hook_gives_only_the_fixed_line_for_an_unreadable_file(
+    tmp_path: Path,
+) -> None:
+    script = _subagent_repo(tmp_path)
+    _write_guidance(tmp_path, b"# Guidance\n")
+    (tmp_path / GUIDANCE_PATH).chmod(0)
+
+    result = _run_subagent_context(script)
+
+    assert _answered_context(result) == SUBAGENT_FIXED_LINE
+    assert b"WARN subagent-context:" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "stdin",
+    (
+        b"",
+        b"not json",
+        b"{",
+        b"[]",
+        b"null",
+        b'"text"',
+        b"123",
+        b"\xff\xfe\x00",
+    ),
+    ids=("empty", "text", "cut-off", "array", "null", "string", "number", "bytes"),
+)
+def test_the_subagent_hook_prints_nothing_for_malformed_input(
+    tmp_path: Path, stdin: bytes
+) -> None:
+    """A context hook is not a guard: it has no decision to make, so it prints
+    nothing, warns, and lets the sub-agent start."""
+    script = _subagent_repo(tmp_path)
+    _write_guidance(tmp_path, b"# Guidance\n")
+
+    _assert_no_answer(_run_subagent_context(script, stdin))
+
+
+@pytest.mark.parametrize("arguments", ((), ("claude-code",), ("openai-codex",), ("x",)))
+def test_the_subagent_hook_serves_only_the_copilot_client(
+    tmp_path: Path, arguments: tuple[str, ...]
+) -> None:
+    script = _subagent_repo(tmp_path)
+    _write_guidance(tmp_path, b"# Guidance\n")
+
+    _assert_no_answer(_run_subagent_context(script, args=arguments))
+
+
+def test_the_subagent_hook_warns_and_exits_zero_when_python_is_missing(
+    tmp_path: Path,
+) -> None:
+    script = _subagent_repo(tmp_path / "repo")
+    _write_guidance(tmp_path / "repo", b"# Guidance\n")
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    for tool in ("dirname", "cat"):
+        found = shutil.which(tool)
+        assert found is not None
+        (tools / tool).symlink_to(found)
+
+    bash = shutil.which("bash")
+    assert bash is not None
+    result = subprocess.run(
+        [bash, str(script), COPILOT],
+        cwd=tmp_path,
+        input=SUBAGENT_START_PASCAL.encode(),
+        capture_output=True,
+        check=False,
+        env={"PATH": str(tools)},
+    )
+
+    assert (result.returncode, result.stdout) == (0, b"")
+    assert result.stderr == (
+        b"WARN subagent-context: python3 is required to build the context; skipping\n"
+    )
+
+
+def test_the_subagent_hook_warns_and_exits_zero_when_python_exits_non_zero(
+    tmp_path: Path,
+) -> None:
+    """The error trap: a python3 that is present but fails must not fail the hook."""
+    script = _subagent_repo(tmp_path / "repo")
+    _write_guidance(tmp_path / "repo", b"# Guidance\n")
+    stub = tmp_path / "stub"
+    stub.mkdir()
+    (stub / "python3").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    (stub / "python3").chmod(0o755)
+
+    result = _run_subagent_context(
+        script, env=_host_env({"PATH": f"{stub}{os.pathsep}{os.environ['PATH']}"})
+    )
+
+    assert (result.returncode, result.stdout) == (0, b"")
+    assert result.stderr == b"WARN subagent-context: internal error; skipping context\n"
+
+
+def test_the_subagent_hook_treats_closed_standard_input_as_malformed(
+    tmp_path: Path,
+) -> None:
+    """With standard input closed Python has no `sys.stdin`: no traceback, and no
+    answer, the same as for any other input that is not a JSON object."""
+    script = _subagent_repo(tmp_path)
+    _write_guidance(tmp_path, b"# Guidance\n")
+
+    result = subprocess.run(
+        ["bash", "-c", 'bash "$@" <&-', "bash", str(script), COPILOT],
+        cwd=tmp_path,
+        capture_output=True,
+        check=False,
+        env=_host_env({}),
+    )
+
+    assert (result.returncode, result.stdout) == (0, b"")
+    assert result.stderr == (
+        b"WARN subagent-context: malformed hook input; skipping context\n"
+    )
+
+
+@pytest.mark.parametrize("where", ("repository-root", "subfolder", "pythonpath"))
+def test_the_subagent_hook_is_not_hijacked_by_a_module_named_json(
+    tmp_path: Path, where: str
+) -> None:
+    """`python3 -I` keeps the working folder and PYTHONPATH off the module path, so
+    a `json.py` in the repository root, in the folder the hook runs in, or on
+    PYTHONPATH is never imported. Its import would write the sentinel."""
+    repo = tmp_path / "repo"
+    script = _subagent_repo(repo)
+    _write_guidance(repo, b"# Guidance\n")
+    sentinel = tmp_path / "sentinel"
+    folder = {
+        "repository-root": repo,
+        "subfolder": repo / "sub",
+        "pythonpath": tmp_path / "elsewhere",
+    }[where]
+    folder.mkdir(exist_ok=True)
+    (folder / "json.py").write_text(
+        f"open({str(sentinel)!r}, 'w').write('imported')\n", encoding="utf-8"
+    )
+
+    result = _run_subagent_context(
+        script,
+        cwd=folder if where == "subfolder" else repo,
+        env=_host_env({"PYTHONPATH": str(folder)} if where == "pythonpath" else {}),
+    )
+
+    assert not sentinel.exists()
+    assert _answered_context(result) == "# Guidance\n\n" + SUBAGENT_FIXED_LINE
+
+
+def test_the_context_hook_is_one_of_the_scripts_that_never_stand_down() -> None:
+    """The stub-based launcher test below runs every script of `OTHER_SCRIPTS`."""
+    assert "subagent-context.sh" in OTHER_SCRIPTS
+    assert "subagent-context.sh" not in LIFECYCLE_CALLS
+
+
+def test_the_launcher_runs_the_subagent_hook_with_every_stand_down_condition_true(
+    tmp_path: Path,
+) -> None:
+    """With the real scripts: the control stands down, the context hook does not."""
+    launcher = _real_launcher_repo(tmp_path)
+    _write_guidance(tmp_path, b"# Guidance\n")
+    _assert_stood_down(
+        _run_launcher(
+            launcher,
+            "session-log.sh",
+            "claude-code",
+            env=_stand_down_env(),
+            stdin=SESSION_START_INPUT,
+        ),
+        "control",
+    )
+
+    result = _run_launcher(
+        launcher,
+        "subagent-context.sh",
+        COPILOT,
+        env=_stand_down_env(),
+        stdin=SUBAGENT_START_PASCAL,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.endswith("\n")
+    answer = json.loads(result.stdout)
+    assert answer["additionalContext"] == "# Guidance\n\n" + SUBAGENT_FIXED_LINE
+
+
+def test_the_session_reminder_prints_the_combined_answer_for_the_copilot_client(
+    tmp_path: Path,
+) -> None:
+    result = _run_gate(
+        tmp_path, "reporting-reminder.sh", SESSION_START_INPUT, "session", COPILOT
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == _combined_context("SessionStart", REMINDER_TEXT)
+    answer = json.loads(result.stdout)
+    assert "hookEventName" not in answer
+    assert len(answer["additionalContext"].encode()) <= 200
+
+
+def test_the_session_reminder_ignores_an_exported_target_id(tmp_path: Path) -> None:
+    result = _run_gate(
+        tmp_path,
+        "reporting-reminder.sh",
+        SESSION_START_INPUT,
+        "session",
+        COPILOT,
+        env={"TARGET_ID": "claude-code"},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _combined_context("SessionStart", REMINDER_TEXT)
+
+
+@pytest.mark.parametrize(
+    ("mode", "client", "warning"),
+    (
+        ("session", "claude-code", "unsupported mode: session"),
+        ("session", "openai-codex", "unsupported mode: session"),
+        ("session", "google-antigravity", "unsupported provider: google-antigravity"),
+        ("session", "unknown", "unsupported provider: unknown"),
+        ("session", "", "unsupported provider: missing"),
+        ("prompt", COPILOT, "unsupported mode: prompt"),
+        ("late-report", COPILOT, "unsupported mode: late-report"),
+        ("", COPILOT, "unsupported mode: missing"),
+    ),
+)
+def test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it(
+    tmp_path: Path, mode: str, client: str, warning: str
+) -> None:
+    """The reminder refuses what it does not serve: one exact warning, no answer,
+    exit 0. `session` is refused as a mode for the other clients, as it was before."""
+    result = _run_gate(
+        tmp_path, "reporting-reminder.sh", SESSION_START_INPUT, mode, client
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == f"WARN reporting-reminder: {warning}\n"
+
+
+def test_the_session_reminder_prints_nothing_for_malformed_input(
+    tmp_path: Path,
+) -> None:
+    result = _run_gate(
+        tmp_path, "reporting-reminder.sh", "not json", "session", COPILOT
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "WARN reporting-reminder: malformed hook input" in result.stderr
+
+
+@pytest.mark.parametrize("client", ("claude-code", "openai-codex"))
+def test_the_claude_and_codex_reminder_modes_keep_their_exact_bytes(
+    tmp_path: Path, client: str
+) -> None:
+    prompt = _run_gate(
+        tmp_path / "prompt",
+        "reporting-reminder.sh",
+        '{"hook_event_name":"UserPromptSubmit"}',
+        "prompt",
+        client,
+    )
+    late = _run_gate(
+        tmp_path / "late",
+        "reporting-reminder.sh",
+        json.dumps(
+            {
+                "hook_event_name": "PostToolUse",
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "uv run python .claude/scripts/verify.py closeout"
+                },
+            }
+        ),
+        "late-report",
+        client,
+    )
+    ordinary = _run_gate(
+        tmp_path / "ordinary",
+        "reporting-reminder.sh",
+        _bash_stdin("echo hello"),
+        "late-report",
+        client,
+    )
+
+    assert (prompt.returncode, prompt.stderr) == (0, "")
+    assert prompt.stdout == _nested_context("UserPromptSubmit", REMINDER_TEXT)
+    assert (late.returncode, late.stderr) == (0, "")
+    assert late.stdout == _nested_context("PostToolUse", REMINDER_TEXT)
+    assert (ordinary.returncode, ordinary.stdout, ordinary.stderr) == (0, "", "")
+
+
+@pytest.mark.parametrize(
+    "variables",
+    (
+        pytest.param({}, id="no-marker"),
+        pytest.param(
+            {"BOOTSTRAP_HOOK_SOURCE": "claude-settings"}, id="inherited-marker"
+        ),
+    ),
+)
+def test_the_launcher_prints_the_session_reminder_in_a_copilot_hook_environment(
+    tmp_path: Path, variables: dict[str, str]
+) -> None:
+    """The new `SessionStart` entry sits in the Copilot hook file, which never
+    carries the marker: its environment has `COPILOT_HOOK_DIR` set, so the reminder
+    runs. The control shows the same call from the Claude settings standing down."""
+    launcher = _real_launcher_repo(tmp_path)
+    _assert_stood_down(
+        _run_launcher(
+            launcher,
+            "reporting-reminder.sh",
+            "session",
+            COPILOT,
+            env=_stand_down_env(),
+            stdin=SESSION_START_INPUT,
+        ),
+        "control",
+    )
+
+    result = _run_launcher(
+        launcher,
+        "reporting-reminder.sh",
+        "session",
+        COPILOT,
+        env=_host_env({**COPILOT_HOOK_ENV, **variables}),
+        stdin=SESSION_START_INPUT,
+    )
+
+    assert (result.returncode, result.stderr) == (0, "")
+    assert result.stdout == _combined_context("SessionStart", REMINDER_TEXT)
+
+
 if __name__ == "__main__":
     test_git_targets_nested_claude_detects_nested_claude_paths()
     test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands()
@@ -5331,4 +5935,15 @@ if __name__ == "__main__":
         )
         test_a_lifecycle_script_runs_when_one_environment_condition_fails(
             Path(folder) / "env", "no-marker"
+        )
+        # The context hook runs python3 and the real file checks (`os.path.realpath`,
+        # `O_NOFOLLOW`) on this host: the macOS CI leg has /var linked to /private/var.
+        test_the_subagent_hook_gives_the_generated_guidance_and_the_fixed_line(
+            Path(folder) / "subagent", "pascal"
+        )
+        test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file(
+            Path(folder) / "unusable", "link-to-a-file-in-the-repository"
+        )
+        test_the_launcher_prints_the_session_reminder_in_a_copilot_hook_environment(
+            Path(folder) / "session", {}
         )

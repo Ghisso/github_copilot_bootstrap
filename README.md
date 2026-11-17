@@ -1424,6 +1424,56 @@ renders an agent, review-profile routing, and the skill library, and
 bounded-implementation route and the Google Antigravity native-acceptance
 status.
 
+### Sub-agents on the Copilot harness
+
+On the Copilot harness, a custom sub-agent such as `coder` or `reviewer` gets
+only its three-line agent file. It gets no repository instructions and no skill
+list (evidence F9, seen in a run on runtime `1.0.108-0`). A `SubagentStart` hook
+adds two things to its first message:
+
+- the text of `.github/copilot-instructions.md`, with its line breaks;
+- one fixed line: agent files live in `.claude/agents/<id>.md`, skills live in
+  `.claude/skills/<name>/SKILL.md`, and a skill that the agent file lists is
+  read with the read tool.
+
+[`subagent-context.sh`](shared/hooks/scripts/subagent-context.sh) does this. It
+is a context hook, not a guard: it never denies, and on any error it warns on
+stderr and lets the sub-agent start without the text. It reads the guidance
+file only when that file is a regular file of at most 2,048 bytes, and neither
+the file nor a folder on its way is a link. Otherwise the sub-agent gets the
+fixed line alone. `validate_targets.py` holds the generated file to the same
+2,048 bytes (it is 1,676 today), apart from the root-guidance budget table.
+
+- **What was run.** The offline probe `scripts/check_copilot_runtime.py` starts
+  `coder` and `reviewer` on runtime `1.0.108-0`. Its check `subagent-context`
+  judges only that the first user message of each holds the heading
+  `GitHub Copilot Workspace Adapter` and the fixed line. The rest comes from one
+  recorded run of the control harness (`raw/phase-E-probe-output.txt` of the
+  evidence folder, no check behind it). In that run the first user message of
+  `coder`, of `reviewer`, and of the `general-purpose` sub-agent that the probe
+  also starts held the whole text of the file, line breaks included, then the
+  fixed line, then the task prompt. The documentation says the built-in
+  `general-purpose` agent emits no sub-agent start event; in that run it
+  received the text anyway.
+- **Observed on runtime `1.0.108-0`, not documented.** The GitHub documentation
+  lists this event as `subagentStart` and shows no PascalCase name. The hook
+  file keeps the PascalCase `SubagentStart`, and it worked on that runtime. The
+  camelCase `subagentStart` also worked there (planning probe P2). The runtime
+  reads the text from top-level `additionalContext`, not from the nested copy,
+  so the hook prints it both ways, like the other Copilot context hooks.
+- **Session start.** The Copilot file also runs `reporting-reminder.sh session
+  github-copilot` at `SessionStart`, so a Copilot session gets the plain-language
+  reporting reminder once. The check `session-reminder` judges that the first
+  user message of the first model request holds the reminder text.
+- **Why the agent-file fields stay.** The `.github/agents/*.agent.md` wrappers
+  keep `agents:`, `user-invocable`, and `disable-model-invocation`. They are the
+  fields written for the Local harness, which stays until February 2027. The
+  Copilot harness loads the wrappers and ignores `agents:` (F9). Removing the
+  fields is a recorded follow-up for that date.
+- **Local harness.** Not run. Whether the Local harness runs this hook, and
+  whether it already gives its sub-agents the repository instructions, was not
+  checked. If it does both, its sub-agents see the guidance twice.
+
 ### Task lanes
 
 Task lanes are this bootstrap's repository policy, not Codex, Claude Code, or
@@ -1510,7 +1560,8 @@ requests for one protected edit.
 - **Lost on purpose.** The Copilot harness no longer gets the Claude-settings
   state push at `UserPromptSubmit` and `SessionEnd`, or the checkpoint at
   `StopFailure`. The Copilot file still pushes at every `Stop`. The Copilot
-  file has no reporting reminder, so that reminder does not run there.
+  file runs the reporting reminder once, at session start, with the argument
+  `session` (see [Sub-agents on the Copilot harness](#sub-agents-on-the-copilot-harness)).
 - **Local harness.** With the VS Code setting `chat.useClaudeHooks: true`, the
   Local harness also runs `.claude/settings.json`, and every hook runs twice.
   Nothing stands down there. Turn that setting off for this bootstrap.

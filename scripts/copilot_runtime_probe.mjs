@@ -59,12 +59,19 @@ record.skippedSteps = {};
 record.subagentFirstRequests = {};
 
 const textOf = (message) => (typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? ""));
+// Room for the repository guidance plus a task prompt; a check reads these texts after the run.
+const USER_TEXT_LIMIT = 20000;
+const userTexts = (messages) => messages.filter((m) => m.role === "user").map((m) => textOf(m).slice(0, USER_TEXT_LIMIT));
 const nextReply = (body) => {
     callCounter += 1;
     const messages = body.messages ?? [];
     const toolNames = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.custom?.name ?? tool.name);
     const isMain = toolNames.length > 0 && messages.some((message) => textOf(message).includes(scenario.marker));
-    if (isMain && record.firstRequestTools === undefined) record.firstRequestTools = body.tools;
+    if (isMain && record.firstRequestTools === undefined) {
+        record.firstRequestTools = body.tools;
+        // What the first request carried for the user, including context text from hooks.
+        record.mainFirstRequestUser = userTexts(messages);
+    }
     if (!isMain) {
         // A sub-agent: its first user message carries the marker the main model put in its task.
         const child = messages.find((message) => message.role === "user" && textOf(message).includes("PROBE-CHILD"));
@@ -73,7 +80,7 @@ const nextReply = (body) => {
             record.subagentFirstRequests[key] = {
                 toolNames,
                 system: messages.filter((m) => m.role === "system" || m.role === "developer").map(textOf),
-                user: messages.filter((m) => m.role === "user").map((m) => textOf(m).slice(0, 3000)),
+                user: userTexts(messages),
             };
         }
         // The sub-agent plays its own scripted steps, in order, one per model request.

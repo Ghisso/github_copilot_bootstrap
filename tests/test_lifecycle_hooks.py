@@ -499,10 +499,23 @@ def test_shared_copilot_hooks_run_no_context_mode_handler() -> None:
     hooks = json.loads(text)["hooks"]
 
     assert "context-mode-dispatch.sh" not in text
-    assert set(hooks) == {"SessionStart", "PreToolUse", "PostToolUse", "Stop"}
-    assert [len(hooks[event]) for event in ("SessionStart", "PreToolUse")] == [3, 5]
+    # Phase E added the `SubagentStart` event and a fourth `SessionStart` entry
+    # (the session-start reminder); none of the entries runs Context Mode.
+    assert set(hooks) == {
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "SubagentStart",
+    }
+    assert [len(hooks[event]) for event in ("SessionStart", "PreToolUse")] == [4, 5]
     assert len(hooks["PostToolUse"]) == 1
     assert "record-branch-state.sh" in hooks["PostToolUse"][0]["bash"]
+    reminder_command = hooks["SessionStart"][3]["bash"]
+    assert "reporting-reminder.sh session github-copilot" in reminder_command
+    assert [hook["bash"] for hook in hooks["SubagentStart"]] == [
+        ".claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot"
+    ]
 
 
 def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(

@@ -68,6 +68,23 @@ BRANCH_GUARD_REASONS = (
 )
 ABSENT = "no pre-tool hook event"
 CHILD_MARKER = "PROBE-CHILD-general"
+# The custom sub-agents the `main` session starts (Phase E); each task prompt carries
+# its own marker, which keys the first request the runner records for it.
+CUSTOM_AGENTS = ("coder", "reviewer")
+# The first heading of the generated `.github/copilot-instructions.md`.
+GUIDANCE_HEADING = "GitHub Copilot Workspace Adapter"
+# The fixed line `subagent-context.sh` adds, and the reminder `reporting-reminder.sh`
+# prints at session start. Tests pin both to the shipped scripts.
+SUBAGENT_LINE = (
+    "Agent files live in `.claude/agents/<id>.md` and skills live in "
+    "`.claude/skills/<name>/SKILL.md`. When your agent file lists a skill, read "
+    "its SKILL.md file with the read tool."
+)
+REMINDER_TEXT = (
+    "For user-facing updates, use direct language; explain internal labels and "
+    "uncommon abbreviations, and avoid idioms. State what options mean in "
+    "practice. Preserve exact technical text."
+)
 WORKFLOW_DENIAL = "Tool blocked by policy"
 SQL_REFUSAL = "Blocked SQL statement"
 # The documented camelCase names of the events the hook file uses (Phase C).
@@ -76,6 +93,7 @@ CAMEL_EVENT_NAMES = {
     "PreToolUse": "preToolUse",
     "PostToolUse": "postToolUse",
     "Stop": "agentStop",
+    "SubagentStart": "subagentStart",
 }
 LIVE_HOOK_FILE = Path(".github/hooks/hooks.json")
 # `state-sync.sh pull` (a SessionStart hook) runs `restore-root-adapters.sh`, which
@@ -866,6 +884,61 @@ def guards_both_sources(record: SessionRecord) -> tuple[bool, str]:
     return True, f"{count} questions of kind hook; not denied"
 
 
+def session_reminder(record: SessionRecord) -> tuple[bool, str]:
+    """The reporting reminder is in the first user message the model received.
+
+    `reporting-reminder.sh session github-copilot` prints it at `SessionStart` as
+    top-level `additionalContext`, the documented route for context on this
+    runtime (F13). The runner records the user messages of the first model
+    request, so the check reads what the model got, not what the hook printed.
+    """
+    messages = record.summary.get("mainFirstRequestUser")
+    if not isinstance(messages, list) or not messages:
+        return False, "the runner recorded no user message of the first model request"
+    if REMINDER_TEXT not in str(messages[0]):
+        return False, (
+            f"the reminder is not in the first of the {len(messages)} user "
+            "message(s) of the first model request"
+        )
+    return True, (
+        f"the first user message holds the reminder ({len(REMINDER_TEXT)} characters)"
+    )
+
+
+def subagent_context(record: SessionRecord) -> tuple[bool, str]:
+    """Each custom sub-agent's first user message holds the guidance and the fixed line.
+
+    `subagent-context.sh` answers `SubagentStart` with the text of
+    `.github/copilot-instructions.md` and one fixed line (F9: a custom sub-agent
+    otherwise gets only its agent file). The runner records the user messages of
+    each sub-agent's first model request, keyed by the marker in its task prompt.
+    """
+    requests = _dict(record.summary.get("subagentFirstRequests"))
+    for agent in CUSTOM_AGENTS:
+        messages = _dict(requests.get(f"PROBE-CHILD-{agent}")).get("user")
+        if not isinstance(messages, list) or not messages:
+            return False, (
+                f"no first request was recorded for sub-agent {agent}: it did not start"
+            )
+        first = str(messages[0])
+        missing = [
+            what
+            for what, text in (
+                (f"the heading {GUIDANCE_HEADING!r}", GUIDANCE_HEADING),
+                ("the fixed line", SUBAGENT_LINE),
+            )
+            if text not in first
+        ]
+        if missing:
+            return False, (
+                f"the first user message of sub-agent {agent} lacks {' and '.join(missing)}"
+            )
+    return True, (
+        f"the first user message of each of {' and '.join(CUSTOM_AGENTS)} holds the "
+        f"heading {GUIDANCE_HEADING!r} and the fixed line"
+    )
+
+
 def mcp_none(record: SessionRecord) -> tuple[bool, str]:
     """No MCP server after trust or in the session, and no MCP file after the session.
 
@@ -993,6 +1066,20 @@ def baseline_scenario(project: Path) -> dict[str, object]:
                 name="probe-general",
                 mode="sync",
             ),
+            # The custom sub-agents. They play no tool steps: the check reads the
+            # first message each one received.
+            *(
+                step(
+                    f"subagent-{agent}",
+                    "task",
+                    description=f"probe {agent}",
+                    prompt=f"PROBE-CHILD-{agent} say ok",
+                    agent_type=agent,
+                    name=f"probe-{agent}",
+                    mode="sync",
+                )
+                for agent in CUSTOM_AGENTS
+            ),
         ],
         # What the sub-agent does: its own tool calls pass through the hooks too.
         "childSteps": {
@@ -1089,6 +1176,7 @@ BASELINE_CHECKS = (
     Check("mcp-none", mcp_none),
     Check("single-session-log", single_session_log),
     Check("state-sync-once", state_sync_once),
+    Check("session-reminder", session_reminder),
     denied("deny-git-reset", "deny-git-reset", "Blocked dangerous git operation"),
     denied("deny-force-push", "deny-force-push", "Blocked dangerous git operation"),
     denied(
@@ -1127,6 +1215,7 @@ BASELINE_CHECKS = (
         "Blocked dangerous git operation",
     ),
     refused("subagent-store-sql-refused", SQL_REFUSAL, "child-store-attach"),
+    Check("subagent-context", subagent_context),
 )
 CODEX_PATCH_CHECKS = (
     allowed("patch-plain-allowed", "patch-plain"),

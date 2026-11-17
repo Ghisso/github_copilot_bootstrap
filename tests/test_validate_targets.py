@@ -217,6 +217,201 @@ def test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list(
     assert target_validator.copilot_guard_target_errors(events)
 
 
+def _copilot_context_handler(script: str, *args: str) -> dict[str, Any]:
+    """The handler the Copilot hook file carries for a context hook (Phase E)."""
+    command = f".claude/hooks/scripts/run-hook.sh {script} {' '.join(args)}"
+    return {
+        "type": "command",
+        "bash": command,
+        "linux": f"/bin/bash {command}",
+        "osx": f"/bin/bash {command}",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10,
+    }
+
+
+def test_the_copilot_event_set_and_the_guidance_budget_are_pinned() -> None:
+    """`SubagentStart` joins the exact event set, and `.github/copilot-instructions.md`
+    gets its own 2048-byte budget, apart from the root-guidance table."""
+    assert target_validator.COPILOT_EXPECTED_EVENTS == {
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "SubagentStart",
+    }
+    assert target_validator.COPILOT_INSTRUCTIONS_MAX_BYTES == 2048
+    assert (
+        ".github/copilot-instructions.md" not in target_validator.ROOT_GUIDANCE_BUDGETS
+    )
+
+
+def test_the_shared_copilot_hook_file_wires_the_sub_agent_context_and_the_reminder() -> (
+    None
+):
+    events = _copilot_hook_events()
+
+    assert events["SubagentStart"] == [
+        _copilot_context_handler("subagent-context.sh", "github-copilot")
+    ]
+    # The fourth entry, after the pull, the session log, and the session state.
+    assert len(events["SessionStart"]) == 4
+    assert events["SessionStart"][3] == _copilot_context_handler(
+        "reporting-reminder.sh", "session", "github-copilot"
+    )
+    assert target_validator.copilot_context_hook_errors(events) == []
+
+
+def _drift_subagent_field(events: dict[str, Any], field: str, value: object) -> None:
+    events["SubagentStart"][0][field] = value
+
+
+def _drift_reminder_field(events: dict[str, Any], field: str, value: object) -> None:
+    events["SessionStart"][3][field] = value
+
+
+@pytest.mark.parametrize(
+    ("edit", "expected"),
+    (
+        pytest.param(
+            lambda e: e.pop("SubagentStart"),
+            "Copilot SubagentStart must have exactly one handler running "
+            "run-hook.sh subagent-context.sh github-copilot",
+            id="no-subagent-start",
+        ),
+        pytest.param(
+            lambda e: e["SubagentStart"].append(e["SubagentStart"][0]),
+            "Copilot SubagentStart must have exactly one handler running "
+            "run-hook.sh subagent-context.sh github-copilot",
+            id="two-subagent-handlers",
+        ),
+        pytest.param(
+            lambda e: e["SessionStart"].pop(),
+            "Copilot SessionStart must have exactly one handler running "
+            "run-hook.sh reporting-reminder.sh session github-copilot",
+            id="no-reminder",
+        ),
+        pytest.param(
+            lambda e: e["Stop"].append(e["SessionStart"].pop()),
+            "Copilot SessionStart must have exactly one handler running "
+            "run-hook.sh reporting-reminder.sh session github-copilot",
+            id="reminder-under-the-wrong-event",
+        ),
+        pytest.param(
+            lambda e: _drift_reminder_field(
+                e,
+                "bash",
+                ".claude/hooks/scripts/run-hook.sh reporting-reminder.sh prompt "
+                "github-copilot",
+            ),
+            "Copilot SessionStart must have exactly one handler running "
+            "run-hook.sh reporting-reminder.sh session github-copilot",
+            id="reminder-in-prompt-mode",
+        ),
+        pytest.param(
+            lambda e: _drift_reminder_field(
+                e,
+                "linux",
+                "/bin/bash .claude/hooks/scripts/run-hook.sh reporting-reminder.sh "
+                "session",
+            ),
+            "Copilot SessionStart must have exactly one handler running "
+            "run-hook.sh reporting-reminder.sh session github-copilot",
+            id="reminder-without-the-client-on-linux",
+        ),
+        pytest.param(
+            lambda e: _drift_subagent_field(
+                e,
+                "osx",
+                "/bin/bash .claude/hooks/scripts/run-hook.sh subagent-context.sh",
+            ),
+            "Copilot SubagentStart must have exactly one handler running "
+            "run-hook.sh subagent-context.sh github-copilot",
+            id="subagent-hook-without-the-client-on-osx",
+        ),
+        pytest.param(
+            lambda e: _drift_subagent_field(e, "timeout", 60),
+            "Copilot SubagentStart handler subagent-context.sh must have timeout "
+            "and timeoutSec 10",
+            id="subagent-timeout",
+        ),
+        pytest.param(
+            lambda e: _drift_reminder_field(e, "timeoutSec", 180),
+            "Copilot SessionStart handler reporting-reminder.sh must have timeout "
+            "and timeoutSec 10",
+            id="reminder-timeout-sec",
+        ),
+    ),
+)
+def test_the_copilot_context_hook_check_names_each_drifted_handler(
+    edit: Callable[[dict[str, Any]], object], expected: str
+) -> None:
+    events = deepcopy(_copilot_hook_events())
+
+    edit(events)
+
+    assert target_validator.copilot_context_hook_errors(events) == [expected]
+
+
+@pytest.mark.parametrize("hooks", (None, [], "hooks"), ids=("none", "list", "text"))
+def test_the_copilot_context_hook_check_rejects_a_hook_file_with_no_events_object(
+    hooks: object,
+) -> None:
+    assert len(target_validator.copilot_context_hook_errors(hooks)) == 2
+
+
+def test_the_validator_names_a_copilot_hook_file_without_the_sub_agent_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def drop_event(root: Path) -> None:
+        _edit_json(
+            root / ".github" / "hooks" / "hooks.json",
+            lambda data: data["hooks"].pop("SubagentStart"),
+        )
+
+    clean = _validate_hooks_on_dist_copy(
+        tmp_path / "clean", monkeypatch, lambda _: None
+    )
+    drifted = _validate_hooks_on_dist_copy(
+        tmp_path / "drifted", monkeypatch, drop_event
+    )
+
+    assert not any("SubagentStart" in error for error in clean), clean
+    assert any("SubagentStart must have exactly one handler" in e for e in drifted)
+    assert "GitHub Copilot hooks must retain the exact supported event set" in drifted
+
+
+def test_the_copilot_guidance_budget_passes_at_the_limit_and_fails_one_byte_over() -> (
+    None
+):
+    limit = 2048  # the plan's number, written here, not read from the validator
+    padding = limit - len(COPILOT_GUIDANCE_FIXTURE.encode())
+    assert padding > 0
+
+    at_limit = COPILOT_GUIDANCE_FIXTURE + " " * padding
+    assert len(at_limit.encode()) == limit
+    assert target_validator.copilot_guidance_errors(at_limit) == []
+
+    over = at_limit + " "
+    assert target_validator.copilot_guidance_errors(over) == [
+        f".github/copilot-instructions.md exceeds its bytes budget of {limit}"
+    ]
+
+
+def test_the_copilot_guidance_budget_counts_bytes_not_characters() -> None:
+    """A multi-byte character costs its encoded size."""
+    limit = 2048  # the plan's number, written here, not read from the validator
+    padding = limit - len(COPILOT_GUIDANCE_FIXTURE.encode())
+    # Half as many two-byte characters fill the same bytes with half the length.
+    wide = COPILOT_GUIDANCE_FIXTURE + "é" * (padding // 2 + 1)
+
+    assert len(wide) < limit < len(wide.encode())
+    assert target_validator.copilot_guidance_errors(wide) == [
+        f".github/copilot-instructions.md exceeds its bytes budget of {limit}"
+    ]
+
+
 # The Copilot runtime also loads `.claude/settings.json`, so the launcher stands a
 # lifecycle hook down only for a command that carries this marker (Phase D). Only
 # the generated Claude settings carry it.

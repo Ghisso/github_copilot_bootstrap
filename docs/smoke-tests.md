@@ -101,6 +101,10 @@ Expected:
 - Claude Code and OpenAI Codex add one prompt-start reminder and one selected
   late-report reminder through `reporting-reminder.sh`; existing state-sync,
   and PostToolUse handlers remain present.
+- GitHub Copilot adds one session-start reminder through
+  `reporting-reminder.sh session github-copilot`, the fourth `SessionStart`
+  entry of `.github/hooks/hooks.json`. Mode `session` is refused for every
+  other client, and `prompt` and `late-report` are refused for Copilot.
 - The reminder text is exactly 183 bytes and no more than 200 bytes. Prompt mode
   emits one parseable `UserPromptSubmit` context object. Late mode emits one
   `PostToolUse` context object for a `verify.py closeout` command or a
@@ -112,8 +116,10 @@ Expected:
 - Ordinary commands, malformed payloads, and unsupported arguments do not block:
   ordinary commands emit no output, while diagnostics go to stderr.
 - No periodic every-N-tool reminder, Stop rewriting, or PreCompact reminder is
-  generated. Copilot and Antigravity event sets are unchanged, and no Gemini
-  adapter is generated.
+  generated. The Antigravity event set is unchanged. The Copilot hook file has
+  one new event, `SubagentStart`, which runs `subagent-context.sh`; the other
+  four events keep their entries, plus the session-start reminder above. No
+  Gemini adapter is generated.
 
 ## MCP Routing
 

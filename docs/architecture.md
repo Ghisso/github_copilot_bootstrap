@@ -27,7 +27,8 @@ agent prompts point to this policy instead of copying its rules, while exact pat
 identifiers, commands, logs, and other evidence remain unchanged. This static
 reporting guidance applies to all four supported targets. The generated
 `reporting-reminder.sh` adds recurring prompt-start and selected late-turn
-reminders only for Claude Code and OpenAI Codex.
+reminders for Claude Code and OpenAI Codex, and one session-start reminder for
+GitHub Copilot.
 
 ### Policy applicability and native discovery
 
@@ -419,8 +420,10 @@ reopen paths are in `.claude/instructions/plan-lifecycle.instructions.md`.
 ### Reporting reminders
 
 `reporting-reminder.sh` is a short, warn-never-fail context reminder wired
-only for Claude Code and OpenAI Codex, though the static reporting policy
-applies to all four supported targets. Its current reminder is 183 bytes
+for Claude Code and OpenAI Codex (prompt start and selected late-turn
+boundaries) and for GitHub Copilot (session start only, mode `session`),
+though the static reporting policy applies to all four supported targets. Its
+current reminder is 183 bytes
 and stays below the 200-byte ceiling. The reminder is deliberately not
 periodic and does not rewrite output at `Stop` or inject at `PreCompact`.
 
