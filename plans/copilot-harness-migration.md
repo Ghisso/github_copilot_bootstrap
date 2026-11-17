@@ -529,7 +529,7 @@ Separately:
 ## Phases
 
 - [x] `2026-11-17_phase-A-copilot-runtime-probe` — offline check of the real runtime; baseline checks
-- [ ] `2026-11-17_phase-B-copilot-tool-inputs` — patch text, shell helpers, read alias, search paths, unmapped tools
+- [x] `2026-11-17_phase-B-copilot-tool-inputs` — patch text, shell helpers, read alias, search paths, unmapped tools
 - [ ] `2026-11-17_phase-C-copilot-hook-answers` — documented answer format for the Copilot client
 - [ ] `2026-11-17_phase-D-lifecycle-hook-stand-down` — Claude-settings lifecycle hooks stand down on the Copilot harness
 - [ ] `2026-11-17_phase-E-subagent-context` — sub-agent context and session-start reminder

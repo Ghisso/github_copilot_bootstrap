@@ -1634,9 +1634,11 @@
   works unchanged, but the runtime also loads `.claude/settings.json`, so
   every hook runs twice; nested `hookSpecificOutput` answers are honored
   only under PascalCase `PreToolUse`; a timeout or non-JSON output lets the
-  tool run; `apply_patch` (six Codex-family models) sends a string
-  `tool_input` and crashes `protect-files.py`; sub-agents get no repository
-  instructions. Read
+  tool run; `apply_patch` sends its patch text as a string `tool_input`
+  (offline only the six Codex-family model ids get that tool, but the real
+  VS Code also gave it to `gpt-6-luna`), which crashed `protect-files.py`
+  until Phase B of the plan `copilot-harness-migration` made the guard read
+  it; sub-agents get no repository instructions. Read
   `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/REPORT.md`
   before any Copilot change; its `scripts/` run the real runtime offline
   with a scripted local model, no account needed.
@@ -1923,3 +1925,14 @@
   hand-back per result; a second report after a follow-up message can be
   refused. Ask a resumed coder to write its report to a scratch file as
   well, and read the file.
+- [LEARN:tooling] The file guard reads an Edit or Write whose text holds a
+  patch start marker with no end marker as an unterminated patch and denies
+  it. In code and tests that mention the markers, define them once as
+  constants (`PATCH_BEGIN`, `PATCH_END` in `protect-files.py`) or split the
+  string.
+- [LEARN:testing] In a differential battery (old guard against new guard
+  over one input matrix), a row the classifier calls "unexplained" can be a
+  planned change the classifier does not recognize. Read each such row
+  before touching the guard: Phase B's 16 rows were hunk context lines that
+  spell a patch header, a planned stricter case, and the classifier was
+  wrong, not the guard.

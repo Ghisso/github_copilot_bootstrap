@@ -6,8 +6,8 @@ phase_index: 2
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-11-17_copilot-harness-phase-B.md
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -45,7 +45,7 @@ and the T1 text in step 8 before branch creation.
 
 ## Steps
 
-- [ ] **1. Write the failing tests first: a decision battery.**
+- [x] **1. Write the failing tests first: a decision battery.**
   Owner: coder. Files: create `tests/test_protect_files_copilot_harness.py`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/testing-patterns/SKILL.md`.
@@ -89,7 +89,7 @@ and the T1 text in step 8 before branch creation.
   Acceptance: the battery fails only on the planned rows before steps 2 to
   6.
 
-- [ ] **2. Read patch text.**
+- [x] **2. Read patch text.**
   Owner: coder. Files: `shared/hooks/scripts/protect-files.py` (`main`).
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/code-style/SKILL.md`.
@@ -103,7 +103,7 @@ and the T1 text in step 8 before branch creation.
   - Else: raise `AmbiguousCommand`.
   Standard library only; compiles on Python 3.9.
 
-- [ ] **3. Match patch headers tolerantly.**
+- [x] **3. Match patch headers tolerantly.**
   Owner: coder. Files: `shared/hooks/scripts/protect-files.py`
   (`add_patch_paths`).
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
@@ -116,7 +116,7 @@ and the T1 text in step 8 before branch creation.
     is the file's own text after one space (Markdown ` *** bold ***`), and
     a deny there would block ordinary edits. The comment says so.
 
-- [ ] **4. Shell helpers and the `Read` name.**
+- [x] **4. Shell helpers and the `Read` name.**
   Owner: coder. Files: `shared/hooks/scripts/protect-files.py`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
   - Add `SHELL_HELPER_TOOLS = {"read_bash", "list_bash", "stop_bash"}`,
@@ -128,14 +128,14 @@ and the T1 text in step 8 before branch creation.
   - Add `"read"` to `READ_ONLY_TOOLS`, commented as the Copilot harness's
     PascalCase name for `view`. Secret-shaped files stay denied.
 
-- [ ] **5. Read the search tools' `paths` list (user choice 1: yes).**
+- [x] **5. Read the search tools' `paths` list (user choice 1: yes).**
   Owner: coder. Files: `shared/hooks/scripts/protect-files.py`
   (`PATH_KEYS`).
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
   - Add `"paths"`. A search over a folder, and a `glob` filter such as
     `.env*`, are not judged, like shell reads.
 
-- [ ] **6. Give every inventory tool a recorded handling.**
+- [x] **6. Give every inventory tool a recorded handling.**
   Owner: coder. Files: `docs/target-mapping.md` (a new table, "Copilot
   harness tools and guard handling"), and `shared/hooks/scripts/protect-files.py`
   only when a row needs a guard change.
@@ -157,7 +157,7 @@ and the T1 text in step 8 before branch creation.
        they do not, or it cannot be shown, deny the tool by name on
        `github-copilot` (row T4), with a battery row and a docs line.
 
-- [ ] **7. Add the probe checks.**
+- [x] **7. Add the probe checks.**
   Owner: coder. Files: `scripts/check_copilot_runtime.py`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/integration-gate-spike/SKILL.md`.
@@ -182,7 +182,7 @@ and the T1 text in step 8 before branch creation.
     - `search-glob-not-judged` (glob `.env*`): no hook denial;
     - any probe step that step 6 adds.
 
-- [ ] **8. Update the docs.**
+- [x] **8. Update the docs.**
   Owner: coder. Files: `docs/target-mapping.md` (the GitHub Copilot column
   of the parity tables and the agent-definition row),
   `docs/runtime-checks.md` (forms the guard does not check).
@@ -196,7 +196,7 @@ and the T1 text in step 8 before branch creation.
   - VS Code can give a model the patch tool even when the runtime's own
     list does not (A4).
 
-- [ ] **9. Run the differential battery and record it.**
+- [x] **9. Run the differential battery and record it.**
   Owner: coder.
   - A scratch script in the session's scratch folder, not committed.
   - It runs `git show dev:shared/hooks/scripts/protect-files.py`, copied
@@ -207,7 +207,7 @@ and the T1 text in step 8 before branch creation.
   - Write the table of every difference into the phase session log. Every
     row must match L1, L2, L3, T1, T2, or T4.
 
-- [ ] **10. Regenerate and refresh this repository's own install.**
+- [x] **10. Regenerate and refresh this repository's own install.**
   Owner: coder.
   Commands:
   - `uv run python scripts/generate_targets.py --all`;
@@ -238,7 +238,7 @@ and the T1 text in step 8 before branch creation.
   - The probe section of `docs/runtime-checks.md` is updated for the new
     counts (31 result lines, two sessions).
 
-- [ ] **11. Review.**
+- [x] **11. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,
   `documentation`.
@@ -284,8 +284,8 @@ uv run python .claude/scripts/verify.py phase --format text
 
 Run the numbered CLOSEOUT sequence in `.claude/instructions/closeout.instructions.md` in order. Tick both boxes at its step 2. Later steps bind this file's bytes, so do not edit this file after step 2.
 
-- [ ] Step 1: documentation updated, or skipped as pure-internal with a reason
-- [ ] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
+- [x] Step 1: documentation updated, or skipped as pure-internal with a reason
+- [x] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
 
 ## Pause Checkpoint
 

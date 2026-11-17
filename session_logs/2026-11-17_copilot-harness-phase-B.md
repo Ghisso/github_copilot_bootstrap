@@ -22,6 +22,51 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
 - **19:55** - Phase B delegated to a fresh `coder` with the evidence packet
   (the small plan, the big plan's decision-change table, the evidence
   folder's raw files, and the Phase A probe structure).
+- **20:35** - `coder` finished steps 1 to 10. The patch-text crash is fixed
+  on the real runtime (`1.0.108-0`): a plain `apply_patch` file succeeds, a
+  `.env` patch is denied, and hook, server, agent, and indented-header
+  patches raise the hook questions. Step 6 found two tools for row T4:
+  `run_dynamic_workflow` and `dynamic_workflows_manage` are denied by name
+  on `github-copilot` only, because offline they answer "extensions are not
+  configured" and no run could show their code passing through a hook. The
+  user was told and can lift or narrow the deny.
+- **20:40** - Scope-change record added to the small plan (the shell
+  heredoc expectation, the two T4 tools, the probe steps step 6 calls for,
+  `print_decision` with the two patch constants, and the updated probe
+  counts in the docs). Evidence saved under
+  `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/raw/phase-B-*`.
+- **20:50** - Review round 1 (`code`, `architecture`, `security`, `tests`,
+  `ponytail`, `documentation`): no finding on the guard, the probe, or the
+  batteries. Gate FAIL on documentation: one MAJOR (row L3 in
+  `docs/target-mapping.md` claimed that patch text gets the same decision as
+  the same patch inside a shell command) and two MINOR (the known false ask
+  for a hunk context line that spells a header was neither documented nor
+  pinned; the `sql` row made a universal claim from five tried statements).
+  Two open requests: the step 9 table in this log, and the two run times
+  saved as evidence.
+- **21:05** - All three fixed; one test added
+  (`test_a_hunk_context_line_that_spells_a_header_is_judged_as_that_target`).
+  Review round 2: Gate PASS, no finding, no open request.
+
+### Phase-boundary summary
+
+- **Objective and change:** the file guard reads patch text, the shell
+  helper tools, the read tool's PascalCase name, and the search tools'
+  `paths` list. Changed: `shared/hooks/scripts/protect-files.py`,
+  `scripts/check_copilot_runtime.py`, `scripts/copilot_runtime_probe.mjs`,
+  `tests/test_check_copilot_runtime.py`, `docs/target-mapping.md`,
+  `docs/runtime-checks.md`; new: `tests/test_protect_files_copilot_harness.py`.
+- **Deviations:** the Scope-change record before step 11 of the small plan.
+- **Checks:** the required items below; the probe printed 31 PASS lines on
+  runtime `1.0.108-0`; the differential battery section below; the negative
+  control (`raw/phase-B-probe-negative-control.txt`: 11 of 31 lines fail
+  with the earlier guard).
+- **Open findings:** none.
+- **Decision for the user (not blocking):** keep, narrow, or lift the deny
+  of the two workflow tools on `github-copilot`.
+- **Next operation:** Phase C,
+  `.claude/plans/2026-11-17_phase-C-copilot-hook-answers.md` (the documented
+  answer format for the Copilot client).
 
 ## Differential battery (plan step 9)
 
@@ -46,9 +91,45 @@ too. Under Python 3.9.0 the new guard gave the same result as the default
 The full table of all 314 rows, with notes on each class, is
 `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/raw/phase-B-differential.md`.
 
+## Stale-claims surfaces checked
+
+This phase changed documented guard behavior (rows L1, L2, L3, T1, T2, T4).
+Surfaces checked for claims it made wrong:
+
+- `docs/target-mapping.md`: updated in this phase (the GitHub Copilot cells
+  of the hook-config and agent-definition rows, the secret-read follow-up,
+  and the new tool table).
+- `docs/runtime-checks.md`: updated in this phase (forms the guard does not
+  check; the probe section).
+- `README.md` and `docs/architecture.md`: searched for read tools, search
+  tools, the shell helper tools, and `apply_patch`; no statement found, so
+  nothing to correct. Their general Copilot statements describe the Local
+  harness and are rewritten in Phase F of this plan.
+- `docs/smoke-tests.md:220`: it says Copilot's read-only tools (it names
+  `view`, `grep`, `rg`, `glob` for the Copilot SDK harness) read protected
+  hook and server configs without a prompt and that secret-shaped files
+  stay denied for read tools. Still true; after this phase it also holds
+  for the search tools' `paths` list and for the name `Read`. Not changed.
+- `.claude/MEMORY.md`: the 2026-11-17 Copilot harness entry said
+  `apply_patch` crashes `protect-files.py`; corrected in place to say the
+  crash lasted until this phase and that the real VS Code also gave the
+  patch tool to `gpt-6-luna`. The entry on VS Code's Local harness tool
+  names stays true for the Local harness.
+- `openwiki/`: not searched; it is refreshed through OpenWiki's tools in
+  the final phase of this plan.
+
 ## [LEARN] Entries
 
-- [LEARN] none - no new lessons this session
+- [LEARN:tooling] The file guard denies an Edit or Write whose text holds a
+  patch start marker with no end marker; define the markers as constants or
+  split the string. Recorded in `.claude/MEMORY.md`.
+- [LEARN:testing] In a differential battery, read each "unexplained" row
+  before touching the guard; the classifier can be the wrong part. Recorded
+  in `.claude/MEMORY.md`.
+- No lesson recorded for: the hook names of the runtime tools and the
+  handling of each tool (the table in `docs/target-mapping.md` carries
+  them), and a long pytest run piped into `tail` keeping the call open
+  (general shell knowledge).
 
 ## Verification
 
@@ -56,6 +137,16 @@ The full table of all 314 rows, with notes on each class, is
 # filled at closeout step 4
 ```
 
+- Findings: `.claude/quality_reports/findings-2026-11-17_phase-B-copilot-tool-inputs.json`
+  (no surviving finding; gate PASS; six profiles; round 1 FAIL with one
+  MAJOR and two MINOR in the documentation, all fixed before round 2).
+- optional 1: PASS — the section "Differential battery (plan step 9)" above holds the class table (314 differences, 0 unexplained) and points to the full 314-row table in `raw/phase-B-differential.md`; every row belongs to L1, L2, L3, T1, T2, or T4.
+- optional 2: NOT RUN — it needs a person in a signed-in VS Code window with this phase's guard installed in a test project; the offline probe session `codex-patch` shows the same patch input creating a plain file on runtime `1.0.108-0`, and the user is asked to repeat the check in VS Code.
+
 ## Open Questions / Next Steps
 
-- Next: review Phase B with the six profiles, then closeout.
+- Next: Phase C, the documented answer format for the Copilot client.
+- For the user: keep, narrow, or lift the deny of `run_dynamic_workflow` and
+  `dynamic_workflows_manage` on `github-copilot`.
+- For the user: one prompt in a Copilot-harness chat that asks for a new
+  plain file, to confirm the patch-tool fix in the real client.
