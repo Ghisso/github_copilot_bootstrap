@@ -53,8 +53,11 @@ A diff in either file is a stop: report it and edit nothing by hand.
 
 Install only the `claude` and `codex` integrations. OpenWiki offers other
 host integrations; never install any of them here. `copilot` targets GitHub
-Copilot CLI, which this bootstrap does not support. `antigravity` writes
-`.agents/mcp_config.json`, which the bootstrap owns.
+Copilot CLI (it writes `.copilot/skills/openwiki` and
+`.copilot/mcp-config.json`), which this bootstrap does not claim. The bootstrap
+supports the Copilot harness inside VS Code, but the Copilot hook file has no
+`openwiki-guard.sh` entry, so run a refresh from Claude Code or Codex.
+`antigravity` writes `.agents/mcp_config.json`, which the bootstrap owns.
 
 If either command reports an unmanaged skill
 directory already occupying the `openwiki` slot under `.claude/skills/` or
