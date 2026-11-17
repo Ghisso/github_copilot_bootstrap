@@ -40,8 +40,8 @@ if [[ ! -f "$TARGET" ]]; then
   exit 0
 fi
 
-# The Copilot runtime loads both hook files, also from a subfolder, so every hook
-# runs twice there (evidence F2, A3, P4). A lifecycle hook reached through the
+# The Copilot runtime loads both hook files, also from a subfolder, so the
+# lifecycle hooks run twice there (evidence F2, A3, P4). One reached through the
 # Claude settings stands down: it drains its input, prints nothing, and exits 0.
 # Only these five scripts; a guard never stands down. Only when every condition
 # holds: the marker that only the generated Claude settings set; COPILOT_CLI=1;
@@ -63,9 +63,9 @@ stands_down() {
   [[ -z "${COPILOT_HOOK_DIR:-}" ]] || return 1
   [[ -z "${CLAUDECODE:-}" ]] || return 1
   [[ -f "$copilot_hooks" && ! -L "$copilot_hooks" ]] || return 1
-  ! grep -q -F disableAllHooks "$copilot_hooks" || return 1
-  grep -q -F "session-log.sh github-copilot" "$copilot_hooks" || return 1
-  grep -q -F "state-sync.sh push" "$copilot_hooks" || return 1
+  ! grep -q -F disableAllHooks "$copilot_hooks" 2>/dev/null || return 1
+  grep -q -F "session-log.sh github-copilot" "$copilot_hooks" 2>/dev/null || return 1
+  grep -q -F "state-sync.sh push" "$copilot_hooks" 2>/dev/null || return 1
 }
 
 if stands_down; then
