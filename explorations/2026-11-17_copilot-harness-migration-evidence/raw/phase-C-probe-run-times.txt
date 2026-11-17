@@ -1,0 +1,7 @@
+Phase C probe run times (uv run python scripts/check_copilot_runtime.py --require), 2026-11-17, runtime 1.0.108-0,
+three sessions, 43 result lines, final code. Limit: 480 s for the whole run, 150 s per session.
+final-probe-1.time: wall: 0m15.196s  exit 0, Result: PASS (0 of 43 checks failed)
+final-probe-2.time: wall: 0m16.635s  exit 0, Result: PASS (0 of 43 checks failed)
+Earlier runs on the same guards (before a one-line change to tr in json_escape):
+  after-1: 0m16.935s, after-2: 0m14.687s; run with the Phase B guards and the camel session added: 0m17.870s (7 of 43 lines FAIL).
+Phase B probe (two sessions, 31 lines), run just before Phase C work: 0m13.571s.

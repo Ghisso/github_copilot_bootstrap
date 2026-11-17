@@ -35,7 +35,7 @@ PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
 PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
 Result: FAIL (1 of 43 checks failed)
-=== control: claude-settings-on (exit 1, 16.4 s)
+=== control: claude-settings-on (exit 1, 16.5 s)
 PASS session-camel-rename: finished after 12 scripted model replies
 FAIL camel-hooks-source: 14 hooks still load from .claude/settings.json
 FAIL camel-events-renamed: .claude/settings.json is back after the session
@@ -49,7 +49,7 @@ PASS camel-ask-vscode-settings: 2 question(s) of kind hook; not denied
 PASS camel-ask-agent-wrapper: 2 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
 Result: FAIL (2 of 43 checks failed)
-=== control: no-rename (exit 1, 14.7 s)
+=== control: no-rename (exit 1, 14.9 s)
 PASS session-camel-rename: finished after 12 scripted model replies
 PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
 FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']
@@ -64,7 +64,7 @@ PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
 Result: FAIL (1 of 43 checks failed)
 ##### round 2
-=== control: live-file-only (exit 1, 15.3 s)
+=== control: live-file-only (exit 1, 15.0 s)
 PASS session-camel-rename: finished after 12 scripted model replies
 PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
 FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']
@@ -78,7 +78,7 @@ PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
 PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
 Result: FAIL (1 of 43 checks failed)
-=== control: claude-settings-on (exit 1, 17.5 s)
+=== control: claude-settings-on (exit 1, 16.4 s)
 PASS session-camel-rename: finished after 12 scripted model replies
 FAIL camel-hooks-source: 14 hooks still load from .claude/settings.json
 FAIL camel-events-renamed: .claude/settings.json is back after the session
@@ -92,7 +92,7 @@ PASS camel-ask-vscode-settings: 2 question(s) of kind hook; not denied
 PASS camel-ask-agent-wrapper: 2 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
 Result: FAIL (2 of 43 checks failed)
-=== control: no-rename (exit 1, 14.5 s)
+=== control: no-rename (exit 1, 15.0 s)
 PASS session-camel-rename: finished after 12 scripted model replies
 PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
 FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']

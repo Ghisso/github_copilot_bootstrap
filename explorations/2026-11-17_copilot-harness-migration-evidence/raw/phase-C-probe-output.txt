@@ -104,7 +104,7 @@ PASS camel-deny-pr: PR/push gate only allows implementation branches; current br
 PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
 PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
-Wall time: 0m16.935s
+Wall time: 0m15.196s
 
 === C. AFTER the guard changes, run 2 ===
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
@@ -153,7 +153,7 @@ PASS camel-deny-pr: PR/push gate only allows implementation branches; current br
 PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
 PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
 PASS camel-allow-plain: 4 steps succeeded with no hook question
-Wall time: 0m14.687s
+Wall time: 0m16.635s
 
 === D. The main and codex-patch lines are unchanged from the Phase B run ===
 Compared with phase-B-probe-output.txt's lines (status and detail text), with the camel lines and the

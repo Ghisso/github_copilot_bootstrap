@@ -1,0 +1,105 @@
+Byte-identity battery, 2026-11-17: pre-phase hook scripts (git archive of 5d229e5) against the Phase C
+working copy (a snapshot of shared/ taken after the last production edit).
+
+METHOD. Every case runs once against the old tree and once against the new tree, with the same input, in
+a synthetic Git repository of the same shape per tree (variants: branch main; branch dev with a big plan;
+branch foo_implementation with a big plan and a small plan). Each tree's scripts are reached through a
+symlink, so REPO_ROOT is the synthetic repository. The repository path is replaced by <ROOT> in the
+outputs before comparing, because the two trees run in different folders. TARGET_ID is removed from the
+environment, except in the sections marked [TARGET_ID exported], which export TARGET_ID=github-copilot
+to a script started for another client. Harness: phase-C-battery-harness.py.txt
+(python3 battery.py <old-tree> <new-tree> <report>). The final run took 5 min 57 s.
+
+WHAT IS COMPARED. For claude-code, openai-codex, and google-antigravity: stdout bytes, stderr bytes, and
+exit code must be identical. For github-copilot: exit code and stderr identical, and the new stdout must
+end with the old stdout minus its first brace (so the nested object is byte-identical to the old whole
+answer), with only whole top-level members `permissionDecision`, `permissionDecisionReason`, or
+`additionalContext` added in front, each equal to the nested value, and no top-level `hookEventName`.
+When the old code printed nothing, the new code must print nothing.
+
+INPUTS. 84 Bash commands (dangerous git, branch creation, commits, push and pull request,
+protected files, ordinary commands, a command with a tab and a newline) in three payload shapes each
+(Claude Bash, Copilot toolName/toolArgs, VS Code run_in_terminal); 16 file paths in native Write, Edit,
+create_file, view, read_file, grep, Copilot edit, and apply_patch shapes; the two workflow tools; 12
+unreadable payloads for the fail_closed paths; Antigravity bridge payloads; context-text scripts with
+closeout and commit commands; the OpenWiki guard in every mode; and the library functions called with 16
+texts without a control character and 10 with control characters.
+
+RESULT, final run
+old tree: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/old
+new tree: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/new
+comparisons (one old run plus one new run each): 19918
+differences: 0
+github-copilot comparisons with an answer: 944; with no answer (allow, both trees): 3425
+
+per section: runs / differences / runs where the old code printed an answer
+  antigravity-pretool.py: 312 / 0 / 312
+  enforce-branch-state.sh: 3024 / 0 / 216
+  enforce-branch-state.sh [TARGET_ID exported]: 324 / 0 / 36
+  enforce-branch-state.sh fail-closed: 48 / 0 / 12
+  enforce-commit-gate.sh: 2016 / 0 / 128
+  enforce-commit-gate.sh [TARGET_ID exported]: 216 / 0 / 12
+  enforce-commit-gate.sh fail-closed: 48 / 0 / 12
+  enforce-pr-gate.sh: 2016 / 0 / 176
+  enforce-pr-gate.sh [TARGET_ID exported]: 216 / 0 / 12
+  enforce-pr-gate.sh fail-closed: 48 / 0 / 12
+  git-protection.sh: 1008 / 0 / 64
+  git-protection.sh [TARGET_ID exported]: 108 / 0 / 6
+  git-protection.sh fail-closed: 48 / 0 / 12
+  library functions (control characters; planned T3 change): 250 / 0 / 250
+  library functions (no control character): 400 / 0 / 395
+  openwiki-guard.sh bogus: 48 / 0 / 48
+  openwiki-guard.sh bogus [TARGET_ID exported]: 48 / 0 / 48
+  openwiki-guard.sh no-mode: 48 / 0 / 48
+  openwiki-guard.sh no-mode [TARGET_ID exported]: 48 / 0 / 48
+  openwiki-guard.sh post: 48 / 0 / 36
+  openwiki-guard.sh post [TARGET_ID exported]: 48 / 0 / 36
+  openwiki-guard.sh pre: 48 / 0 / 48
+  openwiki-guard.sh pre [TARGET_ID exported]: 48 / 0 / 48
+  pretool-bash-guard.sh: 3024 / 0 / 1560
+  pretool-bash-guard.sh [TARGET_ID exported]: 324 / 0 / 162
+  pretool-bash-guard.sh fail-closed: 48 / 0 / 40
+  protect-files.py direct: 920 / 0 / 422
+  protect-files.sh: 1008 / 0 / 264
+  protect-files.sh [TARGET_ID exported]: 108 / 0 / 27
+  protect-files.sh fail-closed: 48 / 0 / 40
+  protect-files.sh native: 584 / 0 / 338
+  record-branch-state.sh: 3072 / 0 / 200
+  reporting-reminder.sh late-report: 90 / 0 / 8
+  reporting-reminder.sh late-report [TARGET_ID exported]: 50 / 0 / 4
+  reporting-reminder.sh prompt: 90 / 0 / 32
+  reporting-reminder.sh prompt [TARGET_ID exported]: 50 / 0 / 16
+  session-start-state.sh: 36 / 0 / 12
+
+(no differences)
+
+READING THE NUMBERS. The third column counts runs where the OLD code printed an answer (a deny, an ask, or
+context), so the battery is not comparing silence with silence. The github-copilot rows hold 944
+comparisons with an answer (nested object byte-identical, only top-level fields added) and 3425 with no
+answer in either tree.
+The section 'library functions (control characters; planned T3 change)' compares the new output for a text
+with control characters against the OLD code run on the same text with each control character already
+replaced by a space: 250 comparisons, 0 differences. That is the whole T3 change for these clients.
+Section 'library functions (no control character)' is the byte-identity check for plain text: 400
+comparisons, 0 differences. The 944 github-copilot answers, and nothing else, differ in bytes.
+
+CONTROL (the battery can see a change). A mutant of the new tree turns the Copilot shape on for every client
+(the two github-copilot tests in the library and in protect-files.py replaced by `true`). Run on the sections
+git-protection.sh, library functions, session-start-state.sh, reporting-reminder.sh prompt, and
+protect-files.sh native:
+old tree: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/old
+new tree: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mutant
+comparisons (one old run plus one new run each): 2574
+differences: 788
+github-copilot comparisons with an answer: 172; with no answer (allow, both trees): 339
+
+per section: runs / differences / runs where the old code printed an answer
+  git-protection.sh: 1008 / 48 / 64
+  git-protection.sh [TARGET_ID exported]: 108 / 6 / 6
+  git-protection.sh fail-closed: 48 / 9 / 12
+  library functions (control characters; planned T3 change): 250 / 160 / 250
+  library functions (no control character): 400 / 256 / 395
+  protect-files.sh native: 584 / 252 / 338
+  reporting-reminder.sh prompt: 90 / 32 / 32
+  reporting-reminder.sh prompt [TARGET_ID exported]: 50 / 16 / 16
+  session-start-state.sh: 36 / 9 / 12

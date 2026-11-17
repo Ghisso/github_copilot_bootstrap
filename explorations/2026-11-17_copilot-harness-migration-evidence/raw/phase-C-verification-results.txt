@@ -1,0 +1,42 @@
+Phase C command results, 2026-11-17, working copy after the last production edit.
+
+== uv run python scripts/validate_targets.py ==
+install-bootstrap: preserve tracked authoring adapter AGENTS.md
+PASS generated target is structurally valid
+
+real	0m46.710s
+user	0m22.641s
+sys	0m14.851s
+
+== uv run python scripts/check_runtime.py ==
+PASS hook scripts guard empty-array expansions for Bash 3.2
+PASS generated runtime wiring is present
+
+real	0m0.715s
+user	0m0.621s
+sys	0m0.150s
+
+== uv run pytest tests/ -q --tb=short (full suite, nothing else running) ==
+5714 passed, 1 skipped in 424.02s (0:07:04)
+exit=0
+wall (usr/bin/time): 7:25.78
+
+== the plan's Verification block pytest line ==
+uv run pytest tests/test_hook_gates.py tests/test_protect_files_copilot_harness.py tests/test_protect_files_scoping.py tests/test_protect_files_substitutions.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+3601 passed in 215.60s (0:03:35)
+
+real	3m47.347s
+user	2m3.221s
+sys	1m2.723s
+
+== other checks, final state ==
+uv run python scripts/generate_targets.py --all                          : generated multi-agent and sidecar
+uv run python scripts/install_bootstrap.py . --allow-self --local-only   : done (run after the last shared/ edit)
+uv run python scripts/check_copilot_runtime.py --require                 : Result: PASS (0 of 43 checks failed), twice (see phase-C-probe-run-times.txt)
+grep -q -F 'git-protection.sh github-copilot' dist/multi-agent/.github/hooks/hooks.json : exit 0
+uv run python scripts/validate_plan_frontmatter.py                       : exit 0
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases : Success: no issues found in 43 source files
+uv run ruff check shared scripts tests                                   : All checks passed
+uv run ruff format --check shared scripts tests                          : 43 files already formatted
+uv run python .claude/scripts/verify.py fast --format text               : fast: PASS
+python3 ast.parse(protect-files.py, feature_version=(3, 9))               : ok
