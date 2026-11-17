@@ -1,8 +1,8 @@
 ---
-name: 2026-11-17_phase-B-copilot-hook-answers
+name: 2026-11-17_phase-C-copilot-hook-answers
 type: small-plan
 parent_plan: copilot-harness-migration
-phase_index: 2
+phase_index: 3
 # status must occur exactly once: planned | in-progress | paused | complete | cancelled
 # New phase files default to planned (not yet started); the branch-creation
 # and post-commit hooks flip the active phase to in-progress automatically.
@@ -18,7 +18,7 @@ closeout_session_log:
 # cancelled_evidence: <repository-relative readable UTF-8 CANCELLED artifact>
 ---
 
-# Small Plan: 2026-11-17_phase-B-copilot-hook-answers
+# Small Plan: 2026-11-17_phase-C-copilot-hook-answers
 
 ## Scope
 
@@ -26,16 +26,19 @@ Today the guards answer only inside `hookSpecificOutput`. The Copilot
 harness honors that only under PascalCase event names, through an
 undocumented rule (F4). This phase makes the guards print the decision both
 at the top level, the documented Copilot shape, and nested, but only for the
-`github-copilot` client (REQ-002). Claude Code, Codex, and Antigravity keep
+`github-copilot` client (REQ-003). Claude Code, Codex, and Antigravity keep
 their exact bytes. The Local harness reads only the nested object (Source:
-Copilot extension 0.74.0), so it is unaffected. A new probe session renames
-the events to camelCase in a temporary copy, to prove that denies no longer
-depend on the PascalCase rule.
+Copilot extension 0.74.0).
 
 The combined answer looks like this:
 `{"permissionDecision":"deny","permissionDecisionReason":"R","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"R"}}`.
 It has no top-level `hookEventName`, because the Local harness drops a
 result whose top-level `hookEventName` names another event.
+
+The phase also stops a reason with a control character from producing
+invalid JSON (row T3). A new probe session renames the events to camelCase
+in a temporary copy. It shows that every gate's deny no longer depends on
+the PascalCase rule, which removes the output blocker for a later rename.
 
 ## Steps
 
@@ -46,31 +49,35 @@ result whose top-level `hookEventName` names another event.
   Cases:
   - For `github-copilot`: `git-protection.sh`, `enforce-branch-state.sh`,
     `enforce-commit-gate.sh`, `enforce-pr-gate.sh`, `protect-files.sh`
-    (deny and ask), and each `fail_closed` path print one JSON object.
-    Its top-level `permissionDecision` and `permissionDecisionReason` equal
-    the nested ones. It has no top-level `hookEventName`. The exit codes are
-    unchanged (0 for a decision, 2 for `fail_closed`).
+    (deny and ask), and each `fail_closed` path print one JSON object. Its
+    top-level `permissionDecision` and `permissionDecisionReason` equal the
+    nested ones. It has no top-level `hookEventName`. The exit codes are
+    unchanged.
   - `additional_context` for `github-copilot` (`session-start-state.sh`,
     `record-branch-state.sh`) prints top-level `additionalContext` equal to
     the nested one.
   - For `claude-code`, `openai-codex`, and `google-antigravity`, the same
-    calls print exactly today's bytes. Compare with literal expected
-    strings.
+    calls print exactly today's bytes (literal expected strings).
+  - With an exported `TARGET_ID=github-copilot`, `openwiki-guard.sh` and
+    `reporting-reminder.sh prompt claude-code` still print today's bytes.
+  - A deny reason holding a tab and a newline gives valid JSON with spaces
+    in their place.
   - `pretool-bash-guard.sh github-copilot` with `git reset --hard HEAD`
-    passes the combined deny through and exits 0, because its reader at
-    line 27 still finds the nested decision.
+    passes the combined deny through and exits 0.
   - The `antigravity-pretool.py` output for a denied write is unchanged.
   Acceptance: the new cases fail before steps 2 to 4.
 
-- [ ] **2. Print the combined answer in the shared library.**
+- [ ] **2. Print the combined answer and escape safely in the library.**
   Owner: coder. Files: `shared/hooks/scripts/_lib-frontmatter.sh`
-  (`deny_pretool`, `ask_pretool`, `additional_context`).
+  (`json_escape`, `deny_pretool`, `ask_pretool`, `additional_context`).
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
   - When `${TARGET_ID:-}` is `github-copilot`, print the combined
-    single-line object. Otherwise print today's line unchanged.
-  - Keep `json_escape` and the one-line `printf` form.
-  - Must not: change any other client's bytes, or add a top-level
-    `hookEventName`.
+    single-line object; otherwise today's line.
+  - `json_escape` turns characters `\001` to `\037` into spaces (with `tr`)
+    before escaping backslash and quote. It stays free of `python3`,
+    because `fail_closed` runs when `python3` is missing.
+  - Must not: change any other client's bytes for text with no control
+    character, or add a top-level `hookEventName`.
 
 - [ ] **3. Print the combined answer in the file guard.**
   Owner: coder. Files: `shared/hooks/scripts/protect-files.py` (`emit`).
@@ -78,25 +85,35 @@ result whose top-level `hookEventName` names another event.
   `.claude/skills/code-style/SKILL.md`.
   - For `target_id == "github-copilot"`, add the top-level
     `permissionDecision` and `permissionDecisionReason` beside the nested
-    object, with the same `json.dumps` separators.
+    object.
   - Standard library only; compiles on Python 3.9.
 
-- [ ] **4. Give every printing script its client name.**
+- [ ] **4. Every printing script names its client.**
   Owner: coder.
   Files:
   - `shared/hooks/scripts/enforce-pr-gate.sh`,
     `shared/hooks/scripts/session-start-state.sh`,
     `shared/hooks/scripts/record-branch-state.sh`: set
-    `TARGET_ID="${1:-unknown-target}"` before any output;
-  - `shared/hooks/hooks.json`: the `git-protection.sh` entry gains the
-    `github-copilot` argument in `bash`, `linux`, and `osx`;
-  - `scripts/validate_targets.py`: a new check that every guard entry under
+    `TARGET_ID="${1:-unknown-target}"`;
+  - `shared/hooks/scripts/reporting-reminder.sh`: set
+    `TARGET_ID="$PROVIDER"`;
+  - `shared/hooks/scripts/openwiki-guard.sh`: set `TARGET_ID=""`;
+  - `shared/hooks/hooks.json`: the `git-protection.sh` entry gains
+    `github-copilot` in `bash`, `linux`, and `osx`;
+  - `scripts/validate_targets.py`: a check that every guard under
     `PreToolUse` in the Copilot hook file passes `github-copilot`.
 
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
   Must not rename any event in `shared/hooks/hooks.json`.
 
-- [ ] **5. Add the camelCase probe session.**
+- [ ] **5. Check the readers of the nested answer.**
+  Owner: coder. Files: none beyond the step 1 tests.
+  Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
+  `pretool-bash-guard.sh:27` and `antigravity-pretool.py` `guard_decision`
+  read only the nested object, which stays. No change; the step 1 tests pin
+  it.
+
+- [ ] **6. Add the camelCase probe session.**
   Owner: coder. Files: `scripts/check_copilot_runtime.py`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/integration-gate-spike/SKILL.md`.
@@ -106,24 +123,27 @@ result whose top-level `hookEventName` names another event.
     `PreToolUse` to `preToolUse`, `PostToolUse` to `postToolUse`, and
     `Stop` to `agentStop`.
   - Rename `.claude/settings.json` to `.claude/settings.json.off` in that
-    copy only, so the Copilot file is the only source.
-  - New checks: `camel-deny-git-reset`, `camel-deny-secret-rm`,
-    `camel-ask-vscode-settings` (at least one question of kind `hook`), and
-    `camel-allow-plain`, with the same expected values as the Phase A
-    checks.
-  - Before this phase's changes, `camel-deny-*` fails, because the nested
-    answer is ignored under camelCase (F4). After them, it passes.
+    copy only.
+  - Checks, each with the same expected value as its Phase A twin:
+    `camel-deny-git-reset`, `camel-deny-secret-rm`, `camel-deny-commit`,
+    `camel-deny-branch`, `camel-deny-pr`, `camel-ask-vscode-settings`,
+    `camel-ask-agent-wrapper`, `camel-allow-plain`.
+  - Before this phase, the `camel-deny-*` checks fail (F4). After it, they
+    pass.
 
-- [ ] **6. Update the docs.**
+- [ ] **7. Update the docs.**
   Owner: coder. Files: `docs/target-mapping.md`.
   Required Skills: `.claude/skills/documentation/SKILL.md`.
-  - Native Adapters, GitHub Copilot: one short paragraph. For the Copilot
-    client, the guards print the documented top-level answer and the nested
-    one. The Local harness reads the nested one. The event names stay
-    PascalCase until the Local removal.
-  - Recorded follow-ups: rename to camelCase after the Local removal.
+  - Native Adapters, GitHub Copilot: for the Copilot client, the guards
+    print the documented top-level answer and the nested one. The Local
+    harness reads the nested one. Events stay PascalCase until the Local
+    removal.
+  - The context text from `session-start-state.sh` and
+    `record-branch-state.sh` now reaches the Copilot model.
+  - Recorded follow-ups: "Phase C removed the output blocker for a
+    camelCase rename; recheck the input side before renaming."
 
-- [ ] **7. Regenerate and refresh this repository's own install.**
+- [ ] **8. Regenerate and refresh this repository's own install.**
   Owner: coder.
   Commands:
   - `uv run python scripts/generate_targets.py --all`;
@@ -131,14 +151,15 @@ result whose top-level `hookEventName` names another event.
   - `uv run python scripts/validate_targets.py`;
   - `uv run python scripts/check_runtime.py`.
 
-- [ ] **8. Review.**
+- [ ] **9. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,
   `documentation`.
   Focus:
   - no byte change for the other three clients;
   - no loosened decision;
-  - the camelCase session really disables the Claude settings source.
+  - `TARGET_ID` cannot leak in;
+  - the camelCase session disables the Claude settings source.
 
 ## Verification
 
@@ -152,8 +173,8 @@ result whose top-level `hookEventName` names another event.
 
 ```bash
 uv run python scripts/generate_targets.py --all
-uv run pytest tests/test_hook_gates.py tests/test_protect_files_scoping.py tests/test_protect_files_substitutions.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
-uv run python scripts/check_copilot_runtime.py --require --format text
+uv run pytest tests/test_hook_gates.py tests/test_protect_files_copilot_harness.py tests/test_protect_files_scoping.py tests/test_protect_files_substitutions.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+uv run python scripts/check_copilot_runtime.py --require
 grep -q -F 'git-protection.sh github-copilot' dist/multi-agent/.github/hooks/hooks.json
 uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py

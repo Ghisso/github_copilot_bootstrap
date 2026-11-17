@@ -497,6 +497,35 @@ What this adds:
   behavior for a guard question, a sub-agent start, and the environment of
   hooks that come from the Claude settings.
 
+**A5. First extra check in the real VS Code (Run, in the real VS Code,
+17:01).** Session `db2427a6…`, model `gpt-6-luna`, prompt: run
+`echo '{}' > .vscode/settings.json`.
+
+- The guard's `ask` reached VS Code as a permission request of kind `hook`
+  with `hookMessage` "Editing agent, hook, or server configuration requires
+  approval: .vscode/settings.json". At 17:27 it was still unanswered, so the
+  number of questions and the "Allow all" behavior are still open.
+- The logger in `.claude/settings.local.json` recorded the environment of a
+  hook that comes from the Claude settings: `COPILOT_CLI=1`,
+  `COPILOT_HOOK_DEPTH=1`, `COPILOT_PROJECT_DIR`, `CLAUDE_PROJECT_DIR`,
+  `CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP=1`, and no `COPILOT_HOOK_DIR` and no
+  `CLAUDECODE`. This matches the offline run
+  (`raw/hook-inputs-from-claude-settings.txt`).
+- Only the `SessionStart` logger from the Claude settings had run by then;
+  its `PreToolUse` logger had not, although two shell calls were made. The
+  first call was denied and the second was waiting at the question, which
+  fits hooks running one after another and stopping at a deny or an
+  unanswered question. Not confirmed.
+
+## Independent critique and plan revision
+
+The first plan draft was critiqued by a separate agent
+(`DEVILS-ADVOCATE-2026-11-17.md`). The planner's summaries are in
+`research/planner-report-draft-1-summary.md` and
+`research/planner-report-revision-1-summary.md`; its four planning probes are
+in `raw/planning-probe-*` and `scripts/sc_e*_planner.json`. The plan itself
+is `.claude/plans/copilot-harness-migration.md`.
+
 ## Corrections to earlier statements in this session
 
 - "The guards must read a different tool-call format" was wrong. They read

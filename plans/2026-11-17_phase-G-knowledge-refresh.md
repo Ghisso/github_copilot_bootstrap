@@ -29,8 +29,9 @@ from `.claude/instructions/closeout.instructions.md`, and records it under
 `## Stale-claims surfaces checked` in this phase's closeout session log.
 
 The pages most affected are `openwiki/architecture/hooks-and-guardrails.md`
-(Copilot answers, the stand-down rule, the tool names, `SubagentStart`),
-`openwiki/architecture/agents-and-skills.md` (sub-agent context), and
+(Copilot answers, the lifecycle stand-down, the tool names, the patch-header
+matching, `SubagentStart`), `openwiki/architecture/agents-and-skills.md`
+(sub-agent context), and
 `openwiki/operations/install-ownership-and-runtime-checks.md` (the probe).
 
 ## Steps
@@ -59,14 +60,18 @@ The pages most affected are `openwiki/architecture/hooks-and-guardrails.md`
   `.claude/MEMORY.md`, and `openwiki/` for claims this plan invalidated.
   In particular:
   - Correct, in place, the `[LEARN:tooling]` entry about the 2026-11-17
-    spike in `.claude/MEMORY.md`. Its "every hook runs twice",
-    `apply_patch` crash, and "sub-agents get no repository instructions"
-    statements are fixed on the Copilot harness by this plan; the Local
-    `chat.useClaudeHooks` double run remains.
+    spike in `.claude/MEMORY.md`. Its double-run, `apply_patch` crash, and
+    "sub-agents get no repository instructions" statements change on the
+    Copilot harness:
+    - the lifecycle hooks run once;
+    - the guards still run from both sources;
+    - the Local `chat.useClaudeHooks` double run remains.
   - Add LEARN entries for:
-    - the shell-helper finding (P3);
-    - the `COPILOT_CLI` inheritance finding (P1);
-    - the Local-settings reason against a Local stand-down (A2).
+    - the shell helpers (P3);
+    - the `COPILOT_CLI` inheritance (P1);
+    - VS Code's own tool set per model (A4);
+    - the Local-settings reason against a Local stand-down (A2);
+    - the option B trade-off.
   - Leave dated records unchanged.
   - Record every surface and its outcome under
     `## Stale-claims surfaces checked`.

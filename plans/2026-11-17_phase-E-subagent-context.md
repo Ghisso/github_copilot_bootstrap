@@ -27,14 +27,15 @@ others) gets only its three-line agent file. It gets no repository
 instructions and no skill list (F9). This phase adds a `SubagentStart` hook
 that gives each sub-agent the text of `.github/copilot-instructions.md`, the
 Copilot root guidance, plus one fixed line about where agent files and
-skills live (REQ-006). P2 showed that top-level `additionalContext` from
-this event reaches the sub-agent's first message.
+skills live (REQ-006). P2 observed that top-level `additionalContext` from
+this event reaches the sub-agent's first message, under both event casings.
+The PascalCase name is observed, not documented, for this event.
 
 The phase also gives Copilot sessions the plain-language reporting reminder
-at session start, the documented route (F13). The agent-file fields stay as
-they are: the Local harness uses `agents:`, `user-invocable`, and
+at session start, the documented route (F13). The agent-file fields stay:
+the Local harness uses `agents:`, `user-invocable`, and
 `disable-model-invocation`, and the Copilot harness ignores `agents:` (F9).
-The Local harness runs these hooks too and reads the nested copy. Its
+The Local harness runs these hooks too and reads the nested copy, so its
 sub-agents may receive the guidance twice; the docs say so.
 
 ## Steps
@@ -49,27 +50,25 @@ sub-agents may receive the guidance twice; the docs say so.
     valid JSON object. Its top-level `additionalContext` equals the nested
     one, contains the file's full text (newlines kept), and ends with the
     fixed line. It exits 0.
-  - With a missing file, a linked file, or a file over 2048 bytes, it
-    prints only the fixed line and exits 0.
-  - With malformed input, it prints nothing and exits 0. This is a context
-    hook, not a guard.
+  - With a missing file, a linked file, or a file over 2048 bytes: only the
+    fixed line, exit 0.
+  - With malformed input: no output, exit 0. This is a context hook, not a
+    guard.
   - `reporting-reminder.sh session github-copilot` prints the reminder in
-    the combined `SessionStart` shape. The existing modes for `claude-code`
-    and `openai-codex` keep their bytes.
+    the combined `SessionStart` shape. The `claude-code` and `openai-codex`
+    modes keep their bytes.
   - The validator expects `SubagentStart` in the Copilot hook file and the
-    reminder under `SessionStart`. It fails when
+    reminder under `SessionStart`. It fails when the generated
     `.github/copilot-instructions.md` exceeds 2048 bytes.
-  Acceptance: the new cases fail before steps 2 to 5.
+  Acceptance: the new cases fail before steps 2 to 4.
 
 - [ ] **2. Add the sub-agent context hook.**
   Owner: coder. Files: create `shared/hooks/scripts/subagent-context.sh`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
   - Read `$REPO_ROOT/.github/copilot-instructions.md` only when it is a
     regular file, not a link, and at most 2048 bytes.
-  - Build the output with `python3` and `json.dumps`, because
-    `json_escape` does not escape newlines.
-  - Print the top-level and nested `additionalContext`, with
-    `hookEventName` `SubagentStart` in the nested object only.
+  - Build the output with `python3` and `json.dumps`, with the nested
+    `hookEventName` `SubagentStart`.
   - The fixed line names `.claude/agents/<id>.md` and
     `.claude/skills/<name>/SKILL.md`, and says to read a skill file with
     the read tool when the agent file lists it.
@@ -79,22 +78,23 @@ sub-agents may receive the guidance twice; the docs say so.
   Owner: coder. Files: `shared/hooks/scripts/reporting-reminder.sh`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full).
   - New mode `session`, accepted only with the provider `github-copilot`.
-  - It prints the existing reminder text through `additional_context`
-    with `TARGET_ID=github-copilot`, which gives the combined shape from
-    Phase B.
-  - The reminder text constant and its 200-byte ceiling stay unchanged.
+    It prints the existing reminder through `additional_context`
+    (`TARGET_ID` is the provider since Phase C).
+  - The reminder text constant and its 200-byte ceiling are unchanged.
 
-- [ ] **4. Wire both hooks.**
+- [ ] **4. Wire both hooks and the budget.**
   Owner: coder.
   Files:
-  - `shared/hooks/hooks.json`: a new `SubagentStart` entry running
+  - `shared/hooks/hooks.json`: a `SubagentStart` entry running
     `run-hook.sh subagent-context.sh github-copilot`, and a fourth
     `SessionStart` entry running
-    `run-hook.sh reporting-reminder.sh session github-copilot`. Same
-    fields as the existing entries, timeout 10.
+    `run-hook.sh reporting-reminder.sh session github-copilot`, timeout 10.
   - `scripts/validate_targets.py`: add `SubagentStart` to
-    `COPILOT_EXPECTED_EVENTS`; check both handlers; add a 2048-byte budget
-    for the generated `.github/copilot-instructions.md`.
+    `COPILOT_EXPECTED_EVENTS`; check both handlers. Add a separate
+    2048-byte check for the generated `.github/copilot-instructions.md`,
+    not an entry in `ROOT_GUIDANCE_BUDGETS`: that table also applies the
+    root-guidance header and lifecycle rules, which this file does not
+    follow.
 
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/code-style/SKILL.md`.
@@ -117,7 +117,9 @@ sub-agents may receive the guidance twice; the docs say so.
   Required Skills: `.claude/skills/documentation/SKILL.md`.
   Content:
   - what sub-agents receive and from where;
-  - why the agent-file fields stay (the Local harness);
+  - "observed on runtime `1.0.108-0`", not "documented", for the PascalCase
+    event;
+  - why the agent-file fields stay;
   - that the Local harness may show the guidance twice;
   - the 2048-byte budget.
 
@@ -135,7 +137,7 @@ sub-agents may receive the guidance twice; the docs say so.
   `documentation`.
   Focus:
   - valid JSON for any file text;
-  - the context hook can never deny;
+  - the context hook never denies;
   - no budget loosened;
   - Local behavior described honestly.
 
@@ -152,7 +154,7 @@ sub-agents may receive the guidance twice; the docs say so.
 ```bash
 uv run python scripts/generate_targets.py --all
 uv run pytest tests/test_hook_gates.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
-uv run python scripts/check_copilot_runtime.py --require --format text
+uv run python scripts/check_copilot_runtime.py --require
 grep -q -F 'subagent-context.sh github-copilot' dist/multi-agent/.github/hooks/hooks.json
 grep -q -F 'reporting-reminder.sh session github-copilot' dist/multi-agent/.github/hooks/hooks.json
 uv run python scripts/validate_targets.py

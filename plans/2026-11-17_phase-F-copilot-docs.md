@@ -30,8 +30,10 @@ no hooks and no Copilot agent files.
 
 Every claim names the runtime version it was seen on: the version the
 Phase E probe printed, `1.0.108-0` at planning time. Every claim also says
-that VS Code hooks are "in preview". Plain language throughout: "harness"
-is explained at first use, and no internal label stands alone.
+that VS Code hooks are "in preview", and that VS Code can give a model a
+different tool set than the runtime's own list (A4). Plain language
+throughout: "harness" is explained at first use, and no internal label
+stands alone.
 
 ## Steps
 
@@ -44,12 +46,12 @@ is explained at first use, and no internal label stands alone.
     command in `README.md`'s sidecar section.
   - Run `uv run python scripts/check_copilot_runtime.py --discover <dir>`
     on each.
-  - Record in `docs/sidecar-provider-contract.md`, as a new dated row
-    (2026-11-17 or the run date, runtime version):
-    - which instruction files load (`.github/instructions/` and
-      `.claude/rules/`);
-    - whether the sidecar `.claude/agents/*.md` appear as Copilot agents;
-    - which skill copy wins.
+  - In `docs/sidecar-provider-contract.md`, add a section headed
+    `### Copilot harness discovery check (2026-11-17 or the run date)`.
+    Record the runtime version, the command used, which instruction files
+    load (`.github/instructions/` and `.claude/rules/`), whether the
+    sidecar `.claude/agents/*.md` appear as Copilot agents, and which skill
+    copy wins.
   - Keep the 2026-09-25 rows as dated records.
   - Any defect becomes a recorded follow-up, not a code change here.
 
@@ -57,33 +59,41 @@ is explained at first use, and no internal label stands alone.
   Owner: coder, as the documenter role.
   Files and content:
   - `README.md`: Quick Install note, conditional policy applicability,
-    Agent System, Hooks. Explain the two harnesses; what the bootstrap
-    supports on each until February 2027; the `chat.useClaudeHooks`
-    advice.
+    Agent System, Hooks. Explain the two harnesses, with the sentence
+    "VS Code removes the Local harness in February 2027." Say what the
+    bootstrap supports on each until then, and repeat the
+    `chat.useClaudeHooks` advice.
   - `docs/target-mapping.md`: Native Adapters; the GitHub Copilot column of
     both parity tables, split into Local harness and Copilot harness;
-    Recorded follow-ups (the list in the big plan).
+    Recorded follow-ups (the big plan's list, including the policies
+    offered twice and the per-hook `disableKey`).
   - `docs/runtime-checks.md`: rewrite "VS Code Copilot evidence boundary":
     - what the probe proves, and on which version;
     - what only a signed-in window shows;
-    - replace the "native-harness support" sentence with the exact claim:
-      Copilot harness inside VS Code yes, Copilot CLI and cloud agents no.
-  - `docs/smoke-tests.md`: a new "VS Code Copilot harness (manual)"
-    checklist. Before starting, check the precondition: `/run/user/<uid>`
-    must be in place. Recognize the fault by repeated
-    `listen EACCES: permission denied /run/user/<uid>/vscode-ipc-<id>.sock`
-    lines in `agenthost.log` under `~/.vscode-server/data/logs/<session>/`
-    (A1). Then the items:
-    - the denied `git reset --hard HEAD`;
-    - one approval question for a protected edit, and what "Allow all" and
-      Autopilot do;
-    - the tool names in the hook log;
-    - each MCP server listed once;
-    - the five custom agents listed, and whether
-      `github.copilot.chat.cli.customAgents.enabled` matters;
-    - the sub-agent context;
-    - when `sessionEnd` fires;
-    - a Local-harness deny still works.
+    - replace the "native-harness support" sentence with: "This bootstrap
+      supports the Copilot harness inside VS Code. It does not claim
+      Copilot CLI or Copilot cloud agents."
+  - `docs/smoke-tests.md`: a new `## VS Code Copilot harness (manual)`
+    section.
+    - Precondition: the folder `/run/user/<uid>` owned by the user. Without
+      it, `agenthost.log` (under `~/.vscode-server/data/logs/<session>/`)
+      repeats
+      `listen EACCES: permission denied /run/user/<uid>/vscode-ipc-<id>.sock`.
+      Fix it with
+      `sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" /run/user/$(id -u)`,
+      repeated after every WSL restart (A1).
+    - Items:
+      - the denied `git reset --hard HEAD`;
+      - the approval questions for a protected edit (two under option B),
+        and what "Allow all" and Autopilot do;
+      - a file edit with a model that uses `apply_patch`;
+      - the tool names in the hook log;
+      - each MCP server listed once;
+      - the five custom agents listed, and whether
+        `github.copilot.chat.cli.customAgents.enabled` matters;
+      - the sub-agent context;
+      - when `sessionEnd` fires;
+      - a Local-harness deny still works.
   - `docs/architecture.md`: the Copilot adapter description.
 
   Required Skills: `.claude/skills/documentation/SKILL.md`,
@@ -114,16 +124,14 @@ is explained at first use, and no internal label stands alone.
 
 ```bash
 uv run python scripts/generate_targets.py --all
-uv run python scripts/check_copilot_runtime.py --require --format text
 uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' docs/target-mapping.md 'is not established from official sources'
 uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' docs/runtime-checks.md 'or native-harness support'
-grep -q -F '1.0.108-0' docs/runtime-checks.md
-grep -q -F 'in preview' docs/runtime-checks.md
-grep -q -F 'EACCES' docs/smoke-tests.md
-grep -q -F 'chat.useClaudeHooks' docs/smoke-tests.md
-grep -q -F 'SubagentStart' docs/target-mapping.md
-grep -q -F 'Copilot harness' README.md
-grep -q -F 'Copilot harness' docs/sidecar-provider-contract.md
+grep -q -F 'It does not claim Copilot CLI or Copilot cloud agents.' docs/runtime-checks.md
+grep -q -F '## VS Code Copilot harness (manual)' docs/smoke-tests.md
+grep -q -F 'sudo install -d -m 700' docs/smoke-tests.md
+grep -q -F 'VS Code removes the Local harness in February 2027.' README.md
+grep -q -F '### Copilot harness discovery check' docs/sidecar-provider-contract.md
+grep -q -F 'check_copilot_runtime.py --discover' docs/sidecar-provider-contract.md
 uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py
 uv run python scripts/validate_plan_frontmatter.py
@@ -135,8 +143,8 @@ uv run python .claude/scripts/verify.py phase --format text
 <!-- The only place a check may be conditional or non-executable. One `- `
      bullet per item, numbered in the order it appears. -->
 
+- Run `uv run python scripts/check_copilot_runtime.py --require` and record the printed runtime version; the docs name that version.
 - The user runs the new manual checklist in a signed-in VS Code window and the results are recorded in the closeout session log; items not run are recorded as not run.
-- If the final probe prints a runtime version other than `1.0.108-0`, the docs name the printed version instead, and the `1.0.108-0` check line above is updated before closeout.
 
 ## Closeout Checklist
 
