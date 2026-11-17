@@ -131,6 +131,41 @@ sub-agents may receive the guidance twice; the docs say so.
   - `uv run python scripts/validate_targets.py`;
   - `uv run python scripts/check_runtime.py`.
 
+  Scope-change record (approved by the orchestrator on 2026-11-18; each
+  item serves this phase's stated intent, and no guard decision changes):
+  - Step 2: `subagent-context.sh` serves only `github-copilot`. It reads
+    the guidance file only when the real path equals the expected path
+    under the real repository root, so a link at any step on the way is
+    refused, and it opens the file without following a link. Empty input
+    or JSON that is not an object counts as malformed.
+  - Step 2: the built-in `general-purpose` sub-agent also received the
+    guidance in the probe, although GitHub's docs say that agent emits no
+    such event. Accepted: every sub-agent that the event fires for gets
+    the guidance; the hook does not filter by agent type. The docs record
+    it as observed on runtime `1.0.108-0`.
+  - Step 3: for `github-copilot`, `reporting-reminder.sh` accepts only the
+    mode `session`. Its warning for another mode with that provider now
+    says "unsupported mode", not "unsupported provider". No hook file
+    makes such a call.
+  - Step 4: `subagent-context.sh` joins `REQUIRED_HOOK_SCRIPTS`; a new
+    validator function checks both new handlers; `SubagentStart` is the
+    last event of the Copilot hook file.
+  - Step 5 also changes `scripts/copilot_runtime_probe.mjs` (it records the
+    user messages of each first request) and
+    `tests/test_check_copilot_runtime.py`. The camelCase copy of the probe
+    renames `SubagentStart` too. A run prints 48 lines. The check
+    `subagent-context` looks for the heading and the fixed line, as
+    planned; the saved run shows the whole file text in each child.
+  - Step 6 also corrects `docs/runtime-checks.md` and
+    `docs/architecture.md`, which said the reminder is only for Claude
+    Code and OpenAI Codex, and the script list in `docs/runtime-checks.md`
+    that the validator compares with the shipped scripts.
+  - `tests/test_lifecycle_hooks.py`: one test pinned four events and three
+    `SessionStart` entries in the Copilot hook file; it now pins the new
+    contract with both new commands.
+  - Step 1: three calls are added to the script form of
+    `tests/test_hook_gates.py`, which the CI workflow runs on macOS.
+
 - [ ] **8. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,
