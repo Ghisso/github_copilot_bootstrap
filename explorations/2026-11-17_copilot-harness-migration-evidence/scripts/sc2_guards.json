@@ -1,0 +1,27 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 400000,
+  "mcpServers": {
+    "probe": { "type": "stdio", "command": "{{NODE}}", "args": ["{{SPIKE}}/mcp_probe.mjs"], "tools": ["*"] }
+  },
+  "steps": [
+    { "tool": "bash", "args": { "command": "echo probe-one", "description": "S01 plain echo" } },
+    { "tool": "view", "args": { "path": "{{PROJECT}}/README.md" } },
+    { "tool": "create", "args": { "path": "{{PROJECT}}/probe-created.txt", "file_text": "probe\n" } },
+    { "tool": "edit", "args": { "path": "{{PROJECT}}/probe-created.txt", "old_str": "probe", "new_str": "probe2" } },
+    { "toolMatch": "echo_text", "args": { "text": "hello" } },
+    { "tool": "bash", "args": { "command": "git reset --hard HEAD", "description": "S06 destructive git: expect deny" } },
+    { "tool": "bash", "args": { "command": "rm -f .env", "description": "S07 secret-shaped target: expect deny" } },
+    { "tool": "bash", "args": { "command": "git push --force origin dev", "description": "S08 force push: expect deny" } },
+    { "tool": "view", "args": { "path": "{{PROJECT}}/.env" } },
+    { "tool": "create", "args": { "path": "{{PROJECT}}/.vscode/settings.json", "file_text": "{}\n" } },
+    { "tool": "bash", "args": { "command": "echo '{}' > .github/copilot/settings.json", "description": "S11 write a hook switch file: expect ask" } },
+    { "tool": "edit", "args": { "path": "{{PROJECT}}/.claude/agents/coder.md", "old_str": "PROBE-NO-SUCH-TEXT", "new_str": "x" } },
+    { "tool": "edit", "args": { "path": "{{PROJECT}}/.github/agents/coder.agent.md", "old_str": "PROBE-NO-SUCH-TEXT", "new_str": "x" } },
+    { "tool": "bash", "args": { "command": "git checkout -b probe_implementation", "description": "S14 implementation branch without a plan: expect deny" } },
+    { "tool": "bash", "args": { "command": "git commit --allow-empty -m 'feat: probe commit'", "description": "S15 commit: gate decides" } },
+    { "tool": "bash", "args": { "command": "gh pr create --title probe --body probe", "description": "S16 pull request: gate decides" } }
+  ]
+}

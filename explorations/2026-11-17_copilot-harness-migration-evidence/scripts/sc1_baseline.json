@@ -1,0 +1,24 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": false,
+  "timeoutMs": 300000,
+  "mcpServers": {
+    "probe": {
+      "type": "stdio",
+      "command": "/home/ghisso/.vscode-server/bin/69047191fc427f2f92828279aae1d90d8eeda7ab/node",
+      "args": ["/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/copilot-spike/mcp_probe.mjs"],
+      "tools": ["*"]
+    }
+  },
+  "steps": [
+    { "tool": "bash", "args": { "command": "echo probe-one", "description": "probe echo" } },
+    { "tool": "view", "args": { "path": "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/copilot-spike/consumer/README.md" } },
+    { "tool": "create", "args": { "path": "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/copilot-spike/consumer/probe-created.txt", "file_text": "probe\n" } },
+    { "tool": "edit", "args": { "path": "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/copilot-spike/consumer/probe-created.txt", "old_str": "probe", "new_str": "probe2" } },
+    { "toolMatch": "echo_text", "args": { "text": "hello" } },
+    { "tool": "bash", "args": { "command": "git reset --hard HEAD", "description": "probe: destructive git, a guard should deny this" } },
+    { "tool": "bash", "args": { "command": "rm -f .env", "description": "probe: secret-shaped target, a guard should deny this" } },
+    { "tool": "bash", "args": { "command": "false", "description": "probe: failing command" } }
+  ]
+}

@@ -1,0 +1,76 @@
+01 list_agents: {}
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True <no background agents>  post=['postToolUse']
+02 task: {"description": "probe coder", "prompt": "PROBE-CHILD-coder run the ch
+     preToolUse hooks: no output
+     permission: none requested
+     result:   post=[]
+03 bash: echo child-one
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True child-one <shellId: 0 completed with exit code 0>  post=['postToolUse']
+04 bash: git reset --hard HEAD
+     preToolUse hooks: {"call_probe_4": "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard  post=[]
+05 create: <project>/child-created.txt
+     preToolUse hooks: no output
+     permission: write:Create file => approved
+     result: success=True Created file <project>/child-created.txt with 6 characters  post=['postToolUse']
+06 view: <project>/README.md
+     preToolUse hooks: no output
+     permission: read:Read file: <project>/README.md => approved
+     result: success=True child PROBE-CHILD-coder complete  post=['postToolUse', 'postToolUse']
+07 task: {"description": "probe reviewer", "prompt": "PROBE-CHILD-reviewer run 
+     preToolUse hooks: no output
+     permission: none requested
+     result:   post=[]
+08 bash: echo child-one
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=False Tool 'bash' does not exist.  post=['postToolUseFailure']
+09 bash: git reset --hard HEAD
+     preToolUse hooks: {"call_probe_10": "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard  post=[]
+10 create: <project>/child-created.txt
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=False Tool 'create' does not exist.  post=['postToolUseFailure']
+11 view: <project>/README.md
+     preToolUse hooks: no output
+     permission: read:Read file: <project>/README.md => approved
+     result: success=True child PROBE-CHILD-reviewer complete  post=['postToolUse', 'postToolUse']
+12 task: {"description": "probe general", "prompt": "PROBE-CHILD-general run th
+     preToolUse hooks: no output
+     permission: none requested
+     result:   post=[]
+13 bash: echo child-one
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True child-one <shellId: 1 completed with exit code 0>  post=['postToolUse']
+14 bash: git reset --hard HEAD
+     preToolUse hooks: {"call_probe_16": "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard  post=[]
+15 create: <project>/child-created.txt
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=False Path already exists  post=['postToolUseFailure']
+16 view: <project>/README.md
+     preToolUse hooks: no output
+     permission: read:Read file: <project>/README.md => approved
+     result: success=True child PROBE-CHILD-general complete  post=['postToolUse', 'postToolUse']
+17 grep: {"pattern": "SECRET", "paths": [".env"]}
+     preToolUse hooks: no output
+     permission: read:Search in directory: <project>/.env => approved
+     result: success=False Search paths do not exist: .env  post=['postToolUseFailure']
+18 glob: {"pattern": ".env*"}
+     preToolUse hooks: no output
+     permission: read:Search for files matching pattern in: <project> => approved
+     result: success=True No files matched the pattern.  post=['postToolUse']
+19 skill: {"skill": "caveman"}
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True Skill "caveman" loaded successfully. Follow the instructions in the skill context.  post=['postToolUse']

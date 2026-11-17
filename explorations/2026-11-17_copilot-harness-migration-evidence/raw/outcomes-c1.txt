@@ -1,0 +1,28 @@
+01 apply_patch: *** Begin Patch *** Add File: probe-patch.txt +plain file *** End Patc
+     preToolUse hooks: {"call_probe_1": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+02 apply_patch: *** Begin Patch *** Add File: .env +SECRET=1 *** End Patch 
+     preToolUse hooks: {"call_probe_2": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+03 apply_patch: *** Begin Patch *** Add File: .github/hooks/evil.json +{} *** End Patc
+     preToolUse hooks: {"call_probe_3": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+04 apply_patch: *** Begin Patch *** Update File: .mcp.json @@ -{ +{  *** End Patch 
+     preToolUse hooks: {"call_probe_4": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+05 apply_patch: *** Begin Patch *** Delete File: .claude/agents/coder.md *** End Patch
+     preToolUse hooks: {"call_probe_5": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+06 rg: {"pattern": "SECRET", "paths": [".env"]}
+     preToolUse hooks: no output
+     permission: read:Search in directory: <project>/.env => approved
+     result: success=False Search paths do not exist: .env  post=['postToolUseFailure']
+07 bash: git reset --hard HEAD
+     preToolUse hooks: {"call_probe_7": "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard  post=[]

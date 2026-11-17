@@ -1,0 +1,8 @@
+2026-11-17T07:02:59.000Z,event=SessionStart,target=github-copilot,sessionId=17d26bf3-2151-4cca-aa12-59692f6921ba,source=new
+2026-11-17T07:03:00.000Z,event=SessionStart,target=claude-code,sessionId=17d26bf3-2151-4cca-aa12-59692f6921ba,source=new
+2026-11-17T07:03:02.000Z,event=Stop,target=github-copilot,sessionId=17d26bf3-2151-4cca-aa12-59692f6921ba
+2026-11-17T07:03:02.000Z,event=Stop,target=claude-code,sessionId=17d26bf3-2151-4cca-aa12-59692f6921ba
+2026-11-17T07:06:29.000Z,event=SessionStart,target=github-copilot,sessionId=2e12f5e4-41b7-4635-a5a2-77a66f2c943d,source=new
+2026-11-17T07:06:30.000Z,event=SessionStart,target=claude-code,sessionId=2e12f5e4-41b7-4635-a5a2-77a66f2c943d,source=new
+2026-11-17T07:06:34.000Z,event=Stop,target=github-copilot,sessionId=2e12f5e4-41b7-4635-a5a2-77a66f2c943d
+2026-11-17T07:06:34.000Z,event=Stop,target=claude-code,sessionId=2e12f5e4-41b7-4635-a5a2-77a66f2c943d

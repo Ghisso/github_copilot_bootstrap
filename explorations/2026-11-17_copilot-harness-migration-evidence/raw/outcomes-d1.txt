@@ -1,0 +1,84 @@
+01 bash: echo ran PROBE-REPLY:t01
+     preToolUse hooks: {"call_probe_1": "Denied by preToolUse hook: t01 camel top-level deny"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: t01 camel top-level deny  post=[]
+02 bash: echo ran PROBE-REPLY:t02
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:t02 <shellId: 0 completed with exit code 0>  post=['postToolUse']
+03 bash: echo ran PROBE-REPLY:t03
+     preToolUse hooks: {"call_probe_3": "Denied by preToolUse hook: t03 pascal top-level deny"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: t03 pascal top-level deny  post=[]
+04 bash: echo ran PROBE-REPLY:t04
+     preToolUse hooks: {"call_probe_4": "Denied by preToolUse hook: t04 pascal nested deny"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: t04 pascal nested deny  post=[]
+05 bash: echo ran PROBE-REPLY:t05
+     preToolUse hooks: {"call_probe_5": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+06 bash: echo ran PROBE-REPLY:t06
+     preToolUse hooks: {"call_probe_6": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+07 bash: echo ran PROBE-REPLY:t07
+     preToolUse hooks: {"call_probe_7": "Denied by preToolUse hook from \".github/hooks/zz-probe-camel.json\" (hook errored)"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook from ".github/hooks/zz-probe-camel.json" (hook errored)  post=[]
+08 bash: echo ran PROBE-REPLY:t08
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:t08 <shellId: 1 completed with exit code 0>  post=['postToolUse']
+09 bash: echo ran PROBE-REPLY:t09
+     preToolUse hooks: no output
+     permission: hook:bash => approved
+     result: success=True ran PROBE-REPLY:t09 <shellId: 2 completed with exit code 0>  post=['postToolUse']
+10 bash: echo ran PROBE-REPLY:t10
+     preToolUse hooks: no output
+     permission: hook:bash => approved
+     result: success=True ran PROBE-REPLY:t10 <shellId: 3 completed with exit code 0>  post=['postToolUse']
+11 bash: echo ran PROBE-REPLY:t11
+     preToolUse hooks: error:{'message': 'HookTimeoutError: Hook command timed out after 10 seconds: bash /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-…', 'source':
+     permission: none requested
+     result: success=True ran PROBE-REPLY:t11 <shellId: 4 completed with exit code 0>  post=['postToolUse']
+12 bash: touch probe-allow.txt; echo ran PROBE-REPLY:t12
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:t12 <shellId: 5 completed with exit code 0>  post=['postToolUse']
+13 bash: echo original PROBE-REPLY:t13
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True modified-by-camel-hook <shellId: 6 completed with exit code 0>  post=['postToolUse']
+14 bash: echo original PROBE-REPLY:t14
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True updated-by-pascal-hook <shellId: 7 completed with exit code 0>  post=['postToolUse']
+15 bash: echo ran PROBE-REPLY:t15
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:t15 <shellId: 8 completed with exit code 0>  post=['postToolUse']
+16 bash: echo ran PROBE-REPLY:t16
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:t16 <shellId: 9 completed with exit code 0>  post=['postToolUse']
+17 bash: echo ran PROBE-REPLY:t17
+     preToolUse hooks: {"call_probe_17": "Denied by preToolUse hook: t17 deny wins over allow"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: t17 deny wins over allow  post=[]
+18 bash: echo ran PROBE-REPLY:t18
+     preToolUse hooks: no output
+     permission: hook:bash => approved
+     result: success=True ran PROBE-REPLY:t18 <shellId: 10 completed with exit code 0>  post=['postToolUse']
+19 bash: echo ran PROBE-REPLY:p01
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:p01 <shellId: 11 completed with exit code 0>  Tool "bash" succeeded. Additional guidance from postToolUse hooks: PROBE-CTX-camel-post-  post=['postToolUse']
+20 bash: echo ran PROBE-REPLY:p02
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:p02 <shellId: 12 completed with exit code 0>  Tool "bash" succeeded. Additional guidance from postToolUse hooks: PROBE-CTX-pascal-post  post=['postToolUse']
+21 bash: echo ran PROBE-REPLY:p03
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:p03 <shellId: 13 completed with exit code 0>  post=['postToolUse']

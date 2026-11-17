@@ -1,0 +1,12 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 200000,
+  "permission": "unavailable",
+  "steps": [
+    { "tool": "bash", "args": { "command": "echo '{}' > .github/copilot/settings.json", "description": "write a hook switch file: the guard asks" } },
+    { "tool": "create", "args": { "path": "{{PROJECT}}/.vscode/settings.json", "file_text": "{}\n" } },
+    { "tool": "create", "args": { "path": "{{PROJECT}}/plain-file.txt", "file_text": "x\n" } }
+  ]
+}

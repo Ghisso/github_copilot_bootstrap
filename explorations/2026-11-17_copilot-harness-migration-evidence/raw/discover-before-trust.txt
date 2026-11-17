@@ -1,0 +1,79 @@
+
+== hooks.discover
+
+== mcp.discover
+
+== instructions.getDiscoveryPaths
+   {"path": "<home>/copilot-instructions.md", "location": "user", "kind": "file", "preferredForCreation": true}
+   {"path": "<home>/instructions", "location": "user", "kind": "directory", "preferredForCreation": false}
+   {"path": "<project>/.github/copilot-instructions.md", "location": "repository", "kind": "file", "preferredForCreation": true, "projectPath": "<project>"}
+   {"path": "<project>/AGENTS.md", "location": "repository", "kind": "file", "preferredForCreation": false, "projectPath": "<project>"}
+   {"path": "<project>/CLAUDE.md", "location": "repository", "kind": "file", "preferredForCreation": false, "projectPath": "<project>"}
+   {"path": "<project>/GEMINI.md", "location": "repository", "kind": "file", "preferredForCreation": false, "projectPath": "<project>"}
+   {"path": "<project>/.github/instructions", "location": "repository", "kind": "directory", "preferredForCreation": false, "projectPath": "<project>"}
+   {"path": "<project>/.claude/rules", "location": "repository", "kind": "directory", "preferredForCreation": false, "projectPath": "<project>"}
+
+== instructions.discover
+   {"id": "repo-copilot", "label": ".github/copilot-instructions.md", "sourcePath": ".github/copilot-instructions.md", "type": "repo", "location": "repository", "projectPath": "<project>"} | chars=1676
+   {"id": "model-agents-md", "label": "AGENTS.md", "sourcePath": "AGENTS.md", "type": "model", "location": "repository", "projectPath": "<project>"} | chars=4740
+   {"id": "model-claude-md", "label": "CLAUDE.md", "sourcePath": "CLAUDE.md", "type": "model", "location": "repository", "projectPath": "<project>"} | chars=4409
+   {"id": "vscode-instructions/.github/instructions/agent-reporting.instructions.md", "label": "agent-reporting.instructions.md", "sourcePath": ".github/instructions/agent-reporting.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=349
+   {"id": "vscode-instructions/.github/instructions/api-service-standards.instructions.md", "label": "api-service-standards.instructions.md", "sourcePath": ".github/instructions/api-service-standards.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["service.py", "src/api/**/*.py" | chars=394
+   {"id": "vscode-instructions/.github/instructions/closeout.instructions.md", "label": "closeout.instructions.md", "sourcePath": ".github/instructions/closeout.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=319
+   {"id": "vscode-instructions/.github/instructions/code-standards.instructions.md", "label": "code-standards.instructions.md", "sourcePath": ".github/instructions/code-standards.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["src/**/*.py", "tests/**/*.py"], "description": ""} | chars=377
+   {"id": "vscode-instructions/.github/instructions/config-first-design.instructions.md", "label": "config-first-design.instructions.md", "sourcePath": ".github/instructions/config-first-design.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["src/configs/**/*.py"], "description" | chars=381
+   {"id": "vscode-instructions/.github/instructions/deployment.instructions.md", "label": "deployment.instructions.md", "sourcePath": ".github/instructions/deployment.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["service.py", "bentofile.yaml", "gradio_app/**", "streamlit_app/ | chars=424
+   {"id": "vscode-instructions/.github/instructions/plan-lifecycle.instructions.md", "label": "plan-lifecycle.instructions.md", "sourcePath": ".github/instructions/plan-lifecycle.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=331
+   {"id": "vscode-instructions/.github/instructions/quality-and-testing.instructions.md", "label": "quality-and-testing.instructions.md", "sourcePath": ".github/instructions/quality-and-testing.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=354
+   {"id": "vscode-instructions/.github/instructions/tests.instructions.md", "label": "tests.instructions.md", "sourcePath": ".github/instructions/tests.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["tests/**/*.py"], "description": ""} | chars=359
+   {"id": "vscode-instructions/.github/instructions/tool-routing.instructions.md", "label": "tool-routing.instructions.md", "sourcePath": ".github/instructions/tool-routing.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=327
+   {"id": "vscode-instructions/.github/instructions/workflow.instructions.md", "label": "workflow.instructions.md", "sourcePath": ".github/instructions/workflow.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=424
+   {"id": "vscode-instructions/.github/instructions/workspace.instructions.md", "label": "workspace.instructions.md", "sourcePath": ".github/instructions/workspace.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>"} | chars=366
+   {"id": "vscode-instructions/.claude/rules/api-service-standards.instructions.md", "label": "api-service-standards.instructions.md", "sourcePath": ".claude/rules/api-service-standards.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["service.py", "src/api/**/*.py"], "descriptio | chars=252
+   {"id": "vscode-instructions/.claude/rules/code-standards.instructions.md", "label": "code-standards.instructions.md", "sourcePath": ".claude/rules/code-standards.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["src/**/*.py", "tests/**/*.py"], "description": ""} | chars=235
+   {"id": "vscode-instructions/.claude/rules/config-first-design.instructions.md", "label": "config-first-design.instructions.md", "sourcePath": ".claude/rules/config-first-design.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["src/configs/**/*.py"], "description": ""} | chars=233
+   {"id": "vscode-instructions/.claude/rules/deployment.instructions.md", "label": "deployment.instructions.md", "sourcePath": ".claude/rules/deployment.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["service.py", "bentofile.yaml", "gradio_app/**", "streamlit_app/**", "deployme | chars=300
+   {"id": "vscode-instructions/.claude/rules/tests.instructions.md", "label": "tests.instructions.md", "sourcePath": ".claude/rules/tests.instructions.md", "type": "vscode", "location": "repository", "projectPath": "<project>", "applyTo": ["tests/**/*.py"], "description": ""} | chars=211
+
+== skills.getDiscoveryPaths
+   {"path": "<project>/.github/skills", "scope": "project", "preferredForCreation": true, "projectPath": "<project>"}
+   {"path": "<project>/.agents/skills", "scope": "project", "preferredForCreation": false, "projectPath": "<project>"}
+   {"path": "<project>/.claude/skills", "scope": "project", "preferredForCreation": false, "projectPath": "<project>"}
+   {"path": "<home>/skills", "scope": "personal-copilot", "preferredForCreation": true}
+
+== skills.discover
+   37 ('project', '<project>/.agents/skills')
+   sample: {"name": "add-dependency", "commandName": "add-dependency", "description": "Add a Python dependency with validation. Checks existence, adds with uv,\nupdates lockfile, and runs tests to verify compatibility. Use when asked to\nadd a dependency, install a package, or add a library.\n", "source": "project", "userInvocable": true, "enabled": true, "path": "<project>/.agents/skills/add-dependency/SKILL.md", "projectPath": "<project>", "argumentHint": "[package-name]"}
+
+== agents.getDiscoveryPaths
+   {"path": "<home>/agents", "scope": "user", "preferredForCreation": true}
+   {"path": "<project>/.github/agents", "scope": "project", "preferredForCreation": true, "projectPath": "<project>"}
+   {"path": "<project>/.claude/agents", "scope": "project", "preferredForCreation": false, "projectPath": "<project>"}
+
+== agents.discover
+   {"id": "coder", "name": "coder", "displayName": "coder", "description": "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting.", "source": "project", "path": "<project>/.github/agents/coder.agent.md", "userInvocable": false, "tools": ["edit", "execute", "read", "search", "semble/*", "context-mode/*", "context7/*", "todo", "todos", "vscode", "web"], "mcpServers": {"github-mcp-server": {"type": "http", "url": "https://api.githubcopilot.com/mcp/readonly", "headers": {"X-MCP-Toolse
+   {"id": "documenter", "name": "documenter", "displayName": "documenter", "description": "Documentation update agent. Reads git diff, identifies changed public interfaces and flows, then updates README.md and docs/ with accurate prose and Mermaid diagrams.", "source": "project", "path": "<project>/.github/agents/documenter.agent.md", "userInvocable": false, "tools": ["edit", "execute", "read", "search", "semble/*", "context-mode/*", "context7/*"]}
+   {"id": "orchestrator", "name": "orchestrator", "displayName": "orchestrator", "description": "Main-thread workflow orchestrator for complex implementation tasks. Delegates planning, coding, review, and verification to specialists, and owns the lifecycle ceremony (branch, commit, PR, memory, and session-log writes) itself. Not itself a delegatable subagent.", "source": "project", "path": "<project>/.github/agents/orchestrator.agent.md", "userInvocable": true, "tools": ["agent", "edit", "execute", "read", "search", "semble/*", "context-mode/*", "context7/*", "todo", "todos"]}
+   {"id": "planner", "name": "planner", "displayName": "planner", "description": "Planning specialist for implementation work. Produces phased plans with ownership, risks, verification commands, required skills, and review profiles.", "source": "project", "path": "<project>/.github/agents/planner.agent.md", "userInvocable": true, "tools": ["agent", "execute", "read", "search", "semble/*", "context-mode/*", "context7/*", "todo", "todos", "vscode", "web"], "mcpServers": {"github-mcp-server": {"type": "http", "url": "https://api.githubcopilot.com/mcp/readonly", "headers": {"X-MCP-Toolsets": "default
+   {"id": "reviewer", "name": "reviewer", "displayName": "reviewer", "description": "Unified review agent for code, architecture, security, tests, APIs, configs, performance, documentation, and domain checks. Selects one or more review profiles and runs two sequential passes itself.", "source": "project", "path": "<project>/.github/agents/reviewer.agent.md", "userInvocable": true, "tools": ["read", "search", "semble/*", "context-mode/*", "context7/*"]}
+
+== tools.list
+   bash, create, edit, glob, grep, list_agents, list_bash, read_agent, read_bash, skill, stop_bash, task, view, web_fetch, write_agent
+
+== user.settings.get
+   assistedApprovalInstructions = {"value": null, "default": null, "isDefault": true}
+   defaultPermissionMode = {"value": "manual", "default": "manual", "isDefault": true}
+   disableAllHooks = {"value": null, "default": null, "isDefault": true}
+   disabledHooks = {"value": null, "default": null, "isDefault": true}
+   disabledMcpServers = {"value": null, "default": null, "isDefault": true}
+   disabledSkills = {"value": null, "default": null, "isDefault": true}
+   enableAllGithubMcpTools = {"value": null, "default": null, "isDefault": true}
+   enabledMcpServers = {"value": null, "default": null, "isDefault": true}
+   githubMcpInsiders = {"value": null, "default": null, "isDefault": true}
+   githubMcpTools = {"value": null, "default": null, "isDefault": true}
+   githubMcpToolsets = {"value": null, "default": null, "isDefault": true}
+   hooks = {"value": null, "default": null, "isDefault": true}
+   ignoredSkillsLocations = {"value": null, "default": null, "isDefault": true}
+   permissions = {"value": null, "default": null, "isDefault": true}
+   skillDirectories = {"value": null, "default": null, "isDefault": true}
+   all setting keys: ahpEnvironment, aiSecretDetection, allowedUrls, askUser, assistedApprovalInstructions, autoTier, autoUpdate, autoUpdatesChannel, banner, bannerStyle, bashEnv, beep, beepOnSchedule, builtInAgents, commandHistoryMaxSize, compactPaste, companyAnnouncements, connectors, contextManagementTools, contextTier, continueOnAutoMode, copilotUrl, copyOnCodeBlockClick, copyOnSelect, customAgents, defaultMode, defaultPermissionMode, deniedUrls, disableAllHooks, disabledHooks, disabledMcpServers, disabledSkills, dynamicRetrieval, editorMode, effortLevel, enableAllGithubMcpTools, enabledFeatureFlags, enabledMcpServers, enabledPlugins, experimental, extensions, extraKnownMarketplaces, feature_flags, footer, fusionTier, githubMcpInsiders, githubMcpTools, githubMcpToolsets, hooks, ide, ignoredSkillsLocations, imageGeneration, imageGenerationWatermark, includeCoAuthoredBy, inlineImageLiveWindow, inlineImages, keepAlive, logLevel, memory, mergeStrategy, model, modelProviderId, mouse, notifications, permissions, pinnedPrompts, planContextTier, planEffortLevel, planModel, planModelProviderId, powershellFlags, proxyKerberosServicePrincipal, proxyUrl, remoteExport, remoteSessions, renderHexColors, renderMarkdown, respectGitignore, sandbox, screenReader, scrollbar, sessionManagementTools, shellShortcut, showReasoning, showTimestamps, showTipsOnStartup, showToolDurations, sidebar, skillDirectories, statusLine, stayInAutopilot, storeTokenPlaintext, stream, streamerMode, strictKnownMarketplaces, subagents, tabs, taskbarPresence, telemetry, terminalNotifications, terminalProgress, theme, toolSearch, transcriptView, updateTerminalTitle, voice, workflows, worktreeBaseRef, worktreePathTemplate

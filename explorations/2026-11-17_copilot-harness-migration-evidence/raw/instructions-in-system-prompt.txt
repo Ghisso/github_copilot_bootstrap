@@ -1,0 +1,40 @@
+system prompt: 48659 chars
+  .github/copilot-instructions.md                                        size=  1676 lines_in_prompt=9/9 mid_line_count=1
+  AGENTS.md                                                              size=  4740 lines_in_prompt=24/24 mid_line_count=2
+  CLAUDE.md                                                              size=  4409 lines_in_prompt=22/22 mid_line_count=2
+  .github/instructions/agent-reporting.instructions.md                   size=   349 lines_in_prompt=3/3 mid_line_count=1
+  .github/instructions/api-service-standards.instructions.md             size=   394 lines_in_prompt=1/2 mid_line_count=7
+  .github/instructions/closeout.instructions.md                          size=   319 lines_in_prompt=2/2 mid_line_count=7
+  .github/instructions/code-standards.instructions.md                    size=   377 lines_in_prompt=1/2 mid_line_count=7
+  .github/instructions/config-first-design.instructions.md               size=   381 lines_in_prompt=1/2 mid_line_count=7
+  .github/instructions/deployment.instructions.md                        size=   424 lines_in_prompt=1/2 mid_line_count=7
+  .github/instructions/plan-lifecycle.instructions.md                    size=   331 lines_in_prompt=2/2 mid_line_count=7
+  .github/instructions/quality-and-testing.instructions.md               size=   354 lines_in_prompt=3/3 mid_line_count=1
+  .github/instructions/tests.instructions.md                             size=   359 lines_in_prompt=1/2 mid_line_count=7
+  .github/instructions/tool-routing.instructions.md                      size=   327 lines_in_prompt=2/2 mid_line_count=7
+  .github/instructions/workflow.instructions.md                          size=   424 lines_in_prompt=3/3 mid_line_count=1
+  .github/instructions/workspace.instructions.md                         size=   366 lines_in_prompt=3/3 mid_line_count=1
+  .claude/rules/api-service-standards.instructions.md                    size=   252 lines_in_prompt=0/1 mid_line_count=0
+  .claude/rules/code-standards.instructions.md                           size=   235 lines_in_prompt=0/1 mid_line_count=0
+  .claude/rules/config-first-design.instructions.md                      size=   233 lines_in_prompt=0/1 mid_line_count=0
+  .claude/rules/deployment.instructions.md                               size=   300 lines_in_prompt=0/1 mid_line_count=0
+  .claude/rules/tests.instructions.md                                    size=   211 lines_in_prompt=0/1 mid_line_count=0
+  .claude/instructions/agent-reporting.instructions.md                   size=  4033 lines_in_prompt=0/48 mid_line_count=0
+  .claude/instructions/api-service-standards.instructions.md             size=  3147 lines_in_prompt=0/31 mid_line_count=0
+  .claude/instructions/closeout.instructions.md                          size= 16183 lines_in_prompt=0/106 mid_line_count=0
+  .claude/instructions/code-standards.instructions.md                    size=  3432 lines_in_prompt=0/32 mid_line_count=0
+  .claude/instructions/config-first-design.instructions.md               size=  3542 lines_in_prompt=0/42 mid_line_count=0
+  .claude/instructions/deployment.instructions.md                        size=  1589 lines_in_prompt=0/17 mid_line_count=0
+  .claude/instructions/plan-lifecycle.instructions.md                    size= 10065 lines_in_prompt=0/128 mid_line_count=0
+  .claude/instructions/quality-and-testing.instructions.md               size=  2973 lines_in_prompt=0/14 mid_line_count=0
+  .claude/instructions/tests.instructions.md                             size=  4976 lines_in_prompt=0/48 mid_line_count=0
+  .claude/instructions/tool-routing.instructions.md                      size=  2956 lines_in_prompt=0/14 mid_line_count=0
+  .claude/instructions/workflow.instructions.md                          size= 15961 lines_in_prompt=2/134 mid_line_count=0
+  .claude/instructions/workspace.instructions.md                         size=  7436 lines_in_prompt=2/42 mid_line_count=0
+  .claude/instructions/workspace.md                                      size=  7436 lines_in_prompt=2/42 mid_line_count=0
+instruction bytes judged loaded: 13295
+  marker '<custom_instruction' count: 3
+  marker '<skills' count: 0
+  marker '<available_skills' count: 1
+  marker '<agent' count: 0
+  marker 'applyTo' count: 0

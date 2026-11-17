@@ -1,0 +1,80 @@
+[0] main=True lastRole=user tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool names: bash, read_bash, stop_bash, list_bash, view, create, edit, web_fetch, semantic_code_search, skill, run_dynamic_workflow, dynamic_workflows_manage, sql, read_agent, list_agents, write_agent, grep, glob, task, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id, semble-find_related, semble-search
+    system prompt chars: 48645
+[1] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook: t01 camel top-level deny
+[2] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t02
+<shellId: 0 completed with exit code 0>
+[3] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook: t03 pascal top-level deny
+[4] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook: t04 pascal nested deny
+[5] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook: hook exited with code 2
+[6] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook: hook exited with code 2
+[7] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook from ".github/hooks/zz-probe-camel.json" (hook errored)
+[8] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t08
+<shellId: 1 completed with exit code 0>
+[9] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t09
+<shellId: 2 completed with exit code 0>
+[10] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t10
+<shellId: 3 completed with exit code 0>
+[11] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t11
+<shellId: 4 completed with exit code 0>
+[12] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t12
+<shellId: 5 completed with exit code 0>
+[13] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: modified-by-camel-hook
+<shellId: 6 completed with exit code 0>
+[14] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: updated-by-pascal-hook
+<shellId: 7 completed with exit code 0>
+[15] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t15
+<shellId: 8 completed with exit code 0>
+[16] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t16
+<shellId: 9 completed with exit code 0>
+[17] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: Denied by preToolUse hook: t17 deny wins over allow
+[18] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}]
+    tool result seen by model: ran PROBE-REPLY:t18
+<shellId: 10 completed with exit code 0>
+[19] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}, {"role": "tool", "found": ["PROBE-CTX-camel-post-top"]}]
+    tool result seen by model: ran PROBE-REPLY:p01
+<shellId: 11 completed with exit code 0>
+
+Tool "bash" succeeded. Additional guidance from postToolUse hooks:
+PROBE-CTX-camel-post-top
+[20] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}, {"role": "tool", "found": ["PROBE-CTX-camel-post-top"]}, {"role": "tool", "found": ["PROBE-CTX-pascal-post-top"]}]
+    tool result seen by model: ran PROBE-REPLY:p02
+<shellId: 12 completed with exit code 0>
+
+Tool "bash" succeeded. Additional guidance from postToolUse hooks:
+PROBE-CTX-pascal-post-top
+[21] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}, {"role": "tool", "found": ["PROBE-CTX-camel-post-top"]}, {"role": "tool", "found": ["PROBE-CTX-pascal-post-top"]}]
+    tool result seen by model: ran PROBE-REPLY:p03
+<shellId: 13 completed with exit code 0>
+[22] main=True lastRole=user tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-camel-sessionstart-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-prompt-top"]}, {"role": "tool", "found": ["PROBE-CTX-camel-post-top"]}, {"role": "tool", "found": ["PROBE-CTX-pascal-post-top"]}, {"role": "user", "found": ["PROBE-CTX-camel-stop-block", "PROBE-CTX-camel-prompt-top"]}]
+session.mcp_server_status_changed {"serverName": "context7", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "semble", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "semble", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "semble", "toolCount": 2}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "connected", "configSource": "workspace"}
+session.mcp_server_status_changed {"serverName": "context7", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context-mode", "toolCount": 3}
+session.mcp_server_tools_loaded {"serverName": "context7", "toolCount": 2}
+session.skills_loaded 37 skills; sources: ['project']
+session.mcp_servers_loaded {"servers": [{"name": "context-mode", "status": "connected", "source": "workspace", "serverMetadata": {"instructions": null}}, {"name": "context7", "status": "connected", "source": "workspace", "displayName": "Context7", "serverMetadata": {"instructions": "Use this server to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service \u2014 even well-known ones 
+session.tools_updated {"model": "probe-model"}
+session.mcp_servers_loaded {"servers": [{"name": "context-mode", "status": "connected", "source": "workspace", "serverMetadata": {"instructions": null}}, {"name": "context7", "status": "connected", "source": "workspace", "displayName": "Context7", "serverMetadata": {"instructions": "Use this server to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service \u2014 even well-known ones 
+session.tools_updated {"model": "probe-model"}

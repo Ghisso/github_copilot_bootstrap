@@ -1,0 +1,15 @@
+bash(command*, description*, shellId, mode, detach, initial_wait) {"safeForTelemetry": true}
+read_bash(shellId*, delay*) {"safeForTelemetry": true}
+stop_bash(shellId*) {"safeForTelemetry": true}
+list_bash() {"safeForTelemetry": true}
+glob(pattern*, paths) {"safeForTelemetry": true}
+grep(pattern*, paths, output_mode, glob, type, -i, -A, -B, -C, -n, head_limit, multiline) {"safeForTelemetry": true}
+create(path*, file_text*) {"safeForTelemetry": true}
+edit(path*, old_str, new_str) {"safeForTelemetry": true}
+skill(skill*) {"safeForTelemetry": true}
+view(path*, view_range, forceReadLargeFiles) {"safeForTelemetry": true}
+web_fetch(url*, max_length, start_index, raw) {"safeForTelemetry": true}
+task(description*, prompt*, agent_type*, name*, model, reasoning_effort, context_tier, mode) {"safeForTelemetry": {"name": true, "inputsNames": false}}
+read_agent(agent_id*, wait, timeout, since_turn) {"safeForTelemetry": true}
+list_agents(include_completed, scope) {"safeForTelemetry": true}
+write_agent(agent_id, agent_ids, scope, message*) {"safeForTelemetry": true}

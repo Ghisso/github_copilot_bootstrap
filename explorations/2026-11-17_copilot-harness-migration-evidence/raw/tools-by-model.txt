@@ -1,0 +1,9 @@
+catalog models: 69
+
+models (64): claude-sonnet-5.5, claude-sonnet-5, claude-fable-5.1, claude-fable-5, claude-opus-5.5, claude-opus-5, claude-opus-4.8, claude-opus-4.8-fast, claude-sonnet-4.6, claude-haiku-5.5, claude-haiku-4.5, gpt-6.1-sol, gpt-6.1-terra, gpt-6-sol, gpt-6-luna, gpt-6-astra, gpt-5.6-sol, gpt-5.6-sol-fast, gpt-5.6-terra, gpt-5.6-luna, mai-code-1.1-flash, gemini-4-argon, gemini-3.8-flash, grok-4.7, grok-4.6, kimi-k3, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-sonnet-4, claude-sonnet-4.5, gemini-2.5-pro, gemini-3.1-pro-preview, gemini-3.5-flash, gemini-3.6-flash, gemini-3.7-flash, gpt-4.1, gpt-4.1-2025-04-14, gpt-4o, gpt-5-mini, gpt-5.1, gpt-5.2, gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, gpt-5.5, grok-4.5, kimi-k2.7-code, mai-code-1-flash-4th, mai-code-1-flash-4th-picker, mai-code-1-flash-picker, mai-code-1-flash-secondary, mai-code-1-flash-secondary-picker, mai-code-1-flash-tertiary, mai-code-1-flash-tertiary-picker, mai-code-2, mai-code-2-flash, claude-opus-4.6-fast, gpt-5, gemini-3-pro-preview, gpt-41-copilot, grok-code-fast-1, gpt-4o-mini, probe-model
+tools: bash, create, edit, glob, grep, list_agents, list_bash, read_agent, read_bash, skill, stop_bash, task, view, web_fetch, write_agent
+
+models (6): gpt-5.3-codex, gpt-5.2-codex, gpt-5-codex, gpt-5.1-codex, gpt-5.1-codex-max, gpt-5.1-codex-mini
+tools: apply_patch, bash, glob, list_agents, list_bash, read_agent, read_bash, rg, skill, stop_bash, task, view, web_fetch, write_agent
+
+apply_patch definition: {"name":"apply_patch","description":"Use the `apply_patch` tool to edit files. This is a FREEFORM tool, so do not wrap the patch in JSON.","safeForTelemetry":true}

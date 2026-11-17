@@ -1628,6 +1628,18 @@
   `.vscode/settings.json` (`chat.useHooks`, `chat.hookFilesLocations`,
   `chat.useClaudeHooks`) and `.github/copilot/settings*.json`
   (`disableAllHooks`). Protect them like other hook configs.
+- [LEARN:tooling] VS Code removes Copilot's Local harness in February 2027;
+  the Copilot harness is the default since 1.143. Spike 2026-11-17 on the
+  runtime bundled in VS Code 1.146.0 (`1.0.108-0`): the PascalCase hook file
+  works unchanged, but the runtime also loads `.claude/settings.json`, so
+  every hook runs twice; nested `hookSpecificOutput` answers are honored
+  only under PascalCase `PreToolUse`; a timeout or non-JSON output lets the
+  tool run; `apply_patch` (six Codex-family models) sends a string
+  `tool_input` and crashes `protect-files.py`; sub-agents get no repository
+  instructions. Read
+  `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/REPORT.md`
+  before any Copilot change; its `scripts/` run the real runtime offline
+  with a scripted local model, no account needed.
 - [LEARN:workflow] After a self-install, new protect-files rules apply to the
   orchestrator's own Bash commands. A command that names a protected config
   or loops over an installed hook script is refused; probe with

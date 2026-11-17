@@ -1,0 +1,45 @@
+== hooks: count | source | origin | event | enabled
+  3 | .github/hooks/hooks.json | repository | agentStop | True
+  1 | .github/hooks/hooks.json | repository | postToolUse | True
+  5 | .github/hooks/hooks.json | repository | preToolUse | True
+  3 | .github/hooks/hooks.json | repository | sessionStart | True
+  1 | .github/hooks/zz-probe-camel.json | repository | agentStop | True
+  1 | .github/hooks/zz-probe-camel.json | repository | errorOccurred | True
+  1 | .github/hooks/zz-probe-camel.json | repository | notification | True
+  1 | .github/hooks/zz-probe-camel.json | repository | permissionRequest | True
+  1 | .github/hooks/zz-probe-camel.json | repository | postToolUse | True
+  1 | .github/hooks/zz-probe-camel.json | repository | postToolUseFailure | True
+  1 | .github/hooks/zz-probe-camel.json | repository | preCompact | True
+  1 | .github/hooks/zz-probe-camel.json | repository | preMcpToolCall | True
+  1 | .github/hooks/zz-probe-camel.json | repository | preToolUse | True
+  1 | .github/hooks/zz-probe-camel.json | repository | sessionEnd | True
+  1 | .github/hooks/zz-probe-camel.json | repository | sessionStart | True
+  1 | .github/hooks/zz-probe-camel.json | repository | subagentStart | True
+  1 | .github/hooks/zz-probe-camel.json | repository | subagentStop | True
+  1 | .github/hooks/zz-probe-camel.json | repository | userPromptSubmitted | True
+  1 | .github/hooks/zz-probe-camel.json | repository | userPromptTransformed | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | agentStop | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | errorOccurred | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | notification | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | permissionRequest | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | postToolUse | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | postToolUseFailure | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | preCompact | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | preToolUse | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | sessionEnd | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | sessionStart | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | subagentStart | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | subagentStop | True
+  1 | .github/hooks/zz-probe-pascal.json | repository | userPromptSubmitted | True
+  1 | repo settings | repository | agentStop | True
+  3 | repo settings | repository | postToolUse | True
+  1 | repo settings | repository | postToolUseFailure | True
+  3 | repo settings | repository | preToolUse | True
+  1 | repo settings | repository | sessionEnd | True
+  3 | repo settings | repository | sessionStart | True
+  2 | repo settings | repository | userPromptSubmitted | True
+  sample row: {"id": "hook:ebc5e6d8c72cb2d3e8e7a9e3c3e4314e6b990182a6981efbb7cd787e052d4977", "hookType": "preToolUse", "origin": "repository", "enabled": true, "source": ".github/hooks/zz-probe-pascal.json", "projectPath": "<project>", "disableKey": "507dfa0c1c71f80902879b41c65159fab1590c0cd68862550a95f490548390d4", "definitionFileUri": "<project>/.github/hooks/zz-probe-pascal.json"}
+== mcp servers
+   {"name": "semble", "type": "stdio", "source": "workspace", "enabled": true, "effectiveSource": {"kind": "workspace", "id": "76671a3ccc2bc4b8922afff63a5925cc182627f566f81805a03bad8818081010", "editability": "editable", "file": {"uri": "<project>/.mcp.json", "jsonPointer": "/mcpServers/semble"}}}
+   {"name": "context-mode", "type": "stdio", "source": "workspace", "enabled": true, "effectiveSource": {"kind": "workspace", "id": "76671a3ccc2bc4b8922afff63a5925cc182627f566f81805a03bad8818081010", "editability": "editable", "file": {"uri": "<project>/.mcp.json", "jsonPointer": "/mcpServers/context-mode"}}}
+   {"name": "context7", "type": "stdio", "source": "workspace", "enabled": true, "effectiveSource": {"kind": "workspace", "id": "76671a3ccc2bc4b8922afff63a5925cc182627f566f81805a03bad8818081010", "editability": "editable", "file": {"uri": "<project>/.mcp.json", "jsonPointer": "/mcpServers/context7"}}}

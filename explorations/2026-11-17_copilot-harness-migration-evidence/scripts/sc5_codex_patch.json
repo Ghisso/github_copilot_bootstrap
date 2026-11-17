@@ -1,0 +1,15 @@
+{
+  "model": "gpt-5.2-codex",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 300000,
+  "steps": [
+    { "tool": "apply_patch", "input": "*** Begin Patch\n*** Add File: probe-patch.txt\n+plain file\n*** End Patch\n" },
+    { "tool": "apply_patch", "input": "*** Begin Patch\n*** Add File: .env\n+SECRET=1\n*** End Patch\n" },
+    { "tool": "apply_patch", "input": "*** Begin Patch\n*** Add File: .github/hooks/evil.json\n+{}\n*** End Patch\n" },
+    { "tool": "apply_patch", "input": "*** Begin Patch\n*** Update File: .mcp.json\n@@\n-{\n+{ \n*** End Patch\n" },
+    { "tool": "apply_patch", "input": "*** Begin Patch\n*** Delete File: .claude/agents/coder.md\n*** End Patch\n" },
+    { "tool": "rg", "args": { "pattern": "SECRET", "paths": [".env"] } },
+    { "tool": "bash", "args": { "command": "git reset --hard HEAD", "description": "destructive git" } }
+  ]
+}

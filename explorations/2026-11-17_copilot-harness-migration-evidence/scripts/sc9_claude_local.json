@@ -1,0 +1,11 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 200000,
+  "steps": [
+    { "tool": "bash", "args": { "command": "echo probe-one", "description": "echo" } },
+    { "tool": "create", "args": { "path": "{{PROJECT}}/plain-file.txt", "file_text": "x\n" } },
+    { "tool": "view", "args": { "path": "{{PROJECT}}/README.md" } }
+  ]
+}

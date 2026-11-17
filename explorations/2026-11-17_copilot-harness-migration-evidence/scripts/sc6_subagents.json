@@ -1,0 +1,23 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 450000,
+  "steps": [
+    { "tool": "list_agents", "args": {} },
+    { "tool": "task", "args": { "description": "probe coder", "prompt": "PROBE-CHILD-coder run the child steps", "agent_type": "coder", "name": "probe-coder", "mode": "sync" } },
+    { "tool": "task", "args": { "description": "probe reviewer", "prompt": "PROBE-CHILD-reviewer run the child steps", "agent_type": "reviewer", "name": "probe-reviewer", "mode": "sync" } },
+    { "tool": "task", "args": { "description": "probe general", "prompt": "PROBE-CHILD-general run the child steps", "agent_type": "general-purpose", "name": "probe-general", "mode": "sync" } },
+    { "tool": "grep", "args": { "pattern": "SECRET", "paths": [".env"] } },
+    { "tool": "glob", "args": { "pattern": ".env*" } },
+    { "tool": "skill", "args": { "skill": "caveman" } }
+  ],
+  "childSteps": {
+    "default": [
+      { "tool": "bash", "args": { "command": "echo child-one", "description": "child echo" } },
+      { "tool": "bash", "args": { "command": "git reset --hard HEAD", "description": "child destructive git: expect deny" } },
+      { "tool": "create", "args": { "path": "{{PROJECT}}/child-created.txt", "file_text": "child\n" } },
+      { "tool": "view", "args": { "path": "{{PROJECT}}/README.md" } }
+    ]
+  }
+}

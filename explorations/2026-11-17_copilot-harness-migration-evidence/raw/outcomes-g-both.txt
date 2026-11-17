@@ -1,0 +1,64 @@
+01 bash: echo probe-one
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True probe-one <shellId: 0 completed with exit code 0>  post=['postToolUse']
+02 view: <project>/README.md
+     preToolUse hooks: no output
+     permission: read:Read file: <project>/README.md => approved
+     result: success=True # probe consumer   post=['postToolUse']
+03 create: <project>/probe-created.txt
+     preToolUse hooks: no output
+     permission: write:Create file => approved
+     result: success=True Created file <project>/probe-created.txt with 6 characters  post=['postToolUse']
+04 edit: <project>/probe-created.txt
+     preToolUse hooks: no output
+     permission: write:Edit file => approved
+     result: success=True File <project>/probe-created.txt updated with changes.  post=['postToolUse']
+05 probe-echo_text: {"text": "hello"}
+     preToolUse hooks: no output
+     permission: mcp:probe-echo_text => approved
+     result: success=True echo:hello  post=['postToolUse']
+06 bash: git reset --hard HEAD
+     preToolUse hooks: {"call_probe_6": "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard  post=[]
+07 bash: rm -f .env
+     preToolUse hooks: {"call_probe_7": "Denied by preToolUse hook: Protected file blocked by policy: .env"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Protected file blocked by policy: .env  post=[]
+08 bash: git push --force origin dev
+     preToolUse hooks: {"call_probe_8": "Denied by preToolUse hook: Blocked dangerous git operation: force push"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Blocked dangerous git operation: force push  post=[]
+09 view: <project>/.env
+     preToolUse hooks: {"call_probe_9": "Denied by preToolUse hook: Protected file blocked by policy: .env"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: Protected file blocked by policy: .env  post=[]
+10 create: <project>/.vscode/settings.json
+     preToolUse hooks: no output
+     permission: hook:create => approved hook:create => approved write:Create file => approved
+     result: success=True Created file <project>/.vscode/settings.json with 3 characters  post=['postToolUse']
+11 bash: echo '{}' > .github/copilot/settings.json
+     preToolUse hooks: no output
+     permission: hook:bash => approved hook:bash => approved
+     result: success=True /bin/bash: line 1: .github/copilot/settings.json: No such file or directory <shellId: 1 completed with exit code 1>  post=['postToolUse']
+12 edit: <project>/.claude/agents/coder.md
+     preToolUse hooks: no output
+     permission: hook:edit => approved hook:edit => approved
+     result: success=False No match found  post=['postToolUseFailure']
+13 edit: <project>/.github/agents/coder.agent.md
+     preToolUse hooks: no output
+     permission: hook:edit => approved hook:edit => approved
+     result: success=False No match found  post=['postToolUseFailure']
+14 bash: git checkout -b probe_implementation
+     preToolUse hooks: {"call_probe_14": "Denied by preToolUse hook: implementation branches must be created from dev; current branch is HEAD"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: implementation branches must be created from dev; current branch is HEAD  post=[]
+15 bash: git commit --allow-empty -m 'feat: probe commit'
+     preToolUse hooks: {"call_probe_15": "Denied by preToolUse hook: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-pla
+     permission: none requested
+     result: success=False Denied by preToolUse hook: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-pl  post=[]
+16 bash: gh pr create --title probe --body probe
+     preToolUse hooks: {"call_probe_16": "Denied by preToolUse hook: PR/push gate only allows implementation branches; current branch is HEAD"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: PR/push gate only allows implementation branches; current branch is HEAD  post=[]

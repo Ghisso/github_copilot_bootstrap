@@ -1,0 +1,8 @@
+### claudelocal-SessionStart
+   stdin: {"hook_event_name": "SessionStart", "session_id": "b4130ea9-e994-478b-bb66-ef84963400d0", "timestamp": "2026-11-17T07:16:06.458Z", "cwd": "<project>", "source": "new", "initial_prompt": "PROBE-MARKER Run the probe steps."}
+### claudelocal-PreToolUse-Bash
+   stdin: {"hook_event_name": "PreToolUse", "session_id": "b4130ea9-e994-478b-bb66-ef84963400d0", "timestamp": "2026-11-17T07:16:06.742Z", "cwd": "<project>", "traceparent": "00-03184be47977f6a1ecc723980840420a-a1e73a47d958914a-01", "tool_use_id": "call_probe_1", "tool_name": "Bash", "tool_input": {"command": "echo probe-one", "description": "echo"}}
+### claudelocal-PreToolUse-EditWrite
+   stdin: {"hook_event_name": "PreToolUse", "session_id": "b4130ea9-e994-478b-bb66-ef84963400d0", "timestamp": "2026-11-17T07:16:06.902Z", "cwd": "<project>", "traceparent": "00-03184be47977f6a1ecc723980840420a-a1e73a47d958914a-01", "tool_use_id": "call_probe_2", "tool_name": "Write", "tool_input": {"path": "<project>/plain-file.txt", "file_text": "x\n"}}
+### claudelocal-Stop
+   stdin: {"hook_event_name": "Stop", "session_id": "b4130ea9-e994-478b-bb66-ef84963400d0", "timestamp": "2026-11-17T07:16:07.096Z", "cwd": "<project>", "traceparent": "00-03184be47977f6a1ecc723980840420a-a1e73a47d958914a-01", "transcript_path": "<home>/session-state/b4130ea9-e994-478b-bb66-ef84963400d0/events.jsonl", "stop_reason": "end_turn", "stop_hook_active": false}

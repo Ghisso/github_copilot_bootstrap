@@ -1,0 +1,9 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 200000,
+  "agent": "orchestrator",
+  "prompt": "List tools only.",
+  "steps": []
+}

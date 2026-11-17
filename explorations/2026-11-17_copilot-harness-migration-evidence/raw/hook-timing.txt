@@ -1,0 +1,36 @@
+== g-both
+  agentStop              n=  1 max=  0.23s mean=  0.23s
+  notification           n=  5 max=  0.02s mean=  0.02s
+  permissionRequest      n=  5 max=  0.02s mean=  0.02s
+  postToolUse            n=  7 max=  0.09s mean=  0.05s
+  postToolUseFailure     n=  2 max=  0.06s mean=  0.06s
+  preMcpToolCall         n=  1 max=  0.01s mean=  0.01s
+  preToolUse             n= 16 max=  0.37s mean=  0.20s
+  sessionEnd             n=  1 max=  0.05s mean=  0.05s
+  sessionStart           n=  1 max=  1.72s mean=  1.72s
+  userPromptSubmitted    n=  1 max=  0.07s mean=  0.07s
+  userPromptTransformed  n=  1 max=  0.01s mean=  0.01s
+== g-copilot
+  agentStop              n=  1 max=  0.11s mean=  0.11s
+  notification           n=  5 max=  0.02s mean=  0.02s
+  permissionRequest      n=  5 max=  0.02s mean=  0.02s
+  postToolUse            n=  7 max=  0.04s mean=  0.04s
+  postToolUseFailure     n=  2 max=  0.02s mean=  0.02s
+  preMcpToolCall         n=  1 max=  0.01s mean=  0.01s
+  preToolUse             n= 16 max=  0.25s mean=  0.17s
+  sessionEnd             n=  1 max=  0.02s mean=  0.02s
+  sessionStart           n=  1 max=  0.85s mean=  0.85s
+  userPromptSubmitted    n=  1 max=  0.02s mean=  0.02s
+  userPromptTransformed  n=  1 max=  0.01s mean=  0.01s
+== g-claude
+  agentStop              n=  1 max=  0.12s mean=  0.12s
+  notification           n=  6 max=  0.02s mean=  0.02s
+  permissionRequest      n=  5 max=  0.02s mean=  0.02s
+  postToolUse            n=  7 max=  0.07s mean=  0.03s
+  postToolUseFailure     n=  3 max=  0.06s mean=  0.06s
+  preMcpToolCall         n=  1 max=  0.01s mean=  0.01s
+  preToolUse             n= 16 max=  0.26s mean=  0.11s
+  sessionEnd             n=  1 max=  0.05s mean=  0.05s
+  sessionStart           n=  1 max=  0.84s mean=  0.84s
+  userPromptSubmitted    n=  1 max=  0.06s mean=  0.06s
+  userPromptTransformed  n=  1 max=  0.01s mean=  0.01s

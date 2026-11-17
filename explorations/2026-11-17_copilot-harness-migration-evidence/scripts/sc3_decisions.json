@@ -1,0 +1,29 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 450000,
+  "steps": [
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t01", "description": "t01" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t02", "description": "t02" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t03", "description": "t03" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t04", "description": "t04" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t05", "description": "t05" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t06", "description": "t06" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t07", "description": "t07" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t08", "description": "t08" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t09", "description": "t09" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t10", "description": "t10" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t11", "description": "t11" } },
+    { "tool": "bash", "args": { "command": "touch probe-allow.txt; echo ran PROBE-REPLY:t12", "description": "t12" } },
+    { "tool": "bash", "args": { "command": "echo original PROBE-REPLY:t13", "description": "t13" } },
+    { "tool": "bash", "args": { "command": "echo original PROBE-REPLY:t14", "description": "t14" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t15", "description": "t15" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t16", "description": "t16" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t17", "description": "t17" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:t18", "description": "t18" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:p01", "description": "p01" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:p02", "description": "p02" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:p03", "description": "p03" } }
+  ]
+}

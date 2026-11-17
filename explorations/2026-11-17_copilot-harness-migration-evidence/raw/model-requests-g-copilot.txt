@@ -1,0 +1,53 @@
+[0] main=True lastRole=user tools=27 ctxHits=[]
+    tool names: bash, read_bash, stop_bash, list_bash, view, create, edit, web_fetch, semantic_code_search, skill, run_dynamic_workflow, dynamic_workflows_manage, sql, read_agent, list_agents, write_agent, grep, glob, task, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id, probe-echo_text, semble-find_related, semble-search
+    system prompt chars: 48659
+[1] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: probe-one
+<shellId: 0 completed with exit code 0>
+[2] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: # probe consumer
+
+[3] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Created file <project>/probe-created.txt with 6 characters
+[4] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: File <project>/probe-created.txt updated with changes.
+[5] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: echo:hello
+[6] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard
+[7] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: Protected file blocked by policy: .env
+[8] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: Blocked dangerous git operation: force push
+[9] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: Protected file blocked by policy: .env
+[10] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Created file <project>/.vscode/settings.json with 3 characters
+[11] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: /bin/bash: line 1: .github/copilot/settings.json: No such file or directory
+<shellId: 1 completed with exit code 1>
+[12] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: No match found: old_str not found in <project>/.claude/agents/coder.md; no changes made; you might want to try again with correct old_str
+[13] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: No match found: old_str not found in <project>/.github/agents/coder.agent.md; no changes made; you might want to try again with correct old_str
+[14] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: implementation branches must be created from dev; current branch is HEAD
+[15] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receip
+[16] main=True lastRole=tool tools=27 ctxHits=[]
+    tool result seen by model: Denied by preToolUse hook: PR/push gate only allows implementation branches; current branch is HEAD
+session.mcp_server_status_changed {"serverName": "semble", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "probe", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context7", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "probe", "status": "connected", "configSource": "user"}
+session.mcp_server_tools_loaded {"serverName": "probe", "toolCount": 1}
+session.mcp_server_status_changed {"serverName": "semble", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "semble", "toolCount": 2}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context-mode", "toolCount": 3}
+session.mcp_server_status_changed {"serverName": "context7", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context7", "toolCount": 2}
+session.skills_loaded 37 skills; sources: ['project']
+session.mcp_servers_loaded {"servers": [{"name": "context-mode", "status": "connected", "source": "workspace", "serverMetadata": {"instructions": null}}, {"name": "context7", "status": "connected", "source": "workspace", "displayName": "Context7", "serverMetadata": {"instructions": "Use this server to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service \u2014 even well-known ones 
+session.tools_updated {"model": "probe-model"}

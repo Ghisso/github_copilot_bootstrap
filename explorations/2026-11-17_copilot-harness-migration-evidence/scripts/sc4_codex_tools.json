@@ -1,0 +1,8 @@
+{
+  "model": "gpt-5.2-codex",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 200000,
+  "prompt": "List tools only.",
+  "steps": []
+}

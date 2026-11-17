@@ -1,0 +1,33 @@
+main conversation: instruction lines present in system prompt
+   AGENTS.md: 24/24
+   CLAUDE.md: 22/22
+   copilot-instructions: 9/9
+   always-on adapter (workflow): 3/3
+
+child PROBE-CHILD-coder: tools=18: create, edit, bash, read_bash, stop_bash, list_bash, view, grep, glob, semble-find_related, semble-search, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id, update_todo, web_fetch
+   system chars=9292 user chars=105
+   AGENTS.md: 0/24
+   CLAUDE.md: 0/22
+   copilot-instructions: 0/9
+   always-on adapter (workflow): 0/3
+   agent file .github/agents/coder.agent.md: 3/3 lines present
+   agent file .claude/agents/coder.md: 0/37 lines present
+   mentions skills list: False | mentions .claude/agents: True
+
+child PROBE-CHILD-reviewer: tools=10: view, grep, glob, semble-find_related, semble-search, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id
+   system chars=3770 user chars=108
+   AGENTS.md: 0/24
+   CLAUDE.md: 0/22
+   copilot-instructions: 0/9
+   always-on adapter (workflow): 0/3
+   agent file .github/agents/reviewer.agent.md: 3/3 lines present
+   agent file .claude/agents/reviewer.md: 0/53 lines present
+   mentions skills list: False | mentions .claude/agents: True
+
+child PROBE-CHILD-general: tools=28: bash, read_bash, stop_bash, list_bash, view, create, edit, web_fetch, fetch_copilot_cli_documentation, semantic_code_search, skill, run_dynamic_workflow, dynamic_workflows_manage, sql, session_store_sql, read_agent, list_agents, write_agent, grep, glob, task, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id, semble-find_related, semble-search
+   system chars=49115 user chars=107
+   AGENTS.md: 24/24
+   CLAUDE.md: 22/22
+   copilot-instructions: 9/9
+   always-on adapter (workflow): 3/3
+   mentions skills list: True | mentions .claude/agents: True
