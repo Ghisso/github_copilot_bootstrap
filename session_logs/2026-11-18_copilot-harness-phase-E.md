@@ -49,6 +49,24 @@ reporting reminder at session start.
   probe check stays as planned (heading and fixed line), because the unit
   tests of the hook pin the whole file text. Review round 1 started with
   six profiles.
+- **04:26** - Review round 1: the hook held on every safety point (valid
+  JSON for any file text, no path that denies or fails, only the one file
+  read). Gate FAIL on one MAJOR in the documentation:
+  `docs/smoke-tests.md` still said the Copilot event set is unchanged and
+  named only Claude Code and Codex for the reminder. Four MINOR: two doc
+  sentences tie more to the probe check than it judges; four stated
+  properties had no test that can fail (`python3 -I`, a failing `python3`,
+  closed standard input, the changed warning text); two over-engineering
+  items in the tests and the probe. Two evidence requests: three hard runs
+  of the hook, and targeted negative controls. All sent to the `coder`.
+- **04:28** - Old gap from the review, kept out of this phase and
+  recorded as a follow-up: older hook scripts run inline Python without
+  `-I` (`_lib-frontmatter.sh`, `pretool-bash-guard.sh`, `session-log.sh`),
+  with the repository root as the working folder. Confirmed with a scratch
+  run: `python3 -c 'import json'` in a folder that holds `json.py` imports
+  that file, and `python3 -I -c` does not. A `json.py` in the repository
+  root is not a protected name, so its code would run inside the guards.
+  The user is told, with the recommendation of a separate small plan.
 
 ## [LEARN] Entries
 
