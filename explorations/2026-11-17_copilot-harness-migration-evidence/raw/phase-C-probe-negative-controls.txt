@@ -1,0 +1,108 @@
+Phase C probe negative controls, 2026-11-17.
+Question: does the camel-rename session really run with camelCase events and without the Claude
+settings source, and can the probe tell when it does not?
+
+Method: scratch script camel_negative_controls.py replaced prepare_camel_project for one run each with a
+deliberately wrong setup; everything else is the shipped probe on the Phase C guards. Each control ran
+twice (rounds 1 and 2 below). Only the camel lines are shown.
+
+Positive proof of camelCase events: with the guards of Phase B, the camel-deny and camel-ask lines FAIL
+(phase-C-probe-output.txt, section A). That can only happen if the runtime sees camelCase event names,
+because the same guards pass the same steps under PascalCase in the main session (F4).
+
+What each control shows:
+- live-file-only: only .github/hooks/hooks.json renamed. The SessionStart hook state-sync.sh pull runs
+  restore-root-adapters.sh, which copied the PascalCase file back from .claude/bootstrap-root during the
+  session. camel-events-renamed FAILS (state read after the run). The deny lines still PASS, because the
+  restored PascalCase file denies: a check on denies alone would have passed in a wrong setup.
+- claude-settings-on: both hook files renamed, Claude settings left on. camel-hooks-source FAILS (14 hooks
+  from .claude/settings.json) and camel-events-renamed FAILS (settings.json is back). The deny lines PASS
+  (the Claude source denies), and the asks raise 2 questions instead of 1.
+- no-rename: Claude settings off, no event renamed. camel-events-renamed FAILS; the deny lines PASS.
+
+##### round 1
+=== control: live-file-only (exit 1, 15.0 s)
+PASS session-camel-rename: finished after 12 scripted model replies
+PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
+FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; 
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (1 of 43 checks failed)
+=== control: claude-settings-on (exit 1, 16.4 s)
+PASS session-camel-rename: finished after 12 scripted model replies
+FAIL camel-hooks-source: 14 hooks still load from .claude/settings.json
+FAIL camel-events-renamed: .claude/settings.json is back after the session
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; 
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (2 of 43 checks failed)
+=== control: no-rename (exit 1, 14.7 s)
+PASS session-camel-rename: finished after 12 scripted model replies
+PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
+FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; 
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (1 of 43 checks failed)
+##### round 2
+=== control: live-file-only (exit 1, 15.3 s)
+PASS session-camel-rename: finished after 12 scripted model replies
+PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
+FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; 
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (1 of 43 checks failed)
+=== control: claude-settings-on (exit 1, 17.5 s)
+PASS session-camel-rename: finished after 12 scripted model replies
+FAIL camel-hooks-source: 14 hooks still load from .claude/settings.json
+FAIL camel-events-renamed: .claude/settings.json is back after the session
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; 
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (2 of 43 checks failed)
+=== control: no-rename (exit 1, 14.5 s)
+PASS session-camel-rename: finished after 12 scripted model replies
+PASS camel-hooks-source: 12 hooks, all from .github/hooks/hooks.json
+FAIL camel-events-renamed: .github/hooks/hooks.json has events ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop'] after the session, expected ['agentStop', 'postToolUse', 'preToolUse', 'sessionStart']
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; 
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (1 of 43 checks failed)

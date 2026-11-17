@@ -1,0 +1,96 @@
+"""Row T3 evidence: a reason with control characters, before and after, per client.
+
+Usage: python t3_evidence.py <old-tree> <new-tree> <report-file>
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+OLD, NEW, REPORT = (Path(arg) for arg in sys.argv[1:4])
+CLIENTS = ("claude-code", "openai-codex", "google-antigravity", "github-copilot")
+TEXTS = {
+    "tab and newline": "tab\there\nnewline",
+    "carriage return and escape": "cr\rhere \x1b[0m",
+    "ends in a newline only": "trailing newline\n",
+    "no control character": 'plain "quoted" \\ text',
+}
+lines: list[str] = []
+
+
+def call(tree: Path, client: str, function: str, *args: str):
+    env = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+    env["TARGET_ID"] = client
+    done = subprocess.run(
+        ["bash", "-c", 'set -eu; . "$1"; shift; "$@"', "bash",
+         str(tree / "shared" / "hooks" / "scripts" / "_lib-frontmatter.sh"), function, *args],
+        capture_output=True, check=False, env=env,
+    )
+    return done.stdout.decode(), done.returncode
+
+
+def valid(text: str) -> str:
+    try:
+        json.loads(text)
+        return "valid JSON"
+    except ValueError as error:
+        return f"INVALID JSON ({error})"
+
+
+lines.append("Row T3: a control character in a guard reason or context text")
+lines.append(f"old tree: {OLD}")
+lines.append(f"new tree: {NEW}")
+lines.append("")
+for label, text in TEXTS.items():
+    lines.append(f"## text: {label}: {text!r}")
+    for function, args in (("deny_pretool", [text]), ("additional_context", ["SessionStart", text])):
+        for client in CLIENTS:
+            old, old_rc = call(OLD, client, function, *args)
+            new, new_rc = call(NEW, client, function, *args)
+            lines.append(f"- {function} client={client}")
+            lines.append(f"    before (rc {old_rc}): {valid(old)}; {old!r}")
+            lines.append(f"    after  (rc {new_rc}): {valid(new)}; {new!r}")
+            if client != "github-copilot":
+                replaced = re.sub(r"[\x01-\x1f]", " ", text)
+                rargs = [replaced] if function == "deny_pretool" else ["SessionStart", replaced]
+                reference, _ = call(OLD, client, function, *rargs)
+                same = "same as the old code on the text with each control character replaced by a space"
+                lines.append(f"    after == {same}: {new == reference}")
+            else:
+                answer = json.loads(new)
+                key = "permissionDecisionReason" if function == "deny_pretool" else "additionalContext"
+                lines.append(f"    top-level {key} == nested: {answer[key] == answer['hookSpecificOutput'][key]}")
+    lines.append("")
+
+# End to end: a phase name with a tab in a big plan reaches the branch gate's reason.
+lines.append("## end to end: enforce-branch-state.sh with a tab in a phase name of the big plan")
+for client in CLIENTS:
+    for label, tree in (("before", OLD), ("after", NEW)):
+        with tempfile.TemporaryDirectory(prefix="t3-") as tmp:
+            root = Path(tmp)
+            scripts = root / "shared" / "hooks" / "scripts"
+            scripts.parent.mkdir(parents=True)
+            scripts.symlink_to(tree / "shared" / "hooks" / "scripts", target_is_directory=True)
+            (root / ".claude" / "plans").mkdir(parents=True)
+            (root / ".claude" / "session_logs").mkdir()
+            (root / ".gitignore").write_text(".claude/\nshared\n", encoding="utf-8")
+            (root / ".claude" / "plans" / "foo.md").write_text(
+                "---\nname: foo\ntype: big-plan\nstatus: planning\nphases:\n  - bad\tname\n---\n",
+                encoding="utf-8",
+            )
+            for args in (["init", "-q", "-b", "dev"], ["add", ".gitignore"], ["commit", "-q", "-m", "seed"]):
+                subprocess.run(["git", "-c", "user.name=T", "-c", "user.email=t@example.com", *args],
+                               cwd=root, check=True, capture_output=True)
+            done = subprocess.run(
+                ["bash", str(scripts / "enforce-branch-state.sh"), client],
+                cwd=root, input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}}),
+                text=True, capture_output=True, check=False,
+            )
+            out = done.stdout.replace(str(root), "<ROOT>")
+            lines.append(f"- client={client} {label} (rc {done.returncode}): {valid(done.stdout)}; {out!r}")
+REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+print("\n".join(lines[:40]))

@@ -1,0 +1,163 @@
+Row T3 evidence, 2026-11-17: a guard reason or context text with control characters.
+Before = shared/hooks/scripts at 5d229e5. After = the working copy of Phase C.
+The library functions were called directly (deny_pretool, additional_context) under `set -eu`,
+with TARGET_ID set to each client, and once through a real caller (enforce-branch-state.sh with a tab in
+a phase name of the big plan).
+
+WHEN THE OTHER THREE CLIENTS' BYTES CHANGE: only when the reason or context text holds a character from
+\001 to \037 (tab, newline, carriage return, escape, and so on). Each such character becomes one space.
+The output is then exactly what the old code printed for the same text with each of those characters
+already replaced by a space (the `after == same as the old code ...` lines are True).
+One corner: a text that ends in a newline was valid JSON before (the shell dropped the trailing newline)
+and now ends in a space; see the 'ends in a newline only' block. A text with no such character gives
+identical bytes (see phase-C-byte-identity-battery.txt).
+
+Row T3: a control character in a guard reason or context text
+old tree: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/old
+new tree: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/new
+
+## text: tab and newline: 'tab\there\nnewline'
+- deny_pretool client=claude-code
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 112 (char 111)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab here newline"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=openai-codex
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 112 (char 111)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab here newline"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=google-antigravity
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 112 (char 111)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab here newline"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=github-copilot
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 112 (char 111)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"permissionDecision":"deny","permissionDecisionReason":"tab here newline","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab here newline"}}\n'
+    top-level permissionDecisionReason == nested: True
+- additional_context client=claude-code
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 79 (char 78)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab here newline"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=openai-codex
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 79 (char 78)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab here newline"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=google-antigravity
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 79 (char 78)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab here newline"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=github-copilot
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 79 (char 78)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab\there\nnewline"}}\n'
+    after  (rc 0): valid JSON; '{"additionalContext":"tab here newline","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"tab here newline"}}\n'
+    top-level additionalContext == nested: True
+
+## text: carriage return and escape: 'cr\rhere \x1b[0m'
+- deny_pretool client=claude-code
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 111 (char 110)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr here  [0m"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=openai-codex
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 111 (char 110)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr here  [0m"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=google-antigravity
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 111 (char 110)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr here  [0m"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=github-copilot
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 111 (char 110)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"permissionDecision":"deny","permissionDecisionReason":"cr here  [0m","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"cr here  [0m"}}\n'
+    top-level permissionDecisionReason == nested: True
+- additional_context client=claude-code
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 78 (char 77)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr here  [0m"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=openai-codex
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 78 (char 77)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr here  [0m"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=google-antigravity
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 78 (char 77)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr here  [0m"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=github-copilot
+    before (rc 0): INVALID JSON (Invalid control character at: line 1 column 78 (char 77)); '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr\rhere \x1b[0m"}}\n'
+    after  (rc 0): valid JSON; '{"additionalContext":"cr here  [0m","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"cr here  [0m"}}\n'
+    top-level additionalContext == nested: True
+
+## text: ends in a newline only: 'trailing newline\n'
+- deny_pretool client=claude-code
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline "}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=openai-codex
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline "}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=google-antigravity
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline "}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=github-copilot
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"permissionDecision":"deny","permissionDecisionReason":"trailing newline ","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"trailing newline "}}\n'
+    top-level permissionDecisionReason == nested: True
+- additional_context client=claude-code
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline "}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=openai-codex
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline "}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=google-antigravity
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline "}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=github-copilot
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline"}}\n'
+    after  (rc 0): valid JSON; '{"additionalContext":"trailing newline ","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"trailing newline "}}\n'
+    top-level additionalContext == nested: True
+
+## text: no control character: 'plain "quoted" \\ text'
+- deny_pretool client=claude-code
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=openai-codex
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=google-antigravity
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- deny_pretool client=github-copilot
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"plain \\"quoted\\" \\\\ text"}}\n'
+    top-level permissionDecisionReason == nested: True
+- additional_context client=claude-code
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=openai-codex
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=google-antigravity
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after == same as the old code on the text with each control character replaced by a space: True
+- additional_context client=github-copilot
+    before (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    after  (rc 0): valid JSON; '{"additionalContext":"plain \\"quoted\\" \\\\ text","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"plain \\"quoted\\" \\\\ text"}}\n'
+    top-level additionalContext == nested: True
+
+## end to end: enforce-branch-state.sh with a tab in a phase name of the big plan
+- client=claude-code before (rc 0): INVALID JSON (Invalid control character at: line 1 column 194 (char 193)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad\tname"}}\n'
+- client=claude-code after (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad name"}}\n'
+- client=openai-codex before (rc 0): INVALID JSON (Invalid control character at: line 1 column 194 (char 193)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad\tname"}}\n'
+- client=openai-codex after (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad name"}}\n'
+- client=google-antigravity before (rc 0): INVALID JSON (Invalid control character at: line 1 column 194 (char 193)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad\tname"}}\n'
+- client=google-antigravity after (rc 0): valid JSON; '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad name"}}\n'
+- client=github-copilot before (rc 0): INVALID JSON (Invalid control character at: line 1 column 194 (char 193)); '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad\tname"}}\n'
+- client=github-copilot after (rc 0): valid JSON; '{"permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad name","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<ROOT>/.claude/plans/foo.md lists a phase that is not a safe plan name: bad name"}}\n'

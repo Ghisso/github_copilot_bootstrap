@@ -1,0 +1,92 @@
+Intermediate run, 2026-11-17: steps 2 and 3 applied (library and file guard print the combined answer) but
+the step 4 script edits undone (enforce-pr-gate.sh, session-start-state.sh, record-branch-state.sh,
+reporting-reminder.sh, openwiki-guard.sh back to their 5d229e5 bytes). A copy of the tree in a scratch folder.
+The exported-TARGET_ID tests and the Copilot context and pr-gate cases fail, which shows that step 4 is
+what stops an inherited TARGET_ID, and that those tests are load-bearing.
+
+...F...FF......FF......FFFFFFFF                                          [100%]
+=================================== FAILURES ===================================
+E   assert '{"hookSpecif... is main"}}\n' == '{"permission... is main"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4352: assert '{"hookSpecif... is main"}}\n' == '{"permission... is main"}}\n'
+E   assert '{"hookSpecif...hase-one"}}\n' == '{"additional...hase-one"}}\n'
+      
+      - {"additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+      + {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4385: assert '{"hookSpecif...hase-one"}}\n' == '{"additional...hase-one"}}\n'
+E   assert '{"hookSpecif...entation"}}\n' == '{"additional...entation"}}\n'
+      
+      - {"additionalContext":"branch state not recorded because current branch is main, not foo_implementation","hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      ?  -------------------------------------------------------------------------------------------------------
+      + {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4385: assert '{"hookSpecif...entation"}}\n' == '{"additional...entation"}}\n'
+E   assert '{"permission... is main"}}\n' == '{"hookSpecif... is main"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+      + {"permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4433: assert '{"permission... is main"}}\n' == '{"hookSpecif... is main"}}\n'
+E   assert '{"permission... is main"}}\n' == '{"hookSpecif... is main"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+      + {"permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4433: assert '{"permission... is main"}}\n' == '{"hookSpecif... is main"}}\n'
+E   assert '{"additional...hase-one"}}\n' == '{"hookSpecif...hase-one"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+      + {"additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4433: assert '{"additional...hase-one"}}\n' == '{"hookSpecif...hase-one"}}\n'
+E   assert '{"additional...hase-one"}}\n' == '{"hookSpecif...hase-one"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+      + {"additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4433: assert '{"additional...hase-one"}}\n' == '{"hookSpecif...hase-one"}}\n'
+E   assert '{"additional...entation"}}\n' == '{"hookSpecif...entation"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      + {"additionalContext":"branch state not recorded because current branch is main, not foo_implementation","hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      ?  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4433: assert '{"additional...entation"}}\n' == '{"hookSpecif...entation"}}\n'
+E   assert '{"additional...entation"}}\n' == '{"hookSpecif...entation"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      + {"additionalContext":"branch state not recorded because current branch is main, not foo_implementation","hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      ?  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4433: assert '{"additional...entation"}}\n' == '{"hookSpecif...entation"}}\n'
+E   assert '{"permission... is main"}}\n' == '{"hookSpecif... is main"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+      + {"permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4467: assert '{"permission... is main"}}\n' == '{"hookSpecif... is main"}}\n'
+E   assert '{"additional...entation"}}\n' == '{"hookSpecif...entation"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      + {"additionalContext":"branch state not recorded because current branch is main, not foo_implementation","hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      ?  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4467: assert '{"additional...entation"}}\n' == '{"hookSpecif...entation"}}\n'
+E   assert '{"additional...hase-one"}}\n' == '{"hookSpecif...hase-one"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+      + {"additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4479: assert '{"additional...hase-one"}}\n' == '{"hookSpecif...hase-one"}}\n'
+E   assert '{"permission... payload"}}\n' == '{"hookSpecif... payload"}}\n'
+      
+      - {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"hook could not evaluate the request safely, denying: unparseable tool payload"}}
+      + {"permissionDecision":"deny","permissionDecisionReason":"hook could not evaluate the request safely, denying: unparseable tool payload","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"hook could not evaluate the request safely, denying: unparseable tool payload"}}
+/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseC/mid/tests/test_hook_gates.py:4500: assert '{"permission... payload"}}\n' == '{"hookSpecif... payload"}}\n'
+=========================== short test summary info ============================
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[pr-gate]
+FAILED tests/test_hook_gates.py::test_copilot_context_is_printed_at_the_top_level_and_nested[session-start-state]
+FAILED tests/test_hook_gates.py::test_copilot_context_is_printed_at_the_top_level_and_nested[record-branch-state]
+FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[pr-gate-claude-code]
+FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[pr-gate-openai-codex]
+FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[session-start-state-claude-code]
+FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[session-start-state-openai-codex]
+FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[record-branch-state-claude-code]
+FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[record-branch-state-openai-codex]
+FAILED tests/test_hook_gates.py::test_a_script_started_without_a_client_ignores_an_exported_target_id[pr-gate]
+FAILED tests/test_hook_gates.py::test_a_script_started_without_a_client_ignores_an_exported_target_id[record-branch-state]
+FAILED tests/test_hook_gates.py::test_session_start_state_started_without_a_client_ignores_an_exported_target_id
+FAILED tests/test_hook_gates.py::test_the_openwiki_guard_and_the_reporting_reminder_ignore_an_exported_target_id
+13 failed, 18 passed, 1020 deselected in 1.66s

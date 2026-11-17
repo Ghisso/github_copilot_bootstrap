@@ -1,0 +1,589 @@
+Phase C step 1: the new tests fail before steps 2 to 4 (and step 6), 2026-11-17.
+
+Two runs are saved.
+
+PART 1. The first run, made right after the tests were written, before any production change
+(working tree = 5d229e5 plus the new tests only). Command:
+  uv run pytest tests/test_hook_gates.py -q --tb=line -k "<the new hook-gate tests>"
+  uv run pytest tests/test_check_copilot_runtime.py tests/test_validate_targets.py -q --tb=line -k "camel or copilot_guard_check or Orchestration or restore_hook"
+Result of the hook-gate run: 39 failed, 57 passed (96 selected). Result of the probe and validator run:
+50 failed, 2 passed, 10 errors. The output is under "PART 1 raw output" below.
+
+PART 2. The same tests run again at the end (a rerun that includes the tests added later), against a copy
+of the pre-phase tree: `git archive 5d229e5 shared scripts tests`, with only the three test files replaced by
+the Phase C versions (so the hook scripts, the probe, and the validator are the old code).
+Summary line: 94 failed, 58 passed, 1484 deselected, 10 errors in 6.63s
+
+Why some new tests pass on the old code: they pin bytes that must NOT change. They cannot fail before the
+change. They are:
+ - test_the_other_clients_keep_todays_exact_bytes_for_a_decision / _for_context / bash_wrapper (the literal
+   nested-only lines for claude-code, openai-codex, google-antigravity);
+ - test_backslashes_and_quotes_in_a_reason_are_escaped_as_before (no-control-character text is byte-identical);
+ - test_the_antigravity_bridge_output_for_a_denied_write_is_unchanged;
+ - the exported-TARGET_ID tests: the old library never read TARGET_ID, so they pass trivially before. They
+   become load-bearing once the library reads it (step 2) and fail until each script assigns its own client
+   (step 4): see phase-C-tests-intermediate-steps-2-3-only.txt (13 failures with steps 2 and 3 applied and the
+   step 4 script edits undone).
+ - test_the_patch_session_has_the_planned_checks_in_order (an existing test, edited to read the first two
+   sessions only).
+Everything else (all 104 FAILED or ERROR below) fails on the old code: the combined Copilot answer, the
+control-character cases, the workflow-tool deny, the validator check, the camel session and its helpers.
+
+=== PART 2: FAILED and ERROR lines on the pre-phase tree (104) ===
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[git-protection]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[branch-state]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[commit-gate]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[pr-gate]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[protect-deny]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[protect-ask]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed]
+FAILED tests/test_hook_gates.py::test_copilot_context_is_printed_at_the_top_level_and_nested[session-start-state]
+FAILED tests/test_hook_gates.py::test_copilot_context_is_printed_at_the_top_level_and_nested[record-branch-state]
+FAILED tests/test_hook_gates.py::test_the_workflow_tool_deny_prints_the_combined_answer[run_dynamic_workflow]
+FAILED tests/test_hook_gates.py::test_the_workflow_tool_deny_prints_the_combined_answer[dynamic_workflows_manage]
+FAILED tests/test_hook_gates.py::test_the_bash_wrapper_passes_the_combined_deny_through
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-None]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-github-copilot]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-claude-code]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-openai-codex]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-google-antigravity]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-None]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-github-copilot]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-claude-code]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-openai-codex]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-google-antigravity]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[None]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[github-copilot]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[claude-code]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[openai-codex]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[google-antigravity]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[None]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[github-copilot]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[claude-code]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[openai-codex]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[google-antigravity]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[None]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[github-copilot]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[claude-code]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[openai-codex]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[google-antigravity]
+FAILED tests/test_hook_gates.py::test_backslashes_and_quotes_in_a_reason_are_escaped_as_before[github-copilot]
+FAILED tests/test_hook_gates.py::test_the_answer_functions_need_no_python3 - ...
+FAILED tests/test_hook_gates.py::test_a_guard_reason_with_a_tab_from_a_real_caller_is_valid_json
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_accepts_the_shared_hook_file
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_names_a_guard_that_drops_the_client_argument[bash]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_names_a_guard_that_drops_the_client_argument[linux]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_names_a_guard_that_drops_the_client_argument[osx]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[not-an-object]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[no-event]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[no-guards]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[guard-not-an-object]
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_session_is_the_third_session_and_renames_events
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_session_has_the_planned_checks_in_order
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_scenario_has_one_step_per_twin_of_the_baseline_step
+FAILED tests/test_check_copilot_runtime.py::test_a_correct_camel_run_passes_every_check
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-git-reset-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-git-reset-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-secret-rm-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-secret-rm-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-commit-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-commit-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-branch-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-branch-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-pr-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-pr-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-vscode-settings-denied]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-vscode-settings-no-question]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-agent-wrapper-denied]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-agent-wrapper-no-question]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-allow-plain-denied]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-allow-plain-asked]
+FAILED tests/test_check_copilot_runtime.py::test_a_camel_step_that_never_ran_fails_its_check
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_ask_checks_pass_with_the_single_question_of_one_source
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[the-claude-settings-source-is-still-on]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[no-hooks-at-all]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[no-guard-event]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[a-third-hook-file]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_without_a_recorded_discovery
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_reads_the_files_left_after_the_session
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-live-file-went-back-to-pascal-case]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-restore-copy-would-undo-the-rename-at-the-next-start]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-live-file-is-not-json]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-live-file-is-gone]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-claude-settings-came-back]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-claude-settings-were-never-switched-off]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_no_project_was_recorded
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_renames_the_events_in_a_copy_only
+FAILED tests/test_check_copilot_runtime.py::test_the_session_start_restore_hook_keeps_the_camel_rename
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[PostToolUse]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[PreToolUse]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[SessionStart]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[Stop]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_it_cannot_read[{]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_it_cannot_read[[]]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_it_cannot_read[{"hooks": []}]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_it_cannot_read[{"version": 1}]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_project_whose_settings_are_missing
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_correct_run_prints_versions_checks_and_inventory
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_wrong_result_exits_1
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_wrong_patch_result_exits_1_and_names_the_check
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_session_failure_such_as_a_timeout_is_a_fail_line
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_the_run_limit_is_a_fail_and_no_session_starts
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_the_camel_copy_is_made_before_any_session_touches_the_project
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_camel_copy_that_cannot_be_made_is_a_project_fail
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_the_session_gets_at_most_the_session_limit
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_temporary_folder_is_removed_unless_keep[False-0]
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_temporary_folder_is_removed_unless_keep[True-1]
+
+=== PART 2: PASSED lines on the pre-phase tree (58; the pins above) ===
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[git-protection-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[git-protection-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[git-protection-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[branch-state-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[branch-state-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[branch-state-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[commit-gate-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[commit-gate-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[commit-gate-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[pr-gate-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[pr-gate-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[pr-gate-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[protect-deny-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[protect-deny-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[protect-deny-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[protect-ask-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[protect-ask-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[protect-ask-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[fail-closed-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[fail-closed-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_a_decision[fail-closed-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_context[session-start-state-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_context[session-start-state-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_context[session-start-state-google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_context[record-branch-state-claude-code]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_context[record-branch-state-openai-codex]
+PASSED tests/test_hook_gates.py::test_the_other_clients_keep_todays_exact_bytes_for_context[record-branch-state-google-antigravity]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[git-protection-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[git-protection-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[branch-state-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[branch-state-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[commit-gate-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[commit-gate-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[pr-gate-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[pr-gate-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[protect-deny-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[protect-deny-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[protect-ask-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[protect-ask-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[session-start-state-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[session-start-state-openai-codex]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[record-branch-state-claude-code]
+PASSED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[record-branch-state-openai-codex]
+PASSED tests/test_hook_gates.py::test_a_script_started_without_a_client_ignores_an_exported_target_id[pr-gate]
+PASSED tests/test_hook_gates.py::test_a_script_started_without_a_client_ignores_an_exported_target_id[record-branch-state]
+PASSED tests/test_hook_gates.py::test_session_start_state_started_without_a_client_ignores_an_exported_target_id
+PASSED tests/test_hook_gates.py::test_the_openwiki_guard_and_the_reporting_reminder_ignore_an_exported_target_id
+PASSED tests/test_hook_gates.py::test_the_bash_wrapper_keeps_todays_bytes_for_the_other_clients[claude-code]
+PASSED tests/test_hook_gates.py::test_the_bash_wrapper_keeps_todays_bytes_for_the_other_clients[openai-codex]
+PASSED tests/test_hook_gates.py::test_the_bash_wrapper_keeps_todays_bytes_for_the_other_clients[google-antigravity]
+PASSED tests/test_hook_gates.py::test_the_antigravity_bridge_output_for_a_denied_write_is_unchanged
+PASSED tests/test_hook_gates.py::test_backslashes_and_quotes_in_a_reason_are_escaped_as_before[None]
+PASSED tests/test_hook_gates.py::test_backslashes_and_quotes_in_a_reason_are_escaped_as_before[claude-code]
+PASSED tests/test_hook_gates.py::test_backslashes_and_quotes_in_a_reason_are_escaped_as_before[openai-codex]
+PASSED tests/test_hook_gates.py::test_backslashes_and_quotes_in_a_reason_are_escaped_as_before[google-antigravity]
+PASSED tests/test_check_copilot_runtime.py::test_the_patch_session_has_the_planned_checks_in_order
+
+=== PART 1 raw output: hook-gate tests ===
+FFFFFFF.....................FF............................FFF....FFFFFFF [ 75%]
+FFFFFFFFFFFFFFFFFF.F...F                                                 [100%]
+=================================== FAILURES ===================================
+E   assert '{"hookSpecif...t --hard"}}\n' == '{"permission...t --hard"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"Blocked dangerous git operation: git reset --hard","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked dangerous git operation: git reset --hard"}}
+      ?  -----------------------------------------------------------------------------------------------------------
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked dangerous git operation: git reset --hard"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif...t --hard"}}\n' == '{"permission...t --hard"}}\n'
+E   assert '{"hookSpecif...and dash"}}\n' == '{"permission...and dash"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"implementation branch must be named <plan_name>_implementation using only letters, numbers, dot, underscore, and dash","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"implementation branch must be named <plan_name>_implementation using only letters, numbers, dot, underscore, and dash"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"implementation branch must be named <plan_name>_implementation using only letters, numbers, dot, underscore, and dash"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif...and dash"}}\n' == '{"permission...and dash"}}\n'
+E   assert '{"hookSpecif...erify.py"}}\n' == '{"permission...erify.py"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not main; missing big-plan file: .claude/plans/main.md; missing plan-frontmatter validator: .claude/scripts/validate_plan_frontmatter.py; missing small-plan file: .claude/plans/unknown.md; missing provider-neutral closeout receipt reader: .claude/scripts/verify.py","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"commit gate failed for github-copilot: commit...
+      
+      ...Full output truncated (2 lines hidden), use '-vv' to show
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif...erify.py"}}\n' == '{"permission...erify.py"}}\n'
+E   assert '{"hookSpecif... is main"}}\n' == '{"permission... is main"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"PR/push gate only allows implementation branches; current branch is main"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif... is main"}}\n' == '{"permission... is main"}}\n'
+E   assert '{"hookSpecif...cy: .env"}}\n' == '{"permission...cy: .env"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"Protected file blocked by policy: .env","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Protected file blocked by policy: .env"}}
+      ?  ------------------------------------------------------------------------------------------------
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Protected file blocked by policy: .env"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif...cy: .env"}}\n' == '{"permission...cy: .env"}}\n'
+E   assert '{"hookSpecif...mcp.json"}}\n' == '{"permission...mcp.json"}}\n'
+      
+      - {"permissionDecision":"ask","permissionDecisionReason":"Editing agent, hook, or server configuration requires approval: .mcp.json","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"Editing agent, hook, or server configuration requires approval: .mcp.json"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"Editing agent, hook, or server configuration requires approval: .mcp.json"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif...mcp.json"}}\n' == '{"permission...mcp.json"}}\n'
+E   assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"hook could not evaluate the request safely, denying: unparseable tool payload","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"hook could not evaluate the request safely, denying: unparseable tool payload"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"hook could not evaluate the request safely, denying: unparseable tool payload"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4352: assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+E   assert '{"hookSpecif...hase-one"}}\n' == '{"additional...hase-one"}}\n'
+      
+      - {"additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+      + {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Implementation branch phase_implementation: big plan phase, phases done=0 pending=0, current_phase=phase-one"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4385: assert '{"hookSpecif...hase-one"}}\n' == '{"additional...hase-one"}}\n'
+E   assert '{"hookSpecif...entation"}}\n' == '{"additional...entation"}}\n'
+      
+      - {"additionalContext":"branch state not recorded because current branch is main, not foo_implementation","hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+      ?  -------------------------------------------------------------------------------------------------------
+      + {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"branch state not recorded because current branch is main, not foo_implementation"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4385: assert '{"hookSpecif...entation"}}\n' == '{"additional...entation"}}\n'
+E   assert '{"hookSpecif...nnot see"}}\n' == '{"permission...nnot see"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"Tool blocked by policy: run_dynamic_workflow runs workflow code that the pre-tool hooks cannot see","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool blocked by policy: run_dynamic_workflow runs workflow code that the pre-tool hooks cannot see"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool blocked by policy: run_dynamic_workflow runs workflow code that the pre-tool hooks cannot see"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4522: assert '{"hookSpecif...nnot see"}}\n' == '{"permission...nnot see"}}\n'
+E   assert '{"hookSpecif...nnot see"}}\n' == '{"permission...nnot see"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"Tool blocked by policy: dynamic_workflows_manage runs workflow code that the pre-tool hooks cannot see","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool blocked by policy: dynamic_workflows_manage runs workflow code that the pre-tool hooks cannot see"}}
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool blocked by policy: dynamic_workflows_manage runs workflow code that the pre-tool hooks cannot see"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4522: assert '{"hookSpecif...nnot see"}}\n' == '{"permission...nnot see"}}\n'
+E   assert '{"hookSpecif...t --hard"}}\n' == '{"permission...t --hard"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"Blocked dangerous git operation: git reset --hard","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked dangerous git operation: git reset --hard"}}
+      ?  -----------------------------------------------------------------------------------------------------------
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked dangerous git operation: git reset --hard"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4534: assert '{"hookSpecif...t --hard"}}\n' == '{"permission...t --hard"}}\n'
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d1303a0>('\n')
+     +    where <built-in method count of str object at 0x7d308d1303a0> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...ookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d130710>('\n')
+     +    where <built-in method count of str object at 0x7d308d130710> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...ookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d130920>('\n')
+     +    where <built-in method count of str object at 0x7d308d130920> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...ookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d130be0>('\n')
+     +    where <built-in method count of str object at 0x7d308d130be0> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...ookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d130f50>('\n')
+     +    where <built-in method count of str object at 0x7d308d130f50> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...ookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d131000>('\n')
+     +    where <built-in method count of str object at 0x7d308d131000> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d1316e0>('\n')
+     +    where <built-in method count of str object at 0x7d308d1316e0> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d131d10>('\n')
+     +    where <built-in method count of str object at 0x7d308d131d10> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d131fd0>('\n')
+     +    where <built-in method count of str object at 0x7d308d131fd0> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   assert 2 == 1
+     +  where 2 = <built-in method count of str object at 0x7d308d132340>('\n')
+     +    where <built-in method count of str object at 0x7d308d132340> = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n'.count
+     +      where '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n' = CompletedProcess(args=['bash', '-c', 'set -eu; . "$1"; shift; "$@"', 'bash', '/home/ghisso/work/github_copilot_bootstr...hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"tab\there\nnewline"}}\n', stderr='').stdout
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4580: assert 2 == 1
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 109 (char 108)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 165 (char 164)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 77 (char 76)
+E   assert '{"hookSpecif...\\\ done"}}\n' == '{"permission...\\\ done"}}\n'
+      
+      - {"permissionDecision":"deny","permissionDecisionReason":"say \"hi\" \\ done","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"say \"hi\" \\ done"}}
+      ?  ----------------------------------------------------------------------------
+      + {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"say \"hi\" \\ done"}}
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:4638: assert '{"hookSpecif...\\\ done"}}\n' == '{"permission...\\\ done"}}\n'
+E   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 241 (char 240)
+/home/ghisso/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/lib/python3.13/json/decoder.py:361: json.decoder.JSONDecodeError: Invalid control character at: line 1 column 241 (char 240)
+=========================== short test summary info ============================
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[git-protection]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[branch-state]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[commit-gate]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[pr-gate]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[protect-deny]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[protect-ask]
+FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed]
+FAILED tests/test_hook_gates.py::test_copilot_context_is_printed_at_the_top_level_and_nested[session-start-state]
+FAILED tests/test_hook_gates.py::test_copilot_context_is_printed_at_the_top_level_and_nested[record-branch-state]
+FAILED tests/test_hook_gates.py::test_the_workflow_tool_deny_prints_the_combined_answer[run_dynamic_workflow]
+FAILED tests/test_hook_gates.py::test_the_workflow_tool_deny_prints_the_combined_answer[dynamic_workflows_manage]
+FAILED tests/test_hook_gates.py::test_the_bash_wrapper_passes_the_combined_deny_through
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-None]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-github-copilot]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-claude-code]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-openai-codex]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[deny_pretool-google-antigravity]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-None]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-github-copilot]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-claude-code]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-openai-codex]
+FAILED tests/test_hook_gates.py::test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces[ask_pretool-google-antigravity]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[None]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[github-copilot]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[claude-code]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[openai-codex]
+FAILED tests/test_hook_gates.py::test_every_control_character_in_a_reason_becomes_one_space[google-antigravity]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[None]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[github-copilot]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[claude-code]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[openai-codex]
+FAILED tests/test_hook_gates.py::test_a_failed_closed_reason_with_a_control_character_is_valid_json[google-antigravity]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[None]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[github-copilot]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[claude-code]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[openai-codex]
+FAILED tests/test_hook_gates.py::test_context_with_control_characters_is_valid_json_with_spaces[google-antigravity]
+FAILED tests/test_hook_gates.py::test_backslashes_and_quotes_in_a_reason_are_escaped_as_before[github-copilot]
+FAILED tests/test_hook_gates.py::test_a_guard_reason_with_a_tab_from_a_real_caller_is_valid_json
+39 failed, 57 passed, 955 deselected in 4.00s
+
+
+=== PART 1 raw output: probe and validator tests ===
+.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.FFFFFEEEEEEEEEEFFFFFFFF           [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of TestMainOrchestration.test_a_correct_run_prints_versions_checks_and_inventory _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_____ ERROR at setup of TestMainOrchestration.test_a_wrong_result_exits_1 ______
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_a_wrong_patch_result_exits_1_and_names_the_check _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_a_session_failure_such_as_a_timeout_is_a_fail_line _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_the_run_limit_is_a_fail_and_no_session_starts _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_the_camel_copy_is_made_before_any_session_touches_the_project _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_a_camel_copy_that_cannot_be_made_is_a_project_fail _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_the_session_gets_at_most_the_session_limit _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_temporary_folder_is_removed_unless_keep[False-0] _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+_ ERROR at setup of TestMainOrchestration.test_temporary_folder_is_removed_unless_keep[True-1] _
+E   AttributeError: <module 'check_copilot_runtime' from '/home/ghisso/work/github_copilot_bootstrap/scripts/check_copilot_runtime.py'> has no attribute 'prepare_camel_project'
+=================================== FAILURES ===================================
+E   AssertionError: assert ['main', 'codex-patch'] == ['main', 'cod...camel-rename']
+      
+      Right contains one more item: 'camel-rename'
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1298: AssertionError: assert ['main', 'codex-patch'] == ['main', 'cod...camel-rename']
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1310: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'camel_rename_scenario'
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1316: AttributeError: module 'check_copilot_runtime' has no attribute 'camel_rename_scenario'
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1341: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1294: AttributeError: module 'check_copilot_runtime' has no attribute 'CAMEL_CHECKS'. Did you mean: 'BASELINE_CHECKS'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1587: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1614: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1664: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1664: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1664: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1664: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_check_copilot_runtime.py:1675: AttributeError: module 'check_copilot_runtime' has no attribute 'prepare_camel_project'. Did you mean: 'prepare_project'?
+E   AssertionError: assert ['protect-fil...e-pr-gate.sh'] == ['protect-fil...e-pr-gate.sh']
+      
+      At index 1 diff: '.claude/hooks/scripts/run-hook.sh' != 'git-protection.sh'
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:182: AssertionError: assert ['protect-fil...e-pr-gate.sh'] == ['protect-fil...e-pr-gate.sh']
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:202: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:202: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:202: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:217: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:217: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:217: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:217: AttributeError: module 'validate_targets' has no attribute 'copilot_guard_target_errors'. Did you mean: 'copilot_guidance_errors'?
+=========================== short test summary info ============================
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_session_is_the_third_session_and_renames_events
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_session_has_the_planned_checks_in_order
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_scenario_has_one_step_per_twin_of_the_baseline_step
+FAILED tests/test_check_copilot_runtime.py::test_a_correct_camel_run_passes_every_check
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-git-reset-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-git-reset-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-secret-rm-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-secret-rm-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-commit-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-commit-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-branch-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-branch-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-pr-ran]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-deny-pr-other-reason]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-vscode-settings-denied]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-vscode-settings-no-question]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-agent-wrapper-denied]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-ask-agent-wrapper-no-question]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-allow-plain-denied]
+FAILED tests/test_check_copilot_runtime.py::test_each_camel_check_fails_on_a_wrong_result_and_only_that_check[camel-allow-plain-asked]
+FAILED tests/test_check_copilot_runtime.py::test_a_camel_step_that_never_ran_fails_its_check
+FAILED tests/test_check_copilot_runtime.py::test_the_camel_ask_checks_pass_with_the_single_question_of_one_source
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[the-claude-settings-source-is-still-on]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[no-hooks-at-all]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[no-guard-event]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_unless_only_the_copilot_file_loads[a-third-hook-file]
+FAILED tests/test_check_copilot_runtime.py::test_camel_hooks_source_fails_without_a_recorded_discovery
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_reads_the_files_left_after_the_session
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-live-file-went-back-to-pascal-case]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-restore-copy-would-undo-the-rename-at-the-next-start]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-live-file-is-not-json]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-live-file-is-gone]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-claude-settings-came-back]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_the_setup_did_not_survive[the-claude-settings-were-never-switched-off]
+FAILED tests/test_check_copilot_runtime.py::test_camel_events_renamed_fails_when_no_project_was_recorded
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_renames_the_events_in_a_copy_only
+FAILED tests/test_check_copilot_runtime.py::test_the_session_start_restore_hook_keeps_the_camel_rename
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[PostToolUse]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[PreToolUse]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[SessionStart]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event[Stop]
+FAILED tests/test_check_copilot_runtime.py::test_prepare_camel_project_refuses_a_project_whose_settings_are_missing
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_accepts_the_shared_hook_file
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_names_a_guard_that_drops_the_client_argument[bash]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_names_a_guard_that_drops_the_client_argument[linux]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_names_a_guard_that_drops_the_client_argument[osx]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[not-an-object]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[no-event]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[no-guards]
+FAILED tests/test_validate_targets.py::test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list[guard-not-an-object]
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_correct_run_prints_versions_checks_and_inventory
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_wrong_result_exits_1
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_wrong_patch_result_exits_1_and_names_the_check
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_session_failure_such_as_a_timeout_is_a_fail_line
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_the_run_limit_is_a_fail_and_no_session_starts
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_the_camel_copy_is_made_before_any_session_touches_the_project
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_a_camel_copy_that_cannot_be_made_is_a_project_fail
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_the_session_gets_at_most_the_session_limit
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_temporary_folder_is_removed_unless_keep[False-0]
+ERROR tests/test_check_copilot_runtime.py::TestMainOrchestration::test_temporary_folder_is_removed_unless_keep[True-1]
+50 failed, 2 passed, 528 deselected, 10 errors in 4.86s

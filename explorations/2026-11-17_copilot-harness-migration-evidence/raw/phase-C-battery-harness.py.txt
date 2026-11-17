@@ -1,0 +1,455 @@
+"""Byte-identity battery: pre-phase hook scripts against the working copy.
+
+Every case runs once against the old tree (git archive of 5d229e5) and once
+against the new tree (a snapshot of the working copy), with the same input in a
+synthetic repository of the same shape. For `claude-code`, `openai-codex`, and
+`google-antigravity` the stdout bytes and exit codes must be identical. For
+`github-copilot` the nested object must be byte-identical to the old whole answer
+(the new line ends with the old line minus its first brace), and only the
+top-level decision fields may be added.
+
+Usage: python battery.py <old-tree> <new-tree> <report-file>
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import itertools
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+OLD, NEW, REPORT = (Path(arg) for arg in sys.argv[1:4])
+OTHERS = ("claude-code", "openai-codex", "google-antigravity")
+COPILOT = "github-copilot"
+CLIENTS = (*OTHERS, COPILOT)
+ADDED_KEYS = {"permissionDecision", "permissionDecisionReason", "additionalContext"}
+
+BASH_COMMANDS = [
+    # dangerous git
+    "git reset --hard HEAD", "git reset --hard", "git push --force origin dev",
+    "git push -f", "git push --force-with-lease origin x", "git clean -fd",
+    "git checkout -- .", "git branch -D foo", "git rebase -i HEAD~3",
+    "git -C /tmp reset --hard", "git stash drop", "git gc --prune=now",
+    "git update-ref -d refs/heads/x", "git reflog expire --expire=now --all",
+    "git status", "git log --oneline", "git diff", "git push origin main",
+    # branch lifecycle
+    "git checkout -b foo_implementation", "git checkout -b not-an-implementation-name",
+    "git switch -c bar_implementation", "git switch -c bad name",
+    "git checkout -b ../evil_implementation", "git branch foo_implementation",
+    "git checkout -B foo_implementation", "git -C /tmp/other checkout -b zzz",
+    "git checkout dev", "git checkout -b 'foo bar'", "git checkout -b a_implementation && git status",
+    # commit gate
+    "git commit -m x", "git commit --amend", "git commit -am 'msg'",
+    "git -C /tmp/other commit -m x", "git commit -m x && git push",
+    "git status && git commit -m x", "git commit --no-verify -m x",
+    "git commit --allow-empty -m \"$(cat <<'EOF'\nmsg\nEOF\n)\"",
+    # pr / push gate
+    "gh pr create --base dev --title t --body b", "gh pr create --title t",
+    "git push origin foo_implementation", "git push", "git push --set-upstream origin x",
+    "git -C .claude push", "gh pr merge 1", "gh pr view",
+    "gh pr create --base main --title t",
+    # protected files
+    "rm -f .env", "cat .env", "echo x > .mcp.json", "echo x >> .github/hooks/hooks.json",
+    "sed -i s/a/b/ .claude/agents/coder.md", "cp x .codex/config.toml",
+    "tee .vscode/settings.json", "mv a .claude/settings.json", "rm -rf .claude/hooks",
+    "python3 -c 'open(\".env\").read()'", "cat uv.lock", "echo > uv.lock",
+    "touch .env.local", "rm keys/server.pem", "cat secrets/key", "git add .env",
+    "chmod +x .claude/hooks/scripts/x.sh", "echo x > .agents/hooks.json",
+    "cat .claude/agents/coder.md", "head .mcp.json", "echo x > .github/agents/a.agent.md",
+    "echo x > .vscode/mcp.json", "cat > .codex/hooks.json",
+    "x=.env; rm $x", "for f in .env; do rm $f; done", "echo $(cat .env)",
+    # ordinary
+    "echo hello", "ls -la", "pytest -q", "uv run python x.py", "true",
+    "cat README.md", "grep -r foo .", "echo a\tb", "echo a\nrm -f .env",
+    "echo 'unterminated", "((", "cd /tmp && ls",
+]
+NATIVE_PATHS = [
+    ".env", ".env.local", "keys/server.pem", "uv.lock", ".mcp.json", ".vscode/mcp.json",
+    ".vscode/settings.json", ".github/hooks/hooks.json", ".claude/agents/coder.md",
+    ".github/agents/coder.agent.md", ".codex/config.toml", ".agents/hooks.json",
+    "README.md", "src/app.py", "docs/notes.md", "notes/release.md",
+]
+BAD_PAYLOADS = ["", "not json", "{bad", "[1, 2", '{"tool_name": "Bash"}',
+                '{"tool_name": "Bash", "tool_input": {}}',
+                '{"tool_name": "Bash", "tool_input": {"command": 5}}',
+                '{"tool_name": "Write"}', "null", "[]", '"x"', "{}"]
+TEXTS = [
+    "plain reason", "", "a", 'say "hi"', "back\\slash", 'q"b\\', "percent %s and %d 100%",
+    "unicode é中文 ok", "x" * 1500, "tail space ", "brace {} ] [ ,",
+    "literal backslash-n \\n and \\t here", "emoji \U0001F600", "single 'quote'",
+    "<plan_name>_implementation & more | pipes ; semis", "DEL \x7f stays",
+]
+CONTROL_TEXTS = [
+    "tab\there", "line\nbreak", "cr\rhere", "bell\x07", "esc\x1b[0m", "all " + "".join(map(chr, range(1, 32))),
+    "trailing newline\n", "trailing tabs\t\t", "\nleading newline", "mixed \t \n \r ok",
+]
+
+
+def native_payloads(client: str) -> list[str]:
+    shapes = []
+    for path in NATIVE_PATHS:
+        for tool, key in (("Write", "file_path"), ("Edit", "file_path"), ("create_file", "filePath"),
+                          ("view", "path"), ("read_file", "filePath"), ("grep", "paths")):
+            value = [path] if key == "paths" else path
+            shapes.append(json.dumps({"tool_name": tool, "tool_input": {key: value}}))
+        shapes.append(json.dumps({"toolName": "edit", "toolArgs": json.dumps({"path": path})}))
+        patch = f"*** Begin Patch\n*** Update File: {path}\n@@\n x\n*** End Patch\n"
+        shapes.append(json.dumps({"tool_name": "apply_patch", "tool_input": {"command": patch}}))
+        shapes.append(json.dumps({"toolName": "apply_patch", "toolArgs": patch}))
+    shapes.append(json.dumps({"toolName": "run_dynamic_workflow", "toolArgs": "{}"}))
+    shapes.append(json.dumps({"tool_name": "dynamic_workflows_manage", "tool_input": {}}))
+    return shapes
+
+
+def bash_payloads() -> list[str]:
+    shapes = []
+    for command in BASH_COMMANDS:
+        shapes.append(json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}))
+        shapes.append(json.dumps({"toolName": "bash", "toolArgs": json.dumps({"command": command})}))
+        shapes.append(json.dumps({"tool_name": "run_in_terminal", "tool_input": {"command": command}}))
+    return shapes
+
+
+def git(cwd: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=B", "-c", "user.email=b@example.com", *args],
+        cwd=cwd, check=True, capture_output=True,
+    )
+
+
+BIG_PLAN = (
+    "---\nname: foo\ntype: big-plan\nstatus: in-progress\noriginating_branch: dev\n"
+    "implementation_branch: foo_implementation\ncurrent_phase: phase-one\n"
+    "phases:\n  - phase-one\n---\n\n# Foo\n"
+)
+SMALL_PLAN = (
+    "---\nname: phase-one\ntype: small-plan\nparent_plan: foo\nphase_index: 1\n"
+    "status: in-progress\n---\n\n# Phase one\n\n## Verification\n\n```bash\ntrue\n```\n"
+)
+
+
+def make_repo(root: Path, tree: Path, variant: str) -> Path:
+    """A synthetic repository whose hook scripts are the tree's real scripts."""
+    scripts = root / "shared" / "hooks" / "scripts"
+    scripts.parent.mkdir(parents=True)
+    scripts.symlink_to(tree / "shared" / "hooks" / "scripts", target_is_directory=True)
+    (root / ".claude" / "session_logs").mkdir(parents=True)
+    (root / ".claude" / "hooks").mkdir()
+    (root / ".claude" / "hooks" / "scripts").symlink_to(
+        tree / "shared" / "hooks" / "scripts", target_is_directory=True
+    )
+    branch = {"main": "main", "dev": "dev", "impl": "foo_implementation"}[variant]
+    git(root, "init", "-q", "-b", "dev" if variant == "impl" else branch)
+    (root / ".gitignore").write_text(".claude/\nshared\n", encoding="utf-8")
+    git(root, "add", ".gitignore")
+    git(root, "commit", "-q", "-m", "seed")
+    if variant in ("dev", "impl"):
+        plans = root / ".claude" / "plans"
+        plans.mkdir(parents=True)
+        (plans / "foo.md").write_text(BIG_PLAN, encoding="utf-8")
+        (plans / "phase-one.md").write_text(SMALL_PLAN, encoding="utf-8")
+    if variant == "impl":
+        git(root, "checkout", "-q", "-b", "foo_implementation")
+    return root
+
+
+def normalise(data: bytes, roots: list[Path]) -> bytes:
+    for root in roots:
+        for text in {str(root), str(root.resolve())}:
+            data = data.replace(text.encode(), b"<ROOT>")
+    return data
+
+
+class Pair:
+    """The same case run against the old tree and the new tree."""
+
+    def __init__(self, base: Path, variant: str):
+        self.old_root = make_repo(base / "old", OLD, variant)
+        self.new_root = make_repo(base / "new", NEW, variant)
+        self.roots = [self.old_root, self.new_root]
+
+    def run(self, argv_tail: list[str], stdin: str, script: str, env: dict[str, str]):
+        results = []
+        for root in self.roots:
+            scripts = root / "shared" / "hooks" / "scripts"
+            tail = [word.replace("{ROOT}", str(root)) for word in argv_tail]
+            argv = (
+                ["python3", str(scripts / script), *tail]
+                if script.endswith(".py")
+                else ["bash", str(scripts / script), *tail]
+            )
+            full_env = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+            full_env.update(env)
+            if script == "antigravity-pretool.py":
+                full_env["REPO_ROOT"] = str(root)
+            done = subprocess.run(
+                argv, cwd=root, input=stdin.replace("{ROOT}", str(root)).encode(),
+                capture_output=True, check=False, env=full_env,
+            )
+            results.append((normalise(done.stdout, self.roots), done.returncode,
+                            normalise(done.stderr, self.roots)))
+        return results
+
+
+def copilot_difference(old: bytes, new: bytes) -> str | None:
+    """None when `new` is `old` plus only top-level decision fields."""
+    if not old:
+        return None if not new else "old printed nothing, new printed something"
+    try:
+        old_obj = json.loads(old)
+    except ValueError:
+        return "old output is not JSON (planned T3 case)"
+    try:
+        new_obj = json.loads(new)
+    except ValueError:
+        return "new output is not JSON"
+    if not new.endswith(old[1:]):
+        return "nested object is not byte-identical to the old whole answer"
+    added = new[1 : len(new) - len(old) + 1]
+    if b"hookEventName" in added:
+        return "a top-level hookEventName was added"
+    extra = set(new_obj) - {"hookSpecificOutput"}
+    if extra - ADDED_KEYS or not extra:
+        return f"unexpected top-level keys {sorted(extra)}"
+    nested = old_obj["hookSpecificOutput"]
+    for key in extra:
+        if new_obj[key] != nested.get(key):
+            return f"top-level {key} differs from the nested value"
+    if not added.startswith(b'"') or not added.endswith(b","):
+        return "added text is not whole top-level members"
+    return None
+
+
+class Tally:
+    def __init__(self):
+        self.runs = 0
+        self.diffs: list[str] = []
+        self.sections: dict[str, list[int]] = {}
+        self.copilot_added = 0
+        self.copilot_same = 0
+
+    def add(self, section: str, count: int = 1, diff: str | None = None, answered: bool = False):
+        self.runs += count
+        self.sections.setdefault(section, [0, 0, 0])
+        self.sections[section][0] += count
+        self.sections[section][2] += 1 if answered else 0
+        if diff:
+            self.diffs.append(f"[{section}] {diff}")
+            self.sections[section][1] += 1
+
+
+def compare(tally: Tally, section: str, client: str, label: str, results) -> None:
+    (old_out, old_rc, old_err), (new_out, new_rc, new_err) = results
+    diff = None
+    if old_rc != new_rc:
+        diff = f"{label}: exit {old_rc} -> {new_rc}"
+    elif client == COPILOT:
+        problem = copilot_difference(old_out, new_out)
+        if problem:
+            diff = f"{label}: {problem}\n    old={old_out!r}\n    new={new_out!r}"
+        elif old_out:
+            tally.copilot_added += 1
+        else:
+            tally.copilot_same += 1
+        if old_err != new_err and not diff:
+            diff = f"{label}: stderr differs"
+    elif old_out != new_out:
+        diff = f"{label}: stdout differs\n    old={old_out!r}\n    new={new_out!r}"
+    elif old_err != new_err:
+        diff = f"{label}: stderr differs"
+    tally.add(section, 1, diff, answered=bool(old_out))
+
+
+def shard(job):
+    (section, script, argv_builder, variant, client, payloads, env) = job
+    tally = Tally()
+    with tempfile.TemporaryDirectory(prefix="battery-") as tmp:
+        pair = Pair(Path(tmp), variant)
+        for payload in payloads:
+            argv = argv_builder(client)
+            results = pair.run(argv, payload, script, env)
+            compare(tally, section, client, f"{script} {argv} {variant} {payload[:90]!r}", results)
+    return tally
+
+
+def library_shard(job):
+    """Library functions called directly with a text matrix."""
+    (section, texts, client, functions, control) = job
+    tally = Tally()
+    for function, text in itertools.product(functions, texts):
+        args = {"deny_pretool": [text], "ask_pretool": [text],
+                "additional_context": ["SessionStart", text], "fail_closed": [text],
+                "json_escape": [text]}[function]
+        outs = []
+        for tree in (OLD, NEW):
+            env = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+            if client:
+                env["TARGET_ID"] = client
+            done = subprocess.run(
+                ["bash", "-c", 'set -eu; . "$1"; shift; "$@"', "bash",
+                 str(tree / "shared" / "hooks" / "scripts" / "_lib-frontmatter.sh"), function, *args],
+                capture_output=True, check=False, env=env,
+            )
+            outs.append((done.stdout, done.returncode, done.stderr))
+        old, new = outs
+        label = f"{function}({text[:40]!r}) client={client}"
+        if control:
+            # Planned T3 change: control characters become spaces, nothing else differs.
+            substituted = re.sub(r"[\x01-\x1f]", " ", text)
+            args2 = {"deny_pretool": [substituted], "ask_pretool": [substituted],
+                     "additional_context": ["SessionStart", substituted],
+                     "fail_closed": [substituted], "json_escape": [substituted]}[function]
+            env = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+            if client:
+                env["TARGET_ID"] = client
+            reference = subprocess.run(
+                ["bash", "-c", 'set -eu; . "$1"; shift; "$@"', "bash",
+                 str(OLD / "shared" / "hooks" / "scripts" / "_lib-frontmatter.sh"), function, *args2],
+                capture_output=True, check=False, env=env,
+            )
+            expected = (reference.stdout, reference.returncode, reference.stderr)
+            if client == COPILOT or function == "json_escape":
+                if function == "json_escape":
+                    diff = None if new == expected else f"{label}: {new!r} != {expected!r}"
+                else:
+                    problem = copilot_difference(expected[0], new[0])
+                    diff = f"{label}: {problem}" if problem or new[1:] != expected[1:] else None
+            else:
+                diff = None if new == expected else f"{label}: {new!r} != {expected!r}"
+            tally.add(section, 1, diff, answered=bool(new[0]))
+        elif function == "json_escape":
+            tally.add(section, 1, None if old == new else f"{label}: {old!r} != {new!r}", answered=bool(old[0]))
+        else:
+            compare(tally, section, client or "none", label, [old, new])
+    return tally
+
+
+def main() -> int:
+    bash = bash_payloads()
+    native = native_payloads("x")
+    jobs: list = []
+    gates = [
+        ("git-protection.sh", ["variant:main"]),
+        ("enforce-branch-state.sh", ["main", "dev", "impl"]),
+        ("enforce-commit-gate.sh", ["main", "impl"]),
+        ("enforce-pr-gate.sh", ["main", "impl"]),
+        ("protect-files.sh", ["main"]),
+        ("pretool-bash-guard.sh", ["main", "dev", "impl"]),
+    ]
+    for script, variants in gates:
+        for variant in variants:
+            variant = variant.replace("variant:", "")
+            for client in CLIENTS:
+                jobs.append((script, script, lambda c: [c], variant, client, bash, {}))
+    # exported TARGET_ID must change nothing for the other clients
+    for script, variants in gates:
+        for variant in variants:
+            variant = variant.replace("variant:", "")
+            for client in OTHERS:
+                jobs.append((script + " [TARGET_ID exported]", script, lambda c: [c], variant, client,
+                             bash[::7], {"TARGET_ID": COPILOT}))
+    for client in CLIENTS:
+        jobs.append(("protect-files.sh native", "protect-files.sh", lambda c: [c], "main", client, native, {}))
+        jobs.append(("protect-files.py direct", "protect-files.py", lambda c: [c, "{ROOT}"], "main", client, native + bash[::3], {}))
+        for script in ("git-protection.sh", "enforce-branch-state.sh", "enforce-commit-gate.sh",
+                       "enforce-pr-gate.sh", "protect-files.sh", "pretool-bash-guard.sh"):
+            jobs.append((script + " fail-closed", script, lambda c: [c], "main", client, BAD_PAYLOADS, {}))
+    # the Antigravity bridge
+    bridge = [json.dumps({"toolCall": {"name": "write_to_file", "args": {"TargetFile": p}}})
+              for p in NATIVE_PATHS]
+    bridge += [json.dumps({"toolCall": {"name": "run_command", "args": {"CommandLine": c, "Cwd": "{ROOT}"}}})
+               for c in BASH_COMMANDS]
+    bridge += [json.dumps({"toolCall": {"name": "view_file", "args": {}}}), "not json", "{}",
+               json.dumps({"toolCall": {"name": "mystery", "args": {}}})]
+    for variant in ("main", "dev", "impl"):
+        jobs.append(("antigravity-pretool.py", "antigravity-pretool.py", lambda c: [], variant,
+                     "google-antigravity", bridge, {}))
+    # scripts that print context
+    for client in CLIENTS:
+        for variant in ("main", "dev", "impl"):
+            jobs.append(("session-start-state.sh", "session-start-state.sh", lambda c: [c], variant, client, ["", "{}", "not json"], {}))
+            jobs.append(("record-branch-state.sh", "record-branch-state.sh", lambda c: [c], variant, client, bash + BAD_PAYLOADS[:4], {}))
+    reminder_payloads = [
+        json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": c}, "tool_response": {}})
+        for c in ("uv run python .claude/scripts/verify.py closeout --format json --persist",
+                  "uv run python .claude/scripts/record_findings.py shared --out findings.json",
+                  "git commit -m 'chore: x'", "ls", "echo hi && git commit -m y", "uv run python .claude/scripts/verify.py phase")
+    ] + ['{"hook_event_name":"UserPromptSubmit"}', "", "not json"]
+    for client in (*OTHERS, COPILOT, "unknown"):
+        for mode in ("prompt", "late-report"):
+            for variant in ("main", "impl"):
+                jobs.append((f"reporting-reminder.sh {mode}", "reporting-reminder.sh",
+                             lambda c, m=mode: [m, c], variant, client, reminder_payloads, {}))
+                jobs.append((f"reporting-reminder.sh {mode} [TARGET_ID exported]", "reporting-reminder.sh",
+                             lambda c, m=mode: [m, c], variant, client, reminder_payloads[::2],
+                             {"TARGET_ID": COPILOT}))
+    openwiki_payloads = [json.dumps({"tool_name": name, "tool_input": {"mode": mode}})
+                         for name in ("mcp__openwiki__openwiki_begin", "mcp__openwiki__openwiki_finish", "Bash", "Write")
+                         for mode in ("update", "init", "bogus")] + BAD_PAYLOADS
+    for mode in ("pre", "post", "bogus", ""):
+        for variant in ("main", "impl"):
+            jobs.append((f"openwiki-guard.sh {mode or 'no-mode'}", "openwiki-guard.sh",
+                         (lambda c, m=mode: [m] if m else []), variant, "claude-code", openwiki_payloads, {}))
+            jobs.append((f"openwiki-guard.sh {mode or 'no-mode'} [TARGET_ID exported]", "openwiki-guard.sh",
+                         (lambda c, m=mode: [m] if m else []), variant, "claude-code", openwiki_payloads,
+                         {"TARGET_ID": COPILOT}))
+    only = [w for w in os.environ.get("BATTERY_ONLY", "").split(",") if w]
+    if only:
+        jobs = [job for job in jobs if any(w in job[0] for w in only)]
+    tally = Tally()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+        for part in pool.map(shard, jobs):
+            tally.runs += part.runs
+            tally.diffs += part.diffs
+            tally.copilot_added += part.copilot_added
+            tally.copilot_same += part.copilot_same
+            for key, (runs, diffs, answered) in part.sections.items():
+                tally.sections.setdefault(key, [0, 0, 0])
+                tally.sections[key][0] += runs
+                tally.sections[key][1] += diffs
+                tally.sections[key][2] += answered
+        # library functions: texts without control characters must be identical
+        lib_jobs = [("library functions (no control character)", TEXTS, client,
+                     ("deny_pretool", "ask_pretool", "additional_context", "fail_closed", "json_escape"), False)
+                    for client in (None, *CLIENTS)]
+        lib_jobs += [("library functions (control characters; planned T3 change)", CONTROL_TEXTS, client,
+                      ("deny_pretool", "ask_pretool", "additional_context", "fail_closed", "json_escape"), True)
+                     for client in (None, *CLIENTS)]
+        if only:
+            lib_jobs = [job for job in lib_jobs if any(w in job[0] for w in only)]
+        for part in pool.map(library_shard, lib_jobs):
+            tally.runs += part.runs
+            tally.diffs += part.diffs
+            tally.copilot_added += part.copilot_added
+            tally.copilot_same += part.copilot_same
+            for key, (runs, diffs, answered) in part.sections.items():
+                tally.sections.setdefault(key, [0, 0, 0])
+                tally.sections[key][0] += runs
+                tally.sections[key][1] += diffs
+                tally.sections[key][2] += answered
+    lines = [
+        f"old tree: {OLD}", f"new tree: {NEW}",
+        f"comparisons (one old run plus one new run each): {tally.runs}",
+        f"differences: {len(tally.diffs)}",
+        f"github-copilot comparisons with an answer: {tally.copilot_added}; "
+        f"with no answer (allow, both trees): {tally.copilot_same}",
+        "",
+        "per section: runs / differences / runs where the old code printed an answer",
+    ]
+    for key, (runs, diffs, answered) in sorted(tally.sections.items()):
+        lines.append(f"  {key}: {runs} / {diffs} / {answered}")
+    lines.append("")
+    lines += tally.diffs[:60] or ["(no differences)"]
+    REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines[:5]))
+    return 1 if tally.diffs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

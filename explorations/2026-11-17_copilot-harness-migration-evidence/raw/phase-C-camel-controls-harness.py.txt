@@ -1,0 +1,57 @@
+"""Run the probe with a deliberately wrong camel-rename setup (scratch helper).
+
+Usage: python camel_negative_controls.py <variant> [<variant> ...]
+
+Variants (each replaces `prepare_camel_project` for one run; the code under
+test is otherwise the shipped probe):
+  live-file-only    rename only `.github/hooks/hooks.json`, not its restore copy
+  claude-settings-on rename both hook files but leave `.claude/settings.json` on
+  no-rename         switch the Claude settings off but rename no event
+"""
+
+import contextlib
+import io
+import shutil
+import sys
+import time
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(REPO / "scripts"))
+
+import check_copilot_runtime as probe  # noqa: E402
+
+
+def make_prepare(variant: str):
+    def prepare(project: Path, work: Path) -> Path:
+        copy = work / "project-camel"
+        shutil.copytree(project, copy, symlinks=True)
+        if variant == "live-file-only":
+            probe._rename_events(copy / probe.LIVE_HOOK_FILE, probe.LIVE_HOOK_FILE)
+        elif variant == "claude-settings-on":
+            for relative in (probe.LIVE_HOOK_FILE, probe.RESTORE_HOOK_FILE):
+                probe._rename_events(copy / relative, relative)
+        elif variant == "no-rename":
+            pass
+        else:
+            raise SystemExit("unknown variant " + variant)
+        if variant != "claude-settings-on":
+            (copy / probe.CLAUDE_SETTINGS_FILE).rename(copy / probe.CLAUDE_SETTINGS_OFF)
+        return copy
+
+    return prepare
+
+
+for variant in sys.argv[1:]:
+    probe.prepare_camel_project = make_prepare(variant)
+    out = io.StringIO()
+    started = time.monotonic()
+    with contextlib.redirect_stdout(out):
+        code = probe.main(["--require"])
+    took = time.monotonic() - started
+    print(f"=== control: {variant} (exit {code}, {took:.1f} s)")
+    for line in out.getvalue().splitlines():
+        if line.startswith(("PASS camel", "FAIL camel", "PASS session-camel", "FAIL session-camel", "Result")):
+            print(line[:230])
+    sys.stdout.flush()

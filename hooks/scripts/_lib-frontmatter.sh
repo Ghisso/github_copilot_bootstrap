@@ -7,10 +7,11 @@ fi
 
 # Control characters (\001-\037, tab and newline included) are not allowed raw
 # in a JSON string, and a hook answer that is not valid JSON lets the tool run
-# on Copilot. They become spaces first. Stays free of python3: fail_closed
+# on Copilot. They become spaces first; `[ *]` pads the second set to the length
+# of the first, on GNU and BSD `tr` alike. Stays free of python3: fail_closed
 # runs when python3 is missing.
 json_escape() {
-  printf '%s' "$1" | tr '\001-\037' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g'
+  printf '%s' "$1" | tr '\001-\037' '[ *]' | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 # Single home for the implementation-branch shape used by every lifecycle gate.
