@@ -1,0 +1,30 @@
+"""Mutation checks (scratch tool): change one line of a shipped file, run the named tests, restore.
+
+Usage: mutate.py FILE OLD NEW PYTEST_ARGS...
+Prints the pytest tail and whether the tests failed (they must, for the tests to be load-bearing).
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+repo = Path("/home/ghisso/work/github_copilot_bootstrap")
+path = repo / sys.argv[1]
+old, new = sys.argv[2], sys.argv[3]
+original = path.read_text(encoding="utf-8")
+assert original.count(old) == 1, f"{old!r} occurs {original.count(old)} times in {path}"
+try:
+    path.write_text(original.replace(old, new), encoding="utf-8")
+    done = subprocess.run(
+        ["uv", "run", "pytest", "-q", "--tb=no", "-p", "no:cacheprovider", *sys.argv[4:]],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    print("\n".join(done.stdout.strip().splitlines()[-8:]))
+    print(f"MUTATION {sys.argv[1]}: {old[:60]!r} -> {new[:60]!r}: tests {'FAILED (good)' if done.returncode else 'PASSED (BAD: not load-bearing)'}")
+finally:
+    path.write_text(original, encoding="utf-8")

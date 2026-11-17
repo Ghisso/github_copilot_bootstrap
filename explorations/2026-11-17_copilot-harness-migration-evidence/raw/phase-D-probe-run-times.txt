@@ -1,0 +1,6 @@
+Phase D probe run times (uv run python scripts/check_copilot_runtime.py --require), 2026-11-18, runtime 1.0.108-0,
+three sessions, 46 result lines, final code. Limit: 480 s for the whole run, 150 s per session.
+final-probe-1.time: real	0m14.989s  Result: PASS (0 of 46 checks failed)
+final-probe-2.time: real	0m12.740s  Result: PASS (0 of 46 checks failed)
+Earlier runs of the same checks, same day: probe-baseline-keep.txt: 0m15.034s, probe-before.txt: 0m16.850s, probe-after-1.txt: 0m12.921s, probe-after-2.txt: 0m12.821s
+(before-all: 43 lines at 49d3460; before: 46 lines with the old launcher, 2 FAIL; after-1 and after-2: 46 lines, 0 FAIL).

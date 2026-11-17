@@ -1,0 +1,27 @@
+Phase D mixed installs, 2026-11-18.
+(1) Direct runs of the exact hook command strings (old generator output of 49d3460, new generator output), with the old and the
+new launcher, real scripts, in a temporary repository. Under a Copilot hook environment (COPILOT_CLI=1, COPILOT_HOOK_DEPTH=1,
+no COPILOT_HOOK_DIR, no CLAUDECODE) only new launcher + new settings stands down. Under this Claude Code session's environment
+nothing stands down. Harness: phase-D-mixed-install-harness.py.txt.
+
+old settings command: REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" reporting-reminder.sh prompt claude-code
+new settings command: REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; BOOTSTRAP_HOOK_SOURCE=claude-settings "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" reporting-reminder.sh prompt claude-code
+
+old launcher  + old settings under a Copilot hook environment: exit 0, stdout 266 bytes -> the hook RAN (expected: run) OK
+old launcher  + new settings under a Copilot hook environment: exit 0, stdout 266 bytes -> the hook RAN (expected: run) OK
+new launcher  + old settings under a Copilot hook environment: exit 0, stdout 266 bytes -> the hook RAN (expected: run) OK
+new launcher  + new settings under a Copilot hook environment: exit 0, stdout 0 bytes -> the hook STOOD DOWN (expected: stand down) OK
+
+Same four combinations under this Claude Code session's own environment (CLAUDECODE=1; never stand down):
+old launcher  + old settings: exit 0, stdout 266 bytes -> the hook RAN OK
+old launcher  + new settings: exit 0, stdout 266 bytes -> the hook RAN OK
+new launcher  + old settings: exit 0, stdout 266 bytes -> the hook RAN OK
+new launcher  + new settings: exit 0, stdout 266 bytes -> the hook RAN OK
+
+old launcher: old and new settings commands give identical output and exit code: True
+mismatches: 0
+
+(2) The same mixed installs on the real Copilot runtime (probe controls `old-launcher` and `old-settings`, two runs each):
+see phase-D-probe-negative-controls.txt. In all four runs no hook stood down (the session is logged under both targets and the
+state pull ran twice), and the other 44 checks passed: the guards denied and asked as before.
+The old Claude settings used there equal the new settings with the marker removed (checked against the output of the old generator).

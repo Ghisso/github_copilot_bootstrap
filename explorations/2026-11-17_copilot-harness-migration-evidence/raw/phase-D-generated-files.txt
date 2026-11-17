@@ -1,0 +1,20 @@
+Phase D generated files, 2026-11-18 (after `generate_targets.py --all` and the self-refresh).
+
+dist/multi-agent/.claude/settings.json: 15 hook commands, 15 carry the marker, 0 do not
+occurrences of BOOTSTRAP_HOOK_SOURCE in dist/multi-agent/.claude/settings.json: 15
+dist/multi-agent/.github/hooks/hooks.json: 0 lines with BOOTSTRAP_HOOK_SOURCE
+dist/multi-agent/.codex/hooks.json: 0 lines with BOOTSTRAP_HOOK_SOURCE
+dist/multi-agent/.agents/hooks.json: 0 lines with BOOTSTRAP_HOOK_SOURCE
+sidecar and other dist trees:
+dist/multi-agent/.claude/hooks/scripts/run-hook.sh
+dist/multi-agent/.claude/settings.json
+
+Installed copy of this repository (after step 6):
+installed .claude/settings.json: 15 hook commands, 15 carry the marker
+first command: REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; BOOTSTRAP_HOOK_SOURCE=claude-settings "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" state-sync.sh pull
+installed launcher is identical to shared/hooks/scripts/run-hook.sh
+installed Claude settings identical to dist/multi-agent
+installed Copilot hook file identical to dist/multi-agent
+.github/hooks/hooks.json: 0 lines with BOOTSTRAP_HOOK_SOURCE
+.codex/hooks.json: 0 lines with BOOTSTRAP_HOOK_SOURCE
+.agents/hooks.json: 0 lines with BOOTSTRAP_HOOK_SOURCE

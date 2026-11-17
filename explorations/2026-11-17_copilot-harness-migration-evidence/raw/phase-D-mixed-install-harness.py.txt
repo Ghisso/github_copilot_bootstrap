@@ -1,0 +1,120 @@
+"""Mixed installs (scratch tool for the Phase D evidence): direct runs of the exact hook command strings.
+
+Four combinations of launcher and settings command, run with the real scripts in a temporary repository
+under the environment the Copilot runtime gives a hook started from the Claude settings
+(COPILOT_CLI=1, COPILOT_HOOK_DEPTH=1, no COPILOT_HOOK_DIR, no CLAUDECODE), and under this Claude Code session's own
+environment. The command strings are taken from the Claude settings that the old generator (49d3460) and the
+new generator produce for `UserPromptSubmit` -> `reporting-reminder.sh prompt claude-code`, which prints one context
+line when it runs and nothing when it stands down.
+
+Usage: python3 -I mixed_install.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+S = Path(
+    "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/"
+    "815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseD"
+)
+PREFIXES = ("COPILOT", "CLAUDE", "BOOTSTRAP_HOOK", "TARGET_ID")
+PAYLOAD = '{"hook_event_name":"UserPromptSubmit","prompt":"hi"}'
+
+
+def command_from(settings: Path) -> str:
+    hooks = json.loads(settings.read_text(encoding="utf-8"))["hooks"]
+    found = [
+        h["command"]
+        for group in hooks["UserPromptSubmit"]
+        for h in group["hooks"]
+        if "reporting-reminder.sh prompt claude-code" in h["command"]
+    ]
+    assert len(found) == 1
+    return found[0]
+
+
+def make_repo(root: Path, launcher: Path) -> None:
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True)
+    for source in (REPO / "shared" / "hooks" / "scripts").iterdir():
+        if source.is_file():
+            shutil.copy(source, scripts / source.name)
+    shutil.copy(launcher, scripts / "run-hook.sh")
+    (scripts / "run-hook.sh").chmod(0o755)
+    (root / ".github" / "hooks").mkdir(parents=True)
+    shutil.copy(REPO / "shared" / "hooks" / "hooks.json", root / ".github" / "hooks" / "hooks.json")
+    subprocess.run(["git", "init", "-q", "-b", "dev"], cwd=root, check=True, capture_output=True)
+
+
+def run(command: str, root: Path, extra: dict[str, str], keep_session: bool) -> tuple[int, str, str]:
+    env = dict(os.environ) if keep_session else {k: v for k, v in os.environ.items() if not k.startswith(PREFIXES)}
+    env.update(extra)
+    env["CLAUDE_PROJECT_DIR"] = str(root)  # what Claude Code and the Copilot runtime both set
+    done = subprocess.run(
+        ["bash", "-c", command], input=PAYLOAD, text=True, capture_output=True, check=False, env=env, cwd=root
+    )
+    return done.returncode, done.stdout, done.stderr
+
+
+def main() -> int:
+    old_command = command_from(S / "old-settings.json")
+    new_command = command_from(REPO / "dist" / "multi-agent" / ".claude" / "settings.json")
+    assert "BOOTSTRAP_HOOK_SOURCE" not in old_command and "BOOTSTRAP_HOOK_SOURCE=claude-settings" in new_command
+    print("old settings command:", old_command)
+    print("new settings command:", new_command)
+    copilot_hook = {"COPILOT_CLI": "1", "COPILOT_HOOK_DEPTH": "1"}
+    failures = 0
+    with tempfile.TemporaryDirectory() as folder:
+        roots = {}
+        for label, launcher in (("old launcher", S / "run-hook.old.sh"), ("new launcher", S / "run-hook.new.sh")):
+            roots[label] = Path(folder) / label.replace(" ", "-")
+            make_repo(roots[label], launcher)
+        print()
+        rows = [
+            # launcher, settings, expected: does the hook run under a Copilot-harness hook environment?
+            ("old launcher", "old settings", old_command, False, True),
+            ("old launcher", "new settings", new_command, False, True),
+            ("new launcher", "old settings", old_command, False, True),
+            ("new launcher", "new settings", new_command, False, False),
+        ]
+        for launcher, settings, command, keep_session, runs in rows:
+            code, out, err = run(command, roots[launcher], copilot_hook, keep_session)
+            ran = bool(out.strip())
+            ok = code == 0 and ran == runs and err == ""
+            failures += not ok
+            print(
+                f"{launcher:13} + {settings:12} under a Copilot hook environment: exit {code}, stdout {len(out)} bytes -> "
+                f"{'the hook RAN' if ran else 'the hook STOOD DOWN'} "
+                f"(expected: {'run' if runs else 'stand down'}) {'OK' if ok else 'MISMATCH'}"
+            )
+        print()
+        print("Same four combinations under this Claude Code session's own environment (CLAUDECODE=1; never stand down):")
+        for launcher, settings, command, _, _ in rows:
+            code, out, err = run(command, roots[launcher], copilot_hook, True)
+            ran = bool(out.strip())
+            ok = code == 0 and ran and err == ""
+            failures += not ok
+            print(
+                f"{launcher:13} + {settings:12}: exit {code}, stdout {len(out)} bytes -> "
+                f"{'the hook RAN' if ran else 'the hook STOOD DOWN'} {'OK' if ok else 'MISMATCH'}"
+            )
+        # Byte identity: old and new settings give the same output through the old launcher.
+        same = run(old_command, roots["old launcher"], copilot_hook, False) == run(
+            new_command, roots["old launcher"], copilot_hook, False
+        )
+        print(f"\nold launcher: old and new settings commands give identical output and exit code: {same}")
+        failures += not same
+    print(f"mismatches: {failures}")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,93 @@
+"""Negative controls and mixed installs for the Phase D probe checks (scratch tool, not shipped).
+
+Usage: probe_control.py MODE
+
+Runs the real probe (scripts/check_copilot_runtime.py) against a temporary project whose launcher
+or Claude settings were changed after the install, to show that the new checks catch the fault.
+
+MODE
+  baseline           no change (the probe as shipped)
+  before             launcher and Claude settings of 49d3460: the state before steps 2 and 3
+  old-launcher       launcher of 49d3460 with the new (marked) Claude settings: mixed install
+  old-settings       the new launcher with the old (unmarked) Claude settings: mixed install
+  guard-stands-down  new launcher that also stands down protect-files.sh (a broken guard rule)
+  camel-count        no change; also judges `guards-both-sources` on the one-source camel session
+  inherited-marker   marker exported to the whole runtime environment; launcher as shipped
+  inherited-marker-no-condition-5   the same, with the COPILOT_HOOK_DIR condition removed
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+SCRATCH = Path(
+    "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/"
+    "815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseD"
+)
+sys.path.insert(0, str(REPO / "scripts"))
+sys.dont_write_bytecode = True
+
+import check_copilot_runtime as probe  # noqa: E402
+
+mode = sys.argv[1]
+LAUNCHER = Path(".claude/hooks/scripts/run-hook.sh")
+SETTINGS = Path(".claude/settings.json")
+MARK = " BOOTSTRAP_HOOK_SOURCE=claude-settings"
+COND_5 = '  [[ -z "${COPILOT_HOOK_DIR:-}" ]] || return 1\n'
+FIVE = "state-sync.sh | session-log.sh |"
+
+original_prepare = probe.prepare_project
+original_run_session = probe.run_session
+records: dict[str, probe.SessionRecord] = {}
+
+
+def patched_prepare(parent: Path, deadline: float | None = None) -> Path:
+    project = original_prepare(parent, deadline)
+    launcher = project / LAUNCHER
+    shipped = launcher.read_text(encoding="utf-8")
+    assert "stands_down" in shipped, "the installed launcher is not the new one"
+    if mode in ("old-launcher", "before"):
+        launcher.write_text((SCRATCH / "run-hook.old.sh").read_text(), encoding="utf-8")
+    if mode == "before":
+        # Both files as at 49d3460: the state before steps 2 and 3.
+        settings = project / SETTINGS
+        text = settings.read_text(encoding="utf-8")
+        assert MARK in text
+        settings.write_text(text.replace(MARK, ""), encoding="utf-8")
+    elif mode == "old-settings":
+        settings = project / SETTINGS
+        text = settings.read_text(encoding="utf-8")
+        assert MARK in text
+        settings.write_text(text.replace(MARK, ""), encoding="utf-8")
+    elif mode == "guard-stands-down":
+        assert FIVE in shipped
+        launcher.write_text(
+            shipped.replace(FIVE, "protect-files.sh | " + FIVE), encoding="utf-8"
+        )
+    elif mode == "inherited-marker-no-condition-5":
+        assert COND_5 in shipped
+        launcher.write_text(shipped.replace(COND_5, ""), encoding="utf-8")
+    return project
+
+
+def capture(runtime, project, scenario, home, timeout=probe.SESSION_LIMIT_SECONDS):  # type: ignore[no-untyped-def]
+    record = original_run_session(runtime, project, scenario, home, timeout)
+    records[str(scenario["name"])] = record
+    return record
+
+
+probe.prepare_project = patched_prepare
+probe.run_session = capture
+if mode.startswith("inherited-marker"):
+    os.environ["BOOTSTRAP_HOOK_SOURCE"] = "claude-settings"
+
+code = probe.main(["--require"])
+if mode == "camel-count":
+    probe.PROTECTED_CREATE_STEP = "camel-ask-vscode-settings"
+    ok, detail = probe.guards_both_sources(records["camel-rename"])
+    print(f"CONTROL guards-both-sources on the one-source camel-rename session: {'PASS' if ok else 'FAIL'}: {detail}")
+print(f"MODE {mode}: probe exit code {code}")
+sys.exit(code)

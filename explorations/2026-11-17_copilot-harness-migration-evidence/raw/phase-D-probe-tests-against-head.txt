@@ -1,0 +1,27 @@
+Phase D, step 4 tests against the probe as at HEAD 49d3460 (the new probe tests, run in a scratch copy with HEAD's scripts/), 2026-11-18.
+The probe code was written before these tests, so they were not failing-first in sequence; this run and phase-D-mutation-checks.txt show they are load-bearing.
+Selection: the new and changed probe tests (-k). One passes against HEAD only vacuously: HEAD has no such check, so the failing list stays empty;
+the mutation 'if f"sessionId={session}" in fields:' -> 'if True:' makes it fail against the new probe.
+
+PASSED tests/test_check_copilot_runtime.py::test_the_session_log_check_judges_only_the_lines_of_its_own_session
+FAILED tests/test_check_copilot_runtime.py::test_runtime_environment_drops_every_git_and_gh_variable
+FAILED tests/test_check_copilot_runtime.py::test_the_baseline_has_the_planned_checks_in_order
+FAILED tests/test_check_copilot_runtime.py::test_a_correct_run_passes_every_check
+FAILED tests/test_check_copilot_runtime.py::test_a_correct_run_passes_the_stand_down_checks_and_says_what_they_read
+FAILED tests/test_check_copilot_runtime.py::test_the_stand_down_checks_belong_to_the_main_session_only
+FAILED tests/test_check_copilot_runtime.py::test_the_session_log_check_fails_when_both_hook_sources_log_the_session
+FAILED tests/test_check_copilot_runtime.py::test_the_session_log_check_fails_unless_the_copilot_copy_logged_alone[only-the-claude-settings-copy-logged]
+FAILED tests/test_check_copilot_runtime.py::test_the_session_log_check_fails_unless_the_copilot_copy_logged_alone[the-session-has-no-line-at-all]
+FAILED tests/test_check_copilot_runtime.py::test_the_session_log_check_fails_unless_the_copilot_copy_logged_alone[the-log-is-empty]
+FAILED tests/test_check_copilot_runtime.py::test_the_session_log_check_fails_when_the_log_is_missing
+FAILED tests/test_check_copilot_runtime.py::test_the_session_log_check_needs_a_session_id_and_a_project
+FAILED tests/test_check_copilot_runtime.py::test_the_pull_check_fails_when_both_hook_sources_ran_the_pull
+FAILED tests/test_check_copilot_runtime.py::test_the_pull_check_fails_without_exactly_one_pull_line[no-pull-ran]
+FAILED tests/test_check_copilot_runtime.py::test_the_pull_check_fails_without_exactly_one_pull_line[no-log]
+FAILED tests/test_check_copilot_runtime.py::test_the_pull_check_counts_only_the_pull_line
+FAILED tests/test_check_copilot_runtime.py::test_the_guard_check_fails_unless_each_hook_source_asked_once[one-source]
+FAILED tests/test_check_copilot_runtime.py::test_the_guard_check_fails_unless_each_hook_source_asked_once[none]
+FAILED tests/test_check_copilot_runtime.py::test_the_guard_check_fails_unless_each_hook_source_asked_once[a-third-source]
+FAILED tests/test_check_copilot_runtime.py::test_the_guard_check_fails_when_the_step_never_ran
+FAILED tests/test_check_copilot_runtime.py::TestRunSession::test_a_finished_session_returns_events_summary_and_no_failure
+20 failed, 1 passed, 181 deselected in 0.17s

@@ -1,0 +1,45 @@
+Phase D verification results, 2026-11-18. Working copy on branch copilot-harness-migration_implementation, HEAD 49d3460, nothing staged.
+Changed files (git status --short): README.md, docs/runtime-checks.md, docs/target-mapping.md, scripts/check_copilot_runtime.py,
+scripts/generate_targets.py, scripts/validate_targets.py, shared/hooks/scripts/run-hook.sh, tests/test_check_copilot_runtime.py,
+tests/test_hook_gates.py, tests/test_validate_targets.py. (dist/ and this repository's own .claude/ install are regenerated and ignored by Git.)
+
+== Step 6 commands ==
+uv run python scripts/generate_targets.py --all                              exit 0
+uv run python scripts/install_bootstrap.py . --allow-self --local-only       exit 0 (the nested AI-state repository got a local commit: "ahead 1")
+uv run python scripts/validate_targets.py                                     exit 0, "PASS generated target is structurally valid"
+uv run python scripts/check_runtime.py                                        exit 0, "PASS generated runtime wiring is present"
+Run again after the last edit (a comment in run-hook.sh and the docs): same four results, see phase-D-generated-files.txt for the installed copy.
+
+== The plan's Verification block, every line but verify.py phase ==
+generate_targets.py --all                                                     exit 0
+pytest tests/test_hook_gates.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+                                                                              1758 passed, 0 failed (153.6 s; run twice on the final tests, same result)
+                                                                              (one earlier run printed "1758 passed, 1 error": the session guard fixture saw the live
+                                                                              .claude/session_logs/hooks-errors.log change at 16:23:05Z. The cause was a Bash command of the
+                                                                              coder's own session that the file guard denied during the run; it is not a test. The clean rerun passed.)
+check_copilot_runtime.py --require                                            exit 0, "Result: PASS (0 of 46 checks failed)" (13 s)
+grep -q -F 'BOOTSTRAP_HOOK_SOURCE=claude-settings' dist/multi-agent/.claude/settings.json            exit 0
+test "$(grep -c -F 'BOOTSTRAP_HOOK_SOURCE' dist/multi-agent/.github/hooks/hooks.json)" = "0"     exit 0
+grep -q -F 'chat.useClaudeHooks' README.md                                    exit 0
+validate_targets.py                                                           exit 0
+check_runtime.py                                                              exit 0
+validate_plan_frontmatter.py                                                  exit 0
+
+== Other commands ==
+uv run python tests/test_hook_gates.py (the CI script form)                   exit 0 (2.4 s)
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases   Success: no issues found in 43 source files
+uv run ruff check shared scripts tests                                        All checks passed!
+uv run ruff format --check shared scripts tests                               43 files already formatted
+uv run python .claude/scripts/verify.py fast --format text                    fast: PASS
+
+== Full suite, nothing else running ==
+uv run pytest tests/ -q --tb=short                                            5826 passed, 1 skipped, 0 failed in 425.90 s (0:07:05); wall time 7m31.966s
+(final code. An earlier full run, before one test got a fixed Git identity and no state remote in its environment, gave the same
+5826 passed, 1 skipped, 0 failed in 424.04 s; wall time 7m30.468s.)
+The skipped test is tests/test_context_mode_mcp_filter.py::test_real_upstream_server_surface_is_filtered (not touched by this phase).
+
+== Extra checks ==
+The probe with no Git identity on the host (empty HOME, no system Git config): "Result: PASS (0 of 46 checks failed)", 14.9 s. The runtime
+environment no longer carries GIT_* variables; no check depends on a commit made by a session hook.
+New tests: 50 in the launcher, marker, and validator groups (test_hook_gates.py, test_validate_targets.py); 19 in test_check_copilot_runtime.py
+(183 tests collected there before, 202 now). Failing first: phase-D-tests-failing-first.txt. Mutations: phase-D-mutation-checks.txt.

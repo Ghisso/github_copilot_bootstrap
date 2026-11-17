@@ -1,0 +1,40 @@
+Phase D mutation checks, 2026-11-18. One line of the shipped file is changed, the new tests run, the file is restored.
+Every mutation must make a test fail. Tool: phase-D-mutate.py.txt.
+
+=== shared/hooks/scripts/run-hook.sh (tests/test_hook_gates.py, the new launcher tests): 15 mutations ===
+'  [[ "${BOOTSTRAP_HOOK_SOURCE:-}" == "claude-settings" ]] ||' -> '': tests FAILED (good)
+'  [[ "${COPILOT_CLI:-}" == "1" ]] || return 1\n' -> '': tests FAILED (good)
+'  [[ -n "${COPILOT_HOOK_DEPTH:-}" ]] || return 1\n' -> '': tests FAILED (good)
+'  [[ -z "${COPILOT_HOOK_DIR:-}" ]] || return 1\n' -> '': tests FAILED (good)
+'  [[ -z "${CLAUDECODE:-}" ]] || return 1\n' -> '': tests FAILED (good)
+'[[ -f "$copilot_hooks" && ! -L "$copilot_hooks" ]]' -> '[[ -f "$copilot_hooks" ]]': tests FAILED (good)
+'  ! grep -q -F disableAllHooks "$copilot_hooks" || return 1\n' -> '': tests FAILED (good)
+'  grep -q -F "session-log.sh github-copilot" "$copilot_hooks' -> '': tests FAILED (good)
+'  grep -q -F "state-sync.sh push" "$copilot_hooks" || return' -> '': tests FAILED (good)
+'state-sync.sh | session-log.sh |' -> 'protect-files.sh | state-sync.sh | session-log.sh |': tests FAILED (good)
+'reporting-reminder.sh) ;;' -> 'reporting-reminder.sh | git-protection.sh) ;;': tests FAILED (good)
+'  cat >/dev/null 2>&1 || true\n  exit 0' -> '  exit 0': tests FAILED (good)
+'  cat >/dev/null 2>&1 || true\n  exit 0' -> '  cat >/dev/null 2>&1 || true\n  exit 1': tests FAILED (good)
+'cat >/dev/null 2>&1 || true' -> 'cat >/dev/null': tests FAILED (good)
+'state-sync.sh | session-log.sh | session-start-state.sh | cl' -> 'state-sync.sh | session-log.sh | session-start-state.sh | cl': tests FAILED (good)
+
+One mutant survives by design: removing only `-f` from `[[ -f ... && ! -L ... ]]`. A missing file or a folder already fails
+the `grep` conditions that follow, so the stand-down is the same. The plan lists `-f`, so it stays as a cheap guard.
+
+=== scripts/check_copilot_runtime.py (tests/test_check_copilot_runtime.py): 8 mutations ===
+3 failed, 199 deselected in 0.04s
+MUTATION scripts/check_copilot_runtime.py: 'DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC", "GIT_", "GH_")' -> 'DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC")': tests FAILED (good)
+3 failed, 199 deselected in 0.05s
+MUTATION scripts/check_copilot_runtime.py: 'DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC", "GIT_", "GH_")' -> 'DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC", "GIT_")': tests FAILED (good)
+2 failed, 1 passed, 199 deselected in 0.05s
+MUTATION scripts/check_copilot_runtime.py: 'DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC", "GIT_", "GH_")' -> 'DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC", "GH_")': tests FAILED (good)
+1 failed, 4 passed, 197 deselected in 2.06s
+MUTATION scripts/check_copilot_runtime.py: 'if pulls != 1:' -> 'if pulls < 1:': tests FAILED (good)
+2 failed, 5 passed, 195 deselected in 0.05s
+MUTATION scripts/check_copilot_runtime.py: 'if claude:' -> 'if False:': tests FAILED (good)
+2 failed, 5 passed, 195 deselected in 0.07s
+MUTATION scripts/check_copilot_runtime.py: 'if not copilot:' -> 'if False:': tests FAILED (good)
+1 failed, 3 passed, 198 deselected in 0.04s
+MUTATION scripts/check_copilot_runtime.py: 'if count != expected:' -> 'if count < expected:': tests FAILED (good)
+2 failed, 5 passed, 195 deselected in 0.06s
+MUTATION scripts/check_copilot_runtime.py: 'if f"sessionId={session}" in fields:' -> 'if True:': tests FAILED (good)

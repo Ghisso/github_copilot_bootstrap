@@ -1,0 +1,191 @@
+Phase D probe negative controls and mixed installs on the real runtime, 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0, command: uv run python scripts/check_copilot_runtime.py --require
+Tool: phase-D-probe-control-harness.py.txt. It runs the shipped probe against a temporary project whose launcher or Claude settings
+were changed after the install (a stand-in for the mixed installs and for a broken rule). Each mode ran twice; only result lines are kept.
+
+=== before, run 1: launcher and Claude settings as at 49d3460 (before steps 2 and 3)
+expected: single-session-log FAIL and state-sync-once FAIL; every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: 2 line(s) with target=claude-code for session c54b4bb5: the Claude-settings hooks did not stand down
+FAIL state-sync-once: 2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE before: probe exit code 1
+real	0m16.964s
+
+=== before, run 2: launcher and Claude settings as at 49d3460 (before steps 2 and 3)
+expected: single-session-log FAIL and state-sync-once FAIL; every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: 2 line(s) with target=claude-code for session c5526ba5: the Claude-settings hooks did not stand down
+FAIL state-sync-once: 2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE before: probe exit code 1
+real	0m14.590s
+
+=== old-launcher, run 1: launcher of 49d3460 with the NEW (marked) Claude settings (mixed install: an old launcher ignores the prefix)
+expected: single-session-log FAIL and state-sync-once FAIL (both copies ran); every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: 2 line(s) with target=claude-code for session 275d9bc1: the Claude-settings hooks did not stand down
+FAIL state-sync-once: 2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE old-launcher: probe exit code 1
+real	0m14.794s
+
+=== old-launcher, run 2: launcher of 49d3460 with the NEW (marked) Claude settings (mixed install: an old launcher ignores the prefix)
+expected: single-session-log FAIL and state-sync-once FAIL (both copies ran); every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: 2 line(s) with target=claude-code for session e1fda066: the Claude-settings hooks did not stand down
+FAIL state-sync-once: 2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE old-launcher: probe exit code 1
+real	0m16.883s
+
+=== old-settings, run 1: the NEW launcher with the OLD (unmarked) Claude settings (mixed install: no marker, so no stand-down)
+expected: single-session-log FAIL and state-sync-once FAIL (both copies ran); every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: 2 line(s) with target=claude-code for session 932b79ae: the Claude-settings hooks did not stand down
+FAIL state-sync-once: 2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE old-settings: probe exit code 1
+real	0m14.741s
+
+=== old-settings, run 2: the NEW launcher with the OLD (unmarked) Claude settings (mixed install: no marker, so no stand-down)
+expected: single-session-log FAIL and state-sync-once FAIL (both copies ran); every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: 2 line(s) with target=claude-code for session a0f994be: the Claude-settings hooks did not stand down
+FAIL state-sync-once: 2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE old-settings: probe exit code 1
+real	0m17.063s
+
+=== guard-stands-down, run 1: the new launcher with `protect-files.sh` added to the stand-down list (a broken rule that stands a guard down)
+expected: guards-both-sources FAIL (1 question instead of 2); every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL guards-both-sources: 1 question(s) of kind hook, expected 2, one per hook source (questions: ['hook'])
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (1 of 46 checks failed)
+MODE guard-stands-down: probe exit code 1
+real	0m12.208s
+
+=== guard-stands-down, run 2: the new launcher with `protect-files.sh` added to the stand-down list (a broken rule that stands a guard down)
+expected: guards-both-sources FAIL (1 question instead of 2); every other check PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL guards-both-sources: 1 question(s) of kind hook, expected 2, one per hook source (questions: ['hook'])
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (1 of 46 checks failed)
+MODE guard-stands-down: probe exit code 1
+real	0m12.402s
+
+=== camel-count, run 1: no change; guards-both-sources judged on the one-source camel-rename session (Claude settings off)
+expected: the control line is FAIL (1 question instead of 2); the probe itself PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: PASS (0 of 46 checks failed)
+CONTROL guards-both-sources on the one-source camel-rename session: FAIL: 1 question(s) of kind hook, expected 2, one per hook source (questions: ['hook'])
+MODE camel-count: probe exit code 0
+real	0m15.306s
+
+=== camel-count, run 2: no change; guards-both-sources judged on the one-source camel-rename session (Claude settings off)
+expected: the control line is FAIL (1 question instead of 2); the probe itself PASS
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: PASS (0 of 46 checks failed)
+CONTROL guards-both-sources on the one-source camel-rename session: FAIL: 1 question(s) of kind hook, expected 2, one per hook source (questions: ['hook'])
+MODE camel-count: probe exit code 0
+real	0m12.506s
+
+=== inherited-marker, run 1: the marker exported to the whole runtime environment, launcher as shipped (condition 5 holds)
+expected: PASS 0 of 46: the .github/hooks copy still ran (COPILOT_HOOK_DIR is set for it), the Claude-settings copy stood down
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: PASS (0 of 46 checks failed)
+MODE inherited-marker: probe exit code 0
+real	0m15.171s
+
+=== inherited-marker, run 2: the marker exported to the whole runtime environment, launcher as shipped (condition 5 holds)
+expected: PASS 0 of 46: the .github/hooks copy still ran (COPILOT_HOOK_DIR is set for it), the Claude-settings copy stood down
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: PASS (0 of 46 checks failed)
+MODE inherited-marker: probe exit code 0
+real	0m12.745s
+
+=== inherited-marker-no-condition-5, run 1: the same environment, with the COPILOT_HOOK_DIR condition removed from the launcher
+expected: single-session-log FAIL (no session log at all) and state-sync-once FAIL (0 pull lines): both copies stood down
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: cannot read .claude/session_logs/hooks-sessions.log after the session: [Errno 2] No such file or directory: '/tmp/copilot-runtime-probe-h5tgj0g9/project/.claude/session_logs/hooks-sessions.log'
+FAIL state-sync-once: 0 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE inherited-marker-no-condition-5: probe exit code 1
+real	0m10.148s
+
+=== inherited-marker-no-condition-5, run 2: the same environment, with the COPILOT_HOOK_DIR condition removed from the launcher
+expected: single-session-log FAIL (no session log at all) and state-sync-once FAIL (0 pull lines): both copies stood down
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+FAIL single-session-log: cannot read .claude/session_logs/hooks-sessions.log after the session: [Errno 2] No such file or directory: '/tmp/copilot-runtime-probe-_ho_x215/project/.claude/session_logs/hooks-sessions.log'
+FAIL state-sync-once: 0 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, expected exactly 1 (2 means both hook sources ran it)
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS session-camel-rename: finished after 12 scripted model replies
+Result: FAIL (2 of 46 checks failed)
+MODE inherited-marker-no-condition-5: probe exit code 1
+real	0m12.552s
