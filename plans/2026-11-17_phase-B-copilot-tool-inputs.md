@@ -237,6 +237,17 @@ and the T1 text in step 8 before branch creation.
     No output byte changes.
   - The probe section of `docs/runtime-checks.md` is updated for the new
     counts (31 result lines, two sessions).
+  - Added at closeout: the verifier's two time budgets in
+    `shared/scripts/verify.py` go from 480 and 600 seconds to 900 and 1020
+    seconds (`COMMAND_TIMEOUT_SECONDS`,
+    `VERIFICATION_ITEM_TIMEOUT_SECONDS`). The first closeout run of this
+    phase ended with `VFY-PYTEST-001: UNVERIFIED`, because the full suite
+    (5,560 tests after this phase, about 410 seconds) ran past 480 seconds.
+    The three statements of the old item budget are corrected
+    (`shared/policies/workflow.instructions.md`, two places in
+    `docs/runtime-checks.md`). The budgets only set how long the verifier
+    waits; no check is removed or made weaker. The probe's own 480-second
+    run limit is a different value and stays.
 
 - [x] **11. Review.**
   Owner: reviewer.

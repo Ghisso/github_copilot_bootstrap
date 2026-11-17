@@ -47,6 +47,17 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
 - **21:05** - All three fixed; one test added
   (`test_a_hunk_context_line_that_spells_a_header_is_judged_as_that_target`).
   Review round 2: Gate PASS, no finding, no open request.
+- **21:25** - First closeout run stopped at step 4: `verify.py phase
+  --persist` gave `VFY-PYTEST-001: UNVERIFIED`, because the full suite
+  (5,560 tests) ran past the verifier's 480-second budget for one command.
+  No test failed. Approved as a scope change: the `coder` set
+  `COMMAND_TIMEOUT_SECONDS = 900` and `VERIFICATION_ITEM_TIMEOUT_SECONDS =
+  1020` in `shared/scripts/verify.py` and corrected the three statements of
+  the old item budget (`shared/policies/workflow.instructions.md`, two
+  places in `docs/runtime-checks.md`). One timed full run: 5,560 passed,
+  1 skipped, 409.74 s by pytest, 436.43 s wall time. The generated OpenWiki
+  page `openwiki/operations/deterministic-verification.md` still states 480
+  and 600; the final phase of this plan refreshes it.
 
 ### Phase-boundary summary
 
