@@ -115,6 +115,24 @@ the patch tool, which the runtime's own list does not (A4).
 
   Acceptance: step 1 passes. Mypy and ruff are clean.
 
+  Scope-change record (approved by the orchestrator on 2026-11-17; each
+  item serves this phase's stated intent and adds no feature):
+  - `prepare_project` removes three things, not one: `<dir>/.mcp.json`, the
+    mirror copy `.claude/bootstrap-root/.mcp.json`, and the line
+    `BOOTSTRAP_ROOT_PATH=.mcp.json` in `.claude/bootstrap-ownership.env`.
+    Reason, seen with `strace` in a loopback-only namespace: the
+    `SessionStart` hook calls `state-sync.sh pull`, which calls
+    `restore-root-adapters.sh`, and that script copies `.mcp.json` back from
+    the mirror. A manifest line with no mirror copy makes that script exit 1.
+  - `prepare_project` writes a one-line `README.md`, because a fresh
+    install ships none and the plain-read step views it.
+  - The runtime environment also drops `GH_TOKEN`, `GITHUB_TOKEN`, and
+    `COPILOT_GITHUB_TOKEN`.
+  - An extra result line, `session-main`, reports FAIL for a session that
+    timed out, crashed, or logged a runtime error.
+  - `--discover DIR` adds no folder trust, so it lists 0 hooks and 0 MCP
+    servers and says so. Instructions, skills, and agents are listed.
+
 - [ ] **3. Add the baseline checks.**
   Owner: coder. Files: `scripts/check_copilot_runtime.py`.
   Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
