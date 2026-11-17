@@ -1,0 +1,16 @@
+Phase D: output of the launcher before and after the change, when no stand-down applies. 2026-11-18.
+Old = shared/hooks/scripts/run-hook.sh at 49d3460. New = the working copy. Harness: phase-D-differential-harness.py.txt.
+Both run the same real hook scripts (the working copy's) in two identical temporary Git repositories on `dev`,
+with a fixed Git identity and AI_STATE_LOCAL_ONLY=1. Cases: 13 scripts with 25 argument lists (5 lifecycle scripts with 9, 8 guards with 16),
+9 inputs (empty, not JSON with NUL and 0xFF bytes, SessionStart, Stop, 3 Bash commands, a Write to a protected config,
+patch text), 5 environments (clean host; marker only; a Claude Code session with COPILOT_CLI=1 and COPILOT_HOOK_DEPTH=1;
+the Local harness with chat.useClaudeHooks; no marker with Copilot variables), plus the launcher's own edge cases
+(no script name, missing script with an argument holding a space and a quote). Guards are also run with all seven
+conditions holding, because a guard never stands down. stdout, stderr, and exit code are compared byte for byte; the
+repository path and timestamps in stderr are replaced first (`<repo>`, `<ts>`).
+
+Launcher differential: 49d3460 (old) against the working copy (new); same scripts, same inputs.
+comparisons where no stand-down applies: 1281
+  of which the old launcher exits non-zero: 138 (compared the same way)
+differences in stdout, stderr, or exit code: 0
+cases where the new launcher stands a lifecycle script down on purpose (all seven conditions): 81; not silent or not exit 0: 0

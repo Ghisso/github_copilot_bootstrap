@@ -40,17 +40,17 @@ if [[ ! -f "$TARGET" ]]; then
   exit 0
 fi
 
-# The Copilot runtime loads both hook files, so every hook runs twice there
-# (evidence F2, A3). A lifecycle hook reached through the Claude settings stands
-# down: it drains its input, prints nothing, and exits 0. Only these five
-# scripts; a guard never stands down. Only when every condition holds: the
-# marker that only the generated Claude settings set; COPILOT_CLI=1 and
+# The Copilot runtime loads both hook files, also from a subfolder, so every hook
+# runs twice there (evidence F2, A3, P4). A lifecycle hook reached through the
+# Claude settings stands down: it drains its input, prints nothing, and exits 0.
+# Only these five scripts; a guard never stands down. Only when every condition
+# holds: the marker that only the generated Claude settings set; COPILOT_CLI=1;
 # COPILOT_HOOK_DEPTH, which the runtime sets only for hook processes (a command
-# from its shell tool lacks the depth, P1); no COPILOT_HOOK_DIR, which only
-# .github/hooks hooks get, so an inherited marker cannot stand both copies down;
-# no CLAUDECODE; and a usable Copilot hook file that runs the same lifecycle
-# hooks. Claude Code and the Local harness with chat.useClaudeHooks (A2) never
-# match. Never key on a CLAUDE_CODE_* variable (A3). Never read the payload.
+# from its shell tool lacks it, P1); no COPILOT_HOOK_DIR, which only .github/hooks
+# hooks get, so an inherited marker cannot stand both copies down; no CLAUDECODE;
+# and a Copilot hook file that runs the same lifecycle hooks. Claude Code and the
+# Local harness with chat.useClaudeHooks (A2) never match. Never key on a
+# CLAUDE_CODE_* variable (A3). Never read the payload.
 stands_down() {
   case "$HOOK_SCRIPT" in
     state-sync.sh | session-log.sh | session-start-state.sh | claude-stop.sh | reporting-reminder.sh) ;;

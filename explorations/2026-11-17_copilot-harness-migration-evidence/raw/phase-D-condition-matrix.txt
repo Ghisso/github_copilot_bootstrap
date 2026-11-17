@@ -1,0 +1,297 @@
+Phase D: condition matrix of the launcher run-hook.sh, 2026-11-18.
+Launcher under test: shared/hooks/scripts/run-hook.sh of the working copy (a copy is run in each temporary repository).
+Harness: phase-D-condition-matrix-harness.py.txt (stub scripts that print `RAN <name>`; the real launcher; a temporary
+repository per Copilot hook file case). `STAND DOWN` = exit 0, no output, the stub did not run. `RUN` = the stub ran.
+The expected result of every row is written in the harness from the plan's seven conditions, independent of the launcher.
+Environments: all seven conditions; each condition broken in turn (the hook file in 5 ways); four named environments
+(this Claude Code session; Claude Code from a Copilot shell, with and without CLAUDECODE; the Local harness with
+chat.useClaudeHooks on).
+
+Summary: 234 rows (5 lifecycle + 8 guard scripts x 18 environments); 0 rows differ from the plan's conditions;
+0 guard rows stand down; 5 lifecycle rows stand down, all in the `all seven conditions hold` environment.
+
+Control: the same harness with the launcher of 49d3460 (before this phase). The launcher has no stand-down, so only the five
+`all seven conditions hold` lifecycle rows differ from the plan:
+
+rows: 234 (5 lifecycle + 8 guard scripts x 18 environments)
+rows where the launcher differs from the plan's seven conditions: 5
+guard rows that stand down: 0
+lifecycle rows that stand down: 0 (only the 'all seven conditions hold' environment: 5 rows)
+
+==== Rows, new launcher ====
+Launcher under test: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseD/run-hook.new.sh
+
+## all seven conditions hold
+  lifecycle state-sync.sh              STAND DOWN
+  lifecycle session-log.sh             STAND DOWN
+  lifecycle session-start-state.sh     STAND DOWN
+  lifecycle claude-stop.sh             STAND DOWN
+  lifecycle reporting-reminder.sh      STAND DOWN
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 2 broken: no marker
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 2 broken: another marker value
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 3 broken: COPILOT_CLI unset
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 3 broken: COPILOT_CLI=0
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 4 broken: COPILOT_HOOK_DEPTH unset
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 4 broken: COPILOT_HOOK_DEPTH empty
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 5 broken: COPILOT_HOOK_DIR set
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 6 broken: CLAUDECODE=1
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 7 broken: Copilot hook file missing
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 7 broken: Copilot hook file is a link
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 7 broken: Copilot hook file has disableAllHooks
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 7 broken: no `session-log.sh github-copilot`
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## 7 broken: no `state-sync.sh push`
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## named: this Claude Code session (extension-host leaks, CLAUDECODE=1, marker)
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## named: Claude Code started from a Copilot shell (P1 variables, marker, no depth)
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## named: the same, plus CLAUDECODE=1
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+## named: Local harness, chat.useClaudeHooks on (A2 variables, marker)
+  lifecycle state-sync.sh              RUN       
+  lifecycle session-log.sh             RUN       
+  lifecycle session-start-state.sh     RUN       
+  lifecycle claude-stop.sh             RUN       
+  lifecycle reporting-reminder.sh      RUN       
+  guard     protect-files.sh           RUN       
+  guard     pretool-bash-guard.sh      RUN       
+  guard     git-protection.sh          RUN       
+  guard     enforce-branch-state.sh    RUN       
+  guard     enforce-commit-gate.sh     RUN       
+  guard     enforce-pr-gate.sh         RUN       
+  guard     openwiki-guard.sh          RUN       
+  guard     record-branch-state.sh     RUN       
+
+rows: 234 (5 lifecycle + 8 guard scripts x 18 environments)
+rows where the launcher differs from the plan's seven conditions: 0
+guard rows that stand down: 0
+lifecycle rows that stand down: 5 (only the 'all seven conditions hold' environment: 5 rows)

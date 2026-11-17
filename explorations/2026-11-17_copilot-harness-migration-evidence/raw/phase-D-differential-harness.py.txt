@@ -1,0 +1,188 @@
+"""Differential run of the launcher: 49d3460 against the working copy (scratch tool for the evidence).
+
+Two identical temporary repositories hold the real hook scripts of the working copy; only the
+launcher differs (`run-hook.old.sh` from 49d3460, `run-hook.new.sh` from the working copy).
+Every (script, arguments, input, environment) case runs through both, and stdout, stderr
+and the exit code are compared byte for byte, after replacing the repository path and
+the timestamps that state-sync and the guards write into stderr.
+
+Cases where the new launcher stands a lifecycle script down on purpose (all seven conditions)
+are counted apart: there the output must be empty and the exit code 0.
+
+Usage: python3 -I differential.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+S = Path(
+    "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/"
+    "815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseD"
+)
+SOURCES = REPO / "shared" / "hooks" / "scripts"
+LIFECYCLE = {
+    "state-sync.sh": [("pull",), ("status",)],
+    "session-log.sh": [("claude-code",), ("github-copilot",)],
+    "session-start-state.sh": [("claude-code",), ("github-copilot",)],
+    "claude-stop.sh": [()],
+    "reporting-reminder.sh": [("prompt", "claude-code"), ("late-report", "claude-code")],
+}
+GUARDS = {
+    "protect-files.sh": [("claude-code",), ("github-copilot",)],
+    "pretool-bash-guard.sh": [("claude-code",), ("github-copilot",)],
+    "git-protection.sh": [("claude-code",), ("github-copilot",)],
+    "enforce-branch-state.sh": [("claude-code",), ("github-copilot",)],
+    "enforce-commit-gate.sh": [("claude-code",), ("github-copilot",)],
+    "enforce-pr-gate.sh": [("claude-code",), ("github-copilot",)],
+    "openwiki-guard.sh": [("pre",), ("post",)],
+    "record-branch-state.sh": [("claude-code",), ("github-copilot",)],
+}
+PATCH = "*** Begin Patch\n*** Add File: .env\n+X\n*** End Patch\n"
+INPUTS = {
+    "empty": "",
+    "not-json": "not json at all\x00\xff",
+    "session-start": json.dumps({"hook_event_name": "SessionStart", "session_id": "s1", "source": "startup"}),
+    "stop": json.dumps({"hook_event_name": "Stop", "session_id": "s1"}),
+    "bash-status": json.dumps({"tool_name": "Bash", "tool_input": {"command": "git status"}}),
+    "bash-reset-hard": json.dumps({"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD"}}),
+    "bash-secret-redirect": json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo x > .env"}}),
+    "write-protected-config": json.dumps(
+        {"tool_name": "Write", "tool_input": {"file_path": ".vscode/settings.json", "content": "{}"}}
+    ),
+    "patch-text": json.dumps({"tool_name": "Edit", "tool_input": PATCH}),
+}
+CLIENT_PREFIXES = ("COPILOT", "CLAUDE", "BOOTSTRAP_HOOK", "TARGET_ID", "GIT_", "GH_")
+IDENTITY = {
+    "GIT_AUTHOR_NAME": "Differential",
+    "GIT_AUTHOR_EMAIL": "differential@example.com",
+    "GIT_COMMITTER_NAME": "Differential",
+    "GIT_COMMITTER_EMAIL": "differential@example.com",
+    "AI_STATE_REMOTE": "",
+    "AI_STATE_LOCAL_ONLY": "1",
+}
+ENVIRONMENTS = {
+    "clean host": {},
+    "marker only": {"BOOTSTRAP_HOOK_SOURCE": "claude-settings"},
+    "Claude Code session with Copilot variables": {
+        "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+        "CLAUDECODE": "1",
+        "COPILOT_CLI": "1",
+        "COPILOT_HOOK_DEPTH": "1",
+    },
+    "Local harness, useClaudeHooks": {
+        "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+        "COPILOT_CLI_ENABLED_FEATURE_FLAGS": "feature-a",
+    },
+    "no marker, Copilot variables": {"COPILOT_CLI": "1", "COPILOT_HOOK_DEPTH": "1", "COPILOT_HOOK_DIR": "/x"},
+}
+ALL_HOLD = {"BOOTSTRAP_HOOK_SOURCE": "claude-settings", "COPILOT_CLI": "1", "COPILOT_HOOK_DEPTH": "1"}
+
+
+def host_env(overlay: dict[str, str]) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if not k.startswith(CLIENT_PREFIXES)}
+    env.update(IDENTITY)
+    env.update(overlay)
+    return env
+
+
+def make_repo(root: Path, launcher: Path) -> Path:
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True)
+    for source in SOURCES.iterdir():
+        if source.is_file():
+            shutil.copy(source, scripts / source.name)
+    shutil.copy(launcher, scripts / "run-hook.sh")
+    (root / ".github" / "hooks").mkdir(parents=True)
+    shutil.copy(REPO / "shared" / "hooks" / "hooks.json", root / ".github" / "hooks" / "hooks.json")
+    (root / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    for command in (
+        ["git", "init", "-q", "-b", "dev"],
+        ["git", "add", ".gitignore", ".github"],
+        ["git", "commit", "-q", "-m", "seed"],
+    ):
+        subprocess.run(command, cwd=root, check=True, capture_output=True, env=host_env({}))
+    return scripts / "run-hook.sh"
+
+
+def normalise(text: str, root: Path) -> str:
+    text = text.replace(str(root), "<repo>")
+    return re.sub(r"\d{4}-\d\d-\d\dT[\d:.]+Z", "<ts>", text)
+
+
+def run(launcher: Path, root: Path, words: tuple[str, ...], stdin: str, overlay: dict[str, str]) -> tuple[int, str, str]:
+    done = subprocess.run(
+        ["bash", str(launcher), *words],
+        input=stdin.encode("utf-8", "surrogateescape"),
+        capture_output=True,
+        check=False,
+        env=host_env(overlay),
+        cwd=root,
+    )
+    return (
+        done.returncode,
+        normalise(done.stdout.decode("utf-8", "replace"), root),
+        normalise(done.stderr.decode("utf-8", "replace"), root),
+    )
+
+
+def main() -> int:
+    comparisons = differences = 0
+    intended = intended_wrong = 0
+    nonzero_exit_cases = 0
+    detail: list[str] = []
+    with tempfile.TemporaryDirectory() as folder:
+        old_root, new_root = Path(folder) / "old", Path(folder) / "new"
+        old = make_repo(old_root, S / "run-hook.old.sh")
+        new = make_repo(new_root, S / "run-hook.new.sh")
+        cases: list[tuple[str, tuple[str, ...], str, str, dict[str, str], bool]] = []
+        for scripts, is_lifecycle in ((LIFECYCLE, True), (GUARDS, False)):
+            for script, arg_lists in scripts.items():
+                for args in arg_lists:
+                    for input_name, stdin in INPUTS.items():
+                        for env_name, overlay in ENVIRONMENTS.items():
+                            cases.append((script, args, input_name, env_name, overlay, False))
+                        # All seven conditions: guards must be identical; lifecycle differs on purpose.
+                        cases.append((script, args, input_name, "all seven conditions", ALL_HOLD, is_lifecycle))
+        # The launcher's own edge cases.
+        for words, label in (((), "no script name"), (("does-not-exist.sh", "a b", "c'd"), "missing script")):
+            for env_name, overlay in {**ENVIRONMENTS, "all seven conditions": ALL_HOLD}.items():
+                cases.append(("", words, label, env_name, overlay, False))
+        for script, args, input_name, env_name, overlay, intended_difference in cases:
+            words = (script, *args) if script else args
+            stdin = INPUTS.get(input_name, "")
+            result_old = run(old, old_root, words, stdin, overlay)
+            result_new = run(new, new_root, words, stdin, overlay)
+            if intended_difference:
+                intended += 1
+                if result_new != (0, "", ""):
+                    intended_wrong += 1
+                    detail.append(f"INTENDED STAND DOWN NOT SILENT: {words} {input_name}: {result_new}")
+                continue
+            comparisons += 1
+            nonzero_exit_cases += result_old[0] != 0
+            if result_old != result_new:
+                differences += 1
+                detail.append(f"DIFFERENCE {words} {input_name} / {env_name}:\n  old {result_old}\n  new {result_new}")
+    print("Launcher differential: 49d3460 (old) against the working copy (new); same scripts, same inputs.")
+    print(f"comparisons where no stand-down applies: {comparisons}")
+    print(f"  of which the old launcher exits non-zero: {nonzero_exit_cases} (compared the same way)")
+    print(f"differences in stdout, stderr, or exit code: {differences}")
+    print(
+        f"cases where the new launcher stands a lifecycle script down on purpose (all seven conditions): {intended}; "
+        f"not silent or not exit 0: {intended_wrong}"
+    )
+    print("\n".join(detail[:40]))
+    return 1 if differences or intended_wrong else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,18 @@
+Phase D: a direct run of the new launcher under the environment of this Claude Code session, 2026-11-18.
+The command is the exact UserPromptSubmit reporting-reminder command in the installed Claude settings (after the
+self-refresh of step 6; it carries the marker). Script: run in the scratch folder; payload {"hook_event_name":"UserPromptSubmit","prompt":"hi"}.
+(a) and (b) are real Claude Code environments: the hook RAN and printed its context line. (c) is the control, with
+CLAUDECODE removed so all seven conditions hold: the hook stood down (no output, exit 0).
+The hooks of this session's tool calls also ran through the refreshed launcher (guards denied and allowed as before).
+
+command: REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; BOOTSTRAP_HOOK_SOURCE=claude-settings "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" reporting-reminder.sh prompt claude-code
+this session: CLAUDECODE=1 COPILOT_CLI=<unset> COPILOT_HOOK_DEPTH=<unset> COPILOT_HOOK_DIR=<unset>
+COPILOT_CLI_ENABLED_FEATURE_FLAGS set: yes; COPILOT_OTEL_FILE_EXPORTER_PATH set: yes
+--- (a) the environment of this session, unchanged
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"For user-facing updates, use direct language; explain internal labels and uncommon abbreviations, and avoid idioms. State what options mean in practice. Preserve exact technical text."}}
+[exit 0]
+--- (b) the same, with COPILOT_CLI=1 and COPILOT_HOOK_DEPTH=1 added (CLAUDECODE still set)
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"For user-facing updates, use direct language; explain internal labels and uncommon abbreviations, and avoid idioms. State what options mean in practice. Preserve exact technical text."}}
+[exit 0]
+--- (c) control: CLAUDECODE removed, so all seven conditions hold (the reminder must be silent)
+[exit 0]

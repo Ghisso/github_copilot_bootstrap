@@ -1,0 +1,210 @@
+"""Condition matrix of the launcher run-hook.sh (scratch tool for the Phase D evidence).
+
+For each of the 5 lifecycle scripts and the 8 guard scripts, runs the launcher under every
+environment below, in a temporary repository whose scripts are stubs that print `RAN <name>`.
+`STAND DOWN` means: exit 0, no output, the stub did not run. `RUN` means the stub ran.
+The expected result of every row is computed here from the plan's seven conditions,
+independently of the launcher, and a row where the launcher differs is counted as a mismatch.
+
+Usage: python3 -I condition_matrix.py LAUNCHER_PATH
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+LAUNCHER_SOURCE = Path(sys.argv[1]).resolve()
+SHARED_HOOKS = Path("/home/ghisso/work/github_copilot_bootstrap/shared/hooks/hooks.json")
+LIFECYCLE = {
+    "state-sync.sh": ("pull",),
+    "session-log.sh": ("claude-code",),
+    "session-start-state.sh": ("claude-code",),
+    "claude-stop.sh": (),
+    "reporting-reminder.sh": ("prompt", "claude-code"),
+}
+GUARDS = {
+    "protect-files.sh": ("claude-code",),
+    "pretool-bash-guard.sh": ("claude-code",),
+    "git-protection.sh": ("github-copilot",),
+    "enforce-branch-state.sh": ("github-copilot",),
+    "enforce-commit-gate.sh": ("github-copilot",),
+    "enforce-pr-gate.sh": ("github-copilot",),
+    "openwiki-guard.sh": ("pre",),
+    "record-branch-state.sh": ("github-copilot",),
+}
+CLIENT_PREFIXES = ("COPILOT", "CLAUDE", "BOOTSTRAP_HOOK", "TARGET_ID")
+BASE = {"BOOTSTRAP_HOOK_SOURCE": "claude-settings", "COPILOT_CLI": "1", "COPILOT_HOOK_DEPTH": "1"}
+
+
+def env_of(variables: dict[str, str | None], start_from_base: bool = True) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if not k.startswith(CLIENT_PREFIXES)}
+    merged: dict[str, str | None] = {**(BASE if start_from_base else {}), **variables}
+    for key, value in merged.items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value
+    return env
+
+
+# (label, environment overlay, whole environment?, hook file case)
+ENVIRONMENTS = [
+    ("all seven conditions hold", {}, True, "valid"),
+    ("2 broken: no marker", {"BOOTSTRAP_HOOK_SOURCE": None}, True, "valid"),
+    ("2 broken: another marker value", {"BOOTSTRAP_HOOK_SOURCE": "copilot-hooks"}, True, "valid"),
+    ("3 broken: COPILOT_CLI unset", {"COPILOT_CLI": None}, True, "valid"),
+    ("3 broken: COPILOT_CLI=0", {"COPILOT_CLI": "0"}, True, "valid"),
+    ("4 broken: COPILOT_HOOK_DEPTH unset", {"COPILOT_HOOK_DEPTH": None}, True, "valid"),
+    ("4 broken: COPILOT_HOOK_DEPTH empty", {"COPILOT_HOOK_DEPTH": ""}, True, "valid"),
+    ("5 broken: COPILOT_HOOK_DIR set", {"COPILOT_HOOK_DIR": "/work/.github/hooks"}, True, "valid"),
+    ("6 broken: CLAUDECODE=1", {"CLAUDECODE": "1"}, True, "valid"),
+    ("7 broken: Copilot hook file missing", {}, True, "missing"),
+    ("7 broken: Copilot hook file is a link", {}, True, "link"),
+    ("7 broken: Copilot hook file has disableAllHooks", {}, True, "disable-all-hooks"),
+    ("7 broken: no `session-log.sh github-copilot`", {}, True, "no-session-log-copilot"),
+    ("7 broken: no `state-sync.sh push`", {}, True, "no-state-sync-push"),
+    (
+        "named: this Claude Code session (extension-host leaks, CLAUDECODE=1, marker)",
+        {
+            "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+            "COPILOT_CLI_ENABLED_FEATURE_FLAGS": "feature-a",
+            "COPILOT_OTEL_FILE_EXPORTER_PATH": "/tmp/otel.jsonl",
+            "CLAUDECODE": "1",
+        },
+        False,
+        "valid",
+    ),
+    (
+        "named: Claude Code started from a Copilot shell (P1 variables, marker, no depth)",
+        {
+            "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+            "COPILOT_CLI": "1",
+            "COPILOT_AGENT_SESSION_ID": "5b0e0b9e-3b7e-4d7c-9d1e-0c5d6a6f6a11",
+            "COPILOT_HOME": "/home/user/.copilot",
+        },
+        False,
+        "valid",
+    ),
+    (
+        "named: the same, plus CLAUDECODE=1",
+        {
+            "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+            "COPILOT_CLI": "1",
+            "COPILOT_AGENT_SESSION_ID": "5b0e0b9e-3b7e-4d7c-9d1e-0c5d6a6f6a11",
+            "COPILOT_HOME": "/home/user/.copilot",
+            "CLAUDECODE": "1",
+        },
+        False,
+        "valid",
+    ),
+    (
+        "named: Local harness, chat.useClaudeHooks on (A2 variables, marker)",
+        {
+            "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+            "COPILOT_CLI_ENABLED_FEATURE_FLAGS": "feature-a",
+            "COPILOT_OTEL_FILE_EXPORTER_PATH": "/tmp/otel.jsonl",
+        },
+        False,
+        "valid",
+    ),
+]
+
+
+def write_hook_file(root: Path, case: str) -> None:
+    hooks = root / ".github" / "hooks"
+    hooks.mkdir(parents=True)
+    text = SHARED_HOOKS.read_text(encoding="utf-8")
+    if case == "missing":
+        return
+    if case == "disable-all-hooks":
+        text = text.replace('"version": 1,', '"version": 1,\n  "disableAllHooks": true,')
+    elif case == "no-session-log-copilot":
+        text = text.replace("session-log.sh github-copilot", "session-log.sh x")
+    elif case == "no-state-sync-push":
+        text = text.replace("state-sync.sh push", "state-sync.sh status")
+    if case == "link":
+        (hooks / "real-hooks.json").write_text(text, encoding="utf-8")
+        (hooks / "hooks.json").symlink_to("real-hooks.json")
+    else:
+        (hooks / "hooks.json").write_text(text, encoding="utf-8")
+
+
+def make_repo(root: Path, case: str) -> Path:
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True)
+    shutil.copy(LAUNCHER_SOURCE, scripts / "run-hook.sh")
+    for name in (*LIFECYCLE, *GUARDS):
+        (scripts / name).write_text(
+            '#!/usr/bin/env bash\nprintf "RAN %s %s\\n" "${0##*/}" "$*"\ncat\n', encoding="utf-8"
+        )
+    write_hook_file(root, case)
+    return scripts / "run-hook.sh"
+
+
+def expected_stand_down(script: str, env: dict[str, str], case: str) -> bool:
+    """The plan's seven conditions, written out again here."""
+    return (
+        script in LIFECYCLE
+        and env.get("BOOTSTRAP_HOOK_SOURCE") == "claude-settings"
+        and env.get("COPILOT_CLI") == "1"
+        and bool(env.get("COPILOT_HOOK_DEPTH"))
+        and not env.get("COPILOT_HOOK_DIR")
+        and not env.get("CLAUDECODE")
+        and case == "valid"
+    )
+
+
+def main() -> int:
+    rows = 0
+    mismatches = 0
+    guard_stand_downs = 0
+    lifecycle_stand_downs = 0
+    lines: list[str] = []
+    with tempfile.TemporaryDirectory() as folder:
+        repos = {case: make_repo(Path(folder) / case, case) for case in
+                 ("valid", "missing", "link", "disable-all-hooks", "no-session-log-copilot", "no-state-sync-push")}
+        for label, overlay, from_base, case in ENVIRONMENTS:
+            env = env_of(overlay, start_from_base=from_base)
+            lines.append(f"\n## {label}")
+            for kind, scripts in (("lifecycle", LIFECYCLE), ("guard", GUARDS)):
+                for script, args in scripts.items():
+                    done = subprocess.run(
+                        ["bash", str(repos[case]), script, *args],
+                        input='{"hook_event_name":"SessionStart"}\n',
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                        env=env,
+                        cwd=repos[case].parents[3],
+                    )
+                    stood_down = (done.returncode, done.stdout, done.stderr) == (0, "", "")
+                    ran = done.returncode == 0 and done.stdout.startswith(f"RAN {script} ")
+                    assert stood_down != ran, (label, script, done)
+                    rows += 1
+                    want = expected_stand_down(script, env, case)
+                    if stood_down != want:
+                        mismatches += 1
+                    if stood_down and kind == "guard":
+                        guard_stand_downs += 1
+                    if stood_down and kind == "lifecycle":
+                        lifecycle_stand_downs += 1
+                    flag = "" if stood_down == want else "   <-- MISMATCH"
+                    lines.append(f"  {kind:9} {script:26} {'STAND DOWN' if stood_down else 'RUN':10}{flag}")
+    print(f"Launcher under test: {LAUNCHER_SOURCE}")
+    print("\n".join(lines))
+    print(
+        f"\nrows: {rows} ({len(LIFECYCLE)} lifecycle + {len(GUARDS)} guard scripts x {len(ENVIRONMENTS)} environments)"
+    )
+    print(f"rows where the launcher differs from the plan's seven conditions: {mismatches}")
+    print(f"guard rows that stand down: {guard_stand_downs}")
+    print(f"lifecycle rows that stand down: {lifecycle_stand_downs} (only the 'all seven conditions hold' environment: {len(LIFECYCLE)} rows)")
+    return 1 if mismatches or guard_stand_downs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
