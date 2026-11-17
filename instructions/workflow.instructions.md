@@ -144,7 +144,7 @@ outcome in the grammar in `.claude/instructions/closeout.instructions.md`.
 ### What `verify closeout` does with the required items
 
 `verify closeout` runs the required items itself, in order, each with
-`VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds. It stops at the first item
+`VERIFICATION_ITEM_TIMEOUT_SECONDS = 1020` seconds. It stops at the first item
 that is not `PASS` and refuses to persist a receipt when any item failed,
 timed out, or never ran. `--format text` prints one summary line per item, for
 example `PASS      1.3s  <item>`.
