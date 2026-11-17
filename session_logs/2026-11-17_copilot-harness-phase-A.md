@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-17
 **Plan:** `.claude/plans/2026-11-17_phase-A-copilot-runtime-probe.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -121,8 +121,19 @@ results that are correct today.
 ## Verification
 
 ```text
-# filled at closeout step 4
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       13.4s  uv run pytest tests/test_check_copilot_runtime.py -q --tb=short
+PASS        5.9s  uv run python scripts/check_copilot_runtime.py --require
+PASS        0.0s  grep -q -F 'Copilot runtime probe' docs/runtime-checks.md
+PASS        0.0s  grep -q -F 'VS Code can give a model a different tool set than the runtime' docs/runtime-checks.md
+PASS       44.7s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      373.1s  uv run python .claude/scripts/verify.py phase --format text
+closeout: PASS
 ```
+
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest, freshness, provenance, generation).
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-A-copilot-runtime-probe.json`
   (no surviving finding; gate PASS; six profiles; round 1 FAIL with two
