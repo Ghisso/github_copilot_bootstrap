@@ -158,9 +158,11 @@ the PascalCase rule, which removes the output blocker for a later rename.
     two workflow tools is a `github-copilot` answer and gets the top-level
     fields too.
   - Step 2: one helper, `pretool_decision`, carries both shapes for
-    `deny_pretool` and `ask_pretool`. `json_escape` uses `tr '\001-\037'
-    '[ *]'`; the second set is the padded form that POSIX defines, so GNU
-    and BSD `tr` give the same result.
+    `deny_pretool` and `ask_pretool`. In `json_escape`, the second `tr`
+    set is exactly 31 spaces (built with the bash builtin `printf -v`), one
+    for each character of `\001-\037`, so the mapping depends on no padding
+    rule. The first form, `[ *]`, gave `]` on BusyBox `tr`. Run on GNU and
+    BusyBox `tr`; a run on macOS or BSD `tr` is an unverified limitation.
   - Row T3 holds for every client, as the big plan's table says: each
     character 1 to 31 in a reason or context text becomes one space. A text
     that ends in a newline now ends in a space. Kept: no caller passes such
@@ -168,6 +170,9 @@ the PascalCase rule, which removes the output blocker for a later rename.
     would add code for no caller.
   - Step 4: tests for the new validator check go into
     `tests/test_validate_targets.py`.
+  - Step 1, after review round 1: the suite covers the `fail_closed` paths
+    of every guard for the Copilot shape (42 more cases), not only
+    `git-protection.sh` and the library function.
   - Step 6 also changes `tests/test_check_copilot_runtime.py` and the probe
     section of `docs/runtime-checks.md`. Three setup checks are added to
     the eight planned ones: `camel-hooks-source`, `camel-events-renamed`,

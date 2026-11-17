@@ -60,6 +60,17 @@ reason that holds a control character from producing invalid JSON.
   Recorded for a later phase (old gap from the review, from Phase A): the
   probe passes `GIT_DIR`, `GIT_WORK_TREE`, and `GH_REPO` through to the
   runtime; remove `GIT_*` and `GH_*` there.
+- **23:40** - Fix round 1: the T3 row is limited to the shell guards; 42
+  test cases cover the `fail_closed` paths of every guard for the Copilot
+  shape, each shown to fail on a broken guard. The `coder` ran the `[ *]`
+  form with BusyBox `tr` 1.36.1 and got `]` for each control character:
+  BusyBox does not read `[c*]`. The manuals had not shown this.
+- **23:58** - Decision: the second `tr` set is exactly 31 spaces, built
+  with `printf -v`, so no padding rule is used. Run on GNU and BusyBox
+  `tr`: spaces and valid JSON on both. Byte-identity battery again: 19,918
+  comparisons, 0 differences. Full suite: 5,756 passed, 1 skipped, 423 s.
+  Orchestrator checks: `verify.py fast` PASS, and one combined answer with
+  a tab, a newline, a backslash, and a quote parsed as expected.
 
 ## [LEARN] Entries
 
