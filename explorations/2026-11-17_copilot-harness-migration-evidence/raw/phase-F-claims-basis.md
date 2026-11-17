@@ -33,17 +33,17 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | README.md | This bootstrap supports the Copilot harness inside VS Code, and it keeps the Local harness working until VS Code removes it. | `decision` (approved user decisions 1 and 2). |
 | README.md | It does not claim Copilot CLI or Copilot cloud agents. | `decision` (approved user decision 1). |
 | README.md | VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17) | Official: "**Agent hooks** is in preview and might change before it becomes generally available." RES §14. |
-| README.md | On 2026-11-18 it printed runtime `1.0.108-0` (VS Code 1.146.0) and 48 result lines, none failed. | `raw/phase-F-require-output.txt` (command `uv run python scripts/check_copilot_runtime.py --require`, exit 0, `Result: PASS (0 of 48 checks failed)`). |
+| README.md | On 2026-11-18 the probe printed runtime `1.0.108-0` (VS Code 1.146.0) and 48 result lines, none | `raw/phase-F-require-output.txt` (command `uv run python scripts/check_copilot_runtime.py --require`, exit 0, `Result: PASS (0 of 48 checks failed)`). |
 | README.md | `git reset --hard HEAD` was denied. | REPORT A4, session `2c3106d8…`, model `gpt-6-luna`, real VS Code 1.146.0, runtime `1.0.108-0`, 2026-11-17: "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard". Guards from before this plan. |
 | README.md | VS Code can give a model a different tool set than the runtime's own list for that model. | REPORT A4 (Auto chose `gpt-6-luna`; VS Code gave it `apply_patch`) and `raw/tools-by-model.txt` (the runtime's own list gives `gpt-6-luna` `create` and `edit`). |
-| README.md | They have not all been run. | Session logs of Phases B to E (`.claude/session_logs/2026-11-17_copilot-harness-phase-B.md` to `2026-11-18_copilot-harness-phase-E.md`): the "optional" lines record `NOT RUN`. |
+| README.md | That file records no run of any of them in a signed-in window since these changes. | Phase B to E session logs (the optional items are `NOT RUN`); `docs/smoke-tests.md` marks every item "never run anywhere" or "seen before, not since the changes". |
 | README.md | It was not run with the current answer format or the current | Phase C session log, "Unverified limitations". `not run`. |
-| README.md | The source of VS Code's Copilot extension 0.74.0 shows that it reads the nested decision object | `source`: `~/.vscode-server/bin/69047191…/extensions/copilot/dist/extension.js`, `ChatHookService.executePreToolUseHook`: `let E=_.hookSpecificOutput;if(!E)return;` then `E.permissionDecision` (read 2026-11-18). Also `DEVILS-ADVOCATE-2026-11-17.md` line 196. |
+| README.md | comes from VS Code's own code, not from a run: in the Copilot extension 0.74.0 of | `source`: `~/.vscode-server/bin/69047191…/extensions/copilot/dist/extension.js`, `ChatHookService.executePreToolUseHook`: `let E=_.hookSpecificOutput;if(!E)return;…let x=E.permissionDecision` (read on 2026-11-18; the excerpt is in `raw/phase-F-fix-round-1.txt`). Also `DEVILS-ADVOCATE-2026-11-17.md` line 196. |
 | README.md | so every hook runs twice (seen in the real VS Code on | REPORT A2 (Local harness with `chat.useClaudeHooks: true`: "[SessionStart] Executing 8 hook(s)"). |
 | README.md | its hook log showed 8 hooks at session start, three from | REPORT A2 (three from `.github/hooks/hooks.json`, three from `.claude/settings.json`, two probe loggers). |
 | README.md | Turn that setting off for this bootstrap. | Advice, not a result: big plan Q1 ("The docs advise turning that setting off"). |
 | README.md | says that Local settings such as `chat.useHooks` do not prevent the Copilot harness from loading a configuration [F1] | REPORT F1, quote from the official VS Code documentation read 2026-11-17. |
-| README.md | is the file generated for the Local harness; the Copilot harness change did not recheck how the Local harness reads it | `not run`: stated in the text. File exists in `dist/multi-agent/.vscode/mcp.json`. |
+| README.md | is the file generated for the Local harness. How the Local harness reads it was not rechecked. | `not run`: stated in the text. The file exists in `dist/multi-agent/.vscode/mcp.json`. |
 | README.md | in a scripted run on runtime `1.0.108-0` on 2026-11-17 it did not read `.vscode/mcp.json` [F12] | REPORT F12 ("The runtime does not read `.vscode/mcp.json`"). |
 | README.md | in the real VS Code on the same day each project MCP server connected once [A3] | REPORT A3 ("`semble`, `context7`, and `context-mode` each connected once"). |
 | README.md | VS Code can also forward server definitions to the runtime | Official, via REPORT F12: "Eligible existing definitions can be forwarded, but the harness doesn't read those files directly." |
@@ -105,33 +105,15 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/target-mapping.md | VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17) | RES §14. |
 | docs/target-mapping.md | (Copilot SDK `1.0.30-preview.0`), run offline with a scripted model | REPORT "How the evidence was gathered" (versions); `raw/phase-F-require-output.txt`. |
 | docs/target-mapping.md | reads the top level under both event spellings (`PreToolUse` and `preToolUse`), in a planning check | Planning probe P1 (`raw/planning-probe-e1-outcomes.txt`); REPORT F4 table (top-level `deny` denied under both names). |
-| docs/target-mapping.md | The Local harness reads the nested object, by the source of VS Code's Copilot extension 0.74.0. | `source`: `extensions/copilot/dist/extension.js` `executePreToolUseHook` (see the README row). |
+| docs/target-mapping.md | The Local harness reads the nested copy only; the reading of VS Code's code is in the [README](../README.md#quick-install). | `source`: see the README row on `executePreToolUseHook`. |
 | docs/target-mapping.md | because it was not checked whether the Local harness accepts the camelCase names | `not run`: stated. Big plan "Rejected: renaming the hook events to camelCase". |
 | docs/target-mapping.md | top-level `additionalContext` reached the model under `SessionStart` and `PostToolUse` and the nested copy did not [P1] | REPORT F13 table; planning probe P1. |
 | docs/target-mapping.md | Before the change the runtime dropped this text. | REPORT F13 ("The bootstrap's reminder prints the nested shape, which is ignored here"); P1. |
-| docs/target-mapping.md | This was seen in a scripted run on runtime `1.0.108-0` on 2026-11-17 [F2], and the double session log in the real VS Code | REPORT F2 and A3. |
-| docs/target-mapping.md | The launcher `run-hook.sh` reads and drops the input, prints nothing, and exits 0. | `source`: `shared/hooks/scripts/run-hook.sh` (`stands_down`); `tests/test_lifecycle_hooks.py`. |
-| docs/target-mapping.md | The generated Claude settings mark each hook command with `BOOTSTRAP_HOOK_SOURCE=claude-settings`. | `source`: `scripts/generate_targets.py` (`_claude_hook_cmd`); `raw/phase-D-generated-files.txt`; `scripts/validate_targets.py` checks it. |
-| docs/target-mapping.md | A command run by VS Code's shell tool saw `COPILOT_CLI=1` and no `COPILOT_HOOK_DEPTH` [A5, A6] | REPORT A6. |
-| docs/target-mapping.md | Both mixes were run on the real runtime `1.0.108-0`. | `raw/phase-D-mixed-installs.txt`, `raw/phase-D-probe-negative-controls.txt`. |
-| docs/target-mapping.md | This was seen in the real VS Code on 2026-11-17 [A2]. Nothing stands down there. | REPORT A2; `source`: `run-hook.sh` (no marker or `COPILOT_CLI` in a Local session; A2 environment). |
-| docs/target-mapping.md | It does not change the Copilot harness: VS Code's documentation | REPORT F1. |
-| docs/target-mapping.md | This was seen in a scripted run on runtime `1.0.108-0` on 2026-11-17, with no hook for sub-agents installed [F9]. | REPORT F9; `raw/subagent-context.txt`. |
-| docs/target-mapping.md | It reads the file only when it is a regular file of at most 2,048 bytes | `source`: `shared/hooks/scripts/subagent-context.sh`; `tests/test_hook_gates.py`; `raw/phase-E-context-hook-hard-inputs.txt`. |
-| docs/target-mapping.md | The hook builds the line with `python3` and `json.dumps` | `source`: `shared/hooks/scripts/subagent-context.sh`. |
-| docs/target-mapping.md | The mode `session` is accepted only for `github-copilot` | `source`: `shared/hooks/scripts/reporting-reminder.sh` lines 30 to 42. |
-| docs/target-mapping.md | The launcher never stands either entry down | `source`: `run-hook.sh` list of five lifecycle scripts; `tests/test_lifecycle_hooks.py`. |
-| docs/target-mapping.md | held the whole text of the file, line breaks included | `raw/phase-E-probe-output.txt` section "What the model received" (2026-11-18). |
-| docs/target-mapping.md | A hook that prints only the nested copy did not reach the model in either place (two runs each | `raw/phase-E-probe-negative-controls.txt`. |
-| docs/target-mapping.md | and so did `subagentStart`, in a planning check on 2026-11-17 [P2] | Planning probe P2. |
-| docs/target-mapping.md | The probe renames the event to `subagentStart` in its camelCase copy, but no probe session starts a sub-agent under that name. | `source`: `scripts/check_copilot_runtime.py`, `scripts/copilot_runtime_probe.mjs` (the `camel-rename` session has no `task` call). |
-| docs/target-mapping.md | In the scripted run of 2026-11-17 the Copilot harness loaded the wrappers and ignored `agents:` | REPORT F9. |
-| docs/target-mapping.md | A per-agent model pin for Copilot is not built | Big plan Non-Goals; `not built`. |
-| docs/target-mapping.md | The Copilot harness cells report runs on runtime `1.0.108-0` | scope sentence for the two parity tables; each cell has its own row below. |
+| docs/target-mapping.md | The Copilot-harness cells report runs on runtime `1.0.108-0` | Scope sentence for the two parity tables; each cell has its own row. |
 | docs/target-mapping.md | all three project servers connected and the Context Mode filter offered exactly | REPORT F12 (`raw/discover-after-trust-hooks-and-mcp.txt`). |
 | docs/target-mapping.md | The runtime reads the project's `.mcp.json`, not `.vscode/mcp.json`. | REPORT F12. |
-| docs/target-mapping.md | Seen in the real VS Code on 2026-11-17, with the guards from before the Copilot harness changes: a shell write to `.vscode/settings.json` raised a hook question [A5] | REPORT A5. |
-| docs/target-mapping.md | Seen offline: the probe checks `ask-*` and the patch checks. | `raw/phase-F-require-output.txt` (`ask-vscode-settings`, `ask-agent-wrapper`, `patch-hook-ask`, `patch-server-ask`, `patch-agent-ask`, `patch-indented-hook-ask` PASS). |
+| docs/target-mapping.md | a shell write to `.vscode/settings.json` raised a hook question [A5] | REPORT A5 (real VS Code, 2026-11-17, session `db2427a6…`: the guard's `ask` reached VS Code as a permission request of kind `hook`). |
+| docs/target-mapping.md | Offline: the probe checks `ask-*` and the patch checks. | `raw/phase-F-require-output.txt` (`ask-vscode-settings`, `ask-agent-wrapper`, `patch-hook-ask`, `patch-server-ask`, `patch-agent-ask`, `patch-indented-hook-ask` PASS). |
 | docs/target-mapping.md | Seen offline: the probe checks `deny-branch` and `camel-deny-branch` | `raw/phase-F-require-output.txt` (both PASS). |
 | docs/target-mapping.md | Seen offline: the probe checks `deny-commit` and `deny-pr`, and the camelCase copies | `raw/phase-F-require-output.txt` (`deny-commit`, `deny-pr`, `camel-deny-commit`, `camel-deny-pr` PASS). |
 | docs/target-mapping.md | `enforce-commit-gate.sh` and `enforce-pr-gate.sh` are listed in the hook file. | `source`: `dist/multi-agent/.github/hooks/hooks.json` `PreToolUse` entries 4 and 5. |
@@ -170,9 +152,9 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/runtime-checks.md | `Copilot runtime version: 1.0.108-0` (VS Code 1.146.0, Copilot SDK | `raw/phase-F-require-output.txt`. |
 | docs/runtime-checks.md | `Result: PASS (0 of 48 checks failed)` | `raw/phase-F-require-output.txt`. |
 | docs/runtime-checks.md | the custom-agent frontmatter, the hook file's events and commands, and the size of `.github/copilot-instructions.md` | `source`: `scripts/validate_targets.py` (`COPILOT_EXPECTED_EVENTS`, the 2,048-byte check). |
-| docs/runtime-checks.md | the Auto choice `gpt-6-luna` was given the patch | REPORT A4; `raw/tools-by-model.txt`. |
-| docs/runtime-checks.md | The source of VS Code's Copilot extension 0.74.0 shows that it | `source`: `extension.js` `executePreToolUseHook` (see the README row). |
-| docs/runtime-checks.md | found no difference (944 comparisons) | `raw/phase-C-byte-identity-battery.txt` ("github-copilot comparisons with an answer: 944 … nested object byte-identical, only top-level fields added"). |
+| docs/runtime-checks.md | the Auto choice was `gpt-6-luna`, and it was given | REPORT A4; `raw/tools-by-model.txt`. |
+| docs/runtime-checks.md | The Local harness reads the nested copy only. That comes from VS Code's | `source`: see the README row on `executePreToolUseHook`. |
+| docs/runtime-checks.md | found no difference (944 comparisons, | `raw/phase-C-byte-identity-battery.txt` ("github-copilot comparisons with an answer: 944 … nested object byte-identical, only top-level fields added"). |
 | docs/runtime-checks.md | Its last full run, on 2026-11-18, printed runtime `1.0.108-0` (VS Code 1.146.0) and | `raw/phase-F-require-output.txt`. |
 | docs/runtime-checks.md | VS Code answered the second request itself [A6] | REPORT A6. |
 | docs/runtime-checks.md | The deny half was first seen in a scripted run with probe hooks on | REPORT F4 (`raw/outcomes-d1.txt`); `raw/phase-C-probe-negative-controls.txt` for the probe's own camelCase checks. |
@@ -191,7 +173,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/smoke-tests.md | Select **Copilot** from the **Session Target** UI control to use the Copilot harness. | Official VS Code hooks page quote, RES §13 [VS-hooks], read 2026-11-17. |
 | docs/smoke-tests.md | It was `1.0.108-0` with VS Code 1.146.0 on 2026-11-17. | REPORT A3 (`copilotVersion: 1.0.108-0`). |
 | docs/smoke-tests.md | The real-window runs of 2026-11-17 | REPORT A3 to A6. Models: `mai-code-1.1-flash` (A3) and `gpt-6-luna` (A4). |
-| docs/smoke-tests.md | The recorded runs show no later run of any item below in a signed-in window. | Phase B to E session logs (optional items `NOT RUN`). |
+| docs/smoke-tests.md | The recorded runs show no run of any item in a signed-in window since the | Phase B to E session logs (optional items `NOT RUN`). |
 | docs/smoke-tests.md | 0 hooks and 0 MCP servers before trust, 28 hooks after | REPORT F15 (0 and 0 before trust); `raw/phase-F-require-output.txt` (`hooks-untrusted`: 0; `hooks-sources`: 28). |
 | docs/smoke-tests.md | `listen EACCES: permission denied /run/user/<uid>/vscode-ipc-<id>.sock` | REPORT A1 (198 starts in `agenthost.log`, VS Code's own logs). |
 | docs/smoke-tests.md | the same log loop is in the VS Code logs of 2026-10-26 and 2026-11-12 | REPORT A1. |
@@ -206,7 +188,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/smoke-tests.md | the current guards give that read no decision (offline probe check `read-agent-file`) | `raw/phase-F-require-output.txt` (`read-agent-file` PASS; the check reads `.claude/agents/coder.md`). |
 | docs/smoke-tests.md | the session recorded `"permissionMode":"manual"` | REPORT A6. |
 | docs/smoke-tests.md | GitHub's hooks reference says that in Copilot CLI autopilot mode no prompt is shown and a hook `ask` is denied | RES §1 [HR] decision table (https://docs.github.com/en/copilot/reference/hooks-reference). |
-| docs/smoke-tests.md | the Auto choice `gpt-6-luna` used `apply_patch` and every call was denied with "hook | REPORT A4. |
+| docs/smoke-tests.md | `gpt-6-luna` used `apply_patch` and every call was denied with | REPORT A4. |
 | docs/smoke-tests.md | session `codex-patch` with the model id `gpt-5.2-codex` creates a plain file (probe check `patch-plain-allowed`) | `raw/phase-F-require-output.txt` (`session-codex-patch`, `patch-plain-allowed` PASS). |
 | docs/smoke-tests.md | `Glob`, `Edit` (for `apply_patch`), `Write` (for `create`), | REPORT A4. |
 | docs/smoke-tests.md | the agent host log shows each of the three connected once; VS Code added its own `pylance mcp server` and | REPORT A3. |
@@ -218,7 +200,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/smoke-tests.md | `session-reminder` (the first user message of the first | `raw/phase-F-require-output.txt` (`session-reminder` PASS). |
 | docs/smoke-tests.md | was logged under both targets [A3] | REPORT A3. |
 | docs/smoke-tests.md | probe check `single-session-log` | `raw/phase-F-require-output.txt`. |
-| docs/smoke-tests.md | these documents record no real-client run of a Local-harness deny | `not run`; search of the six files and the evidence report found none. |
+| docs/smoke-tests.md | No recorded run of a Local-harness deny exists | `not run`; a search of the six files and of the evidence report found none. |
 | docs/smoke-tests.md | the event fired once when a chat was replaced in the real VS Code on | REPORT A3 ("`sessionEnd` fired when the chat was replaced"). |
 | docs/smoke-tests.md | The bootstrap wires no `sessionEnd` hook on the Copilot harness | `source`: `dist/multi-agent/.github/hooks/hooks.json` (no `SessionEnd`); the Claude settings `SessionEnd` entry stands down there. |
 | docs/smoke-tests.md | `bash` in the Copilot harness | REPORT F8. |
@@ -231,15 +213,15 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | File | Short quote | Basis |
 | --- | --- | --- |
 | docs/architecture.md | The Copilot adapter is five groups of generated files | `source`: `dist/multi-agent/` listing; `docs/target-mapping.md` Native Adapters file list. |
-| docs/architecture.md | scripted runs on runtime `1.0.108-0` (the runtime in VS Code 1.146.0, run offline) on 2026-11-17 and 2026-11-18, and in a few runs in the real VS Code | REPORT; `raw/phase-F-require-output.txt`. |
+| docs/architecture.md | What the Copilot harness does with these files was seen in scripted runs on runtime `1.0.108-0` | REPORT; `raw/phase-F-require-output.txt`. |
 | docs/architecture.md | The Copilot harness loads both `.github/hooks/hooks.json` and `.claude/settings.json` [F2] | REPORT F2. |
 | docs/architecture.md | The Copilot harness reads the project's `.mcp.json`, not `.vscode/mcp.json` [F12]. | REPORT F12. |
-| docs/architecture.md | this change did not recheck how the Local harness reads it | `not run`: stated. |
+| docs/architecture.md | How the Local harness reads it was not rechecked. | `not run`: stated. |
 | docs/architecture.md | the copies in `.claude/agents/`, and a wrapper wins by name [F9] | REPORT F9. |
 | docs/architecture.md | A sub-agent there gets only its three-line wrapper. | REPORT F9. |
 | docs/architecture.md | loads `.github/copilot-instructions.md`, `AGENTS.md`, `CLAUDE.md`, and the always-on instruction files into its system prompt | REPORT F10; `raw/instructions-in-system-prompt.txt`. |
 | docs/architecture.md | about 10.8 KB of a 48.6 KB system prompt was root guidance loaded three times | REPORT F10. |
-| docs/architecture.md | each root file is needed by one client | Big plan Q5 (design decision: `CLAUDE.md` for Claude Code, `AGENTS.md` for Codex and Antigravity, `.github/copilot-instructions.md` for the Local harness). Not a run. |
+| docs/architecture.md | `.github/copilot-instructions.md` is needed by the Local harness and, through the `SubagentStart` hook in the bullet above, by every sub-agent on the Copilot harness. | `source`: `shared/hooks/scripts/subagent-context.sh` reads `.github/copilot-instructions.md`; probe check `subagent-context` PASS (`raw/phase-F-require-output.txt`); the Local-harness use is the big plan's Q5 design note (not a run). |
 | docs/architecture.md | for the Copilot harness (the agent runtime of VS Code's Copilot chat | scope; same as the README rows. |
 
 ## docs/sidecar-provider-contract.md
@@ -293,3 +275,43 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/runtime-checks.md | Evidence behind the design. | Each row of the table "Unknown / Result / Evidence" names its own evidence in its last column (`raw/phase-A-probe-evidence.txt` sections 1 to 7 and later `raw/phase-*` files). |
 | docs/smoke-tests.md | The reminder text is exactly 183 bytes | `source`: `shared/hooks/scripts/reporting-reminder.sh` (`REMINDER`, 183 characters); `raw/phase-E-probe-output.txt` ("holds the reminder (183 characters)"). |
 | docs/smoke-tests.md | `prompt` and `late-report` are refused for Copilot | `source`: `shared/hooks/scripts/reporting-reminder.sh` (the `case "$PROVIDER:$MODE"` list); `tests/test_hook_gates.py`. |
+
+## Added in fix round 1 (2026-11-18)
+
+| File | Short quote | Basis |
+| --- | --- | --- |
+| README.md | (Sources: the VS Code hooks page, read on 2026-11-17, and the VS Code 1.146 | REPORT F1: hooks page "The Local harness is deprecated and will be removed in February 2027"; VS Code 1.146 release notes (2026-11-11) "will be removed in three months (February 2027)"; RES §13 [VS-harness] "removed by February 2027". The same wording is used at the first mention of the date in each of the six files. |
+| README.md | The guards print each decision twice in one line: once at the top | `raw/phase-C-byte-identity-battery.txt` ("nested object byte-identical, only top-level fields added"); `source`: `shared/hooks/scripts/_lib-frontmatter.sh`. Top level is the documented shape: REPORT F4 ("The documentation names only the top-level shape"). |
+| README.md | A missing file is silent; the other cases (a link, over the limit | `source`: `shared/hooks/scripts/subagent-context.sh`; `tests/test_hook_gates.py`; `raw/phase-E-context-hook-hard-inputs.txt`. |
+| README.md | with `python3` and `json.dumps`, because the shell library's | `source`: `shared/hooks/scripts/subagent-context.sh` and `_lib-frontmatter.sh` (`additional_context` replaces control characters with spaces). |
+| README.md | The root-guidance budget table applies a header rule and lifecycle rules that this | `source`: `scripts/validate_targets.py` (`POLICY_BYTE_BUDGETS` and the separate check for `.github/copilot-instructions.md`). |
+| README.md | The probe renames the event to `subagentStart` in its | `source`: `scripts/check_copilot_runtime.py` and `scripts/copilot_runtime_probe.mjs` (the `camel-rename` session has no `task` call). |
+| README.md | reporting reminder once. The mode `session` is accepted only for | `source`: `shared/hooks/scripts/reporting-reminder.sh` (the `case "$PROVIDER:$MODE"` list; `REMINDER` is 183 characters, ceiling 200). |
+| README.md | In the recorded run of 2026-11-18 the reminder was a user message of its own | `raw/phase-E-probe-output.txt` ("main user message [0] (183 characters)" holds the reminder, before the prompt). |
+| README.md | A hook that prints only the nested copy did not reach the model, for the sub-agent text | `raw/phase-E-probe-negative-controls.txt` (two runs each). |
+| README.md | `render_github_agent_adapter` did not change. | `git diff 2e8c7bb HEAD -- scripts/generate_targets.py` changes only `_claude_hook_cmd`. |
+| README.md | The launcher never stands this | `source`: `shared/hooks/scripts/run-hook.sh` (list of five lifecycle scripts); `tests/test_lifecycle_hooks.py`. |
+| README.md | The generated `.claude/settings.json` marks each hook command | `source`: `scripts/generate_targets.py` `_claude_hook_cmd`; `raw/phase-D-generated-files.txt`; `scripts/validate_targets.py` checks both. |
+| README.md | A new launcher with old settings finds no marker and runs | `raw/phase-D-mixed-installs.txt`, `raw/phase-D-probe-negative-controls.txt`. |
+| docs/target-mapping.md | The README holds the detail, with the run and version behind each statement | Pointer sentence; the README sections "Hooks on the Copilot harness" and "Sub-agents on the Copilot harness" hold the runs (rows above). |
+| docs/target-mapping.md | A statement about the Local harness rests on tests and VS Code source unless it names a run. | Description of the method; tests are named in the Evidence columns, the source reading is in the README. |
+| docs/target-mapping.md | The Copilot harness loads three files that hold hooks or MCP servers | REPORT F2 (both hook files) and F12 (`.mcp.json`); scripted runs of 2026-11-17 on runtime `1.0.108-0`. |
+| docs/target-mapping.md | A `Write` or `Edit` of one of these files asks when the guard runs as `github-copilot`. | `raw/phase-F-fix-round-1.txt` section "guard decisions" (a run of `protect-files.sh github-copilot` on 2026-11-18: `Write` of four files and `Edit` of `.claude/settings.json` gave `ask`; `Read` of two files gave no decision). |
+| docs/target-mapping.md | Edits of the Local-harness files ask, and so do edits of the three files | Same row. |
+| docs/target-mapping.md | A per-agent Copilot model pin. The agent `model` stays `target-default`. | Big plan Non-Goals; `not built`. |
+| docs/target-mapping.md | Do not remove it: the `SubagentStart` hook gives its text to sub-agents | `source`: `shared/hooks/scripts/subagent-context.sh`; probe check `subagent-context` PASS (`raw/phase-F-require-output.txt`). |
+| docs/target-mapping.md | A planning check is a short offline run made on 2026-11-17 while the plan was written. | Big plan "Planning probes (2026-11-17, runtime `1.0.108-0`, offline, scripted local model)". |
+| docs/target-mapping.md | "Auto" is the automatic setting of VS Code's model picker | REPORT A3 ("The model was chosen by Auto"). |
+| docs/runtime-checks.md | VS Code 1.146 release notes of 2026-11-11 | Same as the README source row. |
+| docs/runtime-checks.md | The dates differ. The probe note, the earlier scripted runs | `raw/phase-F-fix-round-1.txt` section "dates of the raw files" (the date at the top of each file, and the files that carry none). |
+| docs/smoke-tests.md | Items 1, 9, and 10 ask the agent to run `git reset --hard HEAD`. | The item texts themselves; the command's effect is Git's documented behavior. |
+| docs/smoke-tests.md | Item 2 asks the agent to run `echo '{}' > .vscode/settings.json`. | REPORT A5/A6 (the command used on 2026-11-17). |
+| docs/smoke-tests.md | found seven other VS Code server sessions in which the agent host used a socket under `/tmp` | REPORT A1 ("absent from seven other VS Code server sessions, where the agent host listened on a socket under `/tmp`"). |
+| docs/smoke-tests.md | On 2026-11-17 the recovery needed the folder and a window reload [A3]. | REPORT A3 ("The user created `/run/user/1000` with `sudo` and reloaded the window"). |
+| docs/smoke-tests.md | The log records the event, target, session id, source, and prompt of each hook call, not | `source`: `shared/hooks/scripts/session-log.sh` lines 33 to 50 (`sessionId`, `source`, `prompt` fields); `raw/session-log-double-entries.txt` (line format). |
+| docs/smoke-tests.md | Rule: read the tool name. If it is not `apply_patch`, the item is "not | Item rule; basis for the model facts: REPORT A4 and F6. |
+| docs/smoke-tests.md | Auto is the automatic setting of VS Code's model picker | REPORT A3. |
+| docs/architecture.md | The Local harness was not run with the current answer format or the current hooks. | Phase C session log, "Unverified limitations". |
+| docs/architecture.md | sources: the VS Code hooks page, read on 2026-11-17, and the VS Code 1.146 release notes | Same as the README source row. |
+| docs/sidecar-provider-contract.md | The dated records below also name a session type called "Agent Host, Claude harness". | This file's own Step 3 text and the 2026-09-27 matrix row "Agent Host, Claude harness" (all cells `unverified`). |
+| docs/sidecar-provider-contract.md | (VS Code's older built-in agent, which VS Code removes in February 2027; sources: | Same as the README source row. |

@@ -46,3 +46,25 @@ stays in brackets as a pointer for maintainers.
 | 30 | docs/runtime-checks.md | Evidence column "P4; `raw/...`", "`raw/outcomes-g-both.txt`; F3", "P3" | "A planning check of 2026-11-17 on a subfolder two levels below the root [P4]", "(a scripted run of 2026-11-17 with both hook files) [F3]", "A planning check of 2026-11-17 on the shell helper tools [P3]" |
 | 31 | docs/runtime-checks.md | "The Phase E version", "(Phase C)", "The Phase D version", "before Phase C", "before Phase D", "before Phase E", "the three Phase D checks" | Descriptions: "the current version", "the version with 43 lines", "the version with 46 lines", "from before the top-level answer change", "from before the stand-down change", "before the sub-agent context change", "the three stand-down checks (`single-session-log`, `state-sync-once`, and `guards-both-sources`)" |
 | 32 | docs/target-mapping.md | "rows L1, L2, L3, T1, T2, T3, T4" used before the row table that defines them | The row table explains the labels ("an L row makes a decision less strict, and a T row tightens a decision, judges a new target, or makes invalid output valid (T3)"). Each earlier place that names a row links to that table. |
+
+## Fix round 1 (2026-11-18): sentences replaced after review round 1
+
+The full old and new text for each of the 15 points is in `phase-F-fix-round-1.txt`. In short:
+
+| # | File | Old text | New text |
+| --- | --- | --- | --- |
+| 33 | docs/smoke-tests.md | No safety text; item 2 and item 10 had no warning | A "Safety" paragraph (test folder, `git reset --hard HEAD` in items 1, 9, 10; the overwrite of `.vscode/settings.json` in item 2) and a "Dialog" line in every item |
+| 34 | docs/smoke-tests.md | "The folder `/run/user/<uid>` must exist and belong to you. ... Run it again after every WSL restart." | Needed only when a chat freezes and `agenthost.log` shows the `listen EACCES` loop; seven other sessions used a socket under `/tmp`; the recovery needed a window reload |
+| 35 | docs/smoke-tests.md | Item 4 could pass with a model that does not use `apply_patch` | Rule: the item is "not shown" unless the tool name is `apply_patch`; how to try another model |
+| 36 | docs/smoke-tests.md | Item 9 listed the denial among the log expectations | The denial shows in the chat; the log is checked for `target=github-copilot` lines and no `target=claude-code` line for the session id |
+| 37 | docs/smoke-tests.md | "Items marked **never run** have not been run anywhere." on items 3, 7, 11 | Two marks on all 11 items; Session Target named in each |
+| 38 | README.md | "They have not all been run." | "That file records no run of any of them in a signed-in window since these changes." |
+| 39 | docs/architecture.md | Local harness "kept working" with no run note | Adds "The Local harness was not run with the current answer format or the current hooks." |
+| 40 | docs/architecture.md | "because each root file is needed by one client" | `.github/copilot-instructions.md` is also read by every sub-agent on the Copilot harness through the `SubagentStart` hook; do not remove it at the Local removal |
+| 41 | docs/target-mapping.md | Copilot-harness cell "The same files. ..." (about 100 words, several claims) | A short cell that names the three loaded files, plus a paragraph below the table with the guard run of 2026-11-18 |
+| 42 | docs/target-mapping.md | Intro promise "A statement with no run behind it says so." for every cell | The Local-harness column rests on tests and VS Code source unless a cell names a run; the promise applies to Copilot-harness cells |
+| 43 | all six files | "February 2027" with no source | The VS Code hooks page (read 2026-11-17) and the VS Code 1.146 release notes (2026-11-11), named at the first mention in each file |
+| 44 | docs/runtime-checks.md | "Those runs were made on 2026-11-17 on VS Code commit ..." | The dates differ by file: 2026-11-17 for the probe note and the Phase B and C files, 2026-11-18 for the Phase D, E, and F files |
+| 45 | README.md, docs/architecture.md, docs/runtime-checks.md, docs/smoke-tests.md, docs/target-mapping.md | "did not recheck" without a subject; "nested decision object"; "printed both ways"; unexplained "scripted", "Auto", "pins" | Plain wording, explained at first use in each file |
+| 46 | docs/sidecar-provider-contract.md | "VS Code has two" harnesses, beside dated rows that name an "Agent Host, Claude harness" session | "GitHub Copilot chat in VS Code has two harnesses"; the Claude harness session type is named as a third, unverified type; the section's definition is a link to the note |
+| 47 | docs/target-mapping.md | About 9 KB that repeated the README sections on hooks and sub-agents | One short paragraph with links to the two README sections; the facts that existed only here moved to the README |

@@ -1,0 +1,180 @@
+# Phase F, fix round 1 (review round 1, 15 MINOR points): old and new sentences
+Date: 2026-11-18. Files changed: the same six. "Old" is the text before this round; "new" is the text now.
+Quotes are cut where a passage is long; the claims table `phase-F-claims-basis.md` lists the basis of every new sentence.
+
+## 1. docs/smoke-tests.md, safety (items 1, 2, 10)
+old: (no safety text; item 10 and item 2 carried no warning)
+new: "Safety: run this list only in a test folder that holds no work you want to keep. ... Items 1, 9, and 10 ask the agent to run `git reset --hard HEAD`. That command throws away uncommitted changes. The guard should deny it. Item 10 is a deny on the Local harness that has never been run anywhere. If that deny fails, the command runs and discards the uncommitted changes in the test folder. Item 2 asks the agent to run `echo '{}' > .vscode/settings.json`. If you approve the dialog, the command replaces that file of the test folder with `{}`."
+Each item now has a "Dialog:" line: item 1 (answer Deny or Skip if asked), item 2 (Allow once, not "always" and not "Allow all"; Allow once for the read), item 3 (answer Deny if a question shows), item 4 (Allow once for the write; Deny and record a FAIL if the guard's message appears), items 5, 6, 7, 11 (none), item 8 (Allow once for a read approval), item 9 (as item 1), item 10 (Deny or Skip, record a FAIL).
+
+## 2. docs/smoke-tests.md, precondition 2
+old: "The folder `/run/user/<uid>` must exist and belong to you. Without it, VS Code's agent host cannot open its socket, and a Copilot-harness chat freezes. ... Run it again after every WSL restart."
+new: "The folder `/run/user/<uid>` is needed only when a Copilot-harness chat freezes. ... It is not needed in every case: one check of the VS Code logs on this computer on 2026-11-17 found seven other VS Code server sessions in which the agent host used a socket under `/tmp` instead [A1]. ... On 2026-11-17 the recovery needed the folder and a window reload [A3]. ... If the symptom returns after a WSL restart, make the folder again."
+
+## 3. docs/smoke-tests.md, item 4
+old: "Expect: the file is created. There is no "hook exited with code 2"." (no rule for a model that does not use the patch tool)
+new: "Rule: read the tool name. If it is not `apply_patch`, the item is "not shown", not a pass. Try again with another model: choose a model by hand in the model picker instead of Auto, and read the tool name again. On 2026-11-17 Auto chose `gpt-6-luna`, and VS Code gave it `apply_patch`. Offline, only Codex-family model ids such as `gpt-5.2-codex` get it." The result words now include `not shown`.
+
+## 4. docs/smoke-tests.md, item 9
+old: "Action: after one Copilot-harness chat, search `.claude/session_logs/hooks-sessions.log` for the session id. Then repeat item 1 in the same chat. Expect: lines with `target=github-copilot` for the session, no line with `target=claude-code` for it, and the denial of `git reset --hard HEAD`."
+new: "Action: in one new chat, send any message and let the chat finish. Note the session id ... Then, in the same chat, repeat item 1. Then open `.claude/session_logs/hooks-sessions.log` and read the lines that hold that session id. Expect: in the chat, the denial ... The log records the event, target, session id, source, and prompt of each hook call, not denials, so the denial shows in the chat only. In the log, expect lines with `target=github-copilot` for the session id and no line with `target=claude-code` for it. PASS needs both. A `target=claude-code` line for that session id is a FAIL: the Claude-settings hooks did not stand down."
+
+## 5. docs/smoke-tests.md, "never run" marks
+old: "Items marked **never run** have not been run anywhere." with "(never run)" in the titles of items 3, 7, and 11 only.
+new: two marks, on every item: "Never run anywhere." (items 3, 7, 10, 11) and "Seen before, not since the changes." (items 1, 2, 4, 5, 6, 8, 9). Each item also names its Session Target (Copilot, except item 10: Local; item 11: Copilot).
+
+## 6. README.md, "have not all been run"
+old: "They have not all been run."
+new: "That file records no run of any of them in a signed-in window since these changes."
+
+## 7. docs/architecture.md, "keeps the Local harness working"
+old: "This bootstrap supports the Copilot harness inside VS Code, and it keeps the Local harness working until VS Code removes it. It does not claim Copilot CLI or Copilot cloud agents."
+new: "... it keeps the Local harness working until VS Code removes it. The Local harness was not run with the current answer format or the current hooks. This bootstrap does not claim Copilot CLI or Copilot cloud agents."
+
+## 8. docs/architecture.md, "needed by one client"
+old: "This is measured and left as it is, because each root file is needed by one client: `CLAUDE.md` by Claude Code, `AGENTS.md` by Codex and Antigravity, and `.github/copilot-instructions.md` by the Local harness."
+new: "This is measured and left as it is. `CLAUDE.md` is needed by Claude Code, and `AGENTS.md` by Codex and Antigravity. `.github/copilot-instructions.md` is needed by the Local harness and, through the `SubagentStart` hook in the bullet above, by every sub-agent on the Copilot harness. When the Local harness is removed, keep `.github/copilot-instructions.md`, or give that hook another source first. Removing the file would remove the sub-agents' repository guidance."
+Also docs/target-mapping.md, follow-up bullet. old: "Shrink `.github/copilot-instructions.md`." new: "... Do not remove it: the `SubagentStart` hook gives its text to sub-agents on the Copilot harness, so removing it removes their repository guidance unless the hook gets another source first."
+
+## 9. docs/target-mapping.md, hook- and server-config cell of the Copilot-harness column
+old: "The same files. `Bash`, `Write`, `Edit` (object input or patch text), and the shell helpers with a `command` are gated. Read tools (`Read`, `view`, `grep`, `rg`, `glob`) get no decision for a config file (see ...). Seen offline: the probe checks `ask-*` and the patch checks. Seen in the real VS Code on 2026-11-17, with the guards from before the Copilot harness changes: a shell write to `.vscode/settings.json` raised a hook question [A5]"
+new cell: "Edits of the Local-harness files ask, and so do edits of the three files that this harness loads: `.github/hooks/hooks.json`, `.claude/settings.json`, and the project's `.mcp.json`. Read tools get no decision for them. Detail below the table"
+new paragraph below the table, with three bullets (what asks, what else is gated, what was run); the first bullet cites the guard run saved below.
+
+## 10. docs/target-mapping.md, intro promises
+old (Gate-Repair intro): "A cell that says "not run" has no run behind it." old (Native Adapters): "A statement with no run behind it says so."
+new (Gate-Repair intro): "The Local-harness column rests on tests and VS Code source unless a cell names a run. The Copilot-harness cells report runs on runtime `1.0.108-0` ... A Copilot-harness cell that says "not run" has no run behind it."
+new (Native Adapters): "A statement about the Local harness rests on tests and VS Code source unless it names a run. A statement about the Copilot harness that has no run behind it says so."
+
+## 11. The February 2027 date: the source is named at the first mention in each document
+old: "VS Code removes the Local harness in February 2027." (README, target-mapping, runtime-checks, smoke-tests, architecture, sidecar note) with no source, or with "removed in February 2027" only.
+new, README: "VS Code removes the Local harness in February 2027. (Sources: the VS Code hooks page, read on 2026-11-17, and the VS Code 1.146 release notes of 2026-11-11.)" The same source pair, in a parenthesis, in docs/target-mapping.md, docs/runtime-checks.md, docs/smoke-tests.md, docs/architecture.md, and docs/sidecar-provider-contract.md. In target-mapping.md the earlier heading line no longer carries the date ("until VS Code removes it").
+Evidence read before writing (REPORT F1): hooks page "The Local harness is deprecated and will be removed in February 2027."; release notes 1.146 (2026-11-11) "will be removed in three months (February 2027)".
+
+## 12. docs/runtime-checks.md, "Those runs were made on 2026-11-17"
+old: "Those runs were made on 2026-11-17 on VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK `1.0.30-preview.0`, runtime `1.0.108-0`."
+new: "All of those runs used VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK `1.0.30-preview.0`, and runtime `1.0.108-0`. The dates differ. The probe note, the earlier scripted runs (`raw/outcomes-*`, `raw/discover-*`, `raw/planning-probe-*`), and the files `raw/phase-B-*` and `raw/phase-C-*` are from 2026-11-17. The files `raw/phase-D-*` and `raw/phase-E-*` that the table names, and `raw/phase-F-require-output.txt`, are from 2026-11-18. Most raw files carry their date at the top. The phase session logs under `.claude/session_logs/` give the day for the rest. The last column of each row names the file."
+Phase B to F raw files that carry no date inside are listed below; those files are dated by the session logs of their phase.
+
+## 13. Plain wording
+- README.md and docs/architecture.md, "the Copilot harness change did not recheck how the Local harness reads it" / "this change did not recheck how the Local harness reads it" -> "How the Local harness reads it was not rechecked."
+- "nested decision object" (README, docs/runtime-checks.md, docs/smoke-tests.md item 10) -> the guards print each decision twice in one line, at the top level and inside `hookSpecificOutput`, called the "nested copy"; the term is explained at first use in each document.
+- "scripted model" and "scripted run": explained at first use in README ("a small local server that returns fixed tool calls in place of a real model"), docs/target-mapping.md, docs/runtime-checks.md, docs/architecture.md, and docs/smoke-tests.md ("Seen offline" definition).
+- "Auto" (docs/smoke-tests.md, docs/target-mapping.md, docs/runtime-checks.md): "the automatic setting of VS Code's model picker, where VS Code chooses the model", at first use. The older phrase "session-selected Auto unpinned" in docs/runtime-checks.md is now "the model that VS Code's Auto setting (the automatic choice in its model picker) selects unpinned".
+- "pins" (smoke-tests item 2; runtime-checks `guards-both-sources`) -> "requires exactly two requests".
+- "printed both ways" (README sub-agent bullet, docs/target-mapping.md answer shape) -> "prints the text at the top level and in the nested copy".
+
+## 14. docs/sidecar-provider-contract.md, the note and the section definition
+old note: "A harness ... VS Code has two: the Local harness (its older built-in agent, removed in February 2027) and the Copilot harness (the agent runtime shared with Copilot CLI)."
+new note: "GitHub Copilot chat in VS Code has two harnesses: the Local harness (...) and the Copilot harness (...). The dated records below also name a session type called "Agent Host, Claude harness". That is a third session type, which the records list as unverified. This note and the last section do not cover it."
+old section definition (second): a full definition of harness, Local harness, and Copilot harness.
+new section definition: ""Harness", "Local harness", and "Copilot harness" have the meaning given in the [note under the title of this file](#sidecar-provider-contract)."
+
+## 15. Repetition
+- docs/target-mapping.md, the "Two hook files" and "Sub-agent context and the session reminder" blocks (about 9 KB) are replaced by one short paragraph, "Hooks, sub-agents, and agent files on the Copilot harness", with links to the README sections "Hooks on the Copilot harness" and "Sub-agents on the Copilot harness".
+- Facts that were only in the cut text are now in the README: the marker not carried by the Codex, Copilot, and Antigravity hook files (new bullet "The marker"); old installs and the two mixed-install runs (new bullet "Old installs"); a missing guidance file is silent and the other cases warn; the answer carries the text in top-level `additionalContext` and in the nested copy, built with `python3` and `json.dumps`; the file's 2,048-byte check is separate from the root-guidance budget table and why; the session reminder mode is accepted only for `github-copilot`, the text and the 200-byte ceiling did not change, and the launcher never stands the entries down; in the recorded run the reminder was a user message of its own before the prompt, and a nested-only hook did not reach the model (two runs each); the probe renames the event in its camelCase copy but starts no sub-agent under that name; `render_github_agent_adapter` did not change.
+- The Local-harness source reading is stated once, in the README Quick Install note (`ChatHookService.executePreToolUseHook` in `extensions/copilot/dist/extension.js` of the Copilot extension 0.74.0, VS Code 1.146.0: `permissionDecision` is read from `hookSpecificOutput`). docs/target-mapping.md, docs/runtime-checks.md, and checklist item 10 link to it. The excerpt that was read is below.
+
+## Live output 1: guard decisions as github-copilot (basis of the target-mapping bullet "What asks")
+Command: `bash shared/hooks/scripts/protect-files.sh github-copilot` with the payload on standard input, REPO_ROOT set to the repository, run on 2026-11-18 on the current tree.
+Write  .github/hooks/hooks.json     exit 0 -> ask
+Write  .claude/settings.json        exit 0 -> ask
+Write  .mcp.json                    exit 0 -> ask
+Write  .vscode/mcp.json             exit 0 -> ask
+Edit   .claude/settings.json        exit 0 -> ask
+Read   .claude/settings.json        exit 0 -> (no decision)
+Read   .mcp.json                    exit 0 -> (no decision)
+
+## Live output 2: the Local harness source reading (read on 2026-11-18)
+File: ~/.vscode-server/bin/69047191fc427f2f92828279aae1d90d8eeda7ab/extensions/copilot/dist/extension.js (VS Code 1.146.0, built-in Copilot extension 0.74.0)
+executePreToolUseHook(e,n,r,o,a,s,c){let l={tool_name:e,tool_input:n,tool_use_id:r},u=await this.executeHook("PreToolUse",o,l,a,s);if(u.length===0)return;let d,p=[],m,A,g,f=[];QB({hookType:"PreToolUse",results:u,outputStream:c,logService:this._logService,onSuccess:_=>{if(typeof _!="object"||_===null)return;let E=_.hookSpecificOutput;if(!E)return;E.additionalContext&&f.push(E.additionalContext),E.updatedInput&&(g=E.updatedInput);let x=E.permissionDecision;if(x){if(!(x in imn)){let I=`Invalid permissionDecision value '${String(x)}'. Expected 'allow', 'deny', or 'ask'. Field was ignored.`;this._logService.warn(`[ChatHookService] ${I}`),this._outputChannel.appendLine(`[PreToolUse] ${I}`);return}x==="deny"?(E.permissionDecisionReason&&p.push(E.permissionDecisionReason),d!=="deny"&&(d="deny")):(d===void 0||(imn[x]??0)>(imn[d]??0))&&(d=x,x==="ask"?m=E.
+
+## Live output 3: date at the top of the raw files named in runtime-checks.md
+discover-after-trust-hooks-and-mcp.txt: (no date inside the file)
+discover-before-trust.txt: (no date inside the file)
+outcomes-a1.txt: (no date inside the file)
+outcomes-c1.txt: (no date inside the file)
+outcomes-d1.txt: (no date inside the file)
+outcomes-g-both.txt: (no date inside the file)
+outcomes-g-claude.txt: (no date inside the file)
+outcomes-g-copilot.txt: (no date inside the file)
+outcomes-s1.txt: (no date inside the file)
+phase-A-discover-output.txt: (no date inside the file)
+phase-A-probe-evidence.txt: 2026-11-17
+phase-B-battery-before.txt: (no date inside the file)
+phase-B-differential.md: (no date inside the file)
+phase-B-probe-negative-control.txt: (no date inside the file)
+phase-B-probe-output.txt: (no date inside the file)
+phase-B-probe-run-times.txt: 2026-11-17
+phase-B-read-tool-before.txt: (no date inside the file)
+phase-B-tool-handling-evidence.txt: 2026-11-17
+phase-C-battery-harness.py.txt: (no date inside the file)
+phase-C-byte-identity-battery.txt: 2026-11-17
+phase-C-camel-controls-harness.py.txt: (no date inside the file)
+phase-C-fix-round-1.txt: 2026-11-17
+phase-C-probe-negative-controls.txt: 2026-11-17
+phase-C-probe-output.txt: 2026-11-17
+phase-C-probe-run-times.txt: 2026-11-17
+phase-C-t3-control-characters.txt: 2026-11-17
+phase-C-t3-harness.py.txt: (no date inside the file)
+phase-C-tests-failing-first.txt: 2026-11-17
+phase-C-tests-intermediate-steps-2-3-only.txt: 2026-11-17
+phase-C-tr-documentation.txt: 2026-11-17
+phase-C-verification-results.txt: 2026-11-17
+phase-D-condition-matrix-harness.py.txt: (no date inside the file)
+phase-D-condition-matrix.txt: 2026-11-18
+phase-D-differential-harness.py.txt: (no date inside the file)
+phase-D-fix-round-0.txt: 2026-11-18
+phase-D-fix-round-1-differential-control.txt: 2026-11-18
+phase-D-fix-round-1.txt: 2026-11-18
+phase-D-generated-files.txt: 2026-11-18
+phase-D-launcher-differential.txt: 2026-11-18
+phase-D-mixed-install-harness.py.txt: (no date inside the file)
+phase-D-mixed-installs.txt: 2026-11-18
+phase-D-mutate.py.txt: (no date inside the file)
+phase-D-mutation-checks.txt: 2026-11-18
+phase-D-own-session-run.txt: 2026-11-18
+phase-D-probe-control-harness.py.txt: (no date inside the file)
+phase-D-probe-negative-controls.txt: 2026-11-18
+phase-D-probe-output.txt: 2026-11-18
+phase-D-probe-run-times.txt: 2026-11-18
+phase-D-probe-tests-against-head.txt: 2026-11-18
+phase-D-tests-failing-first.txt: 2026-11-18
+phase-D-verification-results.txt: 2026-11-18
+phase-E-context-hook-hard-inputs.txt: 2026-11-18
+phase-E-context-hook-harness.py.txt: (no date inside the file)
+phase-E-edge-runs-harness.py.txt: (no date inside the file)
+phase-E-fix-round-1.txt: 2026-11-18
+phase-E-generated-files.txt: 2026-11-18
+phase-E-mutation-checks.txt: 2026-11-18
+phase-E-mutation-harness.py.txt: (no date inside the file)
+phase-E-probe-before.txt: 2026-11-18
+phase-E-probe-control-harness.py.txt: (no date inside the file)
+phase-E-probe-negative-controls.txt: 2026-11-18
+phase-E-probe-output.txt: 2026-11-18
+phase-E-probe-run-times.txt: 2026-11-18
+phase-E-tests-failing-first.txt: 2026-11-17
+phase-E-unchanged-bytes-harness.py.txt: (no date inside the file)
+phase-E-unchanged-bytes.txt: 2026-11-18
+phase-E-verification-results.txt: 2026-11-18
+planning-probe-e1-model-requests.txt: (no date inside the file)
+planning-probe-e1-outcomes.txt: (no date inside the file)
+planning-probe-e2-model-requests.txt: (no date inside the file)
+planning-probe-e2-outcomes.txt: (no date inside the file)
+planning-probe-e3-hook-inputs.txt: 2026-11-17
+planning-probe-e3-model-requests.txt: (no date inside the file)
+planning-probe-e3-outcomes.txt: (no date inside the file)
+planning-probe-p4-subfolder-discovery.txt: (no date inside the file)
+
+## Full suite on the final tree of fix round 1 (2026-11-18), nothing else running
+Command: ( time uv run pytest tests/ -q --tb=short ). /tmp held 2,572 entries before the run.
+5927 passed, 1 skipped in 424.25s (0:07:04)
+
+real	7m34.777s
+user	3m36.311s
+sys	2m20.357s
+
+## Other checks of this round (all on the final tree)
+generate_targets --all, validate_targets, check_runtime, validate_plan_frontmatter, and every other line of the plan Verification block except verify.py phase: PASS (twice; the last run after the last doc edit).
+Link check: 133 relative links, 0 broken, 0 new broken. Table check: 0 rows with a wrong cell count. Claims table: 255 rows, every quote found in its file.
+ruff check and ruff format --check: clean. verify.py fast: PASS.
