@@ -486,7 +486,7 @@ workflow's own code passing through a hook.
 | VS Code gives a model a tool the offline runtime does not offer it | Phase B maps tools by their hook name and input, not by model; the manual checklist runs in VS Code |
 | The runtime drops a malformed item, or stops loading the `.github/hooks` copy | Under option B only logging and state sync are lost; the probe checks `hooks-sources` and `hooks-subfolder` |
 | A VS Code update changes the runtime mid-plan | The probe prints the version. A FAIL is handled like any failed check. |
-| The probe exceeds the 600-second limit per verification item | 480-second cap; no MCP servers; at most three sessions plus discovery |
+| The probe exceeds the limit per verification item (600 seconds at approval; 1020 seconds since Phase B) | 480-second cap; no MCP servers; at most three sessions plus discovery |
 | The `chat.useClaudeHooks: true` double run on Local | Documented, with the advice to turn the setting off (D, F) |
 
 ### Recorded follow-ups (not in this plan)
