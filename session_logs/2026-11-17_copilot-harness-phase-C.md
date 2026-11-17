@@ -44,6 +44,22 @@ reason that holds a control character from producing invalid JSON.
   of 43 failed). Scope-change record added to the small plan. Decision on
   the one open point: a text that ends in a newline now ends in a space;
   kept, because no caller passes such a text.
+- **23:24** - Review round 1 (`code`, `architecture`, `security`, `tests`,
+  `ponytail`, `documentation`): no CRITICAL or MAJOR finding. Two MINOR:
+  the T3 row in `docs/target-mapping.md` claimed the change for every
+  guard, but the file guard always escaped control characters and keeps
+  them; and only `git-protection.sh` had a suite test for the Copilot shape
+  on its `fail_closed` path. One open request: the `tr` form was run on GNU
+  `tr` only. Sent to the `coder`: both fixes, and a comment that no longer
+  claims a BSD run.
+- **23:26** - For the open request: the POSIX and FreeBSD manual texts for
+  `tr` were fetched and quoted in
+  `raw/phase-C-tr-documentation.txt`. Both define `[c*]` in the second set
+  as padding to the length of the first, and an octal range as coded
+  values. A run on macOS or BSD `tr` stays an unverified limitation.
+  Recorded for a later phase (old gap from the review, from Phase A): the
+  probe passes `GIT_DIR`, `GIT_WORK_TREE`, and `GH_REPO` through to the
+  runtime; remove `GIT_*` and `GH_*` there.
 
 ## [LEARN] Entries
 

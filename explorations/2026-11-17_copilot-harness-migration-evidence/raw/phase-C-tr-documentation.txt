@@ -1,0 +1,70 @@
+Phase C, review round 1, Open Request 1: is `tr '\001-\037' '[ *]'` the
+same on GNU and on BSD/macOS `tr`?
+
+Status: documented behavior only. The command was run on GNU `tr` (this
+machine). It was not run on macOS or BSD `tr`; no such machine was at hand.
+
+Both pages were fetched on 2026-11-17 by a web-fetch agent. The quotes are
+the agent's short verbatim quotes; they are data from the pages, not checked
+a second time against the pages by the orchestrator.
+
+1. POSIX.1-2017, `tr`
+   https://pubs.opengroup.org/onlinepubs/9699919799/utilities/tr.html
+
+   The `[x*n]` construct, valid only in string2:
+   - "Represents n repeated occurrences of the character x."
+   - "If n is omitted or is zero, it shall be interpreted as large enough to
+     extend the string2-based sequence" (to the length of the string1-based
+     sequence).
+
+   A shorter string2 without that construct:
+   - "If the array specified by string2 is shorter that the one specified by
+     string1, ... the results are unspecified."
+   - Application usage: "a conforming application cannot rely on the BSD
+     behavior".
+
+   A range with octal endpoints:
+   - "If either or both of the range endpoints are octal sequences of the
+     form \octal, this shall represent the range of specific coded values
+     between the two range endpoints, inclusive."
+
+2. FreeBSD `tr(1)` (macOS `tr` derives from it)
+   https://man.freebsd.org/cgi/man.cgi?query=tr&sektion=1
+
+   The `[#*n]` construct, valid only in string2:
+   - "If n is omitted or is zero, it is be interpreted as large enough to
+     extend string2 sequence to the length of string1."
+
+   A range with octal endpoints:
+   - "If either or both of the range endpoints are octal sequences, it
+     represents the range of specific coded values between the range
+     endpoints, inclusive."
+
+   A shorter string2:
+   - "If string1 is longer than string2, the last character found in string2
+     is duplicated until string1 is exhausted."
+   - STANDARDS: the duplication "is permitted by POSIX but is not required";
+     portable scripts "should use the "[#*]" convention instead of relying on
+     this behavior."
+
+Conclusion from the two documents: `\001-\037` names the coded values 1 to
+31 on both, and `[ *]` extends the second set to 31 spaces on both, so each
+of those bytes maps to one space. The bare form `' '` would rely on padding
+that POSIX leaves unspecified; the `[ *]` form does not.
+
+What stays unverified: a run on macOS or BSD `tr`, and `tr`/`sed` behavior
+there on invalid UTF-8 in a reason (the earlier `sed`-only code had the same
+kind of risk).
+
+Cases considered for a `tr` that does not follow either document (reasoned,
+not run):
+- It leaves some control characters in the reason: the answer is invalid
+  JSON for such a text, which is the behavior from before Phase C.
+- It reads `[ *]` as four plain characters: control characters become `[`,
+  a space, `*`, or `]`. The answer is valid JSON with a wrong visible
+  character in the reason; the decision is unchanged.
+- It fails: the reason is empty. The answer is valid JSON and the decision
+  is unchanged.
+In the first two cases a text without a control character is unchanged. In
+the third case every reason would be empty, also one without a control
+character.
