@@ -1482,6 +1482,19 @@
   showed one deny reason, and one question seen by the user. Before a
   behavior claim goes from a plan into the docs, name the run that shows
   it, or write "not seen in a recorded run".
+- [LEARN:hooks] Run inline Python in a hook with `python3 -I`. Without
+  it, a `json.py` in the working folder (the repository root for hooks) is
+  imported in place of the standard module. `subagent-context.sh` uses
+  `-I`; `_lib-frontmatter.sh`, `pretool-bash-guard.sh`, and
+  `session-log.sh` do not yet (open follow-up, told to the user on
+  2026-11-18; check with `rg -n 'python3 -c|python3 - |run_python -c'
+  shared/hooks/scripts` before proposing it again).
+- [LEARN:testing] For a new script, a failing-first run only shows that
+  the file was missing. Follow it with one mutation for each stated
+  property. In Phase E this found three weak tests: one matched a single
+  word of a warning, two read a limit from the code under test (use the
+  literal), and a blocking hook would have hung the suite (give the runner
+  a timeout).
 - [LEARN:testing] The CI workflow's macOS job runs only the calls listed
   under `if __name__ == "__main__":` in `tests/test_hook_gates.py`, through
   `scripts/validate_targets.py`. It does not run the pytest suite. Add a
@@ -1675,7 +1688,9 @@
   (offline only the six Codex-family model ids get that tool, but the real
   VS Code also gave it to `gpt-6-luna`), which crashed `protect-files.py`
   until Phase B of the plan `copilot-harness-migration` made the guard read
-  it; sub-agents get no repository instructions. Read
+  it; sub-agents get no repository instructions (since Phase E a
+  `SubagentStart` hook, `subagent-context.sh`, gives them the text of
+  `.github/copilot-instructions.md`, at most 2,048 bytes). Read
   `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/REPORT.md`
   before any Copilot change; its `scripts/` run the real runtime offline
   with a scripted local model, no account needed.
