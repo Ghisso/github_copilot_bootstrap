@@ -1,0 +1,97 @@
+Phase E, review round 1: what was changed, what was checked, and the results. 2026-11-18. Coder run.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes. Runtime 1.0.108-0 (VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab).
+
+=== 1. MAJOR (documentation): the reminder and event-set sentences in docs/smoke-tests.md
+Two places were wrong after this phase. Corrected:
+  before: "Claude Code and OpenAI Codex add one prompt-start reminder and one selected late-report reminder through `reporting-reminder.sh`; existing state-sync, and PostToolUse handlers remain present."
+  after:  the same bullet, then a new one: "GitHub Copilot adds one session-start reminder through `reporting-reminder.sh session github-copilot`, the fourth `SessionStart` entry of `.github/hooks/hooks.json`. Mode `session` is refused for every other client, and `prompt` and `late-report` are refused for Copilot."
+  before: "... Copilot and Antigravity event sets are unchanged, and no Gemini adapter is generated."
+  after:  "... The Antigravity event set is unchanged. The Copilot hook file has one new event, `SubagentStart`, which runs `subagent-context.sh`; the other four events keep their entries, plus the session-start reminder above. No Gemini adapter is generated."
+
+What I searched in README.md and docs/*.md (not docs/evidence, not openwiki/, which Phase G refreshes) for a sentence about the Copilot event list, the number of SessionStart entries, or who gets the reminder:
+  - rg -i for: "event set", "unchanged", "SessionStart", "reminder", "wired only", "only for Claude Code", "has no reporting reminder"
+  - rg -i for: Copilot near "events/hook file/hooks.json" with "four/three/exact/only/PostToolUse/Stop"; "(one|two|three|four) SessionStart"; "(four|three|five) events"; every line that names `.github/hooks/hooks.json`
+  - read in full: docs/smoke-tests.md lines 92-120 and 284-296; docs/architecture.md lines 20-32, 300-312, 400-430; docs/runtime-checks.md 300-330
+  Result: the only stale sentences were the two in docs/smoke-tests.md above, plus the ones fixed in round 0 (README "Lost on purpose" bullet, docs/target-mapping.md, docs/architecture.md x2, docs/runtime-checks.md x2).
+  Checked and left alone because they are still true: docs/smoke-tests.md:293 ("GitHub Copilot hook config remains native at .github/hooks/hooks.json but calls shared .claude scripts"); docs/architecture.md:304 (stand-down of the five lifecycle hooks; no event list); README.md hooks-on-the-Copilot-harness list (names the five lifecycle scripts and the seven conditions; no event count); docs/runtime-checks.md:704 (the 26-hook figure of Phase A, now followed by the Phase E figure 28).
+  Also checked: no document names the number of Copilot SessionStart entries.
+
+=== 2. MINOR (documentation): what the check subagent-context judges
+README.md and docs/target-mapping.md now say that the check `subagent-context` judges only the heading `GitHub Copilot Workspace Adapter` and the fixed line in the first user message of `coder` and `reviewer`. The whole text, the order, and the `general-purpose` observation are attributed to one recorded run of the control harness (`raw/phase-E-probe-output.txt`, "no check behind it"). The same was done for `session-reminder` (the check judges the reminder text in the first user message; "a user message of its own" is from the recorded run).
+
+=== 3. MINOR (tests): four properties that had no test able to fail. New tests (tests/test_hook_gates.py):
+  a. test_the_subagent_hook_is_not_hijacked_by_a_module_named_json[repository-root | subfolder | pythonpath]
+     a json.py that writes a sentinel file when imported is put in the repository root, in the folder the hook runs in, or on PYTHONPATH. The sentinel must not appear, and the answer must be the normal one.
+  b. test_the_subagent_hook_warns_and_exits_zero_when_python_exits_non_zero
+     a stub python3 first in PATH that exits 1: exit 0, no stdout, stderr exactly "WARN subagent-context: internal error; skipping context\n".
+  c. test_the_subagent_hook_treats_closed_standard_input_as_malformed
+     standard input closed (`<&-`): exit 0, no stdout, stderr exactly "WARN subagent-context: malformed hook input; skipping context\n".
+     This needed a one-line change in shared/hooks/scripts/subagent-context.sh. Before it, closed input gave a Python traceback (`sys.stdin` is None) and then the generic "internal error" warning, still exit 0. Now `json.loads(sys.stdin.buffer.read() if sys.stdin else b"")` treats it as input that is not a JSON object, with no traceback.
+  d. test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it now compares the whole stderr line for each of its 8 cases, for example "WARN reporting-reminder: unsupported mode: prompt" for `prompt github-copilot`, not only the prefix.
+Found while writing the mutation checks, and fixed in the tests:
+  - test_the_subagent_hook_warns_and_exits_zero_when_python_is_missing only searched stderr for "python3", which bash's own "command not found" also contains; removing the presence check survived. It now compares the exact warning. The mutation is now killed.
+  - the two budget boundary tests read the limit from the validator, so changing the limit to 2049 moved them along and only the pin test failed. They now use the literal 2048.
+  - _run_subagent_context now has timeout=30 (the hook file's timeout is 10 s), so a hook that blocks on a named pipe fails its test instead of hanging the suite.
+
+=== 4. MINOR (over-engineering): deleted
+  tests/test_hook_gates.py: in test_the_subagent_hook_gives_the_generated_guidance_and_the_fixed_line, `assert guidance in context`, the newline-count equality, and `context.endswith(SUBAGENT_FIXED_LINE)` (all implied by the equality that stays);
+  tests/test_hook_gates.py: test_the_subagent_hook_ignores_an_exported_target_id (the script never reads TARGET_ID). The reminder's twin, test_the_session_reminder_ignores_an_exported_target_id, stays: that script assigns TARGET_ID from its argument, which is the behavior it pins.
+  scripts/check_copilot_runtime.py:
+    - session_reminder: the middle branch (the reminder found in a later message, which only changed the message text) is gone. The FAIL line now reads "the reminder is not in the first of the N user message(s) of the first model request". It keeps N, which is what a reader needs to see an empty or one-message request.
+    - subagent_context: the `notes` list is gone (the pass line now says "each of coder and reviewer"). The `missing` list stays: its text tells a reader whether the heading, the fixed line, or both are absent, and that separates "the hook did not run" (both) from "the guidance file is missing or over the limit" (heading only, as in the controls no-guidance-file and oversized-guidance). That information is not recoverable from a plain "lacks" line.
+  tests/test_check_copilot_runtime.py: the case the-reminder-came-after-another-message is kept, with the new message. It no longer tests the wording; it is the only case that fails if `messages[0]` becomes "any message" (mutation 22 in phase-E-mutation-checks.txt). Say so if you want it deleted too.
+
+=== 5. Evidence request 1: three runs of subagent-context.sh github-copilot (phase-E-edge-runs-harness.py.txt)
+Python 3.13.6; `python3` in PATH: Python 3.13.6
+OK  1. standard input closed (`<&-`)
+      exit 0; empty stdout; 0.02 s (hook timeout 10 s: within)
+      stderr: WARN subagent-context: malformed hook input; skipping context
+OK  2. a stub python3 first in PATH that exits 1
+      exit 0; empty stdout; 0.00 s (hook timeout 10 s: within)
+      stderr: WARN subagent-context: internal error; skipping context
+OK  3. a 100 MB standard input, valid JSON object
+      exit 0; one line of valid JSON, 3851 bytes; 0.21 s (hook timeout 10 s: within)
+      stderr: (empty)
+OK  3. a 100 MB standard input, not JSON (invalid bytes)
+      exit 0; empty stdout; 0.15 s (hook timeout 10 s: within)
+      stderr: WARN subagent-context: malformed hook input; skipping context
+Runs that broke a rule: 0
+(The 100 MB file for the valid case is one JSON object with a 100 MB string; the second is 100 MB of invalid bytes. Python reads the input once; the memory is the input size plus the parse.)
+
+=== 6. Evidence request 2: targeted mutation checks
+See phase-E-mutation-checks.txt (tool: phase-E-mutation-harness.py.txt). 23 mutations, each in a scratch copy of the repository; the working copy was never touched. 22 killed, 1 survives by design.
+  Requested mutations, all killed:
+   - remove the real-path comparison: test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[folder-for-github-is-a-link]
+   - drop O_NONBLOCK: ...[named-pipe] (the test times out after 30 s; the harness kills the process group)
+   - LIMIT + 1 -> LIMIT: ...[over-the-limit]
+   - errors="replace" -> "strict": test_the_subagent_hook_prints_valid_json_for_any_guidance_text[invalid-utf8]
+   - remove the S_ISREG check: ...[named-pipe]. The folder case alone does not kill it: reading a folder raises an OS error that is caught, so the hook still warns and falls back to the fixed line, the same observable result.
+   - reporting-reminder.sh accepts `prompt` for github-copilot: test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it[prompt-github-copilot-...]
+   - validate_targets.py limit 2049: test_the_copilot_event_set_and_the_guidance_budget_are_pinned, test_the_copilot_guidance_budget_passes_at_the_limit_and_fails_one_byte_over, test_the_copilot_guidance_budget_counts_bytes_not_characters
+   - remove -I: test_the_subagent_hook_is_not_hijacked_by_a_module_named_json (all three places)
+   - remove the error trap: test_the_subagent_hook_warns_and_exits_zero_when_python_exits_non_zero
+   - restore the old "unsupported provider" text: test_the_session_mode_is_accepted_... (session-claude-code, session-openai-codex, prompt-github-copilot, and two more)
+   - extra, not asked: revert the closed-stdin fix; remove the python3 presence check; remove the provider check; drop the top-level copy; empty file adds a blank line; any JSON value but null counts; ensure_ascii=False; the reminder prints a PostToolUse event; validator without SubagentStart; validator ignores the timeout; probe check accepts the reminder in any message; probe check ignores the fixed line. All killed.
+  Survivor (1): remove O_NOFOLLOW from the open flags. It is the second layer behind the real-path comparison, which already refuses a link at every step. O_NOFOLLOW only closes the gap between the comparison and the open (a link swapped in between), which a test cannot create. No test added; the mutant behaves like the original on every input a test can build.
+  Two mutations were killed only after a test fix (section 3): the python3 presence check, and the limit 2049.
+
+=== 7. Rerun results on the final tree
+$ uv run python scripts/generate_targets.py --all                 exit 0
+$ uv run python scripts/install_bootstrap.py . --allow-self --local-only   exit 0 ("install-bootstrap: done"; the installer made nested .claude checkpoint commits 8178260 and 2aff004)
+$ uv run python scripts/validate_targets.py                       PASS generated target is structurally valid
+$ uv run python scripts/check_runtime.py                          PASS (Bash 3.2 array check; generated runtime wiring)
+$ uv run python scripts/validate_plan_frontmatter.py              exit 0, no output
+$ uv run pytest tests/test_hook_gates.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short   1859 passed in 158.76s
+$ grep -q -F 'subagent-context.sh github-copilot' dist/multi-agent/.github/hooks/hooks.json            exit 0
+$ grep -q -F 'reporting-reminder.sh session github-copilot' dist/multi-agent/.github/hooks/hooks.json  exit 0
+$ uv run python tests/test_hook_gates.py                          exit 0
+$ uv run python scripts/check_copilot_runtime.py --require        two runs in the verification block, both PASS (0 of 48 checks failed); the two timed runs on the same code, 13.78 s and 15.62 s, are in phase-E-probe-run-times.txt
+$ uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases    Success: no issues found in 43 source files
+$ uv run ruff check shared scripts tests                          All checks passed!
+$ uv run ruff format --check shared scripts tests                 43 files already formatted
+$ uv run python .claude/scripts/verify.py fast --format text      fast: PASS
+Full suite, final tree, nothing else running:
+$ uv run pytest tests/ -q --tb=short                              5927 passed, 1 skipped, 0 failed in 430.33s (0:07:10); wall 7m37.381s
+
+The probe evidence files (phase-E-probe-before, -output, -negative-controls, -run-times), the hard-input table (Python 3.13.6 and 3.9.0), the unchanged-bytes comparison, and the generated-files file were all produced again on this final tree. The failure lines in them use the new check wording ("not in the first of the N user message(s)").
+Not done, as asked: older hooks that run `python3 -c` without -I (`_lib-frontmatter.sh`, `pretool-bash-guard.sh`) are unchanged; the coordinator records that as a follow-up.
