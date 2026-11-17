@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-17
 **Plan:** `.claude/plans/2026-11-17_phase-B-copilot-tool-inputs.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -159,8 +159,19 @@ Surfaces checked for claims it made wrong:
 ## Verification
 
 ```text
-# filled at closeout step 4
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS      133.6s  uv run pytest tests/test_protect_files_copilot_harness.py tests/test_hook_gates.py tests/test_protect_files_scoping.py tests/test_protect_files_substitutions.py tests/test_check_copilot_runtime.py -q --tb=short
+PASS       11.9s  uv run python scripts/check_copilot_runtime.py --require
+PASS        0.0s  python3 -c 'import ast, sys; ast.parse(open(sys.argv[1], encoding="utf-8").read(), feature_version=(3, 9))' shared/hooks/scripts/protect-files.py
+PASS        0.0s  grep -q -F 'Copilot harness tools and guard handling' docs/target-mapping.md
+PASS       44.7s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      415.7s  uv run python .claude/scripts/verify.py phase --format text
+closeout: PASS
 ```
+
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest with 5560 passed and 1 skipped in 410.13 s, freshness, provenance, generation). The first run of this step ended UNVERIFIED on the 480-second budget; this is the second run, after the budget change and review round 3.
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-B-copilot-tool-inputs.json`
   (no surviving finding; gate PASS; six profiles; round 1 FAIL with one
