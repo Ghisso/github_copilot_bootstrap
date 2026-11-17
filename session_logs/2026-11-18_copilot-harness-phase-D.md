@@ -29,6 +29,24 @@ Code session and the Local harness never stand down.
   - One old gap from the Phase C review is added to step 4: the probe
     passes `GIT_DIR`, `GIT_WORK_TREE`, and `GH_REPO` through to the
     runtime; `GIT_*` and `GH_*` variables are removed there.
+- **00:56** - Phase D delegated to a fresh `coder` with the evidence
+  packet and the known traps from Phases A to C.
+- **01:50** - `coder` finished steps 1 to 6. The launcher `run-hook.sh`
+  stands the five lifecycle hooks down only when all seven conditions
+  hold. Condition matrix: 234 rows, no guard row stands down, 5 lifecycle
+  rows stand down (all seven conditions holding). Old launcher against the
+  new one where no stand-down applies: 1,281 comparisons, 0 differences.
+  On the real runtime, before the change `single-session-log` and
+  `state-sync-once` fail (two `claude-code` lines, two pull lines); after
+  it the probe prints 46 lines and 0 fail. Full suite: 5,826 passed,
+  1 skipped, 426 s.
+- **01:53** - Orchestrator checks: `verify.py fast` PASS; the probe PASS
+  (0 of 46 failed). Scope-change record added to the small plan. One
+  follow-up sent to the `coder` before review: `prepare_project` passed
+  the host's `GIT_*` and `GH_*` variables to `git init` and the installer;
+  it now starts from the filtered environment. The `coder` had also noted
+  that `AI_STATE_REMOTE` passes through; it does not, the function sets it
+  to an empty string.
 
 ## [LEARN] Entries
 

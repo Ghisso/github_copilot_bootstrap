@@ -165,6 +165,39 @@ VS Code, A3). This phase implements **option B** of the big plan (REQ-004).
   - `uv run python scripts/validate_targets.py`;
   - `uv run python scripts/check_runtime.py`.
 
+  Scope-change record (approved by the orchestrator on 2026-11-18; each
+  item serves this phase's stated intent, and no guard can stand down):
+  - Step 2: the stand-down path runs `cat >/dev/null 2>&1 || true` and not
+    the bare `cat >/dev/null`. Under `set -e`, a failing `cat` on a closed
+    standard input would exit non-zero, and this path must never do that.
+  - Step 2: `reporting-reminder.sh` and `claude-stop.sh` stand down
+    although the Copilot hook file has no entry for them. Nothing is lost:
+    the Copilot file's `Stop` entries cover the session log, the stop
+    check, and the state push, and the runtime ignored the reminder's
+    nested `claude-code` answer (F13). `README.md` says so.
+  - Step 3: the independent copy of the command builder in
+    `scripts/validate_targets.py` emits the marker too.
+  - Step 4 also changes `tests/test_check_copilot_runtime.py` and the probe
+    section of `docs/runtime-checks.md`. A run prints 46 lines. The session
+    script `scripts/copilot_runtime_probe.mjs` is unchanged.
+  - Step 4, `state-sync-once`: the errors log has no session id, so the
+    check counts the pull lines of the whole log and relies on `main`
+    being the first session in the project.
+  - Step 4, `guards-both-sources`: it passes before and after this phase,
+    because the guards do not change. It is a pin: it fails when a guard
+    stands down or a hook source stops running.
+  - Step 4, added from the Phase C review (old gap): the probe removes
+    every `GIT_*` and `GH_*` variable from the environment it gives the
+    runtime, and from the environment of `git init` and the installer in
+    `prepare_project`, which then adds its own identity values. A
+    to-be-denied command that runs because of a broken guard can then not
+    act on another repository.
+  - Step 1: the tests of the probe checks were written after the probe
+    code. Mutation runs and a run against the earlier probe show that they
+    can fail. The launcher, marker, and validator tests were written first.
+  - Step 1: four calls are added to the script form of
+    `tests/test_hook_gates.py`, which the CI workflow runs on macOS.
+
 - [ ] **7. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,
