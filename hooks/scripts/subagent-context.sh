@@ -80,7 +80,7 @@ def guidance(root):
     except FileNotFoundError:
         return ""
     except OSError as error:
-        warn("cannot read %s: %s" % (RELATIVE, error))
+        warn("cannot read %s: %s" % (RELATIVE, error.strerror or error))
         return ""
     if len(data) > LIMIT:
         warn("not reading %s: over %d bytes" % (RELATIVE, LIMIT))
