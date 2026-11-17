@@ -304,6 +304,16 @@ Open follow-ups to start from:
     `run-hook.sh`, `subagent-context.sh`, and `protect-files.py`.
   - The user can keep, narrow, or lift the deny of `run_dynamic_workflow` and
     `dynamic_workflows_manage` on `github-copilot`.
+  - Not checked: on the Copilot harness `record-branch-state.sh` runs from
+    both hook files, because the launcher stands down only the five
+    lifecycle scripts. By a reading of the code its writes are idempotent,
+    but `fm_write` replaces the whole plan file, so two overlapping runs
+    could lose one key's update. Nothing was run to check this.
+  - `openwiki/INSTRUCTIONS.md`, the user's brief for the wiki, has no item
+    for the Copilot harness, and its authority list does not name
+    `docs/target-mapping.md` or `docs/runtime-checks.md`. Suggested to the
+    user on 2026-11-18. The rules of `subagent-context.sh` on the hooks wiki
+    page should keep a claim of their own at each refresh.
   - At the Local harness removal (February 2027): rename the hook events to
     camelCase (recheck the input side first), drop the Local-only fields of
     the agent wrappers, decide on `.vscode/mcp.json`, and keep
