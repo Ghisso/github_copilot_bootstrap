@@ -67,6 +67,17 @@ reporting reminder at session start.
   that file, and `python3 -I -c` does not. A `json.py` in the repository
   root is not a protected name, so its code would run inside the guards.
   The user is told, with the recommendation of a separate small plan.
+- **05:01** - Fix round 1 done. `docs/smoke-tests.md` corrected; the docs
+  say what the two probe checks judge and what comes from one recorded
+  run. New tests: a planted `json.py` (three cases), a failing `python3`,
+  a closed standard input, exact warning texts. One line changed in the
+  hook: a closed standard input now counts as malformed input. Mutation
+  checks in a scratch copy: 22 of 23 killed; the survivor is the removal
+  of `O_NOFOLLOW`, the second layer behind the real-path comparison, whose
+  gap no test can create. Hard runs: closed input, failing `python3`, and
+  100 MB of input all exit 0 within 0.21 s. Full suite: 5,927 passed,
+  1 skipped, 430 s. Orchestrator checks: `verify.py fast` PASS, the probe
+  PASS (0 of 48 failed). Review round 2 started.
 
 ## [LEARN] Entries
 

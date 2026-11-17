@@ -165,6 +165,15 @@ sub-agents may receive the guidance twice; the docs say so.
     contract with both new commands.
   - Step 1: three calls are added to the script form of
     `tests/test_hook_gates.py`, which the CI workflow runs on macOS.
+  - After review round 1: `docs/smoke-tests.md` is corrected (the Copilot
+    event set and the reminder). In `subagent-context.sh`, a closed
+    standard input counts as malformed input (one line), so it gives the
+    "malformed hook input" warning and no Python traceback. Tests are
+    added for `python3 -I` (a planted `json.py`), a failing `python3`, a
+    closed standard input, and the exact warning texts; three implied
+    assertions and one test that could not fail are deleted; one branch of
+    the probe check `session-reminder` that only changed the message text
+    is removed.
 
 - [ ] **8. Review.**
   Owner: reviewer.
