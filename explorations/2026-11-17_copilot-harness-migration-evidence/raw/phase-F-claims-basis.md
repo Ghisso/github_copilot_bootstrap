@@ -327,3 +327,11 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/smoke-tests.md | no record shows the order of VS Code's own terminal confirmation and the pre-tool hook on the Local harness | `not run`; a search of the six files and of `REPORT.md` found no such record. |
 | docs/smoke-tests.md | Mark: seen in part. Session Target: Copilot. | Items 6, 7, 8, 11: the Seen line of each item names the part that was seen (REPORT A3, F9, A6; probe checks `subagent-context` and `session-reminder`). |
 | docs/smoke-tests.md | `PASS`: every expectation of the item is met. | Definition of the result words; no claim about a run. |
+
+## Added in fix round 3 (2026-11-18)
+
+| File | Short quote | Basis |
+| --- | --- | --- |
+| docs/smoke-tests.md | On 2026-11-17 the command ran after the user approved the | REPORT A6 (real VS Code, session `db2427a6…`: for `echo '{}' > .vscode/settings.json` the user answered the first hook question, VS Code approved the second itself, and the agent then read the file back with the read tool). |
+| docs/smoke-tests.md | With "Allow all" and Autopilot off, the command should run only after you approve such a | The pass rule of the item; "Allow all" and Autopilot were never run, so the rule is limited to the case with both off, which is the case the 2026-11-17 run (`"permissionMode":"manual"`, REPORT A6) covers. |
+| docs/smoke-tests.md | **What has run, and the three marks.** | Heading; the three marks are defined in the text below it. |

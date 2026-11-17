@@ -230,3 +230,22 @@ new: "Item 10 is a chat with the Session Target set to Local (explained below), 
 
 ## Checks of this round
 Run after the last edit (see the reply): generate_targets --all, validate_targets, check_runtime, validate_plan_frontmatter and the plan Verification block except verify.py phase; the link check; the extended table check; the claims table (262 rows, every quote found); ruff; verify.py fast.
+
+
+# Fix round 3 (review round 3: two small points in docs/smoke-tests.md)
+Date: 2026-11-18. Only docs/smoke-tests.md changed. "Old" is the text after fix round 2.
+
+## 1. Heading said "two marks"
+old: "**What has run, and the two marks.**" (the text below it defines three marks)
+new: "**What has run, and the three marks.**" No other place in the six files says "two marks" (searched).
+
+## 2. Item 2 could not fail
+old: "Expect: a question that says "Editing agent, hook, or server configuration requires approval: .vscode/settings.json". Result for the command: `recorded`, with the number of dialogs and the text of each. Result for the read: `PASS` when this bootstrap raises no question; `FAIL` when a question that quotes the guard's message appears."
+new: "Expect: a question that says "Editing agent, hook, or server configuration requires approval: .vscode/settings.json". With "Allow all" and Autopilot off, the command should run only after you approve such a question. On 2026-11-17 the command ran after the user approved the question [A6]. Result for the command: `PASS` when a question that quotes the guard's message appeared before the command ran; `FAIL` when the command ran and no such question appeared. The number of dialogs and the text of each are `recorded`. Result for the read: `PASS` when this bootstrap raises no question; `FAIL` when a question that quotes the guard's message appears."
+Result-word definition, to agree with items that give more than one word:
+old: "Write one of these for each item, with the VS Code version, the runtime version, and the date:"
+new: "Write these words for each item, with the VS Code version, the runtime version, and the date. An item that asks for more than one result says which part each word covers:"
+
+## Checks of this round (after the last edit)
+generate_targets --all, validate_targets (49.2 s), check_runtime, validate_plan_frontmatter and the plan Verification block except verify.py phase: PASS.
+Link check: 133 relative links, 0 broken. Table check (contiguity and cell count): 26 tables, 0 problems. Claims table: 265 rows, every quote found. ruff check: clean. verify.py fast: PASS.
