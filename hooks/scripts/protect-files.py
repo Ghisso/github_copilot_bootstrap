@@ -56,6 +56,19 @@ CONTROL_PLANE_DIRS: tuple[str, ...] = (
 # Tools whose input is a shell command line (`tool_input.command`). A name that
 # ends in `bash` or an empty name is also treated as a shell command in `main`.
 TERMINAL_TOOLS = {"bash", "shell", "run_in_terminal", "send_to_terminal"}
+# The Copilot runtime's shell helper tools. They carry a `shellId` and a `delay`,
+# not a command, and act on a shell that was judged when it started (probe P3,
+# `planning-probe-e3` in the migration evidence). Without a `command` key they
+# are judged like a native tool; with one they are shell commands like any
+# other name that ends in `bash`.
+SHELL_HELPER_TOOLS = {"read_bash", "list_bash", "stop_bash"}
+# Tools of the Copilot runtime that author and start workflows: JavaScript that
+# loads Node modules and spawns agents, run by an extension process. An offline
+# session cannot start a workflow ("extensions are not configured"), so it was
+# not shown whether the code's own steps pass through the pre-tool hooks. They
+# are denied by name, on `github-copilot` only (row T4; see `docs/target-mapping.md`,
+# "Copilot harness tools and guard handling").
+UNVERIFIED_CODE_TOOLS = {"run_dynamic_workflow", "dynamic_workflows_manage"}
 # Native tools that only read. A hook-config path argument is never a write for
 # them, so it gets no decision; a secret-shaped file (`.env*`, `uv.lock`,
 # credentials, keys) is still denied, and their text is not scanned for patches.
@@ -68,12 +81,16 @@ READ_ONLY_TOOLS = {
     "grep_search",
     "semantic_search",
     "view",
+    # The Copilot harness's PascalCase hook name for `view` (lowercased here).
+    "read",
     "grep",
     "rg",
     "glob",
 }
 PATH_KEYS = {
     "path",
+    # The search tools of the Copilot runtime (`grep`, `rg`, `glob`) take a list.
+    "paths",
     "file",
     "filepath",
     "file_path",
@@ -83,11 +100,15 @@ PATH_KEYS = {
     "files",
     "dirpath",
 }
-PATCH_PREFIXES = (
-    "*** Add File: ",
-    "*** Update File: ",
-    "*** Delete File: ",
-    "*** Move to: ",
+# The first and last line of an `apply_patch` request.
+PATCH_BEGIN = "*** Begin Patch"
+PATCH_END = "*** End Patch"
+# One header line of an `apply_patch` request, in any letter case and with any
+# blanks around the words: the runtime's own parser may accept more than the
+# canonical form. The text after the colon is the target.
+PATCH_HEADER = re.compile(
+    r"^\s*\*\*\*\s*(?:(?:add|update|delete)\s+file|move\s+to)\s*:(.*)$",
+    re.IGNORECASE,
 )
 OPERATORS = {";", "&&", "||", "|", "|&", "&", "(", ")"}
 # Characters that end a shell word: blanks (space, tab, newline; a carriage
@@ -904,18 +925,28 @@ def opaque_write_paths(value: str) -> list[str]:
 
 
 def add_patch_paths(value: str, paths: list[str]) -> None:
-    if "*** Begin Patch" not in value:
+    """Add the file named by each header line of an `apply_patch` request.
+
+    Only a header line adds a target, so a wider match only tightens. Another
+    line that starts with `*** ` does not fail closed: an update hunk's context
+    line is the file's own text after one space (Markdown ` *** bold ***`), and
+    a deny there would block ordinary edits.
+
+    Raises:
+        AmbiguousCommand: If the request has no end marker or a header has no
+            target.
+    """
+    if PATCH_BEGIN not in value:
         return
-    if "*** End Patch" not in value:
+    if PATCH_END not in value:
         raise AmbiguousCommand("unterminated apply_patch request")
     for line in value.splitlines():
-        for prefix in PATCH_PREFIXES:
-            if line.startswith(prefix):
-                target = line[len(prefix) :].strip()
-                if not target:
-                    raise AmbiguousCommand("apply_patch has an empty target")
-                paths.append(target)
-                break
+        header = PATCH_HEADER.match(line)
+        if header:
+            target = header.group(1).strip()
+            if not target:
+                raise AmbiguousCommand("apply_patch has an empty target")
+            paths.append(target)
 
 
 def _charge(work: int) -> None:
@@ -3605,6 +3636,22 @@ def native_targets(
         paths.append(value)
 
 
+def print_decision(decision: str, reason: str) -> None:
+    """Print one pre-tool decision: the only place the output shape is written."""
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": decision,
+                    "permissionDecisionReason": reason,
+                }
+            },
+            separators=(",", ":"),
+        )
+    )
+
+
 def emit(
     target_id: str,
     repo_root: str,
@@ -3646,33 +3693,47 @@ def emit(
         )
     else:
         return
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": decision,
-                    "permissionDecisionReason": reason,
-                }
-            },
-            separators=(",", ":"),
-        )
-    )
+    print_decision(decision, reason)
 
 
 def main() -> int:
     target_id, repo_root = sys.argv[1:3]
     payload = json.load(sys.stdin)
     tool_name = str(payload.get("tool_name") or payload.get("toolName") or "").lower()
+    if target_id == "github-copilot" and tool_name in UNVERIFIED_CODE_TOOLS:
+        print_decision(
+            "deny",
+            "Tool blocked by policy: %s runs workflow code that the pre-tool "
+            "hooks cannot see" % tool_name,
+        )
+        return 0
     tool_input = payload.get("tool_input", payload.get("toolArgs", {}))
-    if isinstance(tool_input, str):
-        tool_input = json.loads(tool_input)
-    if not isinstance(tool_input, dict):
-        raise AmbiguousCommand("tool input is not an object")
     read_only = tool_name in READ_ONLY_TOOLS
+    is_shell = (
+        tool_name in TERMINAL_TOOLS or tool_name.endswith("bash") or not tool_name
+    )
     paths: list[str] = []
     uncertain: list[str] = []
-    if tool_name in TERMINAL_TOOLS or tool_name.endswith("bash") or not tool_name:
+    if isinstance(tool_input, str):
+        try:
+            tool_input = json.loads(tool_input)
+        except ValueError as error:
+            # `apply_patch` is a free-form tool: its input is the patch text, not
+            # JSON. Only a tool that can write takes it. A read or shell tool
+            # that gets patch text fails closed, like any other text.
+            text = tool_input
+            if is_shell or read_only or not text.lstrip().startswith(PATCH_BEGIN):
+                raise AmbiguousCommand(
+                    "tool input is neither JSON nor patch text"
+                ) from error
+            add_patch_paths(text, paths)
+            emit(target_id, repo_root, paths, uncertain)
+            return 0
+    if not isinstance(tool_input, dict):
+        raise AmbiguousCommand("tool input is not an object")
+    if tool_name in SHELL_HELPER_TOOLS and "command" not in tool_input:
+        is_shell = False
+    if is_shell:
         command = tool_input.get("command")
         if not isinstance(command, str):
             raise AmbiguousCommand("Bash payload has no command")
