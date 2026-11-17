@@ -14,7 +14,7 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
 Result: FAIL (1 of 48 checks failed)
 MODE no-subagent-hook: probe exit code 1
-wall time 0m15.708s
+wall time 0m13.647s
 
 === no-subagent-hook, run 2: the SubagentStart entry removed from both copies of the hook file
 expected: subagent-context FAIL only
@@ -24,27 +24,27 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
 Result: FAIL (1 of 48 checks failed)
 MODE no-subagent-hook: probe exit code 1
-wall time 0m13.556s
+wall time 0m15.675s
 
 === no-reminder-hook, run 1: the fourth SessionStart entry removed from both copies of the hook file
 expected: session-reminder FAIL only
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
 Copilot runtime version: 1.0.108-0
-FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+FAIL session-reminder: the reminder is not in the first of the 2 user message(s) of the first model request
 Result: FAIL (1 of 48 checks failed)
 MODE no-reminder-hook: probe exit code 1
-wall time 0m15.663s
+wall time 0m13.624s
 
 === no-reminder-hook, run 2: the fourth SessionStart entry removed from both copies of the hook file
 expected: session-reminder FAIL only
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
 Copilot runtime version: 1.0.108-0
-FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+FAIL session-reminder: the reminder is not in the first of the 2 user message(s) of the first model request
 Result: FAIL (1 of 48 checks failed)
 MODE no-reminder-hook: probe exit code 1
-wall time 0m13.586s
+wall time 0m15.601s
 
 === no-guidance-file, run 1: .github/copilot-instructions.md removed, with its restore copy and its manifest line
 expected: subagent-context FAIL only (the heading is missing; the fixed line is still given)
@@ -54,7 +54,7 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
 Result: FAIL (1 of 48 checks failed)
 MODE no-guidance-file: probe exit code 1
-wall time 0m15.660s
+wall time 0m13.660s
 
 === no-guidance-file, run 2: .github/copilot-instructions.md removed, with its restore copy and its manifest line
 expected: subagent-context FAIL only (the heading is missing; the fixed line is still given)
@@ -64,7 +64,7 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
 Result: FAIL (1 of 48 checks failed)
 MODE no-guidance-file: probe exit code 1
-wall time 0m13.645s
+wall time 0m15.646s
 
 === oversized-guidance, run 1: the guidance file made longer than 2048 bytes (live file and restore copy)
 expected: subagent-context FAIL only (the hook gives the fixed line alone)
@@ -74,7 +74,7 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
 Result: FAIL (1 of 48 checks failed)
 MODE oversized-guidance: probe exit code 1
-wall time 0m13.694s
+wall time 0m13.697s
 
 === oversized-guidance, run 2: the guidance file made longer than 2048 bytes (live file and restore copy)
 expected: subagent-context FAIL only (the hook gives the fixed line alone)
@@ -84,7 +84,7 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
 Result: FAIL (1 of 48 checks failed)
 MODE oversized-guidance: probe exit code 1
-wall time 0m15.734s
+wall time 0m13.657s
 
 === nested-only-subagent, run 1: the sub-agent hook prints only the nested copy of the context
 expected: subagent-context FAIL only (the runtime ignores the nested copy, P2)
@@ -94,7 +94,7 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
 Result: FAIL (1 of 48 checks failed)
 MODE nested-only-subagent: probe exit code 1
-wall time 0m13.586s
+wall time 0m15.687s
 
 === nested-only-subagent, run 2: the sub-agent hook prints only the nested copy of the context
 expected: subagent-context FAIL only (the runtime ignores the nested copy, P2)
@@ -104,24 +104,24 @@ Copilot runtime version: 1.0.108-0
 FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
 Result: FAIL (1 of 48 checks failed)
 MODE nested-only-subagent: probe exit code 1
-wall time 0m15.784s
+wall time 0m13.707s
 
 === nested-only-reminder, run 1: the reminder prints only the nested copy (the shape every other client gets)
 expected: session-reminder FAIL only (the runtime ignores the nested copy, P1/F13)
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
 Copilot runtime version: 1.0.108-0
-FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+FAIL session-reminder: the reminder is not in the first of the 2 user message(s) of the first model request
 Result: FAIL (1 of 48 checks failed)
 MODE nested-only-reminder: probe exit code 1
-wall time 0m13.508s
+wall time 0m15.688s
 
 === nested-only-reminder, run 2: the reminder prints only the nested copy (the shape every other client gets)
 expected: session-reminder FAIL only (the runtime ignores the nested copy, P1/F13)
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
 Copilot runtime version: 1.0.108-0
-FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+FAIL session-reminder: the reminder is not in the first of the 2 user message(s) of the first model request
 Result: FAIL (1 of 48 checks failed)
 MODE nested-only-reminder: probe exit code 1
-wall time 0m13.723s
+wall time 0m13.648s

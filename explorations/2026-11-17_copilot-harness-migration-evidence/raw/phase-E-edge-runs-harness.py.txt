@@ -1,0 +1,97 @@
+"""Three edge runs of the real subagent-context.sh github-copilot (scratch tool, evidence).
+
+Usage: python3 -I edge_runs.py
+
+1. standard input closed
+2. a stub python3 first in PATH that exits 1
+3. a 100 MB standard input, two variants: one valid JSON object, and 100 MB that is not JSON (timed; the hook timeout is 10 s)
+Each run must end with exit code 0, and with empty stdout or one line of valid JSON.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+SCRIPTS = REPO / "shared" / "hooks" / "scripts"
+START = json.dumps({"sessionId": "s", "agentName": "coder", "agent_type": "coder"}).encode()
+ENV = {k: v for k, v in os.environ.items() if not k.startswith(("COPILOT", "CLAUDE", "TARGET_ID", "PYTHONPATH"))}
+HUNDRED_MB = 100 * 1024 * 1024
+bad = 0
+
+
+def repo(root: Path) -> Path:
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.parent.mkdir(parents=True)
+    scripts.symlink_to(SCRIPTS, target_is_directory=True)
+    guidance = root / ".github" / "copilot-instructions.md"
+    guidance.parent.mkdir()
+    guidance.write_bytes((REPO / "dist/multi-agent/.github/copilot-instructions.md").read_bytes())
+    return scripts / "subagent-context.sh"
+
+
+def report(name: str, result: subprocess.CompletedProcess[bytes], seconds: float, limit: float = 10.0) -> None:
+    global bad
+    out = result.stdout
+    if not out:
+        shape = "empty stdout"
+        shape_ok = True
+    else:
+        try:
+            json.loads(out)
+            shape_ok = out.count(b"\n") == 1 and out.endswith(b"\n")
+            shape = f"one line of valid JSON, {len(out)} bytes" if shape_ok else "JSON but not one line"
+        except ValueError:
+            shape, shape_ok = "NOT valid JSON", False
+    stderr = result.stderr.decode(errors="replace").strip().replace("\n", " | ")
+    within = seconds <= limit
+    ok = result.returncode == 0 and shape_ok and within
+    bad += not ok
+    print(f"{'OK ' if ok else 'BAD'} {name}")
+    print(f"      exit {result.returncode}; {shape}; {seconds:.2f} s (hook timeout {limit:.0f} s: {'within' if within else 'EXCEEDED'})")
+    print(f"      stderr: {stderr[:240] or '(empty)'}")
+
+
+def main() -> int:
+    print(f"Python {sys.version.split()[0]}; `python3` in PATH: {subprocess.run(['python3', '--version'], capture_output=True, text=True, env=ENV).stdout.strip()}")
+    with tempfile.TemporaryDirectory() as folder:
+        root = Path(folder) / "repo"
+        script = repo(root)
+
+        start = time.monotonic()
+        result = subprocess.run(["bash", "-c", 'bash "$@" <&-', "bash", str(script), "github-copilot"], capture_output=True, cwd=root, env=ENV, timeout=60)
+        report("1. standard input closed (`<&-`)", result, time.monotonic() - start)
+
+        stub = Path(folder) / "stub"
+        stub.mkdir()
+        (stub / "python3").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        (stub / "python3").chmod(0o755)
+        start = time.monotonic()
+        result = subprocess.run(["bash", str(script), "github-copilot"], input=START, capture_output=True, cwd=root, env={**ENV, "PATH": f"{stub}{os.pathsep}{ENV['PATH']}"}, timeout=60)
+        report("2. a stub python3 first in PATH that exits 1", result, time.monotonic() - start)
+
+        valid = Path(folder) / "valid.json"
+        with valid.open("wb") as handle:
+            handle.write(b'{"padding": "')
+            handle.write(b"a" * (HUNDRED_MB - 16))
+            handle.write(b'"}')
+        garbage = Path(folder) / "garbage.bin"
+        garbage.write_bytes(b"\xffnot json " * (HUNDRED_MB // 10))
+        for name, path in (("valid JSON object", valid), ("not JSON (invalid bytes)", garbage)):
+            with path.open("rb") as stdin:
+                start = time.monotonic()
+                result = subprocess.run(["bash", str(script), "github-copilot"], stdin=stdin, capture_output=True, cwd=root, env=ENV, timeout=120)
+                seconds = time.monotonic() - start
+            report(f"3. a {path.stat().st_size / 1048576:.0f} MB standard input, {name}", result, seconds)
+    print()
+    print(f"Runs that broke a rule: {bad}")
+    return 1 if bad else 0
+
+
+sys.exit(main())

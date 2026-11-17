@@ -9,7 +9,7 @@ no SubagentStart), no subagent-context.sh, and the old reporting-reminder.sh.
 Expected: session-reminder FAIL and subagent-context FAIL; every other check PASS (the three Phase D checks included).
 
 
-=== before, run 1 (wall time 0m15.493s)
+=== before, run 1 (wall time 0m13.553s)
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
 Copilot runtime version: 1.0.108-0
@@ -18,9 +18,9 @@ PASS hooks-untrusted: 0 hooks before trust
 PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
 PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
 PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
-PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session df3193d2
+PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session 802d08b5
 PASS state-sync-once: 1 state-sync pull line in .claude/session_logs/hooks-errors.log
-FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+FAIL session-reminder: the reminder is not in the first of the 2 user message(s) of the first model request
 PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
 PASS deny-force-push: Blocked dangerous git operation: force push
 PASS deny-secret-rm: Protected file blocked by policy: .env
@@ -64,7 +64,7 @@ PASS camel-allow-plain: 4 steps succeeded with no hook question
 Result: FAIL (2 of 48 checks failed)
 MODE before: probe exit code 1
 
-=== before, run 2 (wall time 0m13.577s)
+=== before, run 2 (wall time 0m15.610s)
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
 Copilot runtime version: 1.0.108-0
@@ -73,9 +73,9 @@ PASS hooks-untrusted: 0 hooks before trust
 PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
 PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
 PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
-PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session 529b204b
+PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session 736d4a96
 PASS state-sync-once: 1 state-sync pull line in .claude/session_logs/hooks-errors.log
-FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+FAIL session-reminder: the reminder is not in the first of the 2 user message(s) of the first model request
 PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
 PASS deny-force-push: Blocked dangerous git operation: force push
 PASS deny-secret-rm: Protected file blocked by policy: .env

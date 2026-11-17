@@ -29,7 +29,7 @@ Comparing 3402601 with the working copy of 3402601 + changes
      SessionStart: 3 old entries, all unchanged and in place = True; added: reporting-reminder.sh session github-copilot
      Stop: 3 old entries, all unchanged and in place = True; added: none
      SubagentStart: 0 old entries, all unchanged and in place = True; added: subagent-context.sh github-copilot
-   entries added per event: {'SessionStart': 1, 'SubagentStart': 1} (expected {'SessionStart': 1, 'SubagentStart': 1})
+   entries added per event: {'SubagentStart': 1, 'SessionStart': 1} (expected {'SessionStart': 1, 'SubagentStart': 1})
    Copilot file bytes: old 4804, new 5655
    .claude/hooks/scripts/ (SHA-256 of every file):
      24 files at 3402601, 25 now; changed: ['reporting-reminder.sh']; added: ['subagent-context.sh']; removed: []

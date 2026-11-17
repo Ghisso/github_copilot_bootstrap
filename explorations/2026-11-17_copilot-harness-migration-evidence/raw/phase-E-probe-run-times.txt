@@ -3,8 +3,8 @@ Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1
 Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
 uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
 Command: uv run python scripts/check_copilot_runtime.py --require, runtime 1.0.108-0, three sessions, 48 result lines, final code. Limit: 480 s for the whole run, 150 s per session.
-final run 1: real 0m15.903s; Result: PASS (0 of 48 checks failed)
-final run 2: real 0m13.682s; Result: PASS (0 of 48 checks failed)
-baseline run through probe_control.py (shipped probe, no change): real 0m14.521s
+final run 1: real 0m13.776s; Result: PASS (0 of 48 checks failed)
+final run 2: real 0m15.615s; Result: PASS (0 of 48 checks failed)
+baseline run through probe_control.py (shipped probe, no change): real 0m13.691s
 Each of the 14 other runs in phase-E-probe-before.txt and phase-E-probe-negative-controls.txt took 13 to 16 seconds.
 Earlier first run of the new checks (before the final code): real 13.7 s, 0 of 48 failed.

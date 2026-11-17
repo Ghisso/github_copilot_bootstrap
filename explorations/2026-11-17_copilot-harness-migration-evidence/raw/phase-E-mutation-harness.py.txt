@@ -1,0 +1,193 @@
+"""Targeted mutation checks for Phase E (scratch tool, evidence).
+
+Usage: python3 -I mutation_checks.py
+
+Copies the repository (without .git, .venv, and a top-level .claude) into a scratch folder, so the working copy is never
+touched. For each mutation it changes ONE thing in the scratch copy of one shipped file, runs the tests that must
+catch it, and restores the file. A mutation is KILLED when at least one of those tests fails (a timeout counts: the
+process group is killed). A mutation that no test catches is SURVIVED. A control run of the unmutated scratch copy
+must pass first.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+SCRATCH = Path(
+    "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/"
+    "815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseE/mutants"
+)
+PYTHON = REPO / ".venv" / "bin" / "python"
+HOOK = "shared/hooks/scripts/subagent-context.sh"
+REMINDER = "shared/hooks/scripts/reporting-reminder.sh"
+VALIDATOR = "scripts/validate_targets.py"
+PROBE = "scripts/check_copilot_runtime.py"
+GATES = ["tests/test_hook_gates.py", "-k", "subagent or session_mode or session_reminder or context_hook"]
+VALIDATE = ["tests/test_validate_targets.py", "-k", "copilot"]
+PROBE_TESTS = ["tests/test_check_copilot_runtime.py", "-k", "reminder or sub_agent or subagent"]
+CLEAN_ENV = {k: v for k, v in os.environ.items() if not k.startswith(("COPILOT", "CLAUDE", "TARGET_ID", "PYTHONPATH"))}
+
+
+@dataclass(frozen=True)
+class Mutation:
+    name: str
+    file: str
+    old: str
+    new: str
+    tests: list[str]
+    expect: str  # "killed" or "survives"
+    why: str = ""
+
+
+M = Mutation
+MUTATIONS = [
+    # --- the requested mutations of subagent-context.sh
+    M("remove the real-path comparison (a link anywhere on the way)", HOOK,
+      "    if os.path.realpath(path) != os.path.join(os.path.realpath(root), RELATIVE):", "    if False:", GATES, "killed",
+      "the `.github` folder link case must fail"),
+    M("drop O_NONBLOCK (a named pipe blocks the open)", HOOK,
+      ' | getattr(os, "O_NONBLOCK", 0)', "", GATES, "killed", "the named-pipe case; the test times out"),
+    M("LIMIT + 1 -> LIMIT (a file of 2049 bytes is read as 2048)", HOOK,
+      "data = handle.read(LIMIT + 1)", "data = handle.read(LIMIT)", GATES, "killed", "the over-the-limit case"),
+    M('errors="replace" -> "strict" (invalid UTF-8)', HOOK,
+      'data.decode("utf-8", errors="replace")', 'data.decode("utf-8", errors="strict")', GATES, "killed",
+      "the invalid-utf8 case"),
+    M("remove the S_ISREG check", HOOK,
+      "if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):", "if False:", GATES, "killed",
+      "the named-pipe case (a folder still fails on read, so it warns and falls back anyway)"),
+    # --- the mutations of the new tests (item 3)
+    M("remove -I from python3 (a json.py in the folder or on PYTHONPATH)", HOOK,
+      'python3 -I -c "$PROGRAM" "$REPO_ROOT"', 'python3 -c "$PROGRAM" "$REPO_ROOT"', GATES, "killed",
+      "the json.py shadow tests"),
+    M("remove the error trap", HOOK, "trap fail_open ERR", ":", GATES, "killed", "the failing-python3 test"),
+    M("revert the closed-stdin fix", HOOK,
+      'json.loads(sys.stdin.buffer.read() if sys.stdin else b"")', "json.loads(sys.stdin.buffer.read())", GATES,
+      "killed", "the closed-stdin test"),
+    M("restore the old `unsupported provider` text in the reminder", REMINDER,
+      '    warn "unsupported mode: ${MODE:-missing}"', '    warn "unsupported provider: ${MODE:-missing}"', GATES,
+      "killed", "the exact-warning test"),
+    # --- the other requested mutations
+    M("reporting-reminder.sh accepts `prompt` for github-copilot", REMINDER,
+      "  github-copilot:session) ;;", "  github-copilot:session) ;;\n  github-copilot:prompt) ;;", GATES, "killed",
+      "test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it"),
+    M("validate_targets.py: limit 2048 -> 2049", VALIDATOR,
+      "COPILOT_INSTRUCTIONS_MAX_BYTES = 2048", "COPILOT_INSTRUCTIONS_MAX_BYTES = 2049", VALIDATE, "killed",
+      "the two budget tests"),
+    # --- extra mutations (not asked for)
+    M("extra: remove the python3 presence check", HOOK,
+      "if ! command -v python3 >/dev/null 2>&1; then", "if false; then", GATES, "killed",
+      "the python-missing test, now exact on the warning text"),
+    M("extra: remove the provider check", HOOK,
+      'if [[ "$PROVIDER" != "github-copilot" ]]; then', "if false; then", GATES, "killed", "serves-only-Copilot test"),
+    M("extra: remove O_NOFOLLOW", HOOK,
+      'getattr(os, "O_NOFOLLOW", 0)', "0", GATES, "survives",
+      "second layer only: the real-path comparison already refuses a link, so O_NOFOLLOW guards the gap between "
+      "the comparison and the open, which no test can make"),
+    M("extra: drop the top-level copy of the context", HOOK,
+      '        "additionalContext": context,\n        "hookSpecificOutput": {', '        "hookSpecificOutput": {', GATES,
+      "killed", "the answer-shape equality"),
+    M("extra: an empty file adds a blank line before the fixed line", HOOK,
+      'context = text + "\\n" + LINE if text else LINE', 'context = text + "\\n" + LINE', GATES, "killed",
+      "the empty-file case"),
+    M("extra: any JSON value but null counts as input", HOOK,
+      "if not isinstance(payload, dict):", "if payload is None:", GATES, "killed", "the array, string, number cases"),
+    M("extra: ensure_ascii=False", HOOK,
+      "json.dumps(answer)", "json.dumps(answer, ensure_ascii=False)", GATES, "killed", "the non-ASCII case"),
+    M("extra: the session reminder prints a PostToolUse event", REMINDER,
+      'additional_context "SessionStart" "$REMINDER"', 'additional_context "PostToolUse" "$REMINDER"', GATES, "killed",
+      "the combined-answer test"),
+    M("extra: validator expects no SubagentStart event", VALIDATOR,
+      '    "Stop",\n    "SubagentStart",\n}', '    "Stop",\n}', VALIDATE, "killed", "the pinned event set"),
+    M("extra: validator ignores the handler timeout", VALIDATOR,
+      'elif found[0].get("timeout") != 10 or found[0].get("timeoutSec") != 10:', "elif False:", VALIDATE, "killed",
+      "the timeout cases"),
+    M("extra: probe session-reminder accepts the reminder in any user message", PROBE,
+      "if REMINDER_TEXT not in str(messages[0]):", "if not any(REMINDER_TEXT in str(m) for m in messages):",
+      PROBE_TESTS, "killed", "the later-message case"),
+    M("extra: probe subagent-context ignores the fixed line", PROBE,
+      '                ("the fixed line", SUBAGENT_LINE),\n', "", PROBE_TESTS, "killed",
+      "the no-fixed-line cases"),
+]
+
+
+def run_tests(args: list[str], timeout: int = 240) -> tuple[bool, list[str], float]:
+    """Run pytest in the scratch copy. Returns (all passed, failing ids, seconds)."""
+    start = time.monotonic()
+    process = subprocess.Popen(
+        [str(PYTHON), "-m", "pytest", "-q", "--tb=no", "-rf", "-p", "no:cacheprovider", *args],
+        cwd=SCRATCH, env=CLEAN_ENV, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True,
+    )
+    try:
+        out, _ = process.communicate(timeout=timeout)
+        timed_out = False
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        out, _ = process.communicate()
+        timed_out = True
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    failing = re.findall(r"^FAILED (\S+)", out, flags=re.M)
+    if timed_out:
+        failing.append(f"(no result after {timeout} s: the run hung and was killed)")
+    return (process.returncode == 0 and not timed_out), failing, time.monotonic() - start
+
+
+def main() -> int:
+    if SCRATCH.exists():
+        shutil.rmtree(SCRATCH)
+    SCRATCH.mkdir(parents=True)
+    skip = {".git", ".venv", ".claude", ".mypy_cache", ".ruff_cache", ".pytest_cache", "node_modules"}
+    for entry in REPO.iterdir():
+        if entry.name in skip:
+            continue
+        target = SCRATCH / entry.name
+        if entry.is_dir():
+            shutil.copytree(entry, target, symlinks=True, ignore=shutil.ignore_patterns("__pycache__"))
+        else:
+            shutil.copy2(entry, target)
+    print("Targeted mutation checks, scratch copy:", SCRATCH)
+    print("Working copy untouched; one thing changed per mutation in the scratch copy of one shipped file.")
+    print()
+    bad = 0
+    for label, args in (("tests/test_hook_gates.py", GATES), ("tests/test_validate_targets.py", VALIDATE), ("tests/test_check_copilot_runtime.py", PROBE_TESTS)):
+        passed, failing, seconds = run_tests(args)
+        print(f"CONTROL (no mutation) {label} {' '.join(args[1:])!r}: {'all passed' if passed else 'FAILED ' + str(failing)} ({seconds:.1f} s)")
+        bad += not passed
+    print()
+    print("| # | mutation | file | result | tests that failed (first 3) |")
+    print("|---|---|---|---|---|")
+    for number, mutation in enumerate(MUTATIONS, 1):
+        path = SCRATCH / mutation.file
+        original = path.read_text(encoding="utf-8")
+        assert original.count(mutation.old) == 1, f"{mutation.name}: {mutation.old!r} occurs {original.count(mutation.old)} times"
+        try:
+            path.write_text(original.replace(mutation.old, mutation.new), encoding="utf-8")
+            passed, failing, seconds = run_tests(mutation.tests)
+        finally:
+            path.write_text(original, encoding="utf-8")
+        killed = not passed
+        result = "KILLED" if killed else "SURVIVED"
+        verdict_ok = killed == (mutation.expect == "killed")
+        bad += not verdict_ok
+        shown = "; ".join(failing[:3]) + (f" (+{len(failing) - 3} more)" if len(failing) > 3 else "")
+        note = "" if verdict_ok else " <-- UNEXPECTED"
+        print(f"| {number} | {mutation.name} | {mutation.file} | {result}{note} | {shown or '(none)'} |")
+        if mutation.why:
+            print(f"|   | note: {mutation.why} | | | |")
+    print()
+    print(f"Unexpected outcomes: {bad}")
+    return 1 if bad else 0
+
+
+sys.exit(main())

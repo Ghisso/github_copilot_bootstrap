@@ -3,7 +3,7 @@ Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1
 Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
 uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
 Command: uv run python scripts/check_copilot_runtime.py --require   (first of two final runs; both PASS, 48 lines)
-Wall time of this run: 0m15.903s
+Wall time of this run: 0m13.776s
 
 VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
 Copilot SDK version: 1.0.30-preview.0
@@ -13,7 +13,7 @@ PASS hooks-untrusted: 0 hooks before trust
 PASS hooks-sources: 28 hooks (.github/hooks/hooks.json: 14, .claude/settings.json: 14)
 PASS hooks-subfolder: 28 hooks (.github/hooks/hooks.json: 14, .claude/settings.json: 14)
 PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
-PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session 01b8a947
+PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session ce4dac2d
 PASS state-sync-once: 1 state-sync pull line in .claude/session_logs/hooks-errors.log
 PASS session-reminder: the first user message holds the reminder (183 characters)
 PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
@@ -36,7 +36,7 @@ PASS deny-workflow-manage: Tool blocked by policy: dynamic_workflows_manage runs
 PASS sql-no-file-write: 2 steps refused by the tool: Blocked SQL statement
 PASS subagent-deny-git-reset: Blocked dangerous git operation: git reset --hard
 PASS subagent-store-sql-refused: 1 steps refused by the tool: Blocked SQL statement
-PASS subagent-context: the first user message of sub-agent coder and of sub-agent reviewer holds the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+PASS subagent-context: the first user message of each of coder and reviewer holds the heading 'GitHub Copilot Workspace Adapter' and the fixed line
 PASS session-codex-patch: finished after 7 scripted model replies
 PASS patch-plain-allowed: 1 steps succeeded with no hook question
 PASS patch-secret-denied: Protected file blocked by policy: .env
@@ -132,7 +132,7 @@ You are *not* operating in a sandboxed environment dedicated to this task. You m
 </environment_limitations>
 </system_reminder>
 --- main user message [2] (101 characters)
-<current_datetime>2026-11-18T04:03:17.524+09:00</current_datetime>
+<current_datetime>2026-11-18T04:41:37.761+09:00</current_datetime>
 
 PROBE-MARKER Run the probe steps.
 CONTAINMENT: the generated guidance file is 1676 bytes and 17 lines
@@ -141,7 +141,7 @@ CONTAINMENT PROBE-CHILD-reviewer: user messages 1; whole file text, line breaks 
 CONTAINMENT PROBE-CHILD-general: user messages 1; whole file text, line breaks included, in the first user message: True; fixed line: True; order file text, fixed line, task prompt: True
 === RECEIVED by PROBE-CHILD-coder: 1 user message(s), tools offered: 11
 --- user message [0] (1947 characters), exact:
-<current_datetime>2026-11-18T04:03:24.070+09:00</current_datetime>
+<current_datetime>2026-11-18T04:41:43.736+09:00</current_datetime>
 
 # GitHub Copilot Workspace Adapter
 
@@ -167,7 +167,7 @@ PROBE-CHILD-coder say ok
 === end of PROBE-CHILD-coder
 === RECEIVED by PROBE-CHILD-reviewer: 1 user message(s), tools offered: 3
 --- user message [0] (1950 characters), exact:
-<current_datetime>2026-11-18T04:03:24.402+09:00</current_datetime>
+<current_datetime>2026-11-18T04:41:44.073+09:00</current_datetime>
 
 # GitHub Copilot Workspace Adapter
 
@@ -193,7 +193,7 @@ PROBE-CHILD-reviewer say ok
 === end of PROBE-CHILD-reviewer
 === RECEIVED by PROBE-CHILD-general: 1 user message(s), tools offered: 21
 --- user message [0] (1962 characters), exact:
-<current_datetime>2026-11-18T04:03:23.441+09:00</current_datetime>
+<current_datetime>2026-11-18T04:41:43.111+09:00</current_datetime>
 
 # GitHub Copilot Workspace Adapter
 

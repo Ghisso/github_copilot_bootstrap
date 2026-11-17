@@ -1,0 +1,66 @@
+Phase E targeted mutation checks (review round 1)
+Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
+uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
+Tool: phase-E-mutation-harness.py.txt. The whole repository (without .git, .venv, and .claude) is copied to a scratch folder;
+ONE thing is changed in the scratch copy of one shipped file, the tests that must catch it run there, and the file is restored.
+The working copy is never touched. KILLED means at least one of those tests failed (a hang counts, with the process group killed).
+Each test group first runs unmutated in the scratch copy and must pass (the CONTROL lines).
+
+Targeted mutation checks, scratch copy: /tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseE/mutants
+Working copy untouched; one thing changed per mutation in the scratch copy of one shipped file.
+
+CONTROL (no mutation) tests/test_hook_gates.py '-k subagent or session_mode or session_reminder or context_hook': all passed (1.6 s)
+CONTROL (no mutation) tests/test_validate_targets.py '-k copilot': all passed (2.5 s)
+CONTROL (no mutation) tests/test_check_copilot_runtime.py '-k reminder or sub_agent or subagent': all passed (0.3 s)
+
+| # | mutation | file | result | tests that failed (first 3) |
+|---|---|---|---|---|
+| 1 | remove the real-path comparison (a link anywhere on the way) | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[folder-for-github-is-a-link] |
+|   | note: the `.github` folder link case must fail | | | |
+| 2 | drop O_NONBLOCK (a named pipe blocks the open) | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[named-pipe] |
+|   | note: the named-pipe case; the test times out | | | |
+| 3 | LIMIT + 1 -> LIMIT (a file of 2049 bytes is read as 2048) | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[over-the-limit] |
+|   | note: the over-the-limit case | | | |
+| 4 | errors="replace" -> "strict" (invalid UTF-8) | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_prints_valid_json_for_any_guidance_text[invalid-utf8] |
+|   | note: the invalid-utf8 case | | | |
+| 5 | remove the S_ISREG check | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[named-pipe] |
+|   | note: the named-pipe case (a folder still fails on read, so it warns and falls back anyway) | | | |
+| 6 | remove -I from python3 (a json.py in the folder or on PYTHONPATH) | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_is_not_hijacked_by_a_module_named_json[repository-root]; tests/test_hook_gates.py::test_the_subagent_hook_is_not_hijacked_by_a_module_named_json[subfolder]; tests/test_hook_gates.py::test_the_subagent_hook_is_not_hijacked_by_a_module_named_json[pythonpath] |
+|   | note: the json.py shadow tests | | | |
+| 7 | remove the error trap | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_warns_and_exits_zero_when_python_exits_non_zero |
+|   | note: the failing-python3 test | | | |
+| 8 | revert the closed-stdin fix | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_treats_closed_standard_input_as_malformed |
+|   | note: the closed-stdin test | | | |
+| 9 | restore the old `unsupported provider` text in the reminder | shared/hooks/scripts/reporting-reminder.sh | KILLED | tests/test_hook_gates.py::test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it[session-claude-code-unsupported; tests/test_hook_gates.py::test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it[session-openai-codex-unsupported; tests/test_hook_gates.py::test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it[prompt-github-copilot-unsupported (+2 more) |
+|   | note: the exact-warning test | | | |
+| 10 | reporting-reminder.sh accepts `prompt` for github-copilot | shared/hooks/scripts/reporting-reminder.sh | KILLED | tests/test_hook_gates.py::test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it[prompt-github-copilot-unsupported |
+|   | note: test_the_session_mode_is_accepted_only_for_the_copilot_client_and_only_by_it | | | |
+| 11 | validate_targets.py: limit 2048 -> 2049 | scripts/validate_targets.py | KILLED | tests/test_validate_targets.py::test_the_copilot_event_set_and_the_guidance_budget_are_pinned; tests/test_validate_targets.py::test_the_copilot_guidance_budget_passes_at_the_limit_and_fails_one_byte_over; tests/test_validate_targets.py::test_the_copilot_guidance_budget_counts_bytes_not_characters |
+|   | note: the two budget tests | | | |
+| 12 | extra: remove the python3 presence check | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_warns_and_exits_zero_when_python_is_missing |
+|   | note: the python-missing test, now exact on the warning text | | | |
+| 13 | extra: remove the provider check | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_serves_only_the_copilot_client[arguments0]; tests/test_hook_gates.py::test_the_subagent_hook_serves_only_the_copilot_client[arguments1]; tests/test_hook_gates.py::test_the_subagent_hook_serves_only_the_copilot_client[arguments2] (+1 more) |
+|   | note: serves-only-Copilot test | | | |
+| 14 | extra: remove O_NOFOLLOW | shared/hooks/scripts/subagent-context.sh | SURVIVED | (none) |
+|   | note: second layer only: the real-path comparison already refuses a link, so O_NOFOLLOW guards the gap between the comparison and the open, which no test can make | | | |
+| 15 | extra: drop the top-level copy of the context | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_gives_the_generated_guidance_and_the_fixed_line[pascal]; tests/test_hook_gates.py::test_the_subagent_hook_gives_the_generated_guidance_and_the_fixed_line[camel]; tests/test_hook_gates.py::test_the_subagent_hook_prints_valid_json_for_any_guidance_text[quotes] (+24 more) |
+|   | note: the answer-shape equality | | | |
+| 16 | extra: an empty file adds a blank line before the fixed line | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[missing]; tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[empty-file]; tests/test_hook_gates.py::test_the_subagent_hook_gives_only_the_fixed_line_for_an_unusable_guidance_file[over-the-limit] (+7 more) |
+|   | note: the empty-file case | | | |
+| 17 | extra: any JSON value but null counts as input | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_prints_nothing_for_malformed_input[array]; tests/test_hook_gates.py::test_the_subagent_hook_prints_nothing_for_malformed_input[string]; tests/test_hook_gates.py::test_the_subagent_hook_prints_nothing_for_malformed_input[number] |
+|   | note: the array, string, number cases | | | |
+| 18 | extra: ensure_ascii=False | shared/hooks/scripts/subagent-context.sh | KILLED | tests/test_hook_gates.py::test_the_subagent_hook_prints_valid_json_for_any_guidance_text[non-ascii]; tests/test_hook_gates.py::test_the_subagent_hook_prints_valid_json_for_any_guidance_text[invalid-utf8] |
+|   | note: the non-ASCII case | | | |
+| 19 | extra: the session reminder prints a PostToolUse event | shared/hooks/scripts/reporting-reminder.sh | KILLED | tests/test_hook_gates.py::test_the_session_reminder_prints_the_combined_answer_for_the_copilot_client; tests/test_hook_gates.py::test_the_session_reminder_ignores_an_exported_target_id; tests/test_hook_gates.py::test_the_launcher_prints_the_session_reminder_in_a_copilot_hook_environment[no-marker] (+1 more) |
+|   | note: the combined-answer test | | | |
+| 20 | extra: validator expects no SubagentStart event | scripts/validate_targets.py | KILLED | tests/test_validate_targets.py::test_the_copilot_event_set_and_the_guidance_budget_are_pinned; tests/test_validate_targets.py::test_the_validator_names_a_copilot_hook_file_without_the_sub_agent_event |
+|   | note: the pinned event set | | | |
+| 21 | extra: validator ignores the handler timeout | scripts/validate_targets.py | KILLED | tests/test_validate_targets.py::test_the_copilot_context_hook_check_names_each_drifted_handler[subagent-timeout]; tests/test_validate_targets.py::test_the_copilot_context_hook_check_names_each_drifted_handler[reminder-timeout-sec] |
+|   | note: the timeout cases | | | |
+| 22 | extra: probe session-reminder accepts the reminder in any user message | scripts/check_copilot_runtime.py | KILLED | tests/test_check_copilot_runtime.py::test_the_session_reminder_check_fails_on_a_wrong_first_request[the-reminder-came-after-another-message] |
+|   | note: the later-message case | | | |
+| 23 | extra: probe subagent-context ignores the fixed line | scripts/check_copilot_runtime.py | KILLED | tests/test_check_copilot_runtime.py::test_the_sub_agent_check_fails_on_a_wrong_first_request[the-coder-got-only-its-task]; tests/test_check_copilot_runtime.py::test_the_sub_agent_check_fails_on_a_wrong_first_request[the-reviewer-got-no-fixed-line]; tests/test_check_copilot_runtime.py::test_the_sub_agent_check_fails_on_a_wrong_first_request[the-fixed-line-is-cut] |
+|   | note: the no-fixed-line cases | | | |
+
+Unexpected outcomes: 0
