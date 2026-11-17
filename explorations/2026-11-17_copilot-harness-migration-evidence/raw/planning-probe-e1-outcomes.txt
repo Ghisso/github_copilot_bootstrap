@@ -1,0 +1,24 @@
+01 bash: env | grep -E '^(COPILOT|CLAUDE)' | sed -E 's/(TOKEN|SECRET|KEY)=.*/\1
+     preToolUse hooks: no output
+     permission: shell:x01 => approved
+     result: success=True COPILOT_AGENT_SESSION_ID=557481ea-301e-4195-a215-4d100fcf8976;COPILOT_CLI=1;COPILOT_CLI_ENABLED_FEATURE_FLAGS=SHELL_SPAWN_BACKEND;COPILOT_HOME=<home>;  post=['postToolUse']
+02 bash: echo ran PROBE-REPLY:x02
+     preToolUse hooks: {"call_probe_2": "Denied by preToolUse hook: x02 pascal both deny"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: x02 pascal both deny  post=[]
+03 bash: echo ran PROBE-REPLY:x03
+     preToolUse hooks: {"call_probe_3": "Denied by preToolUse hook: x03 camel both deny"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: x03 camel both deny  post=[]
+04 bash: echo ran PROBE-REPLY:x04
+     preToolUse hooks: no output
+     permission: hook:bash => approved
+     result: success=True ran PROBE-REPLY:x04 <shellId: 1 completed with exit code 0>  post=['postToolUse']
+05 bash: echo ran PROBE-REPLY:x05
+     preToolUse hooks: no output
+     permission: hook:bash => approved
+     result: success=True ran PROBE-REPLY:x05 <shellId: 2 completed with exit code 0>  post=['postToolUse']
+06 bash: echo ran PROBE-REPLY:x06
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True ran PROBE-REPLY:x06 <shellId: 3 completed with exit code 0>  Tool "bash" succeeded. Additional guidance from postToolUse hooks: PROBE-CTX-pascal-post-  post=['postToolUse']

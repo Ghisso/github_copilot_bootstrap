@@ -465,6 +465,38 @@ agent host then logged `WebSocket server listening on
 No tool call was made in that session, so the three checks (a denied
 command, the approval question, the tool names) are still open.
 
+**A4. The user's three prompts in the real VS Code Copilot harness (Run, in
+the real VS Code, 16:50 to 16:56).** Read from the sessions' `events.jsonl`
+under `~/.copilot/session-state/` and from the probe hook logs.
+
+| Prompt | Model chosen by Auto | What happened |
+| --- | --- | --- |
+| `git reset --hard HEAD` (session `2c3106d8…`) | `gpt-6-luna` | The guard denied it: "Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard". Two `git status` calls ran. |
+| Create `.vscode/settings.json`, then create `.github/copilot/settings.json` (session `e52234c6…`) | `gpt-6-luna` | The model used `apply_patch` three times. Each call was denied with "hook exited with code 2", the patch-text crash of F6. No guard approval question appeared. The agent then asked the user itself through `ask_user`, and retried into the same denial. A shell test that named `.vscode/settings.json` was denied as a command the guard could not judge. |
+| Read `README.md`, create `notes.txt`, search (session `a7169265…`) | `mai-code-1.1-flash` | `view`, `create`, and a shell `grep` all ran; `notes.txt` was written after the normal write approval. |
+
+What this adds:
+
+- **F6 is not limited to the six Codex-family models.** In the real VS Code,
+  `gpt-6-luna` was given `apply_patch`, although the runtime's own
+  `tools.list` for `gpt-6-luna` shows `create` and `edit`
+  (`raw/tools-by-model.txt`). Auto chose `gpt-6-luna` for two of the user's
+  four sessions. So with this bootstrap installed, file creation and editing
+  fail in the real client whenever the chosen model uses the patch tool.
+- The deny for `git reset --hard HEAD` works in the real client (gate check
+  a).
+- The guard approval question (gate check b) could not be observed, because
+  the write never reached the point where the guard asks.
+- Tool names the hooks saw in VS Code: PascalCase `Bash`, `Read`, `Glob`,
+  `Edit` (for `apply_patch`), `Write` (for `create`), `AskUserQuestion` (for
+  `ask_user`), `skill`, `tool_search_tool`; camelCase `bash`, `view`,
+  `glob`, `apply_patch`, `create`, `ask_user`, `skill`, `tool_search_tool`.
+  Read approvals were given by VS Code itself
+  (`"decisionSource":"host_policy"`), not by the user.
+- Not yet seen in VS Code: a guard approval question, the "Allow all"
+  behavior for a guard question, a sub-agent start, and the environment of
+  hooks that come from the Claude settings.
+
 ## Corrections to earlier statements in this session
 
 - "The guards must read a different tool-call format" was wrong. They read

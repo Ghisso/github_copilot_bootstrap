@@ -1,0 +1,37 @@
+[0] main=True lastRole=user tools=26 ctxHits=[]
+    tool names: bash, read_bash, stop_bash, list_bash, view, create, edit, web_fetch, semantic_code_search, skill, run_dynamic_workflow, dynamic_workflows_manage, sql, read_agent, list_agents, write_agent, grep, glob, task, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id, semble-find_related, semble-search
+    system prompt chars: 48645
+[1] main=False lastRole=user tools=18 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-substart-top", "PROBE-CTX-camel-substart-top"]}]
+[2] main=None lastRole=None tools=18 ctxHits=null
+[3] main=False lastRole=tool tools=18 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-substart-top", "PROBE-CTX-camel-substart-top"]}]
+    tool result seen by model: # probe consumer
+
+[4] main=True lastRole=tool tools=26 ctxHits=[]
+    tool result seen by model: child PROBE-CHILD-coder complete
+[5] main=False lastRole=user tools=10 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-substart-top", "PROBE-CTX-camel-substart-top"]}]
+[6] main=None lastRole=None tools=10 ctxHits=null
+[7] main=False lastRole=tool tools=10 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-substart-top", "PROBE-CTX-camel-substart-top"]}]
+    tool result seen by model: # probe consumer
+
+[8] main=True lastRole=tool tools=26 ctxHits=[]
+    tool result seen by model: child PROBE-CHILD-reviewer complete
+session.mcp_server_status_changed {"serverName": "semble", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context7", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "semble", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "semble", "toolCount": 2}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context-mode", "toolCount": 3}
+session.mcp_server_status_changed {"serverName": "context7", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context7", "toolCount": 2}
+session.skills_loaded 37 skills; sources: ['project']
+session.mcp_servers_loaded {"servers": [{"name": "context-mode", "status": "connected", "source": "workspace", "serverMetadata": {"instructions": null}}, {"name": "context7", "status": "connected", "source": "workspace", "displayName": "Context7", "serverMetadata": {"instructions": "Use this server to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service \u2014 even well-known ones 
+session.tools_updated {"model": "probe-model"}
+session.mcp_server_tools_loaded {"serverName": "context7", "toolCount": 2}
+session.mcp_server_tools_loaded {"serverName": "context-mode", "toolCount": 3}
+session.mcp_server_tools_loaded {"serverName": "semble", "toolCount": 2}
+session.mcp_server_status_changed {"serverName": "context7", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "semble", "status": "pending"}
+session.tools_updated {"model": "probe-model"}
+session.tools_updated {"model": "probe-model"}

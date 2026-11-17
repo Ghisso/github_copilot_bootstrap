@@ -1,0 +1,4 @@
+[
+  { "tag": "_always", "label": "pascal-SubagentStart", "reply": { "additionalContext": "PROBE-CTX-pascal-substart-top", "hookSpecificOutput": { "hookEventName": "SubagentStart", "additionalContext": "PROBE-CTX-pascal-substart-nested" } } },
+  { "tag": "_always", "label": "camel-subagentStart", "reply": { "additionalContext": "PROBE-CTX-camel-substart-top" } }
+]

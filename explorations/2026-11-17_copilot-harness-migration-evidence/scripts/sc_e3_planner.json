@@ -1,0 +1,13 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 300000,
+  "steps": [
+    { "tool": "bash", "args": { "command": "sleep 4; echo async-done", "description": "async", "mode": "async" } },
+    { "tool": "read_bash", "args": { "shellId": "0", "delay": 1 } },
+    { "tool": "list_bash", "args": {} },
+    { "tool": "stop_bash", "args": { "shellId": "0" } },
+    { "tool": "list_agents", "args": {} }
+  ]
+}

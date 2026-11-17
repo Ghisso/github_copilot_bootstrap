@@ -1,0 +1,15 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 300000,
+  "steps": [
+    { "tool": "task", "args": { "description": "probe coder", "prompt": "PROBE-CHILD-coder run the child steps", "agent_type": "coder", "name": "probe-coder", "mode": "sync" } },
+    { "tool": "task", "args": { "description": "probe reviewer", "prompt": "PROBE-CHILD-reviewer run the child steps", "agent_type": "reviewer", "name": "probe-reviewer", "mode": "sync" } }
+  ],
+  "childSteps": {
+    "default": [
+      { "tool": "view", "args": { "path": "{{PROJECT}}/README.md" } }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+[0] main=True lastRole=user tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}]
+    tool names: bash, read_bash, stop_bash, list_bash, view, create, edit, web_fetch, semantic_code_search, skill, run_dynamic_workflow, dynamic_workflows_manage, sql, read_agent, list_agents, write_agent, grep, glob, task, context-mode-ctx_index, context-mode-ctx_search, context-mode-ctx_stats, context7-query-docs, context7-resolve-library-id, semble-find_related, semble-search
+    system prompt chars: 48645
+[1] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}]
+    tool result seen by model: COPILOT_AGENT_SESSION_ID=557481ea-301e-4195-a215-4d100fcf8976;COPILOT_CLI=1;COPILOT_CLI_ENABLED_FEATURE_FLAGS=SHELL_SPAWN_BACKEND;COPILOT_HOME=<home>;COPILOT_RUNTIME_PROCESS_FILE_LOGGING=1;
+PROBE-REPLY:x01
+<shellId: 0 completed with exit code 0>
+[2] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}]
+    tool result seen by model: Denied by preToolUse hook: x02 pascal both deny
+[3] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}]
+    tool result seen by model: Denied by preToolUse hook: x03 camel both deny
+[4] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}]
+    tool result seen by model: ran PROBE-REPLY:x04
+<shellId: 1 completed with exit code 0>
+[5] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}]
+    tool result seen by model: ran PROBE-REPLY:x05
+<shellId: 2 completed with exit code 0>
+[6] main=True lastRole=tool tools=26 ctxHits=[{"role": "user", "found": ["PROBE-CTX-pascal-ss-top"]}, {"role": "tool", "found": ["PROBE-CTX-pascal-post-top"]}]
+    tool result seen by model: ran PROBE-REPLY:x06
+<shellId: 3 completed with exit code 0>
+
+Tool "bash" succeeded. Additional guidance from postToolUse hooks:
+PROBE-CTX-pascal-post-top
+session.mcp_server_status_changed {"serverName": "context7", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "semble", "status": "pending"}
+session.mcp_server_status_changed {"serverName": "context-mode", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context-mode", "toolCount": 3}
+session.mcp_server_status_changed {"serverName": "semble", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "semble", "toolCount": 2}
+session.mcp_server_status_changed {"serverName": "context7", "status": "connected", "configSource": "workspace"}
+session.mcp_server_tools_loaded {"serverName": "context7", "toolCount": 2}
+session.skills_loaded 37 skills; sources: ['project']
+session.mcp_servers_loaded {"servers": [{"name": "context-mode", "status": "connected", "source": "workspace", "serverMetadata": {"instructions": null}}, {"name": "context7", "status": "connected", "source": "workspace", "displayName": "Context7", "serverMetadata": {"instructions": "Use this server to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service \u2014 even well-known ones 
+session.tools_updated {"model": "probe-model"}

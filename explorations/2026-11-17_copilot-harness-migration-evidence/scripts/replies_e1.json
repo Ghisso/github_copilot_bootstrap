@@ -1,0 +1,8 @@
+[
+  { "tag": "_always", "label": "pascal-SessionStart", "reply": { "additionalContext": "PROBE-CTX-pascal-ss-top", "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "PROBE-CTX-pascal-ss-nested" } } },
+  { "tag": "x02", "label": "pascal-PreToolUse", "reply": { "permissionDecision": "deny", "permissionDecisionReason": "x02 pascal both deny", "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "x02 pascal both deny" } } },
+  { "tag": "x03", "label": "camel-preToolUse", "reply": { "permissionDecision": "deny", "permissionDecisionReason": "x03 camel both deny", "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "x03 camel both deny" } } },
+  { "tag": "x04", "label": "pascal-PreToolUse", "reply": { "permissionDecision": "ask", "permissionDecisionReason": "x04 pascal both ask", "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": "x04 pascal both ask" } } },
+  { "tag": "x05", "label": "camel-preToolUse", "reply": { "permissionDecision": "ask", "permissionDecisionReason": "x05 camel both ask", "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": "x05 camel both ask" } } },
+  { "tag": "x06", "label": "pascal-PostToolUse", "reply": { "additionalContext": "PROBE-CTX-pascal-post-top", "hookSpecificOutput": { "hookEventName": "PostToolUse", "additionalContext": "PROBE-CTX-pascal-post-nested" } } }
+]

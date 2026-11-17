@@ -1,0 +1,24 @@
+01 bash: sleep 4; echo async-done
+     preToolUse hooks: no output
+     permission: shell:async => approved
+     result: success=True <command started in background with shellId: 0>  post=['postToolUse']
+02 read_bash: {"shellId": "0", "delay": 1}
+     preToolUse hooks: {"call_probe_2": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+03 list_bash: {}
+     preToolUse hooks: {"call_probe_3": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+04 stop_bash: {"shellId": "0"}
+     preToolUse hooks: {"call_probe_4": "Denied by preToolUse hook: hook exited with code 2"}
+     permission: none requested
+     result: success=False Denied by preToolUse hook: hook exited with code 2  post=[]
+05 list_agents: {}
+     preToolUse hooks: no output
+     permission: none requested
+     result: success=True <no background agents>  post=['postToolUse']
+06 read_bash: {"shellId": "0", "delay": 0}
+     preToolUse hooks: 
+     permission: none requested
+     result: success=True async-done <shellId: 0 completed with exit code 0>  post=[]

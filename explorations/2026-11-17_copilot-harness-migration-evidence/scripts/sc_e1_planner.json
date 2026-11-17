@@ -1,0 +1,14 @@
+{
+  "model": "probe-model",
+  "marker": "PROBE-MARKER",
+  "trust": true,
+  "timeoutMs": 300000,
+  "steps": [
+    { "tool": "bash", "args": { "command": "env | grep -E '^(COPILOT|CLAUDE)' | sed -E 's/(TOKEN|SECRET|KEY)=.*/\\1=<redacted>/' | sort | tr '\\n' ';'; echo; echo PROBE-REPLY:x01", "description": "x01" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:x02", "description": "x02" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:x03", "description": "x03" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:x04", "description": "x04" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:x05", "description": "x05" } },
+    { "tool": "bash", "args": { "command": "echo ran PROBE-REPLY:x06", "description": "x06" } }
+  ]
+}

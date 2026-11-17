@@ -1,0 +1,16 @@
+01 task: {"description": "probe coder", "prompt": "PROBE-CHILD-coder run the ch
+     preToolUse hooks: no output
+     permission: none requested
+     result:   post=[]
+02 view: <project>/README.md
+     preToolUse hooks: no output
+     permission: read:Read file: <project>/README.md => approved
+     result: success=True child PROBE-CHILD-coder complete  post=['postToolUse', 'postToolUse']
+03 task: {"description": "probe reviewer", "prompt": "PROBE-CHILD-reviewer run 
+     preToolUse hooks: no output
+     permission: none requested
+     result:   post=[]
+04 view: <project>/README.md
+     preToolUse hooks: no output
+     permission: read:Read file: <project>/README.md => approved
+     result: success=True child PROBE-CHILD-reviewer complete  post=['postToolUse', 'postToolUse']

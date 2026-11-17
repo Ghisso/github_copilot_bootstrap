@@ -1,0 +1,222 @@
+---
+name: 2026-11-17_phase-A-copilot-runtime-probe
+type: small-plan
+parent_plan: copilot-harness-migration
+phase_index: 1
+# status must occur exactly once: planned | in-progress | paused | complete | cancelled
+# New phase files default to planned (not yet started); the branch-creation
+# and post-commit hooks flip the active phase to in-progress automatically.
+status: planned
+closeout_session_log:
+# Pause fields (required only when status is paused):
+# paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
+# paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
+# pause_session_log: <repository-relative readable UTF-8 PAUSED session log>
+# Cancellation fields (required only when status is cancelled):
+# cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
+# cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
+# cancelled_evidence: <repository-relative readable UTF-8 CANCELLED artifact>
+---
+
+# Small Plan: 2026-11-17_phase-A-copilot-runtime-probe
+
+## Scope
+
+This phase adds an opt-in, offline check of the real Copilot runtime that
+ships inside VS Code (REQ-001). The check runs the runtime through its own
+SDK with a private data folder, no login, and a small local server that
+plays the model and returns scripted tool calls. So it makes no model call
+and needs no account. It installs a fresh copy of this bootstrap into a
+temporary folder and checks the guard results that are correct today. Later
+phases add the checks for their own fixes, and list this command in their
+required verification.
+
+The method is the evidence harness in
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/scripts/`
+(`step2_discover.mjs`, `step3_session.mjs`, `show_outcomes.py`,
+`sc2_guards.json`). The runtime behavior it relies on was observed there and
+in planning probes P1 to P3 (big plan). It does not exercise VS Code's own
+layer: approval dialogs, "Allow all", and the tools VS Code adds.
+
+## Steps
+
+- [ ] **1. Write the failing tests first.**
+  Owner: coder. Files: create `tests/test_check_copilot_runtime.py`.
+  Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
+  `.claude/skills/testing-patterns/SKILL.md`.
+  Cases. None of them starts Node or the runtime:
+  - Runtime discovery picks the newest folder under a fake
+    `~/.vscode-server/bin/*/` that has both `node` and
+    `node_modules/@github/copilot-sdk/dist/index.js`. It skips folders that
+    lack either. `--vscode-bin DIR` overrides discovery.
+  - With no runtime found, `--require` exits 1 with a FAIL line. Without
+    `--require` the probe exits 0 with a WARN line.
+  - The runtime environment builder removes every variable whose name
+    starts with `CLAUDE`, `ANTHROPIC`, or `CLAUDECODE`, and keeps `PATH` and
+    `HOME`.
+  - `evaluate` turns a small synthetic event list into the right PASS and
+    FAIL results. Use the event names and fields that `show_outcomes.py`
+    reads: `tool.execution_start`, `hook.end`, `permission.requested`,
+    `tool.execution_complete`. Cases: one denial, one hook question, one
+    plain success.
+  - `scripts/copilot_runtime_probe.mjs` is a regular file that the Python
+    script names.
+  Acceptance: the tests fail before step 2 and pass after it.
+
+- [ ] **2. Add the probe.**
+  Owner: coder. Files: create `scripts/check_copilot_runtime.py` and
+  `scripts/copilot_runtime_probe.mjs`.
+  Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
+  `.claude/skills/integration-gate-spike/SKILL.md`,
+  `.claude/skills/code-style/SKILL.md`.
+  Contracts (adapt bodies to the codebase):
+  - `find_runtime(vscode_bin: Path | None) -> RuntimeInfo | None`.
+    `RuntimeInfo` holds `node`, `sdk_root`, `sdk_version` (from the SDK's
+    `package.json`), and `vscode_commit` (the folder name).
+  - `prepare_project(parent: Path) -> Path`: `git init -b dev`, then
+    `scripts/install_bootstrap.py <dir> --mode full --local-only`, with no
+    commit, like the spike's probe project.
+  - `run_session(runtime: RuntimeInfo, project: Path, scenario: dict[str, object], home: Path) -> SessionRecord`:
+    writes the scenario as JSON, starts the Node runner with VS Code's
+    `node`, and reads back the events, permission requests, model requests,
+    and summary.
+  - `evaluate(record: SessionRecord, checks: Sequence[Check]) -> list[CheckResult]`.
+  - `main(argv: Sequence[str] | None = None) -> int`, with these options:
+    - `--require` and `--vscode-bin DIR`;
+    - `--format text|json`;
+    - `--keep`, which leaves the temporary folders for inspection;
+    - `--discover DIR`, which prints what the runtime discovers in DIR
+      (hooks, MCP servers, instructions, skills, agents) and runs no
+      session.
+
+  The Node runner is adapted from `step3_session.mjs` and
+  `step2_discover.mjs`, without the probe-hook reply files:
+  - `CopilotClient` with `baseDirectory` in the temporary folder,
+    `useLoggedInUser: false`, and the stripped environment;
+  - the session with `provider: {type: "openai", baseUrl, apiKey, wireApi: "completions"}`
+    pointed at its own 127.0.0.1 server;
+  - folder trust added through the session's `folderTrust.addTrusted` (the
+    record stays in the private data folder);
+  - every session event recorded;
+  - the first request of each sub-agent recorded, for Phase E.
+
+  Must:
+  - print the VS Code commit, the SDK version, and the runtime version from
+    `client.getStatus()`;
+  - stop each session after 150 seconds and the whole run after 480
+    seconds, as FAIL;
+  - remove the temporary folders unless `--keep` is given.
+
+  Must not:
+  - write to `~/.copilot`, VS Code settings, or this repository;
+  - log in, or contact any host other than 127.0.0.1 for the model;
+  - be called by `verify.py` or by pytest;
+  - assert anything about MCP tools: the project's servers may need the
+    network, so they are not part of any check.
+
+  Acceptance: step 1 passes. Mypy and ruff are clean on the new Python file.
+
+- [ ] **3. Add the baseline checks.**
+  Owner: coder. Files: `scripts/check_copilot_runtime.py`.
+  Required Skills: `.claude/skills/ponytail/SKILL.md` (full),
+  `.claude/skills/integration-gate-spike/SKILL.md`.
+  - Session `main` uses both hook sources (the real full install), model
+    `probe-model`, and the steps ported from `sc2_guards.json`.
+  - Expected values come from the policy in `docs/target-mapping.md` and
+    the F3 table, not from running the code.
+
+  | Check | Tool call | Expected |
+  | --- | --- | --- |
+  | `hooks-untrusted` | discovery before trust | 0 hooks |
+  | `hooks-sources` | discovery after trust | hooks listed from `.github/hooks/hooks.json` and from `.claude/settings.json` |
+  | `deny-git-reset` | bash `git reset --hard HEAD` | denied; reason has `Blocked dangerous git operation` |
+  | `deny-force-push` | bash `git push --force origin dev` | denied; same reason |
+  | `deny-secret-rm` | bash `rm -f .env` | denied; reason has `Protected file blocked by policy: .env` |
+  | `deny-secret-view` | view `.env` | denied; same reason |
+  | `ask-vscode-settings` | create `.vscode/settings.json` | at least one question of kind `hook`; not denied |
+  | `ask-agent-wrapper` | edit `.github/agents/coder.agent.md` | at least one question of kind `hook` |
+  | `deny-branch` | bash `git checkout -b probe_implementation` | denied by the branch guard |
+  | `deny-commit` | bash `git commit -m probe` | denied; reason has `commit gate failed for github-copilot` |
+  | `deny-pr` | bash `gh pr create --base dev --title probe --body probe` | denied by the PR gate |
+  | `allow-plain` | bash `echo probe`; view `README.md`; create `probe-plain.txt`; edit it | success; no question of kind `hook` |
+
+  Acceptance: `uv run python scripts/check_copilot_runtime.py --require --format text`
+  prints PASS for every check and the three version lines.
+
+- [ ] **4. Document the probe.**
+  Owner: coder. Files: `docs/runtime-checks.md`, under "VS Code Copilot
+  evidence boundary". Add a subsection, "Copilot runtime probe".
+  Required Skills: `.claude/skills/documentation/SKILL.md`,
+  `.claude/skills/ponytail/SKILL.md` (full).
+  Content:
+  - what the probe proves and what it does not (VS Code's own layer);
+  - the command, and how the runtime is found;
+  - that it makes no model call and needs no account;
+  - that it is opt-in and not part of `verify.py`;
+  - the integration-gate-spike evidence table (unknown, result, evidence:
+    SDK options, trust, event names, tool sets per model), citing the
+    evidence folder and probes P1 to P3;
+  - that it starts the runtime through the SDK, not through VS Code's agent
+    host, so the `/run/user/<uid>` socket fault (A1) does not stop it.
+
+  Use plain language. Say that VS Code hooks are "in preview".
+
+- [ ] **5. Review.**
+  Owner: reviewer.
+  Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,
+  `documentation`.
+  Focus:
+  - no user-config writes;
+  - no network except 127.0.0.1;
+  - the time limits;
+  - each check fails on a wrong result, not only on a crash;
+  - the docs claim nothing beyond the run.
+
+## Verification
+
+<!-- Every non-comment line in a `bash`/`sh` block below is a required item:
+     a shell command `verify closeout` runs itself, from the repository
+     root, and that must exit 0. Never list `verify.py closeout` itself.
+     Anything a script cannot run — an interactive probe, a host session, a
+     manual inspection — belongs under `## Optional Verification` instead.
+     See the Verification Evidence Contract in
+     `.claude/instructions/workflow.instructions.md`. -->
+
+```bash
+uv run python scripts/generate_targets.py --all
+uv run pytest tests/test_check_copilot_runtime.py -q --tb=short
+uv run python scripts/check_copilot_runtime.py --require --format text
+grep -q -F 'Copilot runtime probe' docs/runtime-checks.md
+uv run python scripts/validate_targets.py
+uv run python scripts/check_runtime.py
+uv run python scripts/validate_plan_frontmatter.py
+uv run python .claude/scripts/verify.py phase --format text
+```
+
+## Optional Verification
+
+<!-- The only place a check may be conditional or non-executable. One `- `
+     bullet per item, numbered in the order it appears. -->
+
+- Run the probe a second time and record that every check gives the same result (no flaky check).
+- Record the printed VS Code commit, SDK version, and runtime version in the closeout session log.
+
+## Closeout Checklist
+
+Run the numbered CLOSEOUT sequence in `.claude/instructions/closeout.instructions.md` in order. Tick both boxes at its step 2. Later steps bind this file's bytes, so do not edit this file after step 2.
+
+- [ ] Step 1: documentation updated, or skipped as pure-internal with a reason
+- [ ] Step 2: this plan set to `status: complete` with `closeout_session_log`, every step ticked, and LEARN entries or the no-lessons marker recorded
+
+## Pause Checkpoint
+
+Use only after the user explicitly asks to stop or checkpoint and resume later.
+Set `status: paused`, record the three pause fields, and create a session log
+with `**Status:** PAUSED`. A checkpoint commit preserves incomplete work; it
+does not require final findings, LEARN, DOCUMENT, or a completed closeout.
+After the checkpoint commit, it may be pushed as a durable remote backup when
+paused-publication invariants pass. It remains unfinished and blocks PR creation
+and final closeout.
+Keep the big plan `in-progress` with the same `current_phase`. On resume, read
+the pause log and Git state, restore this plan to `in-progress`, and continue
+this same phase without creating another small plan.
