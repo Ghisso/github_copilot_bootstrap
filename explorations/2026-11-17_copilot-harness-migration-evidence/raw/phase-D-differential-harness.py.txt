@@ -172,9 +172,37 @@ def main() -> int:
             if result_old != result_new:
                 differences += 1
                 detail.append(f"DIFFERENCE {words} {input_name} / {env_name}:\n  old {result_old}\n  new {result_new}")
+    unreadable = unreadable_differences = 0
+    if os.geteuid() != 0:
+        with tempfile.TemporaryDirectory() as folder:
+            old_root, new_root = Path(folder) / "old", Path(folder) / "new"
+            old = make_repo(old_root, S / "run-hook.old.sh")
+            new = make_repo(new_root, S / "run-hook.new.sh")
+            hook_files = [r / ".github" / "hooks" / "hooks.json" for r in (old_root, new_root)]
+            for hook_file in hook_files:
+                hook_file.chmod(0)
+            try:
+                # Conditions 1 to 6 hold; the Copilot hook file cannot be read: the hook must run as before.
+                for script, arg_lists in LIFECYCLE.items():
+                    for args in arg_lists:
+                        for input_name, stdin in INPUTS.items():
+                            result_old = run(old, old_root, (script, *args), stdin, ALL_HOLD)
+                            result_new = run(new, new_root, (script, *args), stdin, ALL_HOLD)
+                            unreadable += 1
+                            if result_old != result_new:
+                                unreadable_differences += 1
+                                detail.append(
+                                    f"DIFFERENCE (unreadable hook file) {script} {args} {input_name}:\n  old {result_old}\n  new {result_new}"
+                                )
+            finally:
+                for hook_file in hook_files:
+                    hook_file.chmod(0o644)
+    comparisons += unreadable
+    differences += unreadable_differences
     print("Launcher differential: 49d3460 (old) against the working copy (new); same scripts, same inputs.")
     print(f"comparisons where no stand-down applies: {comparisons}")
     print(f"  of which the old launcher exits non-zero: {nonzero_exit_cases} (compared the same way)")
+    print(f"  of which with conditions 1 to 6 holding and an unreadable Copilot hook file (mode 000): {unreadable}")
     print(f"differences in stdout, stderr, or exit code: {differences}")
     print(
         f"cases where the new launcher stands a lifecycle script down on purpose (all seven conditions): {intended}; "

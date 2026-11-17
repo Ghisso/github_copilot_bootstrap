@@ -5,12 +5,14 @@ with a fixed Git identity and AI_STATE_LOCAL_ONLY=1. Cases: 13 scripts with 25 a
 9 inputs (empty, not JSON with NUL and 0xFF bytes, SessionStart, Stop, 3 Bash commands, a Write to a protected config,
 patch text), 5 environments (clean host; marker only; a Claude Code session with COPILOT_CLI=1 and COPILOT_HOOK_DEPTH=1;
 the Local harness with chat.useClaudeHooks; no marker with Copilot variables), plus the launcher's own edge cases
-(no script name, missing script with an argument holding a space and a quote). Guards are also run with all seven
+(no script name, missing script with an argument holding a space and a quote), and, since fix round 1, 81 cases with conditions 1 to 6
+holding and the Copilot hook file unreadable (mode 000): the hook must run as before. Guards are also run with all seven
 conditions holding, because a guard never stands down. stdout, stderr, and exit code are compared byte for byte; the
 repository path and timestamps in stderr are replaced first (`<repo>`, `<ts>`).
 
 Launcher differential: 49d3460 (old) against the working copy (new); same scripts, same inputs.
-comparisons where no stand-down applies: 1281
+comparisons where no stand-down applies: 1362
   of which the old launcher exits non-zero: 138 (compared the same way)
+  of which with conditions 1 to 6 holding and an unreadable Copilot hook file (mode 000): 81
 differences in stdout, stderr, or exit code: 0
 cases where the new launcher stands a lifecycle script down on purpose (all seven conditions): 81; not silent or not exit 0: 0

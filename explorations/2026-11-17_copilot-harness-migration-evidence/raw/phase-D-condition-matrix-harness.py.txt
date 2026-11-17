@@ -68,6 +68,7 @@ ENVIRONMENTS = [
     ("7 broken: Copilot hook file has disableAllHooks", {}, True, "disable-all-hooks"),
     ("7 broken: no `session-log.sh github-copilot`", {}, True, "no-session-log-copilot"),
     ("7 broken: no `state-sync.sh push`", {}, True, "no-state-sync-push"),
+    ("7 broken: Copilot hook file unreadable (mode 000)", {}, True, "unreadable"),
     (
         "named: this Claude Code session (extension-host leaks, CLAUDECODE=1, marker)",
         {
@@ -132,6 +133,8 @@ def write_hook_file(root: Path, case: str) -> None:
         (hooks / "hooks.json").symlink_to("real-hooks.json")
     else:
         (hooks / "hooks.json").write_text(text, encoding="utf-8")
+    if case == "unreadable":
+        (hooks / "hooks.json").chmod(0)
 
 
 def make_repo(root: Path, case: str) -> Path:
@@ -167,7 +170,7 @@ def main() -> int:
     lines: list[str] = []
     with tempfile.TemporaryDirectory() as folder:
         repos = {case: make_repo(Path(folder) / case, case) for case in
-                 ("valid", "missing", "link", "disable-all-hooks", "no-session-log-copilot", "no-state-sync-push")}
+                 ("valid", "missing", "link", "disable-all-hooks", "no-session-log-copilot", "no-state-sync-push", "unreadable")}
         for label, overlay, from_base, case in ENVIRONMENTS:
             env = env_of(overlay, start_from_base=from_base)
             lines.append(f"\n## {label}")

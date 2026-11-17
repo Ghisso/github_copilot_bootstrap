@@ -1,0 +1,32 @@
+Fix round 1 control: the differential with the three greps of the new launcher WITHOUT 2>/dev/null (81 unreadable-file comparisons differ), 2026-11-18.
+
+Launcher differential: 49d3460 (old) against the working copy (new); same scripts, same inputs.
+comparisons where no stand-down applies: 1362
+  of which the old launcher exits non-zero: 138 (compared the same way)
+  of which with conditions 1 to 6 holding and an unreadable Copilot hook file (mode 000): 81
+differences in stdout, stderr, or exit code: 81
+cases where the new launcher stands a lifecycle script down on purpose (all seven conditions): 81; not silent or not exit 0: 0
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) empty:
+  old (0, '', "WARN <ts> state-sync: no state remote configured (set AI_STATE_REMOTE, pass --state-remote at install time, or ensure this repo has an 'origin'); state will stay local-only until one is configured.\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n")
+  new (0, '', "grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nWARN <ts> state-sync: no state remote configured (set AI_STATE_REMOTE, pass --state-remote at install time, or ensure this repo has an 'origin'); state will stay local-only until one is configured.\nstate-sync: pull: local-only mode; bootstrap complete, remote sync ski
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) not-json:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) session-start:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) stop:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) bash-status:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) bash-reset-hard:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) bash-secret-redirect:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+DIFFERENCE (unreadable hook file) state-sync.sh ('pull',) write-protected-config:
+  old (0, '', 'state-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
+  new (0, '', 'grep: <repo>/.github/hooks/hooks.json: Permission denied\ngrep: <repo>/.github/hooks/hooks.json: Permission denied\nstate-sync: pull: local-only mode; bootstrap complete, remote sync skipped.\n')
