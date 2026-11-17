@@ -24,14 +24,21 @@ PROVIDER="${2:-}"
 TARGET_ID="$PROVIDER"
 INPUT="$(cat)"
 
-if [[ "$PROVIDER" != "claude-code" && "$PROVIDER" != "openai-codex" ]]; then
+if [[ "$PROVIDER" != "claude-code" && "$PROVIDER" != "openai-codex" && "$PROVIDER" != "github-copilot" ]]; then
   warn "unsupported provider: ${PROVIDER:-missing}"
   exit 0
 fi
-if [[ "$MODE" != "prompt" && "$MODE" != "late-report" ]]; then
-  warn "unsupported mode: ${MODE:-missing}"
-  exit 0
-fi
+# Session start is the documented route for context on the Copilot harness, and
+# its only mode there; Claude Code and Codex keep the prompt and late-report modes.
+case "$PROVIDER:$MODE" in
+  claude-code:prompt | claude-code:late-report) ;;
+  openai-codex:prompt | openai-codex:late-report) ;;
+  github-copilot:session) ;;
+  *)
+    warn "unsupported mode: ${MODE:-missing}"
+    exit 0
+    ;;
+esac
 if ! payload_parseable "$INPUT"; then
   warn "malformed hook input"
   exit 0
@@ -39,6 +46,10 @@ fi
 
 if [[ "$MODE" == "prompt" ]]; then
   additional_context "UserPromptSubmit" "$REMINDER"
+  exit 0
+fi
+if [[ "$MODE" == "session" ]]; then
+  additional_context "SessionStart" "$REMINDER"
   exit 0
 fi
 
