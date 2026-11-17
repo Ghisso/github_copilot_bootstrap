@@ -15,6 +15,18 @@ clients' documentation and, in a few places, their published source code
 say. Step 4 at the end records the native runs of 2026-09-25 and the frozen
 read list, write list, and bridge paths that the later phases use.
 
+*Added 2026-11-18, no dated record below was changed.* A **harness** is the part
+of a client that runs the agent, calls the tools, and runs the hooks. GitHub
+Copilot chat in VS Code has two harnesses: the Local harness (VS Code's older
+built-in agent, which VS Code removes in February 2027; sources: the VS Code
+hooks page, read on 2026-11-17, and the VS Code 1.146 release notes of
+2026-11-11) and the Copilot harness (the agent runtime that VS Code shares with
+Copilot CLI). The dated records below also name a session type called "Agent
+Host, Claude harness". That is a third session type, which the records list as
+unverified. This note and the last section do not cover it. The last section,
+[Copilot harness check, 2026-11-18](#copilot-harness-check-2026-11-18), adds a
+discovery check made on the Copilot harness runtime.
+
 ## Evidence tiers
 
 | Tier | Meaning |
@@ -1256,3 +1268,97 @@ This confirms the caller-saves decision from "Side finding, carried into
 Phase B" above against a real generated install, not only the fixture-only
 probe earlier in this section. Copilot in VS Code, OpenAI Codex, and
 Google Antigravity remain unverified for delegated writes.
+
+## Copilot harness check, 2026-11-18
+
+The sections above are dated records. They stand as written. They predate this
+check, which asks a new question: what does the Copilot runtime that ships
+inside VS Code find in a repository that holds a sidecar install?
+
+"Harness", "Local harness", and "Copilot harness" have the meaning given in the
+[note under the title of this file](#sidecar-provider-contract). The Copilot
+harness has been the default for new chats since VS Code 1.143. VS Code hooks
+are "in preview" (VS Code hooks page, read on 2026-11-17). The sidecar ships no
+hooks and no `.github/agents` files, so this check needed no code change.
+
+### Copilot harness discovery check (2026-11-18)
+
+**Runtime.** VS Code 1.146.0 (commit `69047191fc427f2f92828279aae1d90d8eeda7ab`),
+Copilot SDK `1.0.30-preview.0`, Copilot runtime `1.0.108-0`. The command below
+printed all three.
+
+**Method.** For each profile, the check made a new temporary Git repository with
+one commit (`README.md` and `app.py`), installed the sidecar overlay, and ran the
+runtime's discovery on the folder. The two profiles used two separate
+repositories. The environment held no `GIT_*`, `GH_*`, or `AI_STATE_*` variable
+from the host, and Git had a fixed identity.
+
+```bash
+uv run python scripts/install_bootstrap.py <team-repo> --mode sidecar --profile skills
+uv run python scripts/check_copilot_runtime.py --discover <team-repo>
+uv run python scripts/install_bootstrap.py <team-repo> --mode sidecar --profile workflow
+uv run python scripts/check_copilot_runtime.py --discover <team-repo>
+```
+
+`--discover` starts the runtime and asks what it finds in the folder. It starts
+no session and adds no folder trust. It prints counts and names, not file paths.
+To read each skill's and agent's path, a second run with `--keep` was read from
+the runtime's own record (`record.json`). The code of this repository did not
+change.
+
+**Result.**
+
+| Profile | Install summary | Instruction sources found | Skills | Agents |
+| --- | --- | --- | --- | --- |
+| `skills` | 10 units installed | 2: `.github/instructions/ai-bootstrap-sidecar.instructions.md` and `.claude/rules/ai-bootstrap-sidecar.md` | 4 | 0 |
+| `workflow` | 68 units installed | 4: `.github/instructions/ai-bootstrap-workflow.instructions.md`, `.claude/rules/ai-bootstrap-reporting.md`, `.claude/rules/ai-bootstrap-tool-routing.md`, and `.claude/rules/ai-bootstrap-workflow.md` | 22 | 5: `coder`, `documenter`, `orchestrator`, `planner`, `reviewer` |
+
+Both runs printed 0 hooks and 0 MCP servers. Repository hooks and MCP servers
+load only for a trusted folder, and this command adds no trust, so it would list
+none even if the folder held some. The sidecar ships none. In both repositories
+`git status --short` printed nothing after the install, and the ignored paths
+were `.agents/`, `.claude/`, and `.github/` (and `.ai-bootstrap/` for
+`workflow`).
+
+- **Instruction files that load.** The runtime lists the files in both
+  `.github/instructions/` and `.claude/rules/` as instruction sources. "Lists"
+  is all this check shows: it starts no session, so it does not show what text
+  reaches the model. It differs from one earlier record. On 2026-09-25 (VS Code
+  1.139.0, Copilot Chat 0.67.0), an Agent Host session with the Copilot harness
+  loaded only the `.github/instructions/` bridge, and the `.claude/rules/`
+  bridge did not load. Only the Local agent session loaded both. The two
+  results differ in VS Code version and in kind (a chat session and a
+  discovery listing), so they do not contradict each other. Whether the
+  `.claude/rules/` text reaches the model in a Copilot-harness chat now was not
+  checked.
+- **Sidecar agents.** In the `workflow` profile the runtime lists the five
+  `.claude/agents/<id>.md` files as agents (source `project`), although Git
+  ignores the files. The `skills` profile ships no agent. The records above did
+  not run Copilot for agents, and the sidecar documents say that no
+  `.github/agents` file ships. That is still true. The new fact is that the
+  Copilot harness runtime finds the `.claude/agents` files. Whether VS Code
+  shows them in its agent list was not checked, and the setting
+  `github.copilot.chat.cli.customAgents.enabled` (documented default `false`)
+  was not tried. The runtime listed the Claude-format `tools` names (`Edit`,
+  `Write`, `Bash`, and so on) and the `model` values (`sonnet`, `opus`) as
+  written. Whether the agents work on that harness was not run. The runtime
+  also attached a `github-mcp-server` entry with the tool `web_search` to
+  `coder` and `planner`; the cause was not investigated. This is not a support
+  claim.
+- **Which skill copy wins.** For every skill (4 of 4 and 22 of 22), the runtime
+  listed the copy at `.agents/skills/<name>/SKILL.md` and none at
+  `.claude/skills/<name>/`: one entry for each name.
+
+**Defects.** None found in the install or in the discovery output. The README
+and `docs/target-mapping.md` said that Copilot gets no sidecar agents. They now
+say what this check found, and that VS Code was not checked. Recorded follow-up,
+with no code change here: a run in a signed-in window should show whether VS
+Code lists the five agents, with the setting on and off (item 7 of the [manual
+checklist](smoke-tests.md#vs-code-copilot-harness-manual)). Until then, make no
+claim that the sidecar's agents work on the Copilot harness.
+
+The full outputs, with the commands, are `raw/phase-F-sidecar-discover-skills.txt`
+and `raw/phase-F-sidecar-discover-workflow.txt` in the evidence folder
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. That
+folder is in the private AI state of the authoring repository and is not
+tracked in this repository.

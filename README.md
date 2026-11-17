@@ -70,6 +70,65 @@ A repository that tracks only code and `.gitignore` still gets a plain full
 install. The installer tells you to pass one of the two flags explicitly
 (see [Behavior changes](#behavior-changes-you-should-know-about) below).
 
+**GitHub Copilot in VS Code: two harnesses.** VS Code runs a Copilot chat in one
+of two harnesses. A harness is the part of the client that runs the agent, calls
+the tools, and runs the hooks. This is a different use of the word from "agent
+harness" in the install modes above.
+
+- The **Local harness** is VS Code's older built-in agent, the only Copilot mode
+  this bootstrap was first built for.
+  VS Code removes the Local harness in February 2027.
+  (Sources: the VS Code hooks page, read on 2026-11-17, and the VS Code 1.146
+  release notes of 2026-11-11.)
+- The **Copilot harness** is the agent runtime that VS Code shares with Copilot
+  CLI. It is the default for new chats since VS Code 1.143.
+
+This bootstrap supports the Copilot harness inside VS Code, and it keeps the
+Local harness working until VS Code removes it. It does not claim Copilot CLI or
+Copilot cloud agents. VS Code hooks are "in preview" (VS Code hooks page, read on
+2026-11-17), so a VS Code update can change what works. What was run:
+
+- **Copilot harness.** The opt-in probe `scripts/check_copilot_runtime.py` runs
+  the real runtime that ships inside VS Code, offline, with a scripted model: a
+  small local server that returns fixed tool calls in place of a real model. A
+  "scripted run" in this README is a run of that kind. On 2026-11-18 the probe
+  printed runtime `1.0.108-0` (VS Code 1.146.0) and 48 result lines, none
+  failed. In the real VS Code on 2026-11-17, with the guards from before the
+  Copilot harness changes, `git reset --hard HEAD` was denied. VS Code can give a
+  model a different tool set than the runtime's own list for that model. The
+  checks that need a signed-in window are in
+  [docs/smoke-tests.md](docs/smoke-tests.md#vs-code-copilot-harness-manual). That
+  file records no run of any of them in a signed-in window since these changes.
+- **Local harness.** It was not run with the current answer format or the
+  current hooks. The guards print each decision twice in one line: once at the top
+  level of the answer, which is the shape GitHub documents for the Copilot
+  harness, and once inside a part called `hookSpecificOutput`, called the "nested
+  copy" in these documents. The Local harness takes the decision from the nested
+  copy, and it drops a whole result whose top-level `hookEventName` names another
+  event, which is why the answer carries none. That comes from VS Code's own code,
+  not from a run. In the Copilot extension 0.74.0 of VS Code 1.146.0
+  (`extensions/copilot/dist/extension.js`, read on 2026-11-18), the function
+  `ChatHookService.executePreToolUseHook` reads `permissionDecision` from
+  `hookSpecificOutput`, and the code that parses a hook's result returns no output
+  for a result whose top-level `hookEventName` does not match the event (its trace
+  message is "Ignoring result with mismatched hookEventName"). The guards left the
+  nested copy unchanged.
+  With the VS Code setting `chat.useClaudeHooks` on, the Local harness also runs
+  `.claude/settings.json`, so every hook runs twice (seen in the real VS Code on
+  2026-11-17). Turn that setting off for this bootstrap. It does not change the
+  Copilot harness, which loads both hook files. VS Code's documentation (read on
+  2026-11-17) says that Local settings such as `chat.useHooks` do not prevent
+  the Copilot harness from loading a configuration [F1].
+  See [Hooks on the Copilot harness](#hooks-on-the-copilot-harness).
+
+Short notes in brackets in this README, such as `[A6]` or `[F9]`, point to the
+evidence report `REPORT.md` in
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. That
+folder is in the private AI state of this authoring repository (`.claude/` is its
+own Git repository). It is not tracked here, and you do not need it to use the
+bootstrap. Each note follows a plain description of what was seen, where, and
+when.
+
 ### Full Install
 
 Regenerate first, then install the single generated bootstrap into a target repo.
@@ -434,7 +493,7 @@ Generated layout:
 
 - `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos
 - `.claude/`: installed canonical runtime basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
-- `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config
+- `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config. `.vscode/mcp.json` is the file generated for the Local harness. How the Local harness reads it was not rechecked. The Copilot harness reads the project's `.mcp.json` instead: in a scripted run on runtime `1.0.108-0` on 2026-11-17 it did not read `.vscode/mcp.json` [F12], and in the real VS Code on the same day each project MCP server connected once [A3]. VS Code can also forward server definitions to the runtime, so what the Copilot harness gets there from `.vscode/mcp.json` was not checked. See [GitHub Copilot in VS Code: two harnesses](#quick-install).
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoint/config
 - `AGENTS.md`, `.codex/`: OpenAI Codex native entrypoint/adapters/config
 - `.agents/`: Google Antigravity workspace adapters, skills, MCP configuration, and safety hook configuration
@@ -487,9 +546,10 @@ those generated files tracked in the consumer repository; the AI state in
 `.claude/` still stays ignored and git-backed. The selected mode is persisted in
 the ownership manifest: later installs and `update_consumers.py` retain it
 unless you explicitly pass `--commit-copilot-surface` or
-`--no-commit-copilot-surface`. The supported Copilot claim here is limited to
-custom agents in local VS Code; this bootstrap does not claim Copilot CLI or
-cloud-agent support.
+`--no-commit-copilot-surface`. These files are for Copilot inside VS Code, on
+the Copilot harness and on the Local harness (see [GitHub Copilot in VS Code:
+two harnesses](#quick-install)). This bootstrap does not claim Copilot CLI or
+Copilot cloud agents.
 
 If you do not use one of the tools, you may delete its native adapter/config
 files locally after installing. A later installer refresh restores every path
@@ -582,9 +642,14 @@ Client coverage differs by unit kind (native-run evidence in
 `docs/sidecar-provider-contract.md`, "Workflow profile evidence"): Claude
 Code gets everything above; Copilot in VS Code gets the instructions file
 and the skills; Codex gets the skills and the state folder only. No
-`.github/agents` or `.codex/agents` file ships — neither client has a
-config-free way to discover a custom agent from an ignored file. The
-workflow agents carry no `mcp__` tool grants.
+`.github/agents` or `.codex/agents` file ships. The 2026-09 native runs did not
+show a config-free way for either client to find a custom agent in an ignored
+file. One later check differs for Copilot: on the Copilot harness, offline
+discovery on runtime `1.0.108-0` (2026-11-18) lists the five `.claude/agents/`
+files of the `workflow` profile as agents. Whether VS Code lists them was not
+checked, and the sidecar makes no claim that these agents work there (see
+[Copilot harness discovery check](docs/sidecar-provider-contract.md#copilot-harness-discovery-check-2026-11-18)).
+The workflow agents carry no `mcp__` tool grants.
 
 Claude Code's workflow rule reads the memory pointer in later sessions.
 Codex has no equivalent workflow rule in this overlay, so invoke `onboard`
@@ -905,10 +970,14 @@ devcontainer changes by hand first — in practice, choose the right mode
 before your first install instead.
 
 **Client support (`skills` profile).** Claude Code, Codex, and Copilot in VS
-Code (both the Local agent and Agent Host sessions) are verified with a real
-client run (`native-run` evidence in
-[docs/sidecar-provider-contract.md](docs/sidecar-provider-contract.md)). See
-**What the `workflow` profile adds** above for that profile's own,
+Code (both the Local agent session and the Agent Host session with the Copilot
+harness) were verified with a real client run on 2026-09-25, with VS Code 1.139.0
+and Copilot Chat 0.67.0 for Copilot (`native-run` evidence in
+[docs/sidecar-provider-contract.md](docs/sidecar-provider-contract.md)). A
+later offline discovery check on the Copilot runtime `1.0.108-0` (2026-11-18)
+listed the skills and the instruction files of both profiles (see [Copilot
+harness discovery check](docs/sidecar-provider-contract.md#copilot-harness-discovery-check-2026-11-18)).
+See **What the `workflow` profile adds** above for that profile's own,
 narrower, per-client coverage.
 Codex is skill-only by design: no client mechanism lets an instruction file
 both stay additive to `AGENTS.md` and load in every session without a
@@ -916,8 +985,8 @@ project-trust config file, so no Codex bridge ships. In a Copilot Local
 agent session, both bridge files load, so the one bridge body appears twice;
 the text is identical, so this is harmless. Google Antigravity is
 unverified for sidecar v1 — no client was available to run the fixture — and
-gets no rules file. Copilot CLI and cloud agents are out of scope, matching
-this project's existing Copilot claim.
+gets no rules file. Copilot CLI and Copilot cloud agents are out of scope, as
+everywhere else in this README.
 
 **Limits:**
 
@@ -1326,11 +1395,24 @@ use the corresponding fallback skill instead (Codex reads its `.agents/skills/` 
 budget is not widened speculatively. See [Codex AGENTS.md
 guidance](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
-GitHub Copilot has first-class **VS Code custom-agent** support. Its
-`.github/instructions/` adapters derive `applyTo` from the same target-neutral
-patterns, and its custom agents are structurally validated with the shared
-metadata. This claim excludes Copilot CLI and Copilot cloud coding agents.
-Authenticated VS Code loading remains separate native evidence.
+GitHub Copilot in VS Code gets `.github/instructions/*.instructions.md`
+adapters. They derive `applyTo` from the same target-neutral patterns, and the
+custom agents are structurally validated with the shared metadata. This
+bootstrap supports the Copilot harness inside VS Code and keeps the Local
+harness working until VS Code removes it in February 2027. It does not claim
+Copilot CLI or Copilot cloud agents.
+
+The Copilot harness also reads `.claude/rules/`, so it is offered each
+path-scoped policy twice: once from `.github/instructions/` and once from
+`.claude/rules/`. In one scripted run on runtime `1.0.108-0` on 2026-11-17, the
+runtime put the always-on instruction files into the system prompt and listed
+the path-scoped files of both folders (five policies in each) for loading when
+needed [F10]. What VS Code forwards on top of that was not checked, and the
+doubled offer is a recorded follow-up (see
+[Recorded follow-ups](docs/target-mapping.md#gate-repair-client-parity)). The
+runtime listed all five generated custom agents in that run [F9]. Whether a
+signed-in VS Code window lists them was not run (see [VS Code Copilot harness
+(manual)](docs/smoke-tests.md#vs-code-copilot-harness-manual)).
 
 ## Most Important Skills
 
@@ -1428,8 +1510,10 @@ status.
 
 On the Copilot harness, a custom sub-agent such as `coder` or `reviewer` gets
 only its three-line agent file. It gets no repository instructions and no skill
-list (evidence F9, seen in a run on runtime `1.0.108-0`). A `SubagentStart` hook
-adds two things to its first message:
+list. This was seen in a scripted run on runtime `1.0.108-0` on 2026-11-17, with
+no hook for sub-agents installed [F9]. GitHub's documentation agrees. It was not
+checked in a VS Code window. A `SubagentStart` hook adds two things to the
+sub-agent's first message:
 
 - the text of `.github/copilot-instructions.md`, with its line breaks;
 - one fixed line: agent files live in `.claude/agents/<id>.md`, skills live in
@@ -1441,15 +1525,25 @@ is a context hook, not a guard: it never denies, and on any error it warns on
 stderr and lets the sub-agent start without the text. It reads the guidance
 file only when that file is a regular file of at most 2,048 bytes, and neither
 the file nor a folder on its way is a link. Otherwise the sub-agent gets the
-fixed line alone. `validate_targets.py` holds the generated file to the same
-2,048 bytes (it is 1,676 today), apart from the root-guidance budget table.
+fixed line alone. A missing file is silent; the other cases (a link, over the
+limit, not a regular file, unreadable) warn. The answer carries the text in
+top-level `additionalContext` and in the nested copy, with the nested
+`hookEventName` `SubagentStart` and no top-level event name. The hook builds it
+with `python3` and `json.dumps`, because the shell library's
+`additional_context` turns control characters into spaces, which would change
+the text. `validate_targets.py` holds the generated file to the same 2,048 bytes
+(it is 1,676 bytes on 2026-11-18). That is a check of its own. The
+root-guidance budget table applies a header rule and lifecycle rules that this
+file does not follow, so the file is not an entry in that table.
 
 - **What was run.** The offline probe `scripts/check_copilot_runtime.py` starts
   `coder` and `reviewer` on runtime `1.0.108-0`. Its check `subagent-context`
   judges only that the first user message of each holds the heading
   `GitHub Copilot Workspace Adapter` and the fixed line. The rest comes from one
-  recorded run of the control harness (`raw/phase-E-probe-output.txt` of the
-  evidence folder, no check behind it). In that run the first user message of
+  recorded run of the same probe on 2026-11-18, with a scratch script that
+  records what the model received and no check behind it (the end of
+  `raw/phase-E-probe-output.txt` in the evidence folder). In that run the first
+  user message of
   `coder`, of `reviewer`, and of the `general-purpose` sub-agent that the probe
   also starts held the whole text of the file, line breaks included, then the
   fixed line, then the task prompt. The documentation says the built-in
@@ -1458,18 +1552,40 @@ fixed line alone. `validate_targets.py` holds the generated file to the same
 - **Observed on runtime `1.0.108-0`, not documented.** The GitHub documentation
   lists this event as `subagentStart` and shows no PascalCase name. The hook
   file keeps the PascalCase `SubagentStart`, and it worked on that runtime. The
-  camelCase `subagentStart` also worked there (planning probe P2). The runtime
-  reads the text from top-level `additionalContext`, not from the nested copy,
-  so the hook prints it both ways, like the other Copilot context hooks.
+  camelCase `subagentStart` also worked there, in a planning check on
+  2026-11-17 [P2]. The probe renames the event to `subagentStart` in its
+  camelCase copy, but no probe session starts a sub-agent under that name. The
+  runtime reads the text from top-level `additionalContext`, not from the nested
+  copy, so the hook prints the text at the top level and in the nested copy, like
+  the other Copilot context hooks.
 - **Session start.** The Copilot file also runs `reporting-reminder.sh session
   github-copilot` at `SessionStart`, so a Copilot session gets the plain-language
-  reporting reminder once. The check `session-reminder` judges that the first
-  user message of the first model request holds the reminder text.
+  reporting reminder once. The mode `session` is accepted only for
+  `github-copilot`, and the reminder text and its 200-byte ceiling did not
+  change. The check `session-reminder` judges that the first user message of the
+  first model request holds the reminder text. In the recorded run of
+  2026-11-18 the reminder was a user message of its own before the prompt. A hook
+  that prints only the nested copy did not reach the model, for the sub-agent text
+  or for the reminder (two runs each, `raw/phase-E-probe-negative-controls.txt`).
+  The launcher never stands this
+  entry or the `SubagentStart` entry down: the Copilot hook file never carries
+  the marker (see "Hooks on the Copilot harness"), and `subagent-context.sh` is
+  not one of the five lifecycle scripts.
 - **Why the agent-file fields stay.** The `.github/agents/*.agent.md` wrappers
   keep `agents:`, `user-invocable`, and `disable-model-invocation`. They are the
-  fields written for the Local harness, which stays until February 2027. The
-  Copilot harness loads the wrappers and ignores `agents:` (F9). Removing the
-  fields is a recorded follow-up for that date.
+  fields written for the Local harness, which stays until February 2027. In the
+  scripted run of 2026-11-17 the Copilot harness loaded the wrappers and
+  ignored `agents:`, and GitHub's documentation says that harness does not
+  accept `handoffs`, `agents`, or `argument-hint` [F9]. Removing the fields is a
+  recorded follow-up for that date. `render_github_agent_adapter` did not change.
+- **Which agents the Copilot harness lists.** In the same run the runtime
+  listed the five wrappers in `.github/agents/` and also found the copies in
+  `.claude/agents/`. A wrapper wins over its copy by name. A sub-agent
+  there gets only the tools its agent file maps to: the `reviewer` got `view`,
+  `grep`, `glob`, and the MCP tools, and its attempts to use `bash` and `create`
+  were refused by the runtime [F9]. A per-agent model pin for Copilot is not
+  built: the agent `model` stays `target-default`, and a pin is a recorded
+  follow-up.
 - **Local harness.** Not run. Whether the Local harness runs this hook, and
   whether it already gives its sub-agents the repository instructions, was not
   checked. If it does both, its sub-agents see the guidance twice.
@@ -1503,7 +1619,7 @@ scripts under `shared/hooks/scripts/` (installed as
 calls the direct Python bridge `antigravity-pretool.py` instead, which
 normalizes its payload into the same guards. A single ordered Bash lane
 (protected files, dangerous Git, branch, commit, then PR) decides every
-Bash tool call (Copilot's `run_in_terminal` and `send_to_terminal` go through the same guards), and matching git hooks (`commit-msg`, `pre-push`) enforce
+Bash tool call (Copilot's shell tools go through the same guards: `run_in_terminal` and `send_to_terminal` on the Local harness, and `bash` on the Copilot harness), and matching git hooks (`commit-msg`, `pre-push`) enforce
 the same commit and push contracts directly inside Git. See [Hook
 dispatcher and guardrail
 scripts](openwiki/architecture/hooks-and-guardrails.md) for the full event
@@ -1519,12 +1635,18 @@ Design intent:
 
 ### Hooks on the Copilot harness
 
-VS Code runs Copilot chats in one of two harnesses. The Copilot harness is the
-default since VS Code 1.143. The older Local harness is deprecated, and VS Code
-removes it in February 2027. The Copilot harness loads both
-`.github/hooks/hooks.json` and `.claude/settings.json`, so every hook would run
-twice: one session logged as two, the AI state synced twice, and two permission
-requests for one protected edit.
+VS Code runs a Copilot chat in the Local harness or in the Copilot harness (see
+[GitHub Copilot in VS Code: two harnesses](#quick-install)). The Copilot harness
+is the default since VS Code 1.143. VS Code removes the older Local harness in
+February 2027. VS Code hooks are "in preview", so a VS Code update can change
+what follows.
+
+The Copilot harness loads both `.github/hooks/hooks.json` and
+`.claude/settings.json`, so every hook would run twice. This was seen in a
+scripted run on runtime `1.0.108-0` on 2026-11-17 [F2]: one session logged as two,
+the AI-state pull and push each run twice, and two permission requests for one
+protected edit. The double session log was also seen in the real VS Code on
+2026-11-17 [A3], and the two permission requests in the real VS Code too [A6].
 
 - **What stands down.** On the Copilot harness, the five lifecycle hooks that
   `.claude/settings.json` calls stand down: `state-sync.sh`, `session-log.sh`,
@@ -1533,9 +1655,10 @@ requests for one protected edit.
   in `.github/hooks/hooks.json` runs its own lifecycle hooks once.
 - **The guards never stand down.** They run from both files, and a deny from
   either file blocks the call. For one protected edit the runtime raises two
-  hook questions. In the one real VS Code run, VS Code answered the second one
-  itself, so the user saw one question (evidence A6). No recorded run shows
-  whether a deny is shown twice.
+  hook questions. In the one real VS Code run, on 2026-11-17 with the guards from
+  before these changes, VS Code answered the second one itself, so the user saw
+  one question [A6]. No recorded run shows whether a deny is shown twice: the
+  recorded runs show one deny reason for each denied call.
 - **When.** The launcher [run-hook.sh](shared/hooks/scripts/run-hook.sh) stands
   a hook down only when all seven conditions hold:
   1. the script is one of the five above;
@@ -1546,13 +1669,34 @@ requests for one protected edit.
      processes (a command from its shell tool does not have it);
   5. `COPILOT_HOOK_DIR` is empty, because the runtime sets it only for
      `.github/hooks` hooks;
-  6. `CLAUDECODE` is empty;
+  6. `CLAUDECODE` is empty (extra protection: whether Claude Code's hook
+     processes have this variable was not checked);
   7. `.github/hooks/hooks.json` is a regular file and not a link, has no
      `disableAllHooks`, and contains `session-log.sh github-copilot` and
      `state-sync.sh push`.
 
-  A real Claude Code session, Claude Code started from a Copilot shell, and the
-  Local harness never meet all seven.
+  The basis for conditions 3 to 5 is the environment seen in hook processes and
+  in a shell-tool command, in scripted runs on runtime `1.0.108-0` on
+  2026-11-17 [P1] and in the real VS Code on the same day. A hook from the
+  Claude settings saw `COPILOT_CLI=1` and `COPILOT_HOOK_DEPTH=1` and no
+  `COPILOT_HOOK_DIR`. A command run by VS Code's shell tool saw `COPILOT_CLI=1`
+  and no `COPILOT_HOOK_DEPTH` [A5, A6]. A real Claude Code session, Claude Code
+  started from a Copilot shell, and the Local harness never meet all seven. The
+  launcher's tests and the offline probe show this. A direct run of the launcher
+  on 2026-11-18, in the shell environment of a real Claude Code session, did not
+  stand down (`raw/phase-D-own-session-run.txt` in the evidence folder). Hook
+  processes of Claude Code were not inspected, and the Local harness was not run
+  with the new launcher.
+- **The marker.** The generated `.claude/settings.json` marks each hook command
+  with `BOOTSTRAP_HOOK_SOURCE=claude-settings`. The Codex, Copilot, and
+  Antigravity hook files never carry the marker, and `validate_targets.py`
+  checks both.
+- **Old installs.** A new launcher with old settings finds no marker and runs
+  every hook. An old launcher with new settings ignores the marker prefix. Both
+  mixes were run on the real runtime `1.0.108-0`. In both, the probe showed the
+  old double run (`single-session-log` and `state-sync-once` failed) and nothing
+  else failed (`raw/phase-D-mixed-installs.txt` and
+  `raw/phase-D-probe-negative-controls.txt` in the evidence folder).
 - **What a wrong stand-down costs.** If a lifecycle hook stands down while the
   `.github/hooks` copy does not run, that session loses its session-log
   entries, the session-start context, the AI-state pull and push, and the
@@ -1564,7 +1708,11 @@ requests for one protected edit.
   `session` (see [Sub-agents on the Copilot harness](#sub-agents-on-the-copilot-harness)).
 - **Local harness.** With the VS Code setting `chat.useClaudeHooks: true`, the
   Local harness also runs `.claude/settings.json`, and every hook runs twice.
-  Nothing stands down there. Turn that setting off for this bootstrap.
+  This was seen in the real VS Code on 2026-11-17: its hook log showed 8 hooks
+  at session start, three from `.github/hooks/hooks.json`, three from
+  `.claude/settings.json`, and two probe loggers [A2]. Nothing stands down on the
+  Local harness. Turn that setting off for this bootstrap. The setting does not
+  change the Copilot harness (see the note under [Quick Install](#quick-install)).
 
 ### Deterministic Commit And Push Gates (Git Hooks)
 

@@ -259,12 +259,62 @@ changing a compatibility gate.
 
 ### VS Code Copilot evidence boundary
 
-Generation and `validate_targets.py` prove the rendered Copilot custom-agent
-frontmatter only. They do not prove that an authenticated VS Code Copilot
-session loads the agents, exposes their MCP tools, honors delegation metadata,
-or leaves session-selected Auto unpinned. Record those observations only after
-a small authenticated VS Code smoke; otherwise record the smoke as `not run`.
-This bootstrap does not add Copilot CLI, cloud-agent, or native-harness support.
+VS Code runs a Copilot chat in one of two **harnesses**. A harness is the part
+of the client that runs the agent, calls the tools, and runs the hooks. The
+**Local harness** is VS Code's older built-in agent, and VS Code removes it in
+February 2027 (sources: the VS Code hooks page, read on 2026-11-17, and the
+VS Code 1.146 release notes of 2026-11-11). The **Copilot harness** is the agent
+runtime that VS Code shares with Copilot CLI. It is the default for new chats
+since VS Code 1.143. VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17), so a VS Code
+update can change what this page says.
+
+This bootstrap supports the Copilot harness inside VS Code.
+It does not claim Copilot CLI or Copilot cloud agents.
+It keeps the Local harness working until VS Code removes it.
+
+Short notes in brackets on this page, such as `[A6]` or `[F4]`, point to the
+evidence report `REPORT.md` in
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. That
+folder is in the private AI state of the bootstrap's authoring repository
+(`.claude/` is its own Git repository). It is not tracked in this repository.
+Every note comes after a plain description of what was seen, where, and when.
+
+What each kind of check proves:
+
+- **Generation and `validate_targets.py`** prove the rendered Copilot files
+  only: the custom-agent frontmatter, the hook file's events and commands, and
+  the size of `.github/copilot-instructions.md`. They do not prove that a
+  signed-in VS Code Copilot session loads the agents, exposes their MCP tools,
+  honors delegation metadata, or leaves the model that VS Code's Auto setting (the
+  automatic choice in its model picker) selects unpinned.
+- **The Copilot runtime probe** (below) runs the real Copilot runtime that ships
+  inside VS Code, offline, with a scripted model (a small local server that
+  returns fixed tool calls in place of a real model) and no account. It proves
+  what the guards and hooks do on that runtime, on the one version it prints. On
+  2026-11-18, `uv run python scripts/check_copilot_runtime.py --require` printed
+  `Copilot runtime version: 1.0.108-0` (VS Code 1.146.0, Copilot SDK
+  `1.0.30-preview.0`) and `Result: PASS (0 of 48 checks failed)`. It says
+  nothing about another version.
+- **Only a signed-in VS Code window** shows VS Code's own layer: the approval
+  dialogs and how many appear, "Allow all", Autopilot, and the tool set VS Code
+  gives each model. That tool set can differ from the runtime's own list. In the
+  real VS Code on 2026-11-17 the Auto choice was `gpt-6-luna`, and it was given
+  the patch tool `apply_patch`, while the runtime's own list gives that model
+  `create` and `edit` [A4]. A window also shows whether VS Code lists the custom agents,
+  whether a sub-agent there receives the text of the hook for sub-agents, and
+  when `sessionEnd` fires. The steps are in the manual checklist,
+  [VS Code Copilot harness (manual)](smoke-tests.md#vs-code-copilot-harness-manual).
+  Record any item not run as `not run`.
+- **The Local harness** was not run with the current answer format or the
+  current hooks. The guards print each decision twice in one line: at the top
+  level of the answer, and again inside `hookSpecificOutput` (the "nested
+  copy"). The Local harness takes the decision from the nested copy, and it drops
+  a whole result whose top-level `hookEventName` names another event, which is why
+  the answer carries none. That comes from VS Code's code, not from a run (read on
+  2026-11-18; see the [README](../README.md#quick-install)). The nested copy is
+  unchanged. A byte comparison of it against the answer from
+  before the change found no difference (944 comparisons,
+  `raw/phase-C-byte-identity-battery.txt` in the evidence folder).
 
 The persistent path must be dedicated: preparation refuses broad paths and
 nonempty directories without its ownership marker. A later preparation refreshes
@@ -514,10 +564,12 @@ the nested repository metadata are retained.
 
 #### Copilot runtime probe
 
-VS Code hooks are "in preview". The Copilot runtime that ships inside VS Code
-runs repository hooks, and its version changes with VS Code. The probe is an
-opt-in check that runs that real runtime offline, so a change in what the
-guards do on it shows up as a failed check.
+VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17). The
+Copilot runtime that ships inside VS Code runs repository hooks, and its version
+changes with VS Code. The probe is an opt-in check that runs that real runtime
+offline, so a change in what the guards do on it shows up as a failed check. Its
+last full run, on 2026-11-18, printed runtime `1.0.108-0` (VS Code 1.146.0) and
+48 result lines, none failed.
 
 ```bash
 uv run python scripts/check_copilot_runtime.py --require
@@ -587,8 +639,9 @@ baseline checks are:
   probe does not see which hook source raised which; with one source (the
   `camel-rename` session) the runtime raises one. The probe answers every
   request itself, so this shows nothing about what a user sees: in the one real
-  VS Code run, VS Code answered the second request itself (evidence A6). The
-  `ask-*` checks need at least one request; this check pins two;
+  VS Code run, on 2026-11-17 with the guards from before the Copilot harness
+  changes, VS Code answered the second request itself [A6]. The
+  `ask-*` checks need at least one request; this check requires exactly two;
 - the shell helpers `read_bash`, `list_bash`, and `stop_bash` are not denied
   (`helper-tools`; a helper call with no pre-tool hook event is not judged);
 - the read tool reads `.claude/agents/coder.md` with no guard question
@@ -647,9 +700,11 @@ question is raised once, not twice. Three more checks show that the setup held:
 - `camel-mcp-none`: the same check as `mcp-none`, for the copy.
 
 Before the guards printed the top-level answer, the five `camel-deny-*` checks and
-the two `camel-ask-*` checks failed: the runtime ignored the nested answers under
-camelCase names (evidence F4), so the denied commands ran and the protected edits
-raised no question.
+the two `camel-ask-*` checks failed: the runtime ignored the nested copy of the answer under
+camelCase names, so the denied commands ran and the protected edits raised no
+question. The deny half was first seen in a scripted run with probe hooks on
+runtime `1.0.108-0` on 2026-11-17 [F4]. The ask half was found when the
+`camel-rename` session was added.
 
 The `main` session has 28 checks, `codex-patch` has 6, and `camel-rename` has 11.
 The probe also prints one line for each session, `session-main`,
@@ -667,7 +722,7 @@ dialogs, "Allow all", Autopilot, or the tool set VS Code gives each model.
 VS Code can give a model a different tool set than the runtime's own list for that model.
 In the real VS Code, Auto chose `gpt-6-luna` and VS Code gave it the patch tool
 `apply_patch`, while the runtime's own list gives that model `create` and `edit`
-(evidence A4). Each printed inventory is the runtime's list for the model name of
+(seen in the real VS Code on 2026-11-17 [A4]). Each printed inventory is the runtime's list for the model name of
 its session: `probe-model` for `main` and `camel-rename`, and `gpt-5.2-codex` for
 `codex-patch`. The
 probe makes no claim about Copilot CLI, Copilot
@@ -685,33 +740,39 @@ it lists no repository hooks or MCP servers.
 
 **Not the agent host.** The probe starts the runtime through the SDK, not
 through VS Code's agent host. So the missing `/run/user/<uid>` folder that
-freezes a Copilot chat in VS Code (evidence A1) does not stop it, and the probe
-cannot detect that fault.
+freezes a Copilot chat in VS Code (on 2026-11-17 [A1]) does not stop it, and the
+probe cannot detect that fault.
 
 **Evidence behind the design.** Evidence folder:
 `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. The
 "probe note" is
 `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/raw/phase-A-probe-evidence.txt`.
 It holds the command, the date and time, and the output lines for each figure
-below that comes from a run of this script. Those runs were made on 2026-11-17
-on VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK
-`1.0.30-preview.0`, runtime `1.0.108-0`.
+below that comes from a run of this script. All of those runs used VS Code
+commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK `1.0.30-preview.0`, and
+runtime `1.0.108-0`. The dates differ. The probe note, the earlier scripted runs
+(`raw/outcomes-*`, `raw/discover-*`, `raw/planning-probe-*`), and the files
+`raw/phase-B-*` and `raw/phase-C-*` are from 2026-11-17. The files
+`raw/phase-D-*` and `raw/phase-E-*` that the table names, and
+`raw/phase-F-require-output.txt`, are from 2026-11-18. Most raw files carry their date at the top. The phase session logs
+under `.claude/session_logs/` give the day for the rest. The last column of each
+row names the file.
 
 | Unknown | Result | Evidence |
 | --- | --- | --- |
 | Can the SDK start the runtime with no account and a private data folder? | Yes. `getStatus()` returned the runtime version; sessions ran. | `raw/outcomes-g-both.txt`; probe note, section 1 |
-| Can a scripted model on 127.0.0.1 drive real tool calls? | Yes. 13 scripted calls ran in 14 model replies (the first version of the probe). The current version also sends free-form calls (the patch tool) and scripts a sub-agent's own steps; its `main` session ran 27 scripted calls in 29 model replies, and `codex-patch` ran 6 in 7. The Phase E version adds a `task` call for `coder` and one for `reviewer`: its `main` session finished after 33 model replies. | `raw/outcomes-g-both.txt`; probe note, section 1; run of 2026-11-17 for the Copilot tool-input change; `raw/phase-E-probe-output.txt` |
-| Do repository hooks load only for a trusted folder? | Yes. In a fresh install the probe counted 0 hooks before trust and 26 after trust (12 from `.github/hooks/hooks.json`, 14 from `.claude/settings.json`). Since Phase E the Copilot hook file has two more hooks, and the probe counts 28 after trust (14 and 14; `raw/phase-E-probe-output.txt`). The raw files show the same 12 and 14 for the two sources in an older test project, which also had two logging hook files (54 hooks in total). | Probe note, sections 1 and 6; `raw/discover-before-trust.txt`; `raw/discover-after-trust-hooks-and-mcp.txt` |
-| Do both hook files load from a subfolder two levels down? | Yes, on `1.0.108-0`. | P4; `raw/planning-probe-p4-subfolder-discovery.txt` |
-| How do a deny and a guard question appear in session events? | A deny is a `hook.end` of `preToolUse` whose output reads `Denied by preToolUse hook: <reason>`, with `tool.execution_complete` `success: false`. A question is a `permission.requested` of kind `hook`; with both hook files, a protected edit raises two. | `raw/outcomes-g-both.txt`; F3 |
-| Does every tool run have a pre-tool hook event? | No. The runtime's own read of a finished shell has none. The probe judges only its scripted steps, and a scripted step with no hook event is a `FAIL`. The one exception is `helper-tools`, which does not judge a helper step that has no hook event. | P3 |
+| Can a scripted model on 127.0.0.1 drive real tool calls? | Yes. 13 scripted calls ran in 14 model replies (the first version of the probe). The current version also sends free-form calls (the patch tool) and scripts a sub-agent's own steps; its `main` session ran 27 scripted calls in 29 model replies, and `codex-patch` ran 6 in 7. The current version also sends a `task` call for `coder` and one for `reviewer`: its `main` session finished after 33 model replies. | `raw/outcomes-g-both.txt`; probe note, section 1; run of 2026-11-17 for the Copilot tool-input change; `raw/phase-E-probe-output.txt` |
+| Do repository hooks load only for a trusted folder? | Yes. In a fresh install the probe counted 0 hooks before trust and 26 after trust (12 from `.github/hooks/hooks.json`, 14 from `.claude/settings.json`). Since the Copilot hook file got its `SubagentStart` entry and its session-start reminder entry, it has two more hooks, and the probe counts 28 after trust (14 and 14; `raw/phase-E-probe-output.txt`). The raw files show the same 12 and 14 for the two sources in an older test project, which also had two logging hook files (54 hooks in total). | Probe note, sections 1 and 6; `raw/discover-before-trust.txt`; `raw/discover-after-trust-hooks-and-mcp.txt` |
+| Do both hook files load from a subfolder two levels down? | Yes, on `1.0.108-0`. | A planning check of 2026-11-17 on a subfolder two levels below the root [P4]; `raw/planning-probe-p4-subfolder-discovery.txt` |
+| How do a deny and a guard question appear in session events? | A deny is a `hook.end` of `preToolUse` whose output reads `Denied by preToolUse hook: <reason>`, with `tool.execution_complete` `success: false`. A question is a `permission.requested` of kind `hook`; with both hook files, a protected edit raises two. | `raw/outcomes-g-both.txt` (a scripted run of 2026-11-17 with both hook files) [F3] |
+| Does every tool run have a pre-tool hook event? | No. The runtime's own read of a finished shell has none. The probe judges only its scripted steps, and a scripted step with no hook event is a `FAIL`. The one exception is `helper-tools`, which does not judge a helper step that has no hook event. | A planning check of 2026-11-17 on the shell helper tools [P3]; `raw/planning-probe-e3-outcomes.txt` |
 | Does deleting the project's `.mcp.json` keep MCP servers from starting? | No, not alone. The SessionStart hook `state-sync.sh pull` runs `restore-root-adapters.sh`, which copies `.mcp.json` back from `.claude/bootstrap-root/` during the session. In a control run that deleted only the project file, the traced process tree showed 2 such copies inside the session and 3 MCP server launches (`uvx` for `semble`, `npx` for `context7` and for `context-mode`). The only connection attempts outside loopback in that run were 16 DNS lookups (8 to 1.1.1.1 and 8 to 8.8.8.8, port 53), all refused because the namespace had no route. The file was back after the run in 4 of 4 control runs. The first version of `mcp-none` read only discovery and session events: it printed `FAIL` in 1 of those 4 runs (the traced run, which is slower) and `PASS` in the other 3, because no MCP event reached the session before it ended. The check now also reads the project file after the session, and the same control failed in 4 of 4 runs. The probe deletes the mirror copy and the manifest line too; the traced run of the shipped probe shows 0 copies inside the session and 0 launches. A test runs the restore script on the prepared project. | Probe note, sections 2, 3, and 7 |
 | Does the run leave 127.0.0.1? | In one run, no. It ran in a network namespace with only loopback, traced with `strace -f`, counting `connect` calls: the whole process tree (Python, git, node, the runtime, the hooks) made 2 `connect` calls, both to 127.0.0.1. Only that run was traced. | Probe note, section 2 |
 | Does the run write to `~/.copilot`? | Not observed. After a run, none of its session ids was under `~/.copilot/session-state`, and no file under `~/.copilot` mentioned a probe folder. | Probe note, section 5 |
-| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The version with two sessions and 31 lines took 13.61 and 11.72 seconds in two runs with a network. The current version, with three sessions and 43 lines, took 15.20 and 16.64 seconds in two runs with a network (Phase C). The Phase D version, with 46 lines, took 14.99 and 12.74 seconds (`raw/phase-D-probe-run-times.txt`). The Phase E version, with 48 lines, took 15.90 and 13.68 seconds (`raw/phase-E-probe-run-times.txt`). | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt` |
-| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the first version of the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. With the file guard from before the Copilot tool-input change put into the temporary project, 11 of 31 lines failed and the probe exited 1: `helper-tools`, `read-agent-file`, `search-secret-denied`, `deny-workflow-run`, `deny-workflow-manage`, and the six patch checks. Checks of behavior that did not change, such as `sql-no-file-write` and `subagent-deny-git-reset`, still passed. With the guards from before Phase C and the `camel-rename` session added, 7 of 43 lines failed: the five `camel-deny-*` and the two `camel-ask-*` checks. Three controls with a wrong camelCase setup each failed the matching setup check, in two runs each: only the live hook file renamed (`camel-events-renamed`; the restore hook put the original names back), the Claude settings left on (`camel-hooks-source` and `camel-events-renamed`), and no event renamed (`camel-events-renamed`). In all three, the deny checks still passed, because the denies came from PascalCase events or from the Claude settings source, which is why the setup checks exist. | Probe note, section 4; run of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt`, `raw/phase-C-probe-negative-controls.txt` |
-| Do the stand-down checks fail on a wrong setup? | Yes, in two runs each on the real runtime. With the launcher and Claude settings from before Phase D, 2 of 46 lines failed: `single-session-log` (2 `target=claude-code` lines for the session) and `state-sync-once` (2 pull lines). The same two failed with the new launcher and old settings (no marker), and with the old launcher and new settings (the prefix is ignored), and nothing else failed in those runs, so a mixed install runs every hook as before. A launcher that also stood down `protect-files.sh` failed only `guards-both-sources` (1 question instead of 2). With the marker exported to the whole runtime environment, the shipped launcher still passed all 46 lines, because `.github/hooks` hooks have `COPILOT_HOOK_DIR` set; a launcher without that condition stood both copies down and failed `single-session-log` and `state-sync-once` (no session log, 0 pull lines). `guards-both-sources` cannot fail on the stand-down change itself, because the guards do not change; it fails when a guard stands down or a hook source stops running. | `raw/phase-D-probe-output.txt`, `raw/phase-D-probe-negative-controls.txt`, `raw/phase-D-mixed-installs.txt` |
-| Do the sub-agent and session-reminder checks fail on a wrong setup? | Yes, in two runs each on the real runtime. With the install put back to the state before Phase E (no `SubagentStart` entry, no session-start reminder entry, no `subagent-context.sh`, the old reminder script), 2 of 48 lines failed: `session-reminder` and `subagent-context`. Nothing else failed, the three Phase D checks included. Each of these changes failed only the check named: the `SubagentStart` entry removed (`subagent-context`); the fourth `SessionStart` entry removed (`session-reminder`); the guidance file removed, or made longer than 2,048 bytes (`subagent-context`); a sub-agent hook that prints only the nested copy of the text (`subagent-context`); and a reminder that prints only the nested copy (`session-reminder`). The last two show that the runtime reads the top-level text for both events in this setup. | `raw/phase-E-probe-before.txt`, `raw/phase-E-probe-negative-controls.txt` |
+| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The version with two sessions and 31 lines took 13.61 and 11.72 seconds in two runs with a network. The version with three sessions and 43 lines took 15.20 and 16.64 seconds in two runs with a network. The version with 46 lines took 14.99 and 12.74 seconds (`raw/phase-D-probe-run-times.txt`). The current version, with 48 lines, took 15.90 and 13.68 seconds (`raw/phase-E-probe-run-times.txt`). | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt` |
+| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the first version of the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. With the file guard from before the Copilot tool-input change put into the temporary project, 11 of 31 lines failed and the probe exited 1: `helper-tools`, `read-agent-file`, `search-secret-denied`, `deny-workflow-run`, `deny-workflow-manage`, and the six patch checks. Checks of behavior that did not change, such as `sql-no-file-write` and `subagent-deny-git-reset`, still passed. With the guards from before the top-level answer change and the `camel-rename` session added, 7 of 43 lines failed: the five `camel-deny-*` and the two `camel-ask-*` checks. Three controls with a wrong camelCase setup each failed the matching setup check, in two runs each: only the live hook file renamed (`camel-events-renamed`; the restore hook put the original names back), the Claude settings left on (`camel-hooks-source` and `camel-events-renamed`), and no event renamed (`camel-events-renamed`). In all three, the deny checks still passed, because the denies came from PascalCase events or from the Claude settings source, which is why the setup checks exist. | Probe note, section 4; run of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt`, `raw/phase-C-probe-negative-controls.txt` |
+| Do the stand-down checks fail on a wrong setup? | Yes, in two runs each on the real runtime. With the launcher and Claude settings from before the stand-down change, 2 of 46 lines failed: `single-session-log` (2 `target=claude-code` lines for the session) and `state-sync-once` (2 pull lines). The same two failed with the new launcher and old settings (no marker), and with the old launcher and new settings (the prefix is ignored), and nothing else failed in those runs, so a mixed install runs every hook as before. A launcher that also stood down `protect-files.sh` failed only `guards-both-sources` (1 question instead of 2). With the marker exported to the whole runtime environment, the shipped launcher still passed all 46 lines, because `.github/hooks` hooks have `COPILOT_HOOK_DIR` set; a launcher without that condition stood both copies down and failed `single-session-log` and `state-sync-once` (no session log, 0 pull lines). `guards-both-sources` cannot fail on the stand-down change itself, because the guards do not change; it fails when a guard stands down or a hook source stops running. | `raw/phase-D-probe-output.txt`, `raw/phase-D-probe-negative-controls.txt`, `raw/phase-D-mixed-installs.txt` |
+| Do the sub-agent and session-reminder checks fail on a wrong setup? | Yes, in two runs each on the real runtime. With the install put back to the state before the sub-agent context change (no `SubagentStart` entry, no session-start reminder entry, no `subagent-context.sh`, the old reminder script), 2 of 48 lines failed: `session-reminder` and `subagent-context`. Nothing else failed, the three stand-down checks (`single-session-log`, `state-sync-once`, and `guards-both-sources`) included. Each of these changes failed only the check named: the `SubagentStart` entry removed (`subagent-context`); the fourth `SessionStart` entry removed (`session-reminder`); the guidance file removed, or made longer than 2,048 bytes (`subagent-context`); a sub-agent hook that prints only the nested copy of the text (`subagent-context`); and a reminder that prints only the nested copy (`session-reminder`). The last two show that the runtime reads the top-level text for both events in this setup. | `raw/phase-E-probe-before.txt`, `raw/phase-E-probe-negative-controls.txt` |
 
 The runtime's environment drops every variable whose name starts with `CLAUDE`,
 `ANTHROPIC`, `GIT_`, `GH_`, or `AI_STATE_`, and `GITHUB_TOKEN` and

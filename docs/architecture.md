@@ -39,8 +39,13 @@ Code conditional `.claude/rules/` with `paths`, Codex nested `AGENTS.md`
 only where a policy owns a stable directory, and GitHub Copilot
 `applyTo`-scoped instruction adapters. These are discovery adapters, not
 editable policy copies, and structural parity is not itself proof that a
-real client loaded one — runtime loading is probed separately by
-`scripts/check_native_clients.py`. See [Source, generated output, consumer
+real client loaded one. Runtime loading is probed separately: for Claude Code
+and Codex by `scripts/check_native_clients.py`, and for the Copilot harness (the
+agent runtime of VS Code's Copilot chat; see [GitHub Copilot
+adapter](#github-copilot-adapter)) by
+`scripts/check_copilot_runtime.py` (offline, on the runtime in VS Code) and the
+manual list in [VS Code Copilot harness
+(manual)](smoke-tests.md#vs-code-copilot-harness-manual). See [Source, generated output, consumer
 repo, and nested AI
 state](../openwiki/architecture/source-generated-consumer-layout.md)'s
 "Policy discovery per host" for the full per-target mechanics, and
@@ -96,6 +101,22 @@ against that same allowlist, so a tree missing a file, or carrying an extra
 one elsewhere — for example a skill rendered at only one of the two write
 roots — is refused by both the generated-target validator and the installer
 itself, never silently accepted as a smaller-but-valid profile.
+
+### GitHub Copilot adapter
+
+The Copilot adapter is five groups of generated files: `.github/copilot-instructions.md` (root guidance), `.github/instructions/*.instructions.md` (path-scoped policies), `.github/agents/*.agent.md` (five agent wrappers), `.github/hooks/hooks.json` (hooks), and `.vscode/mcp.json` (MCP servers). Hook commands go through `run-hook.sh` into the shared scripts under `.claude/hooks/scripts/`.
+
+VS Code runs a Copilot chat in one of two **harnesses**. A harness is the part of the client that runs the agent, calls the tools, and runs the hooks.
+
+- The **Local harness** is VS Code's older built-in agent, the only Copilot mode this adapter was first built for. VS Code removes the Local harness in February 2027 (sources: the VS Code hooks page, read on 2026-11-17, and the VS Code 1.146 release notes of 2026-11-11).
+- The **Copilot harness** is the agent runtime that VS Code shares with Copilot CLI. It is the default for new chats since VS Code 1.143.
+
+This bootstrap supports the Copilot harness inside VS Code, and it keeps the Local harness working until VS Code removes it. The Local harness was not run with the current answer format or the current hooks. This bootstrap does not claim Copilot CLI or Copilot cloud agents. VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17), so a VS Code update can change what follows. What the Copilot harness does with these files was seen in scripted runs on runtime `1.0.108-0` (the runtime in VS Code 1.146.0, run offline with a scripted model: a small local server that returns fixed tool calls in place of a real model) on 2026-11-17 and 2026-11-18, and in a few runs in the real VS Code on 2026-11-17. The checks that need a signed-in VS Code window are in [VS Code Copilot harness (manual)](smoke-tests.md#vs-code-copilot-harness-manual). Short notes in brackets, such as `[F2]`, point to the evidence report `REPORT.md` in `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. That folder is in the private AI state of this authoring repository and is not tracked here.
+
+- **Hooks.** The Copilot harness loads both `.github/hooks/hooks.json` and `.claude/settings.json` [F2]. The five lifecycle hooks reached through the Claude settings stand down there, and the guards run from both files. See [Hooks on the Copilot harness](../README.md#hooks-on-the-copilot-harness) in the README.
+- **MCP servers.** The Copilot harness reads the project's `.mcp.json`, not `.vscode/mcp.json` [F12]. `.vscode/mcp.json` is the file generated for the Local harness. How the Local harness reads it was not rechecked.
+- **Agents.** The Copilot harness loads the five wrappers and also finds the copies in `.claude/agents/`, and a wrapper wins by name [F9]. A sub-agent there gets only its three-line wrapper. A `SubagentStart` hook adds the text of `.github/copilot-instructions.md` (see [Sub-agents on the Copilot harness](../README.md#sub-agents-on-the-copilot-harness)).
+- **Instructions.** The Copilot harness loads `.github/copilot-instructions.md`, `AGENTS.md`, `CLAUDE.md`, and the always-on instruction files into its system prompt. It lists the path-scoped files of both `.github/instructions/` and `.claude/rules/`, so it is offered each path-scoped policy twice [F10]. In that scripted run about 10.8 KB of a 48.6 KB system prompt was root guidance loaded three times. This is measured and left as it is. `CLAUDE.md` is needed by Claude Code, and `AGENTS.md` by Codex and Antigravity. `.github/copilot-instructions.md` is needed by the Local harness and, through the `SubagentStart` hook in the bullet above, by every sub-agent on the Copilot harness. When the Local harness is removed, keep `.github/copilot-instructions.md`, or give that hook another source first. Removing the file would remove the sub-agents' repository guidance.
 
 ### Skill Library Validation Contract
 

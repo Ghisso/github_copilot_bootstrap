@@ -117,9 +117,10 @@ Expected:
   ordinary commands emit no output, while diagnostics go to stderr.
 - No periodic every-N-tool reminder, Stop rewriting, or PreCompact reminder is
   generated. The Antigravity event set is unchanged. The Copilot hook file has
-  one new event, `SubagentStart`, which runs `subagent-context.sh`; the other
-  four events keep their entries, plus the session-start reminder above. No
-  Gemini adapter is generated.
+  five events: `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`, and
+  `SubagentStart`. `SubagentStart` runs `subagent-context.sh`, and
+  `SessionStart` also runs the session-start reminder above. No Gemini adapter
+  is generated.
 
 ## MCP Routing
 
@@ -160,8 +161,11 @@ Expected:
   200 lines and 5 KiB. `POLICY_BYTE_BUDGETS` in `scripts/validate_targets.py`
   caps six policies: workflow and closeout at 16 KiB, plan-lifecycle at 11 KiB,
   workspace at 7,680 bytes, and quality-and-testing and tool-routing at 3 KiB.
-- These are structural generation checks. Real Claude, Codex, and Copilot
-  adapter-loading probes are covered by `scripts/check_native_clients.py`.
+- These are structural generation checks. Real Claude Code and Codex
+  adapter-loading probes are covered by `scripts/check_native_clients.py`. That
+  command does not cover Copilot. Copilot has the offline runtime probe
+  `scripts/check_copilot_runtime.py` and the manual list in [VS Code Copilot
+  harness (manual)](#vs-code-copilot-harness-manual).
 - In particular, these checks do not prove current native Codex routing for all
   seven declared Codex roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
   preserves the historical six-role observation and defines the native-evidence
@@ -210,6 +214,339 @@ Compact/resume and coder escalation currently remain unexercised WARNs. See
 broad or nonempty unmarked paths and refreshes only marker-owned inputs; it
 never approves or changes trust.
 
+## VS Code Copilot harness (manual)
+
+These checks need a person in a signed-in VS Code window. No script runs them.
+The offline probe `scripts/check_copilot_runtime.py` (see [Copilot runtime
+probe](runtime-checks.md#copilot-runtime-probe)) runs the real Copilot runtime
+without VS Code's own layer, so it cannot show approval dialogs, "Allow all",
+Autopilot, or the tools VS Code gives each model.
+
+**Safety: run this list only in a test folder that holds no work you want to
+keep.** Three kinds of item can change the folder:
+
+- Items 1, 9, and 10 ask the agent to run `git reset --hard HEAD`. That command
+  throws away uncommitted changes. The guard should deny it. Item 10 is a chat
+  with the Session Target set to Local (explained below), where this deny has
+  never been run anywhere. If that deny fails, the command runs and discards the
+  uncommitted changes in the test folder.
+- Item 2 asks the agent to run `echo '{}' > .vscode/settings.json`. If you
+  approve the dialog, the command replaces that file of the test folder with
+  `{}`.
+- Item 3 repeats that overwrite of `.vscode/settings.json` with "Allow all" and
+  with Autopilot. No dialog may appear then, so the command can run without any
+  question.
+
+Each item that can raise a dialog says which answer to give. The button names
+in your VS Code version may differ from the names used here: "Allow once" means
+the button that allows this one call only, and "Deny" or "Skip" means the button
+that refuses it.
+
+A **harness** is the part of the client that runs the agent, calls the tools,
+and runs the hooks. VS Code runs a Copilot chat in one of two harnesses:
+
+- The **Local harness** is VS Code's older built-in agent, the only Copilot mode
+  this bootstrap was first built for. VS Code removes the Local harness in
+  February 2027 (sources: the VS Code hooks page, read on 2026-11-17, and the
+  VS Code 1.146 release notes of 2026-11-11).
+- The **Copilot harness** is the agent runtime that VS Code shares with Copilot
+  CLI. It is the default for new chats since VS Code 1.143. The VS Code hooks
+  page says: "Select **Copilot** from the **Session Target** UI control to use
+  the Copilot harness."
+
+VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17), so a
+VS Code update can change a result. Write down the VS Code version and the
+runtime version with each result. Look for the field `copilotVersion` in the
+session's `events.jsonl` file under `~/.copilot/session-state/<session id>/` or
+in `agenthost.log`. It was `1.0.108-0` with VS Code 1.146.0 on 2026-11-17.
+
+This bootstrap supports the Copilot harness inside VS Code.
+It does not claim Copilot CLI or Copilot cloud agents.
+
+**Where the evidence is.** Short notes in brackets, such as `[A6]` or `[F9]`,
+point to the evidence report `REPORT.md` in
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. That
+folder is in the private AI state of the bootstrap's authoring repository
+(`.claude/` is its own Git repository). It is not tracked in this
+repository, and you do not need it to run the items. Each item below says in
+words what was seen, where, and when.
+
+**What has run, and the three marks.** The real-window runs of 2026-11-17 (VS Code
+1.146.0, runtime `1.0.108-0`, with the models that VS Code's Auto setting chose,
+`gpt-6-luna` and `mai-code-1.1-flash`) were made with the guards and hook files
+from before the Copilot harness changes. Auto is the automatic setting of VS
+Code's model picker, where VS Code chooses the model. Every item below starts
+with one of three marks:
+
+- **Never run anywhere.** No recorded run of any part of this check exists,
+  offline or in a window.
+- **Seen in part.** Some of what the item asks for was seen, offline or once in
+  the real VS Code on 2026-11-17. The whole check, as described here, was never
+  run. The "Seen" line of the item says which part.
+- **Seen before, not since the changes.** The check, as described here, was seen
+  offline or once in the real VS Code on 2026-11-17, and not in a signed-in
+  window with the current guards and hooks. "Seen offline" means a run of the
+  probe on runtime `1.0.108-0` (VS Code 1.146.0) with a scripted model: a small
+  local server that returns fixed tool calls in place of a real model.
+
+The recorded runs show no run of any item in a signed-in window since the
+changes.
+
+**Before you start.**
+
+1. Install the current bootstrap into a test folder with
+   `uv run python scripts/install_bootstrap.py <folder> --local-only` (see
+   [Quick Install](../README.md#quick-install)), open it in VS Code, and trust
+   the folder. Repository hooks and the project's MCP servers load only
+   for a trusted folder (offline, on `1.0.108-0`: 0 hooks and 0 MCP servers
+   before trust, 28 hooks after) [F15].
+2. The folder `/run/user/<uid>` is needed only when a Copilot-harness chat
+   freezes. VS Code's agent host then cannot open its socket, and the log
+   `agenthost.log` (under `~/.vscode-server/data/logs/<session>/`) repeats
+   `listen EACCES: permission denied /run/user/<uid>/vscode-ipc-<id>.sock`. It is
+   not needed in every case: one check of the VS Code logs on this computer on
+   2026-11-17 found seven other VS Code server sessions in which the agent host
+   used a socket under `/tmp` instead [A1]. When the symptom appears, make the
+   folder with:
+
+   ```bash
+   sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" /run/user/$(id -u)
+   ```
+
+   On 2026-11-17 the user created the folder and then reloaded the window, and
+   the Copilot-harness chat then ran [A3]. The record does not show whether the
+   reload was needed. The folder was missing in that WSL session, and the same
+   log loop is in the VS Code logs of 2026-10-26 and 2026-11-12 on that computer
+   [A1]. If the symptom returns after a WSL restart, make the folder again. This
+   is an environment fault, not a bootstrap defect.
+3. In the chat, set the Session Target to Copilot, except for item 10, which
+   needs Local.
+4. Item 11 needs a hook logger: a hook command of your own, added to a copy of
+   the test folder's hook file, that appends its input to a file. The runs of
+   2026-11-17 used one. Item 5 can use `events.jsonl` instead.
+
+**Result words.** Write these words for each item, with the VS Code version,
+the runtime version, and the date. An item that asks for more than one result
+says which part each word covers:
+
+- `PASS`: every expectation of the item is met.
+- `FAIL`: the item names a failure, and it happened (for example, a command that
+  should be denied ran).
+- `not shown`: the check could not test what it is for (for example, item 4 with
+  a model that does not use `apply_patch`, or an item where VS Code's own
+  confirmation stopped the command before the guard).
+- `recorded`: an observation with no pass or fail. Write down what the item asks
+  for, such as a count, a text, or which action fired an event.
+- `not run`: you skipped the item.
+
+**Items.** Each item gives the mark, the Session Target, the action, the answer
+to give to a dialog, the expected result, the result words that apply, and what
+was seen before. The list is meant to take about 20 minutes. That time was not
+measured.
+
+1. **A denied command.**
+   - Mark: seen before, not since the changes. Session Target: Copilot.
+   - Action: ask the agent to run `git reset --hard HEAD`.
+   - Dialog: none is expected. In the real VS Code on 2026-11-17 the guard
+     denied this command, and the report of that run mentions a denial and no
+     dialog [A4]. If
+     VS Code shows its own confirmation before any denial, answer with the
+     refusing button (Deny or Skip) and record `not shown` with the text of the
+     dialog: the guard's result was not reached.
+   - Expect: `PASS` when the command does not run and the chat shows the guard's
+     reason, "Denied by preToolUse hook: Blocked dangerous git operation: git
+     reset --hard". `FAIL` when the command runs.
+   - Seen: in the real VS Code on 2026-11-17 with the model `gpt-6-luna`, with
+     the guards from before the changes [A4]. Seen offline, with the current
+     guards: probe check `deny-git-reset`. Record the reply text and whether it
+     names the denial once or twice. No recorded run shows a deny reason
+     twice.
+2. **The approval questions for a protected edit.**
+   - Mark: seen before, not since the changes. Session Target: Copilot.
+   - Action: ask the agent to run `echo '{}' > .vscode/settings.json`. Then ask
+     it to read that file with its read tool.
+   - Dialog: for the command, answer Allow once (not "always", and not "Allow
+     all"), so that every hook question can show and be counted. The command
+     then replaces `.vscode/settings.json` of the test folder with `{}`. For the
+     read, answer Allow once if a dialog appears, and record it as a result.
+   - Expect: a question that says "Editing agent, hook, or server
+     configuration requires approval: .vscode/settings.json". With "Allow all"
+     and Autopilot off, the command should run only after you approve such a
+     question. On 2026-11-17 the user answered the first question, VS Code
+     approved the second itself, and the agent then read the file back [A6].
+     Result for the command: `PASS` when a question that quotes
+     the guard's message appeared before the command ran; `FAIL` when the
+     command ran and no such question appeared. The number of dialogs and the
+     text of each are `recorded`. Result for the read: `PASS` when this
+     bootstrap raises no question; `FAIL` when a question that quotes the
+     guard's message appears.
+   - Seen: in the real VS Code on 2026-11-17, with the guards from before the
+     changes, the runtime raised two permission requests of kind `hook`, one for
+     each hook file. The user answered the first. VS Code approved the second
+     0.3 seconds later by itself, so the user saw one dialog [A6]. The same
+     run asked again for the read of the file with the read tool; the current
+     guards give that read no decision (offline probe check `read-agent-file`),
+     which was not seen in a window. Seen offline: probe check
+     `guards-both-sources` requires exactly two requests, and the probe answers
+     each itself, so it shows nothing about what a person sees.
+3. **"Allow all" and Autopilot.**
+   - Mark: never run anywhere. Session Target: Copilot.
+   - Action: repeat item 2 once after choosing "Allow all" for the session, and
+     once in Autopilot. Afterwards, switch both "Allow all" and Autopilot off
+     again.
+   - Dialog: none is chosen by you here. Record whether a question shows, and if
+     one does, answer Deny.
+   - Expect: not known. Result: `recorded`, once for "Allow all" and once for
+     Autopilot: whether the question was skipped, shown, or turned into a
+     denial, whether the command ran, and what `.vscode/settings.json` holds
+     afterwards.
+   - Seen: nothing. On 2026-11-17 the agent stopped after its own pre-check
+     command was denied, and the session recorded `"permissionMode":"manual"`
+     [A6]. GitHub's hooks reference says that in Copilot CLI autopilot mode no
+     prompt is shown and a hook `ask` is denied. It does not say the same for
+     Autopilot in VS Code. If "Allow all" skips the question, an edit of a
+     protected configuration file proceeds with no person's answer on the
+     Copilot harness. Tell the repository owner, because that decides whether
+     those edits should be denied instead of asked.
+4. **A new plain file from a model that uses `apply_patch`.**
+   - Mark: seen before, not since the changes. Session Target: Copilot.
+   - Action: pick a model that VS Code gives the patch tool `apply_patch`, then
+     ask the agent to create a file `notes-check.txt` with one line of text.
+     Read the model id and the tool name in `events.jsonl`.
+   - Dialog: for the normal write approval of `notes-check.txt`, answer Allow
+     once. If a question that quotes the guard's message ("Editing agent, hook,
+     or server configuration requires approval") appears, answer Deny and record
+     a FAIL.
+   - Expect: the file is created. There is no "hook exited with code 2".
+   - Rule: read the tool name. If it is not `apply_patch`, the item is "not
+     shown", not a pass. Try again with another model: choose a model by hand in
+     the model picker instead of Auto, and read the tool name again. On
+     2026-11-17 Auto chose `gpt-6-luna`, and VS Code gave it `apply_patch`.
+     Offline, only Codex-family model ids such as `gpt-5.2-codex` get it.
+   - Seen: before the fix, in the real VS Code on 2026-11-17, `gpt-6-luna` used
+     `apply_patch` and every call was denied with "hook exited with code 2"
+     [A4]. Seen offline after the fix: session `codex-patch` with the model id
+     `gpt-5.2-codex` creates a plain file (probe check `patch-plain-allowed`). A
+     successful `apply_patch` call was not seen in a window. Which models get
+     `apply_patch` in VS Code can differ from the runtime's own list for a model.
+5. **The tool names in the hook log.**
+   - Mark: seen before, not since the changes. Session Target: Copilot.
+   - Action: after items 1 to 4, read the tool name of each call from
+     `events.jsonl` or from a hook logger.
+   - Dialog: none.
+   - Expect: `PASS` when every tool name is in the table "Copilot harness tools
+     and guard handling" in
+     [target-mapping.md](target-mapping.md#copilot-harness-tools-and-guard-handling).
+     That table includes names that VS Code adds, such as `AskUserQuestion` and
+     `tool_search_tool`. A name that is not in the table is `recorded`, not a
+     `FAIL`: write the name down, and the repository owner decides whether it
+     needs guard handling.
+   - Seen: in the real VS Code on 2026-11-17, a hook logger saw `Bash`, `Read`,
+     `Glob`, `Edit` (for `apply_patch`), `Write` (for `create`),
+     `AskUserQuestion`, `skill`, and `tool_search_tool` as PascalCase names, and
+     the runtime's own names in camelCase [A4].
+6. **Each MCP server listed once.**
+   - Mark: seen in part. Session Target: Copilot.
+   - Action: open the chat's list of tools and MCP servers.
+   - Dialog: none.
+   - Expect: `PASS` when `semble`, `context7`, and `context-mode` are listed
+     once each, and `context-mode` offers only `ctx_index`, `ctx_search`, and
+     `ctx_stats`. `FAIL` when a project server is listed twice or `context-mode`
+     offers another tool. Servers that VS Code adds itself (on 2026-11-17,
+     `pylance mcp server` and `github-mcp-server`) do not count against the
+     result; write them down as `recorded`.
+   - Seen: in the real VS Code on 2026-11-17, the agent host log shows each of
+     the three connected once; VS Code added its own `pylance mcp server` and
+     `github-mcp-server` [A3]. The three-tool filter was seen offline only.
+     What the list shows was not seen.
+7. **The five custom agents, and the setting.**
+   - Mark: seen in part. Session Target: Copilot.
+   - Action: open the list of agents. Then switch
+     `github.copilot.chat.cli.customAgents.enabled` and open the list again.
+   - Dialog: none.
+   - Expect: `coder`, `documenter`, `orchestrator`, `planner`, and `reviewer`.
+     Result: `PASS` when the five show with the setting off or with it on. The
+     effect of the setting is `recorded`: which agents show in each state. The
+     official documentation
+     (read on 2026-11-17) describes the setting as "Enable using custom agents
+     in Copilot harness sessions", with the default `false`. What it gates was
+     not run.
+   - Seen: offline, the runtime lists the five agents [F9]. In the real
+     VS Code on 2026-11-17 a `reviewer` sub-agent started through the `task`
+     tool [A6]; the value of the setting in that run was not read.
+8. **Sub-agent context and the session reminder.**
+   - Mark: seen in part. Session Target: Copilot.
+   - Action: ask the main agent to start the `coder` agent as a sub-agent and to
+     answer one question: "Without reading any file, quote the first heading of
+     the repository instructions you were given." Then open a new chat and ask:
+     "Quote any instruction you were given about how to word your updates."
+   - Dialog: none is expected. If VS Code asks to approve a read, answer Allow
+     once.
+   - Expect: `GitHub Copilot Workspace Adapter` from the sub-agent, and text that
+     starts "For user-facing updates, use direct language" from the new chat. A
+     model may paraphrase or decline; then read the first user message in
+     `events.jsonl`. `PASS` when both texts are found, in the reply or in that
+     message. `FAIL` when a text is absent from that message. `not shown` when
+     the model declined and `events.jsonl` was not read.
+   - Seen offline: probe checks `subagent-context` (the first message of `coder`
+     and of `reviewer` holds that heading and the fixed line about agent files
+     and skills) and `session-reminder` (the first user message of the first
+     model request holds the reminder). Neither was seen in a window. A
+     sub-agent start itself was seen in the real VS Code on 2026-11-17 [A6],
+     before this hook existed.
+9. **One session-log entry per chat.**
+   - Mark: seen before, not since the changes. Session Target: Copilot.
+   - Action: in one new chat, send any message and let the chat finish. Note the
+     session id (the folder name under `~/.copilot/session-state/`). Then, in
+     the same chat, repeat item 1. Then open
+     `.claude/session_logs/hooks-sessions.log` and read the lines that hold that
+     session id.
+   - Dialog: as in item 1.
+   - Expect: in the chat, the denial of `git reset --hard HEAD`, as in item 1.
+     The log records the event, target, session id, source, and prompt of each
+     hook call, not denials, so the denial shows in the chat only. In the log,
+     expect lines with `target=github-copilot` for the session id and no line
+     with `target=claude-code` for it. `PASS` needs both. A `target=claude-code`
+     line for that session id is a `FAIL`: the Claude-settings hooks did not
+     stand down. If VS Code's own confirmation came first, the denial part is
+     `not shown`; judge the log part alone.
+   - Seen: before the stand-down, in the real VS Code on 2026-11-17, one chat
+     was logged under both targets [A3]. Seen offline after it: probe check
+     `single-session-log`.
+10. **A Local-harness deny still works.**
+    - Mark: never run anywhere. Session Target: Local.
+    - Action: start a new chat with the Session Target set to Local, and ask the
+      agent to run `git reset --hard HEAD`.
+    - Dialog: none is expected, but no record shows the order of VS Code's own
+      terminal confirmation and the pre-tool hook on the Local harness. If VS Code
+      shows its own confirmation first, answer with the refusing button (Deny or
+      Skip), and record whether a confirmation came first and its text. The
+      guard's result is then `not shown`. A confirmation that you approve would
+      let a failed deny discard uncommitted changes (see the safety note above).
+    - Expect: `PASS` when the command does not run and the chat shows the guard's
+      reason ("Blocked dangerous git operation"). `FAIL` when the command runs.
+    - Seen: not run. No recorded run of a Local-harness deny exists, and the
+      Local harness was not run with the new answer format or the new hooks. The
+      Local harness takes the decision from the "nested copy" (the copy inside
+      `hookSpecificOutput` in the guard's answer); the reading of VS Code's code
+      is in the [README](../README.md#quick-install). Hooks did
+      run on the Local harness in the real VS Code on 2026-11-17: with the VS Code
+      setting `chat.useClaudeHooks` on, the Local harness runs
+      `.claude/settings.json` too, so every hook runs twice [A2]. Turn that
+      setting off for this bootstrap.
+11. **When `sessionEnd` fires.**
+    - Mark: seen in part. Session Target: Copilot.
+    - Action: with a hook logger on `sessionEnd`, close the chat tab in one
+      session and close the window in another.
+    - Dialog: none.
+    - Expect: not known. Result: `recorded`: whether closing the chat tab fired
+      the event, and whether closing the window fired it.
+    - Seen: the event fired once when a chat was replaced in the real VS Code on
+      2026-11-17 [A3]. Nothing else. The bootstrap wires no `sessionEnd` hook on
+      the Copilot harness, so only a logger shows it.
+
+These results are not produced by `verify.py` or by the test suite.
+
 ## Hooks
 
 Expected:
@@ -223,7 +560,7 @@ Expected:
 - `pretool-bash-guard.sh` runs protected-file, dangerous-Git, branch, commit, then PR guards in that exact order and returns the first safety decision. A guard failure or malformed safety output fails closed.
 - The branch, commit, and push guards stand down for an invocation that carries an explicit `-C <dir>`, `--git-dir <dir>`, or `--work-tree <dir>` redirect resolving to a repository other than this checkout, so `git -C <dir> switch -c`, `git -C <dir> commit`, and `git -C <dir> push` are the supported ways to act on another repository from here. An undeterminable redirect, an unresolvable target, or a `cd` into another directory beforehand keeps the full gate. `gh pr create` is never scoped this way: it is always checked against this checkout, whatever repository `-R` names, because comparing remote URLs to decide otherwise could wrongly let a real pull request skip this repository's closeout ceremony. `git branch foo`, which creates a branch without switching to it, is not covered by the branch guard at all, unchanged.
 - Hook config edits through native tools, Bash redirection, or in-place edits are protected, with Codex denying and Claude asking for approval. Missing redirect targets and ambiguous commands fail closed.
-- Copilot terminal calls (`run_in_terminal` and `send_to_terminal` in VS Code's Local harness) go through the same shell guards as Bash: protected-file analysis and the branch, commit, and PR gates. Copilot's read-only tools (`read_file`, `view_image`, `list_dir`, `file_search`, `grep_search`, `semantic_search`, and in the Copilot SDK harness `view`, `grep`, `rg`, `glob`) may read the protected hook and server configs without a prompt. Secret-shaped files (`.env*`, `uv.lock`, `credentials*`, `*.pem`, `*.key`) stay denied for read tools, and edit tools still ask.
+- Copilot terminal calls (`run_in_terminal` and `send_to_terminal` in VS Code's Local harness, `bash` in the Copilot harness) go through the same shell guards as Bash: protected-file analysis and the branch, commit, and PR gates. Copilot's read-only tools (`read_file`, `view_image`, `list_dir`, `file_search`, `grep_search`, `semantic_search` in the Local harness; `view`, `grep`, `rg`, `glob` in the Copilot harness, where a hook sees `view` as `Read`) get no decision for a protected hook or server config, so this bootstrap asks nothing when they read one. Secret-shaped files (`.env*`, `uv.lock`, `credentials*`, `*.pem`, `*.key`) stay denied for read tools. On the Copilot harness the same holds for an explicit secret-shaped entry in the `paths` list of `grep`, `rg`, and `glob`; a search over a folder is not judged. Edit tools still ask. The Copilot-harness part was run offline on runtime `1.0.108-0` (probe checks `read-agent-file`, `search-secret-denied`, and `search-glob-not-judged`). The Local-harness part rests on VS Code source and tests, with no recorded real-client run.
 - The protected hook and server configs include `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json` (it holds the Copilot hook switches `chat.useHooks`, `chat.hookFilesLocations`, and `chat.useClaudeHooks`), `.github/copilot/settings.json`, and `.github/copilot/settings.local.json` (`disableAllHooks`, inline `hooks`). An agent edit of any of them asks on Claude and Copilot and is denied on Codex and Antigravity, so this includes an ordinary `.vscode/settings.json` edit. Besides edits, any command that is not on the guard's read-only list and merely names one of these files is denied on all four clients (the existing prose-literal floor), including `ls`, `jq`, `test -f`, `git add <file>`, and a PR body passed inline to `gh pr create --body "..."`. Inspect these files with `cat` or the native read tool; stage with `git add -u` or a path that does not name the file; write PR text with the native Write tool and pass it with `--body-file`.
 - Agent definition files (`.claude/agents/`, `.codex/agents/`, `.github/agents/`, `.agents/agents/`), each protected hook folder (`.github/hooks`, `.claude/hooks`, `.codex/hooks`) as a whole folder, and `*.code-workspace` files inside the repository are protected the same way. An agent edit, and `rm -rf`, `mv`, or `ln -s` on a whole folder, asks on Claude and Copilot and is denied on Codex and Antigravity. Any command outside the guard's read-only list that merely names one of them is denied on all four clients, for example `ls`, `find`, `diff`, or `cmp` on an agent file. Read with `cat`, a native read tool, or `rg --files`; compare with `git diff --no-index` or `uv run python scripts/check_runtime.py`. Heredoc bodies and arguments of commands the guard does not model are scanned too, so write findings JSON, PR bodies, and session-log additions that name such a path with the native Write or Edit tool, then pass `--findings-json <file>` or `--body-file <file>`. No native client run of these cases is recorded here.
 - The kit wires no Context Mode hooks on any client. A hook call from stale wiring (for example a consumer's committed `.codex/` or `.github/hooks`) runs `context-mode-dispatch.sh`, which reads its input, prints nothing, and exits 0 without starting upstream or touching the cache.
