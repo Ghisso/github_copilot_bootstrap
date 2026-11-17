@@ -1,0 +1,66 @@
+Phase D follow-up before review ("fix round 0"), 2026-11-18. Working copy on branch copilot-harness-migration_implementation, HEAD 49d3460, nothing staged.
+
+== 1. What changed ==
+scripts/check_copilot_runtime.py, `prepare_project`: the environment of `git init` and of the installer is now
+`{**runtime_environment(os.environ), "AI_STATE_REMOTE": "", the four GIT_AUTHOR_*/GIT_COMMITTER_* identity values}`.
+It was `{**os.environ, ...}`, so a host GIT_DIR, GIT_WORK_TREE, or GH_REPO reached both commands. `runtime_environment` got a longer docstring.
+The installer does not need the CLAUDE* or ANTHROPIC* variables: install_bootstrap.py reads only AI_STATE_REMOTE from the environment, and
+the word CLAUDE there is a file name (CLAUDE.md). It also pops the repository-local GIT_* names itself (line 101), so the installer was
+already safe from GIT_DIR; `git init` was not.
+docs/runtime-checks.md: the environment text now says the same filtered environment goes to `git init` and the installer, and that the
+probe adds an empty AI_STATE_REMOTE and a fixed Git identity to those two commands only (the runtime gets neither).
+tests/test_check_copilot_runtime.py:
+- new TestPrepareProjectLimits::test_a_host_git_dir_and_work_tree_do_not_move_the_project (real `git init` and real installer, with GIT_DIR and
+  GIT_WORK_TREE aimed at another folder and GH_REPO set: the project is created in the temporary folder, `.git` and the manifest exist, and the
+  other folder still holds only its own file);
+- new TestPrepareProjectLimits::test_the_installer_gets_the_filtered_environment_and_the_probes_own_values (a fake installer records its
+  environment: no GIT_/GH_/CLAUDE/ANTHROPIC/GITHUB_TOKEN variable except the four identity values; AI_STATE_REMOTE is empty although the host set
+  one; an unrelated variable and PATH still arrive);
+- changed (setup only, same purpose) TestPrepareProjectLimits::test_it_works_on_a_host_with_no_git_identity: it forced "no identity can be guessed"
+  with GIT_CONFIG_COUNT/KEY_0/VALUE_0 (user.useConfigOnly=true). The probe now drops every GIT_ variable, so that channel no longer arrives. The same
+  setting now goes in `$HOME/.gitconfig` (the test's HOME is an empty folder). I removed the two other GIT_CONFIG_* lines, which are dropped too
+  (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM). The test still fails when the identity values are removed from `prepare_project`: "fatal: no email was
+  given and auto-detection is disabled; state-sync setup did not create a nested AI-state commit" (checked, 0.62 s). A system-wide Git identity, on a
+  host that has one, can no longer be switched off for the child; the test then still passes, but less strictly.
+
+== 2. Correction ==
+`AI_STATE_REMOTE` does not pass through: `prepare_project` sets it to an empty string after the host values (the dict is built in that order, and a test
+already checks it). My earlier hand-back said the host's AI_STATE_REMOTE would make the probe not offline: that was wrong for `prepare_project`. It is
+still true that the runtime's own environment (`runtime_environment` alone) passes a host AI_STATE_REMOTE to the session hooks; no evidence file or
+doc sentence says otherwise (searched raw/phase-D-*.txt, README.md, docs/target-mapping.md, docs/runtime-checks.md).
+
+== 3. Load-bearing checks ==
+Put `**os.environ` back in `prepare_project` (the old line), run the new tests (2 runs): both new tests FAIL.
+  The real one fails at `assert (project / ".git").is_dir()`: git init made the repository in the other folder (GIT_DIR) and not in the project.
+Put it back: both pass.
+
+== 4. Results ==
+uv run pytest tests/test_hook_gates.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+    1760 passed in 155.65 s (2 more than before: the two new tests)
+uv run python scripts/check_copilot_runtime.py --require
+    Result: PASS (0 of 46 checks failed), 15.09 s
+One probe run with GIT_DIR=<scratch>/hostile-git-target/.git, GIT_WORK_TREE=<scratch>/hostile-git-target, GH_REPO=owner/other in the calling environment
+(script: scratch folder hostile_git_probe.sh; the folder held only keep.txt):
+    Result: PASS (0 of 46 checks failed), 12.75 s
+    scratch folder after: keep.txt (content unchanged); "scratch folder untouched: yes"
+Control, the old `**os.environ` line put back, same run, 2 runs:
+    Result: FAIL (1 of 46 checks failed): hooks-subfolder (no hook found: the project was built in the wrong place)
+    scratch folder after: .git keep.txt; "scratch folder untouched: NO" (git init wrote a repository into it)
+    (the file was restored after each run; `git diff --stat` shows the intended change only)
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases    Success: no issues found in 43 source files
+uv run ruff check shared scripts tests                                                All checks passed!
+uv run ruff format --check shared scripts tests                                       43 files already formatted
+uv run python .claude/scripts/verify.py fast --format text                            fast: PASS
+No full-suite run this round, as asked. Nothing under .claude/ outside .claude/explorations/ was created; no commit, no staging.
+
+git status --short:
+ M README.md
+ M docs/runtime-checks.md
+ M docs/target-mapping.md
+ M scripts/check_copilot_runtime.py
+ M scripts/generate_targets.py
+ M scripts/validate_targets.py
+ M shared/hooks/scripts/run-hook.sh
+ M tests/test_check_copilot_runtime.py
+ M tests/test_hook_gates.py
+ M tests/test_validate_targets.py
