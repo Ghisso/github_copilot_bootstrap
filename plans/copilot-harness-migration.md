@@ -2,10 +2,10 @@
 name: copilot-harness-migration
 type: big-plan
 # status must occur exactly once: planning | in-progress | complete | cancelled
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: copilot-harness-migration_implementation
-started_at:
+started_at: 2026-11-17T08:42:51Z
 phases:
   - 2026-11-17_phase-A-copilot-runtime-probe
   - 2026-11-17_phase-B-copilot-tool-inputs
@@ -14,7 +14,7 @@ phases:
   - 2026-11-17_phase-E-subagent-context
   - 2026-11-17_phase-F-copilot-docs
   - 2026-11-17_phase-G-knowledge-refresh
-current_phase:
+current_phase: 2026-11-17_phase-A-copilot-runtime-probe
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -158,6 +158,25 @@ the test folder's `.claude/settings.local.json` (A4).
 | (b) The agent edits `.vscode/settings.json` (protected config, so the guard asks) | Partly seen: the request arrives as kind `hook` with the guard's `hookMessage` (A4) | How many questions the user sees; what "Allow all" does; what Autopilot does | One question with both sources running: check `hooks-sessions.log`. If the Claude-settings hooks do not run in VS Code, cancel Phase D with that evidence. "Allow all" approves hook questions silently: the user decides whether `github-copilot` moves from ask to deny for protected configs, a stricter rule added to Phase C. Autopilot denies: documentation only (Phase F). |
 | (c) Hook tool names and environment for a shell command, a read, a create or edit, a search, and a sub-agent start, from both sources. Also `env \| grep -E '^(COPILOT\|CLAUDE)'` run through the VS Code shell tool. Optional: a window opened on a subfolder of the repository | Tool names seen (A4); sub-agent start, Claude-settings hook environment, and shell-tool environment still open | `tool_name` per tool; `COPILOT_*` and `CLAUDE*` per source; whether `COPILOT_HOOK_DEPTH` is absent from the shell-tool output; which sources load from a subfolder | New tool names go into Phase B step 6. `COPILOT_HOOK_DEPTH` in the shell-tool output, or missing from Claude-settings hooks: Phase D uses `COPILOT_PROJECT_DIR` (also hook-only in P1), or is cancelled. Under option B a wrong signal costs only logging and state sync. |
 
+**Gate result (2026-11-17, evidence Addendum A4 to A6).**
+
+- (a) Passed.
+- (b) Seen for a shell write to `.vscode/settings.json`: the user answered
+  one question; VS Code itself approved the second request for the same
+  command (`"decisionSource":"host_policy"`). The read-back of that file
+  with the read tool asked the user again, which is row L1. "Allow all" and
+  Autopilot were not exercised: the agent stopped after its own pre-check
+  was denied. They stay on Phase F's manual checklist. If "Allow all" turns
+  out to approve guard questions silently, the stricter rule in the table
+  above is a user decision and a plan revision.
+- (c) Passed. A sub-agent start was seen (`agentName: reviewer`, started by
+  the `task` tool). Hooks from the Claude settings see `COPILOT_CLI=1`,
+  `COPILOT_HOOK_DEPTH=1`, and `COPILOT_PROJECT_DIR`, and no
+  `COPILOT_HOOK_DIR`. Commands run by the VS Code shell tool see
+  `COPILOT_CLI=1` and `COPILOT_AGENT_SESSION_ID`, and no
+  `COPILOT_HOOK_DEPTH` and no `COPILOT_PROJECT_DIR`. The optional subfolder
+  window was not run; P4 covers it offline.
+
 **User choices at approval.**
 
 1. Search tools: should `grep`, `rg`, and `glob` be denied, like the read
@@ -173,6 +192,18 @@ the test folder's `.claude/settings.local.json` (A4).
    - REQ-005.
 2. How much stands down on the Copilot harness: option A, B, or C (below).
    Recommended and planned: **B**.
+
+**Approval record (2026-11-17).** The user answered four questions and
+approved the plan:
+
+- Stand-down: **option B** (lifecycle hooks only; the guards keep running
+  from both sources).
+- Search tools on secret-shaped paths: **yes, refuse** (decision row T1
+  stays).
+- The two less strict rules: **both agreed** (rows L1, the read tool on
+  configuration files, and L2, the shell helper tools).
+- **Approved to start.** The untested "Allow all" case stays on Phase F's
+  manual checklist.
 
 ## Goals
 

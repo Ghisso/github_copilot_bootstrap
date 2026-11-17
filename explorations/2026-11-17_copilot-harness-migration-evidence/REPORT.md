@@ -517,6 +517,35 @@ What this adds:
   fits hooks running one after another and stopping at a deny or an
   unanswered question. Not confirmed.
 
+**A6. The rest of the extra checks in the real VS Code (Run, in the real
+VS Code, 17:30 to 17:39).**
+
+- **The approval question (session `db2427a6…`).** For
+  `echo '{}' > .vscode/settings.json` the runtime raised two `hook`
+  requests, one per hook source. The user answered the first
+  (`"decisionSource":"human_response"`); VS Code approved the second 0.3
+  seconds later by itself (`"decisionSource":"host_policy"`). So the user
+  saw one question for the command. The agent then read the file back with
+  the read tool, and the guard asked again ("Editing agent, hook, or server
+  configuration requires approval"); the user answered that one too.
+- **"Allow all" was not exercised.** In the next prompt the agent first ran
+  its own check command that named `.github/copilot/settings.json`. The
+  guard denied it as a command it could not judge, and the agent stopped
+  without running the requested command. The session records
+  `"permissionMode":"manual"`.
+- **Sub-agent (session `ed99e1e6…`).** The main agent (`gpt-6-luna`) called
+  `task` with `agent_type: "reviewer"`. `SubagentStart` and `SubagentStop`
+  fired with `agentName: "reviewer"`. The child ran on
+  `mai-code-1.1-flash` and read `README.md` with `view`. So custom agents
+  work as sub-agents in the real client.
+- **Environment.** A hook from the Claude settings (`PreToolUse`, matcher
+  `Bash`) saw `COPILOT_CLI=1`, `COPILOT_HOOK_DEPTH=1`,
+  `COPILOT_PROJECT_DIR`, and no `COPILOT_HOOK_DIR`. A command run by the VS
+  Code shell tool (`env | grep -E '^(COPILOT|CLAUDE)'`, session
+  `cb2f6974…`) saw `COPILOT_CLI=1`, `COPILOT_AGENT_SESSION_ID`,
+  `COPILOT_HOME`, `CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP=1`, and no
+  `COPILOT_HOOK_DEPTH` and no `COPILOT_PROJECT_DIR`.
+
 ## Independent critique and plan revision
 
 The first plan draft was critiqued by a separate agent
