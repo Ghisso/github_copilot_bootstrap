@@ -38,7 +38,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | README.md | VS Code can give a model a different tool set than the runtime's own list for that model. | REPORT A4 (Auto chose `gpt-6-luna`; VS Code gave it `apply_patch`) and `raw/tools-by-model.txt` (the runtime's own list gives `gpt-6-luna` `create` and `edit`). |
 | README.md | That file records no run of any of them in a signed-in window since these changes. | Phase B to E session logs (the optional items are `NOT RUN`); `docs/smoke-tests.md` marks every item "never run anywhere" or "seen before, not since the changes". |
 | README.md | It was not run with the current answer format or the current | Phase C session log, "Unverified limitations". `not run`. |
-| README.md | comes from VS Code's own code, not from a run: in the Copilot extension 0.74.0 of | `source`: `~/.vscode-server/bin/69047191…/extensions/copilot/dist/extension.js`, `ChatHookService.executePreToolUseHook`: `let E=_.hookSpecificOutput;if(!E)return;…let x=E.permissionDecision` (read on 2026-11-18; the excerpt is in `raw/phase-F-fix-round-1.txt`). Also `DEVILS-ADVOCATE-2026-11-17.md` line 196. |
+| README.md | comes from VS Code's own code, not from a run. In the Copilot extension 0.74.0 of VS Code 1.146.0 | `source`: `~/.vscode-server/bin/69047191…/extensions/copilot/dist/extension.js` (VS Code 1.146.0, Copilot extension 0.74.0), read on 2026-11-18: `ChatHookService.executePreToolUseHook` takes `E=_.hookSpecificOutput` and then `E.permissionDecision`; the result parser has `let l=r.hookEventName;if(typeof l=="string"&&!yui(l,e))return this._logService.trace(`[ChatHookService] Ignoring result with mismatched hookEventName ...`),{resultKind:"success",output:void 0}`. The excerpts are in `raw/phase-F-fix-round-1.txt` (fix round 2). Also `DEVILS-ADVOCATE-2026-11-17.md` line 196. |
 | README.md | so every hook runs twice (seen in the real VS Code on | REPORT A2 (Local harness with `chat.useClaudeHooks: true`: "[SessionStart] Executing 8 hook(s)"). |
 | README.md | its hook log showed 8 hooks at session start, three from | REPORT A2 (three from `.github/hooks/hooks.json`, three from `.claude/settings.json`, two probe loggers). |
 | README.md | Turn that setting off for this bootstrap. | Advice, not a result: big plan Q1 ("The docs advise turning that setting off"). |
@@ -105,7 +105,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/target-mapping.md | VS Code hooks are "in preview" (VS Code hooks page, read on 2026-11-17) | RES §14. |
 | docs/target-mapping.md | (Copilot SDK `1.0.30-preview.0`), run offline with a scripted model | REPORT "How the evidence was gathered" (versions); `raw/phase-F-require-output.txt`. |
 | docs/target-mapping.md | reads the top level under both event spellings (`PreToolUse` and `preToolUse`), in a planning check | Planning probe P1 (`raw/planning-probe-e1-outcomes.txt`); REPORT F4 table (top-level `deny` denied under both names). |
-| docs/target-mapping.md | The Local harness reads the nested copy only; the reading of VS Code's code is in the [README](../README.md#quick-install). | `source`: see the README row on `executePreToolUseHook`. |
+| docs/target-mapping.md | The Local harness takes the decision from the nested copy, and it drops a whole result whose top-level `hookEventName` names another event | `source`: see the README row on `executePreToolUseHook` and the `hookEventName` check. |
 | docs/target-mapping.md | because it was not checked whether the Local harness accepts the camelCase names | `not run`: stated. Big plan "Rejected: renaming the hook events to camelCase". |
 | docs/target-mapping.md | top-level `additionalContext` reached the model under `SessionStart` and `PostToolUse` and the nested copy did not [P1] | REPORT F13 table; planning probe P1. |
 | docs/target-mapping.md | Before the change the runtime dropped this text. | REPORT F13 ("The bootstrap's reminder prints the nested shape, which is ignored here"); P1. |
@@ -153,7 +153,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/runtime-checks.md | `Result: PASS (0 of 48 checks failed)` | `raw/phase-F-require-output.txt`. |
 | docs/runtime-checks.md | the custom-agent frontmatter, the hook file's events and commands, and the size of `.github/copilot-instructions.md` | `source`: `scripts/validate_targets.py` (`COPILOT_EXPECTED_EVENTS`, the 2,048-byte check). |
 | docs/runtime-checks.md | the Auto choice was `gpt-6-luna`, and it was given | REPORT A4; `raw/tools-by-model.txt`. |
-| docs/runtime-checks.md | The Local harness reads the nested copy only. That comes from VS Code's | `source`: see the README row on `executePreToolUseHook`. |
+| docs/runtime-checks.md | The Local harness takes the decision from the nested copy, and it drops | `source`: see the README row on `executePreToolUseHook` and the `hookEventName` check. |
 | docs/runtime-checks.md | found no difference (944 comparisons, | `raw/phase-C-byte-identity-battery.txt` ("github-copilot comparisons with an answer: 944 … nested object byte-identical, only top-level fields added"). |
 | docs/runtime-checks.md | Its last full run, on 2026-11-18, printed runtime `1.0.108-0` (VS Code 1.146.0) and | `raw/phase-F-require-output.txt`. |
 | docs/runtime-checks.md | VS Code answered the second request itself [A6] | REPORT A6. |
@@ -307,7 +307,7 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/smoke-tests.md | Items 1, 9, and 10 ask the agent to run `git reset --hard HEAD`. | The item texts themselves; the command's effect is Git's documented behavior. |
 | docs/smoke-tests.md | Item 2 asks the agent to run `echo '{}' > .vscode/settings.json`. | REPORT A5/A6 (the command used on 2026-11-17). |
 | docs/smoke-tests.md | found seven other VS Code server sessions in which the agent host used a socket under `/tmp` | REPORT A1 ("absent from seven other VS Code server sessions, where the agent host listened on a socket under `/tmp`"). |
-| docs/smoke-tests.md | On 2026-11-17 the recovery needed the folder and a window reload [A3]. | REPORT A3 ("The user created `/run/user/1000` with `sudo` and reloaded the window"). |
+| docs/smoke-tests.md | On 2026-11-17 the user created the folder and then reloaded the window, and | REPORT A3 ("The user created `/run/user/1000` with `sudo` and reloaded the window"). The record does not show whether the reload was needed, and the text says so. |
 | docs/smoke-tests.md | The log records the event, target, session id, source, and prompt of each hook call, not | `source`: `shared/hooks/scripts/session-log.sh` lines 33 to 50 (`sessionId`, `source`, `prompt` fields); `raw/session-log-double-entries.txt` (line format). |
 | docs/smoke-tests.md | Rule: read the tool name. If it is not `apply_patch`, the item is "not | Item rule; basis for the model facts: REPORT A4 and F6. |
 | docs/smoke-tests.md | Auto is the automatic setting of VS Code's model picker | REPORT A3. |
@@ -315,3 +315,15 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 | docs/architecture.md | sources: the VS Code hooks page, read on 2026-11-17, and the VS Code 1.146 release notes | Same as the README source row. |
 | docs/sidecar-provider-contract.md | The dated records below also name a session type called "Agent Host, Claude harness". | This file's own Step 3 text and the 2026-09-27 matrix row "Agent Host, Claude harness" (all cells `unverified`). |
 | docs/sidecar-provider-contract.md | (VS Code's older built-in agent, which VS Code removes in February 2027; sources: | Same as the README source row. |
+
+## Added in fix round 2 (2026-11-18)
+
+| File | Short quote | Basis |
+| --- | --- | --- |
+| README.md | returns no output for a result whose top-level `hookEventName` does not match the event (its trace | The `source` row above (the result parser and its trace message "Ignoring result with mismatched hookEventName"). |
+| docs/target-mapping.md | There is no top-level `hookEventName`, because the Local harness drops a result whose top-level event name is another event. | Same `source` excerpt (README row). |
+| docs/smoke-tests.md | Item 3 repeats that overwrite of `.vscode/settings.json` with "Allow all" and | The item 3 text; the overwrite is the command of item 2 (REPORT A5, A6). No run of "Allow all" or Autopilot exists, so "No dialog may appear" is stated as a possibility. |
+| docs/smoke-tests.md | the guard denied this command, and the report of that run mentions a denial and no | REPORT A4 table row for session `2c3106d8…` ("The guard denied it ... Two `git status` calls ran"); the report names no dialog. |
+| docs/smoke-tests.md | no record shows the order of VS Code's own terminal confirmation and the pre-tool hook on the Local harness | `not run`; a search of the six files and of `REPORT.md` found no such record. |
+| docs/smoke-tests.md | Mark: seen in part. Session Target: Copilot. | Items 6, 7, 8, 11: the Seen line of each item names the part that was seen (REPORT A3, F9, A6; probe checks `subagent-context` and `session-reminder`). |
+| docs/smoke-tests.md | `PASS`: every expectation of the item is met. | Definition of the result words; no claim about a run. |

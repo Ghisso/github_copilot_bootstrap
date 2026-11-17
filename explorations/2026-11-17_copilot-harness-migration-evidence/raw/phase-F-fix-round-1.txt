@@ -178,3 +178,55 @@ sys	2m20.357s
 generate_targets --all, validate_targets, check_runtime, validate_plan_frontmatter, and every other line of the plan Verification block except verify.py phase: PASS (twice; the last run after the last doc edit).
 Link check: 133 relative links, 0 broken, 0 new broken. Table check: 0 rows with a wrong cell count. Claims table: 255 rows, every quote found in its file.
 ruff check and ruff format --check: clean. verify.py fast: PASS.
+
+# Fix round 2 (review round 2: 1 MAJOR and 7 small points; point 8 is the coordinator's own)
+Date: 2026-11-18. Same six files. "Old" is the text after fix round 1; "new" is the text now.
+
+## 1. MAJOR: docs/target-mapping.md, a paragraph and three bullets inside the Gate-Repair table
+old: the paragraph "**Hook- and server-config protection on the Copilot harness.** ..." and its three bullets sat between the row "Shipped commands cannot hide test failures" and the row "Context7 for subagents", so the last row was no longer part of the table.
+new: the paragraph and the three bullets follow the last row ("Context7 for subagents"); the table is contiguous.
+Table check, extended: rule 1 (cell count per row) and rule 2 (contiguity: a line that starts with `|` must follow another table line, or be a header row that a separator row follows at once; a row after a non-table line is an orphan row and fails). Run on all six files.
+Before the fix (current text of fix round 1), exit 1:
+docs/target-mapping.md:119: orphan table row (no header and separator before it): | Context7 for subagents | Generated agents with the `search` capabili
+tables checked: 26; problems: 1
+After the fix, exit 0:
+tables checked: 26; problems: 0
+
+## 2. docs/smoke-tests.md, safety paragraph: item 3
+old: "Two kinds of item can change the folder:" with items 1, 9, 10 and item 2.
+new: "Three kinds of item can change the folder:" and the added bullet "Item 3 repeats that overwrite of `.vscode/settings.json` with "Allow all" and with Autopilot. No dialog may appear then, so the command can run without any question." Item 3: old "Switch "Allow all" off again afterwards." new "Afterwards, switch both "Allow all" and Autopilot off again."
+
+## 3. docs/smoke-tests.md, marks
+old: two marks; items 7 and 11 were "Never run anywhere" although their "Seen" lines record observations.
+new: three marks. "Never run anywhere" (items 3 and 10: no part was seen), "Seen in part" (items 6, 7, 8, 11: the Seen line names the part that was seen; the whole check was never run), "Seen before, not since the changes" (items 1, 2, 4, 5, 9: the check as described was seen offline or once in the real VS Code on 2026-11-17).
+
+## 4. docs/smoke-tests.md, result words
+old: one closing paragraph "Write each result as PASS, FAIL, not shown, or not run"; items 3 and 11 said "Expect: not known"; item 2 asked only for a count; items 5 and 6 did not say whether extra names or servers are a pass.
+new: a "Result words" list before the items (`PASS`, `FAIL`, `not shown`, `recorded`, `not run`, each defined). Item 2: `recorded` for the dialog count; PASS or FAIL for the read. Item 3: `recorded` (what happened in "Allow all", what in Autopilot). Item 5: PASS when every name is in the table; an unknown name is `recorded`, not a FAIL. Item 6: PASS when the three project servers are listed once each and `context-mode` offers only its three tools; servers VS Code adds are `recorded`. Item 7: PASS when the five agents show with the setting off or on; the effect of the setting is `recorded`. Item 8: PASS, FAIL, and `not shown` named. Item 11: `recorded`.
+
+## 5. docs/smoke-tests.md, items 1, 9, 10: dialog and pass rule
+old (items 1 and 10): "If a dialog asks whether to run the command, answer Deny or Skip, and record that the guard did not deny it." / "... and record a FAIL."
+new, item 1 (Copilot harness): "In the real VS Code on 2026-11-17 the guard denied this command, and the report of that run mentions a denial and no dialog [A4]. If VS Code shows its own confirmation before any denial, answer with the refusing button (Deny or Skip) and record `not shown` with the text of the dialog: the guard's result was not reached." Pass rule: "`PASS` when the command does not run and the chat shows the guard's reason ... `FAIL` when the command runs."
+new, item 10 (Local harness): "no record shows the order of VS Code's own terminal confirmation and the pre-tool hook on the Local harness. If VS Code shows its own confirmation first, answer with the refusing button (Deny or Skip), and record whether a confirmation came first and its text. The guard's result is then `not shown`." Pass rule as in item 1.
+new, item 9: the denial part is `not shown` when VS Code's own confirmation came first; the log part is judged alone.
+
+## 6. docs/smoke-tests.md, "The recovery needed the folder and a window reload"
+old: "On 2026-11-17 the recovery needed the folder and a window reload [A3]."
+new: "On 2026-11-17 the user created the folder and then reloaded the window, and the Copilot-harness chat then ran [A3]. The record does not show whether the reload was needed."
+
+## 7. README.md, docs/target-mapping.md, docs/runtime-checks.md: "reads the nested copy only"
+old (README): "The Local harness reads the nested copy only. That comes from VS Code's own code ... the function `ChatHookService.executePreToolUseHook` ... reads `permissionDecision` from `hookSpecificOutput`, and the part that was read has no step that looks at the top level"
+old (target-mapping): "The Local harness reads the nested copy only; the reading of VS Code's code is in the README."
+old (runtime-checks): "The Local harness reads the nested copy only. That comes from VS Code's code, not from a run; the reading is in the README."
+new (README, full statement): "The Local harness takes the decision from the nested copy, and it drops a whole result whose top-level `hookEventName` names another event, which is why the answer carries none. That comes from VS Code's own code, not from a run. In the Copilot extension 0.74.0 of VS Code 1.146.0 (`extensions/copilot/dist/extension.js`, read on 2026-11-18), the function `ChatHookService.executePreToolUseHook` reads `permissionDecision` from `hookSpecificOutput`, and the code that parses a hook's result returns no output for a result whose top-level `hookEventName` does not match the event (its trace message is "Ignoring result with mismatched hookEventName")."
+new (target-mapping and runtime-checks): "The Local harness takes the decision from the nested copy, and it drops a whole result whose top-level `hookEventName` names another event, which is why the answer carries none (VS Code's code, read on 2026-11-18; see the README)." The words "only" and "ignores the top level" are not used.
+Excerpts read on 2026-11-18 (extension.js of VS Code 1.146.0):
+  the result parser: let l=r.hookEventName;if(typeof l=="string"&&!yui(l,e))return this._logService.trace(`[ChatHookService] Ignoring result with mismatched hookEventName '${l}' (expected '${e}')`),{resultKind:"success",output:void 0};let u=!1,d=r.hookSpecificOutput;if(typeof
+  the decision reader: executePreToolUseHook(e,n,r,o,a,s,c){let l={tool_name:e,tool_input:n,tool_use_id:r},u=await this.executeHook("PreToolUse",o,l,a,s);if(u.length===0)return;let d,p=[],m,A,g,f=[];QB({hookType:"PreToolUse",results:u,outputStream:c,logService:this._logService,onSuccess:_=>{if(typeof _!="object"||_===null)return;let E=_.hookSpecificOutput;if(!E)return;E.additionalContext&&f.push(E.additionalContext),E.updatedInput&&(g=E.updatedInput);let x=E.permissionDecision;if(x){if(!(x in imn)){let I=`Invalid permissionDecision value '${String(x)}'. 
+
+## 9. docs/smoke-tests.md, the safety paragraph used "Local harness" before its definition
+old: "Item 10 is a deny on the Local harness that has never been run anywhere."
+new: "Item 10 is a chat with the Session Target set to Local (explained below), where this deny has never been run anywhere." The safety paragraph now uses no term that is defined later ("harness" does not appear in it).
+
+## Checks of this round
+Run after the last edit (see the reply): generate_targets --all, validate_targets, check_runtime, validate_plan_frontmatter and the plan Verification block except verify.py phase; the link check; the extended table check; the claims table (262 rows, every quote found); ruff; verify.py fast.
