@@ -105,6 +105,13 @@ code change.
   pass rule of the deny items is "the command does not run and the chat
   shows the guard's reason". Orchestrator checks: `verify.py fast` PASS,
   and the two table rows read. Review round 3 started.
+- **07:13** - Review round 3: Gate PASS, no open request. The table is one
+  block again; the reviewer confirmed both halves of the Local-harness
+  sentence in VS Code's `extension.js`. Three MINOR, all fixed: a heading
+  still said "the two marks"; item 2 of the checklist could never fail
+  when the guard asks nothing (a `FAIL` rule is added); the Scope-change
+  record lacked two corrections and had an old finding count (extended
+  by the orchestrator). The two doc lines went to the `coder`.
 
 ## [LEARN] Entries
 

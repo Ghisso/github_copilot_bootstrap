@@ -129,8 +129,16 @@ stands alone.
   - Not added to the docs: the follow-up on inline Python without `-I`
     and on the temp-file leak of `protect-files.sh`. The user decides how
     to handle both.
-  - After review rounds 1 and 2 (23 MINOR findings and one MAJOR, all
+  - After review rounds 1 to 3 (26 MINOR findings and one MAJOR, all
     fixed):
+    - `docs/runtime-checks.md` gives the run dates by evidence file
+      (2026-11-17 and 2026-11-18); it had said all runs were made on
+      2026-11-17.
+    - The statement on the Local harness changed after a new reading of
+      VS Code's `extension.js` on 2026-11-18: it takes the decision from
+      the nested copy, and it drops a whole result whose top-level
+      `hookEventName` names another event. The three documents that
+      state it use the same words.
     - The checklist opens with a safety paragraph: run it only in a test
       folder with no work to keep. Each item starts with a mark that says
       whether it was ever run, names its Session Target, and gives the
