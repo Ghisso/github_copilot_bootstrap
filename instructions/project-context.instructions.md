@@ -281,7 +281,9 @@ PR #57 (`217b3ca`, 2026-11-15) merged `dev` into `main`, so `origin/main`
 holds everything on `dev`, and `dev` is 0 commits ahead of it. The local
 `main` branch on this computer is still at PR #50 (`d514277`, 2026-10-23),
 29 commits behind `origin/main`; it can be fast-forwarded, and doing so is
-the user's call. No implementation branch is unmerged; the remote has only
+the user's call. On 2026-11-15 no implementation branch was unmerged. Since
+2026-11-17 the remote also holds `copilot-harness-migration_implementation`,
+which is not merged (see the paragraph above); the other remote branches are
 `dev`, `main`, and `ai-state`.
 
 Open follow-ups to start from:
@@ -415,7 +417,7 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   `receipt metadata control-plane provenance is invalid`. Run
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after editing either file.
-- `README.md`, `docs/`, and the wiki cite the private evidence report of the
+- `README.md` and `docs/` cite the private evidence report of the
   Copilot migration by bracket labels such as `[A6]` after a plain
   description. The report is in `.claude/explorations/` and is not tracked,
   so never cite it by a bare label in a tracked file.

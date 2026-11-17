@@ -78,6 +78,28 @@ of the live-advice surfaces for statements this plan made outdated.
   `validate_plan_frontmatter.py` exit 0, `verify.py fast` PASS; the three
   text checks of the plan's Verification block hold. Scope-change record
   added to the small plan. Review round 1 started with six profiles.
+- **08:44** - Review round 1: every changed wiki sentence the reviewer
+  opened against its source matched, and the audit list covers every
+  surface. Gate FAIL on two MAJOR, both false statements that stayed: on
+  the sidecar wiki page, the reason for shipping no `.github/agents` file
+  still said Copilot has no way to find an agent in an ignored file, which
+  the page's own new text contradicts; and the project context file still
+  said no implementation branch is unmerged. Six MINOR: four statements
+  in `.claude/MEMORY.md` without a basis or a "not run" label; "Copilot
+  harness" used before its definition on four wiki pages; "starts with
+  the marker" where the marker is an environment prefix on the launcher
+  call; "and the wiki" in a context-file sentence on bracket labels;
+  `SECURITY.md` not saying that VS Code's own trust prompt was not run;
+  and two pages repeating the hooks page at length.
+- **08:48** - All eight fixed. The wiki fixes went through a second scoped
+  OpenWiki run (mode `update`, seven pages, `openwiki_finish` returned
+  `complete`; no `openwiki/.run.json`, no managed block in the root
+  files). The hooks page also says now that the launcher stands down no
+  other script, so another Claude-settings hook such as
+  `record-branch-state.sh` still runs on the Copilot harness. Open point,
+  not checked: whether that script is safe to run twice there.
+  `validate_targets.py` exit 0 and `verify.py fast` PASS. Review round 2
+  started.
 
 ## Stale-claims surfaces checked
 

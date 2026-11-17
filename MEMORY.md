@@ -1713,7 +1713,8 @@
   `chat.hookFilesLocations`, `chat.useClaudeHooks`). Those Local settings
   do not stop the Copilot harness from loading a hook file (VS Code docs,
   read 2026-11-17). For the Copilot runtime, `disableAllHooks` at the top
-  of a hook file skips that file's hooks; a top-level `disableAllHooks` in
+  of a hook file skips that file's hooks (GitHub's documentation; not
+  run); a top-level `disableAllHooks` in
   a repository `settings.json` under `.github/copilot/` is documented for
   Copilot CLI only, and its effect on the Copilot harness in VS Code was
   not run. Protect all of these files like other hook configs; the
@@ -1731,12 +1732,14 @@
   stand down there, so they run once (Phase D: `run-hook.sh`, marker
   `BOOTSTRAP_HOOK_SOURCE=claude-settings`); the guards run from both files
   and never stand down. With `chat.useClaudeHooks` on, the Local harness
-  still runs every hook twice. For `github-copilot` the guards print the
+  ran every hook twice on 2026-11-17 (A2); it was not run with the new
+  launcher, whose conditions it does not meet. For `github-copilot` the guards print the
   decision at the top level and nested (Phase C): the runtime reads the
   top level under both event spellings; a nested-only answer works only
   under PascalCase `PreToolUse`; the Local harness takes the decision from
   the nested copy and drops a result whose top-level `hookEventName` names
-  another event; a timeout or non-JSON output lets the tool run.
+  another event (read in VS Code's `extension.js` on 2026-11-18; not run
+  with the new answer); a timeout or non-JSON output lets the tool run.
   `apply_patch` sends its patch text as a string `tool_input` (offline
   only Codex-family models get that tool; the real VS Code also gave it to
   `gpt-6-luna`); Phase B made `protect-files.py` read it, where it had
@@ -1746,7 +1749,8 @@
   `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/REPORT.md`
   before any Copilot change (its items are cited below as F, A, and P
   numbers); `scripts/check_copilot_runtime.py --require` runs the real
-  runtime offline with a scripted model (no account) and prints 48 lines.
+  runtime offline with a scripted model (no account) and prints 48 result
+  lines.
 - [LEARN:hooks] The Copilot runtime's shell helper tools `read_bash`,
   `list_bash`, and `stop_bash` carry `shellId` and `delay`, no `command`.
   A guard that treats every tool whose name ends in `bash` as a shell
