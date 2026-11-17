@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-18
 **Plan:** `.claude/plans/2026-11-17_phase-F-copilot-docs.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -203,8 +203,23 @@ This phase rewrote documented Copilot behavior in six files.
 ## Verification
 
 ```text
-# filled at closeout step 4
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' docs/target-mapping.md 'is not established from official sources'
+PASS        0.0s  uv run python -I -c 'import pathlib, sys; text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); hits = [s for s in sys.argv[2:] if s in text]; sys.exit("stale text: " + "; ".join(hits) if hits else 0)' docs/runtime-checks.md 'or native-harness support'
+PASS        0.0s  grep -q -F 'It does not claim Copilot CLI or Copilot cloud agents.' docs/runtime-checks.md
+PASS        0.0s  grep -q -F '## VS Code Copilot harness (manual)' docs/smoke-tests.md
+PASS        0.0s  grep -q -F 'sudo install -d -m 700' docs/smoke-tests.md
+PASS        0.0s  grep -q -F 'VS Code removes the Local harness in February 2027.' README.md
+PASS        0.0s  grep -q -F '### Copilot harness discovery check' docs/sidecar-provider-contract.md
+PASS        0.0s  grep -q -F 'check_copilot_runtime.py --discover' docs/sidecar-provider-contract.md
+PASS       44.1s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      424.6s  uv run python .claude/scripts/verify.py phase --format text
+closeout: PASS
 ```
+
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest with 5927 passed and 1 skipped in 426.36 s, freshness, provenance, generation).
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-F-copilot-docs.json`
   (no surviving finding; gate PASS; six profiles; round 1 PASS with 15
