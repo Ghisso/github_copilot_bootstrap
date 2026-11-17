@@ -1,0 +1,9 @@
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+hooks: 0
+MCP servers: 0
+instructions: 20 (.github/copilot-instructions.md, AGENTS.md, CLAUDE.md, agent-reporting.instructions.md, api-service-standards.instructions.md, closeout.instructions.md, code-standards.instructions.md, config-first-design.instructions.md, deployment.instructions.md, plan-lifecycle.instructions.md, quality-and-testing.instructions.md, tests.instructions.md, tool-routing.instructions.md, workflow.instructions.md, workspace.instructions.md, api-service-standards.instructions.md, code-standards.instructions.md, config-first-design.instructions.md, deployment.instructions.md, tests.instructions.md)
+skills: 37
+agents: 5 (coder, documenter, orchestrator, planner, reviewer)
+note: repository hooks and MCP servers load only for a trusted folder; this command adds no trust, so none are listed.

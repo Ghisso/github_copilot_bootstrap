@@ -1,0 +1,415 @@
+Phase A probe evidence note (copilot-harness-migration, small plan 2026-11-17_phase-A-copilot-runtime-probe)
+Collected on 2026-11-17 18:42:35 JST. Runtime: VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+The home folder is written <user-home>; the session scratch folder is written <scratchpad>.
+Host: Linux 6.18.58.1-microsoft-standard-WSL2. strace -- version 6.8. unshare from util-linux.
+
+Figures in docs/runtime-checks.md (section "Copilot runtime probe") and where each comes from
+- Normal run, with a network: 6.06 s and 5.82 s wall (section 1).
+- Loopback-only namespace, under strace: 90 s wall; first to last session event 63.8 s; session-start hook 32.4 s;
+  tool (preToolUse) hooks 0.5 to 3.6 s; agentStop hook 5.0 s. The same session in a normal run: 4.4 s, session-start
+  hook 1.6 s, tool hooks 0.1 to 0.3 s (sections 1 and 2). strace itself slows the run; the cause of the slow hooks was not traced.
+- 13 scripted calls, 14 model replies; 0 hooks before trust, 26 after (12 + 14) in the fresh install (section 1).
+- Whole process tree of the shipped probe in the loopback-only run: 2 connect calls, both 127.0.0.1; 1 copy of the
+  mirror .mcp.json (the installer), 0 copies during the session, 0 MCP server launches (section 2).
+- Negative control with the FIRST version of mcp-none (discovery and session events only; only <project>/.mcp.json
+  deleted; section 3): the file was back after the run in 4 of 4 runs. mcp-none printed FAIL in 1 of 4 runs (the traced
+  one) and PASS in 3 of 4 (two untraced loopback-only runs, one normal run).
+  The traced run shows 2 copies of the mirror file during the session, 3 MCP server launches (uvx semble, npx context7,
+  npx context-mode), and 16 DNS connect attempts (8 to 1.1.1.1 and 8 to 8.8.8.8, port 53, all ENETUNREACH).
+- Negative control with the CURRENT mcp-none (it also reads the project file after the session; section 7): FAIL in 4 of 4
+  runs (two untraced loopback-only runs, one traced loopback-only run, one normal run), exit 1 each time. Three runs
+  failed on the file condition ("the project has a .mcp.json after the session"). The traced run failed on the older
+  event condition, which is checked first ("the session reported MCP server context7"); the file was back in that run too.
+  The shipped probe still prints PASS for mcp-none ("no .mcp.json after the session").
+- Hook source removed from the temporary project: 12 of 15 lines FAIL (both files), 4 of 15 (only .github/hooks/hooks.json) (section 4).
+- Writes to ~/.copilot: none of the probe's session ids, and no file mentioning a probe folder (section 5).
+- 12 and 14 hooks per source: also in the earlier raw file, 54 in total there because that project had two logging hook files (section 6).
+- NOT backed, so not in the docs: "three probe runs" of the old removal in a network-isolated namespace. Those
+  runs were made before this note existed and their output was not saved; section 3 replaces them.
+
+==== 1. Normal runs with a network (the 'about 6 seconds' figure, the 14 replies, the 26 hooks)
+
+[run 1] 2026-11-17 18:42:35 JST
+$ /usr/bin/time -f 'wall: %e s' uv run python scripts/check_copilot_runtime.py --require --keep
+exit: 0
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+  bash: command, description, shellId, mode, detach, initial_wait
+  read_bash: shellId, delay
+  stop_bash: shellId
+  list_bash: (no input)
+  view: path, view_range, forceReadLargeFiles
+  create: path, file_text
+  edit: path, old_str, new_str
+  web_fetch: url, max_length, start_index, raw
+  semantic_code_search: query, repo
+  skill: skill
+  run_dynamic_workflow: name, args, limits, resumeFromRunId
+  dynamic_workflows_manage: operation, name, runId, beforeSeq, meta, run
+  sql: description, query
+  read_agent: agent_id, wait, timeout, since_turn
+  list_agents: include_completed, scope
+  write_agent: agent_id, agent_ids, scope, message
+  grep: pattern, paths, output_mode, glob, type, -i, -A, -B, -C, -n, head_limit, multiline
+  glob: pattern, paths
+  task: description, prompt, agent_type, name, model, reasoning_effort, context_tier, mode
+Result: PASS (0 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-5xy67xm3
+wall: 6.06 s
+
+[run 2] 2026-11-17 18:42:41 JST
+$ /usr/bin/time -f 'wall: %e s' uv run python scripts/check_copilot_runtime.py --require --keep
+exit: 0
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+  bash: command, description, shellId, mode, detach, initial_wait
+  read_bash: shellId, delay
+  stop_bash: shellId
+  list_bash: (no input)
+  view: path, view_range, forceReadLargeFiles
+  create: path, file_text
+  edit: path, old_str, new_str
+  web_fetch: url, max_length, start_index, raw
+  semantic_code_search: query, repo
+  skill: skill
+  run_dynamic_workflow: name, args, limits, resumeFromRunId
+  dynamic_workflows_manage: operation, name, runId, beforeSeq, meta, run
+  sql: description, query
+  read_agent: agent_id, wait, timeout, since_turn
+  list_agents: include_completed, scope
+  write_agent: agent_id, agent_ids, scope, message
+  grep: pattern, paths, output_mode, glob, type, -i, -A, -B, -C, -n, head_limit, multiline
+  glob: pattern, paths
+  task: description, prompt, agent_type, name, model, reasoning_effort, context_tier, mode
+Result: PASS (0 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-txy2ug3c
+wall: 5.82 s
+
+[hook durations in normal run 1] 2026-11-17 18:42:47 JST
+$ python hook_durations.py <kept folder>/sessions/main/events.jsonl
+session events: 363; first to last event: 4.4 s
+  sessionStart: 1 hook runs, min 1.6 s, max 1.6 s
+  userPromptSubmitted: 1 hook runs, min 0.0 s, max 0.0 s
+  preToolUse: 13 hook runs, min 0.1 s, max 0.3 s
+  postToolUse: 5 hook runs, min 0.0 s, max 0.1 s
+  agentStop: 1 hook runs, min 0.2 s, max 0.2 s
+
+==== 2. Run in a network namespace with only loopback, traced: wall time, hook durations, connect calls
+
+[run] 2026-11-17 18:42:47 JST
+$ unshare -rn sh -c 'ip link set lo up; strace -f -qq -e trace=connect,execve -s 300 -o <trace> python scripts/check_copilot_runtime.py --require --keep'
+exit: 0; wall: 90 s (measured with date +%s around the command)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+Result: PASS (0 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-tus_401s
+
+[trace summary of the shipped probe's loopback-only run] $ python trace_summary.py <trace>
+(summary regenerated 2026-11-17 18:49:02 JST from the saved trace, with a revised summary script that also separates copies and server launches made before the Node runner started from those after)
+Node runner started at trace line: 2766
+connect calls in the whole process tree: 2
+  2 x 127.0.0.1 port (local)  ->  -1 EINPROGRESS (Operation now in progress)
+copies of the mirror .mcp.json into the project: 1 before the runner started (installer), 0 after it started (a hook in the session)
+  561267 execve("/usr/bin/cp", ["cp", "--", "/tmp/copilot-runtime-probe-tus_401s/project/.claude/bootstrap-root/.mcp.json", "/tmp/copilot-runtime-probe-tus_401s/project/.mcp.json"],)
+MCP server launches (npx or uvx) after the runner started: 0
+
+[hook durations in the loopback-only run] $ python hook_durations.py <kept folder>/sessions/main/events.jsonl
+session events: 363; first to last event: 63.8 s
+  sessionStart: 1 hook runs, min 32.4 s, max 32.4 s
+  userPromptSubmitted: 1 hook runs, min 0.4 s, max 0.4 s
+  preToolUse: 13 hook runs, min 0.5 s, max 3.6 s
+  postToolUse: 5 hook runs, min 0.2 s, max 0.9 s
+  agentStop: 1 hook runs, min 5.0 s, max 5.0 s
+
+==== 3. Negative control for mcp-none: only <project>/.mcp.json is deleted (the behavior before the scope change)
+Script: scratchpad control_mcp.py. It imports scripts/check_copilot_runtime.py and replaces the one function _remove_mcp_file
+with: (project / '.mcp.json').unlink(missing_ok=True). The shipped script is not edited.
+
+[control, loopback-only namespace, run 1] 2026-11-17 18:44:17 JST
+$ unshare -rn sh -c 'ip link set lo up; python control_mcp.py'
+exit: 0
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+Result: PASS (0 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-hz4i0wdl
+project .mcp.json exists after the run: True
+
+[control, loopback-only namespace, run 2] 2026-11-17 18:44:23 JST
+$ unshare -rn sh -c 'ip link set lo up; python control_mcp.py'
+exit: 0
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+Result: PASS (0 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-olb3hhom
+project .mcp.json exists after the run: True
+
+[control, loopback-only namespace, run 3, traced] 2026-11-17 18:44:28 JST
+$ unshare -rn sh -c 'ip link set lo up; strace -f -qq -e trace=connect,execve -s 300 -o <trace> python control_mcp.py'
+exit: 1
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+FAIL mcp-none: the session reported MCP server context-mode
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+Result: FAIL (1 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-f4xc1707
+project .mcp.json exists after the run: True
+
+[control run 3 trace summary]
+(summary regenerated 2026-11-17 18:49:02 JST from the saved trace, with a revised summary script that also separates copies and server launches made before the Node runner started from those after)
+Node runner started at trace line: 2766
+connect calls in the whole process tree: 22
+  8 x 1.1.1.1 port 53  ->  -1 ENETUNREACH (Network is unreachable)
+  2 x 127.0.0.1 port (local)  ->  -1 EINPROGRESS (Operation now in progress)
+  8 x 8.8.8.8 port 53  ->  -1 ENETUNREACH (Network is unreachable)
+  4 x AF_UNIX /var/run/nscd/socket  ->  -1 ENOENT (No such file or directory)
+copies of the mirror .mcp.json into the project: 1 before the runner started (installer), 2 after it started (a hook in the session)
+  576040 execve("/usr/bin/cp", ["cp", "--", "/tmp/copilot-runtime-probe-f4xc1707/project/.claude/bootstrap-root/.mcp.json", "/tmp/copilot-runtime-probe-f4xc1707/project/.mcp.json"],)
+  577149 execve("/usr/bin/cp", ["cp", "--", "/tmp/copilot-runtime-probe-f4xc1707/project/.claude/bootstrap-root/.mcp.json", "/tmp/copilot-runtime-probe-f4xc1707/project/.mcp.json"],)
+  578208 execve("/usr/bin/cp", ["cp", "--", "/tmp/copilot-runtime-probe-f4xc1707/project/.claude/bootstrap-root/.mcp.json", "/tmp/copilot-runtime-probe-f4xc1707/project/.mcp.json"],)
+MCP server launches (npx or uvx) after the runner started: 3
+  581152 execve("<user-home>/.local/bin/uvx", ["<user-home>/.local/bin/uvx", "--from", "semble[mcp]", "semble"],)
+  581153 execve("<user-home>/.local/bin/npx", ["<user-home>/.local/bin/npx", "-y", "@upstash/context7-mcp"],)
+  581214 execve("<user-home>/.local/bin/npx", ["npx", "-y", "context-mode@2.1.8", "server", "--agent", "codex"],)
+
+[control, normal network, one run] 2026-11-17 18:47:15 JST
+$ python control_mcp.py
+exit: 0
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+Result: PASS (0 of 15 checks failed)
+Kept the temporary folder: /tmp/copilot-runtime-probe-atcr9zxd
+project .mcp.json exists after the run: True
+
+==== 4. Wrong-result runs on the real runtime (the '12 of 15' and '4 of 15' figures)
+
+[hook source removed: both] 2026-11-17 18:47:21 JST
+$ python mutation_run.py both   (calls the probe with prepare_project wrapped to delete the hook file(s))
+exit: 1
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+FAIL hooks-sources: no preToolUse hook from .github/hooks/hooks.json, .claude/settings.json (found .github/hooks/hooks.json: 0, .claude/settings.json: 0)
+FAIL hooks-subfolder: no preToolUse hook from .github/hooks/hooks.json, .claude/settings.json (found .github/hooks/hooks.json: 0, .claude/settings.json: 0)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+FAIL deny-git-reset: no pre-tool hook event for step deny-git-reset (call_probe_1): the hooks did not run
+FAIL deny-force-push: no pre-tool hook event for step deny-force-push (call_probe_2): the hooks did not run
+FAIL deny-secret-rm: no pre-tool hook event for step deny-secret-rm (call_probe_3): the hooks did not run
+FAIL deny-secret-view: no pre-tool hook event for step deny-secret-view (call_probe_4): the hooks did not run
+FAIL ask-vscode-settings: no pre-tool hook event for step ask-vscode-settings (call_probe_5): the hooks did not run
+FAIL ask-agent-wrapper: no pre-tool hook event for step ask-agent-wrapper (call_probe_6): the hooks did not run
+FAIL deny-branch: no pre-tool hook event for step deny-branch (call_probe_7): the hooks did not run
+FAIL deny-commit: no pre-tool hook event for step deny-commit (call_probe_8): the hooks did not run
+FAIL deny-pr: no pre-tool hook event for step deny-pr (call_probe_9): the hooks did not run
+FAIL allow-plain: no pre-tool hook event for step allow-plain-bash (call_probe_10): the hooks did not run
+Tool inventory, session main (19 tools):
+Result: FAIL (12 of 15 checks failed)
+
+[hook source removed: github] 2026-11-17 18:47:23 JST
+$ python mutation_run.py github   (calls the probe with prepare_project wrapped to delete the hook file(s))
+exit: 1
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 14 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+FAIL hooks-sources: no preToolUse hook from .github/hooks/hooks.json (found .github/hooks/hooks.json: 0, .claude/settings.json: 14)
+FAIL hooks-subfolder: no preToolUse hook from .github/hooks/hooks.json (found .github/hooks/hooks.json: 0, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered; none started in the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+FAIL deny-secret-view: not denied: the view call ran (success=False)
+PASS ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+FAIL deny-commit: denied for another reason: Denied by preToolUse hook: commit gate failed for claude-code: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file:
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+Tool inventory, session main (19 tools):
+Result: FAIL (4 of 15 checks failed)
+
+==== 5. Writes to ~/.copilot (normal run 1 kept folder)
+
+[2026-11-17 18:47:27 JST]
+probe session ids in the private data folder: 290807e5-d857-4399-9033-6345361c1775 50424d79-281d-44b3-aef8-c35f5455da11
+  290807e5-d857-4399-9033-6345361c1775: not under ~/.copilot/session-state
+  50424d79-281d-44b3-aef8-c35f5455da11: not under ~/.copilot/session-state
+$ grep -r -l -a 'copilot-runtime-probe' ~/.copilot
+files under ~/.copilot that mention a probe folder: 0
+
+==== 6. Hook counts per source in the evidence folder (the 12 / 14 split)
+
+[2026-11-17 18:47:27 JST]
+$ python sum_raw_hooks.py .claude/explorations/2026-11-17_copilot-harness-migration-evidence/raw/discover-after-trust-hooks-and-mcp.txt
+  .github/hooks/hooks.json: 12
+  repo settings: 14
+  all sources in that project (it also had two logging hook files): 54
+
+(end of note; the kept temporary folders of this collection were removed)
+
+==== 7. Negative control again, after mcp-none was changed to read the project file (added later)
+Change: the Node runner records record.mcpFileAfterSession (fs.existsSync of <project>/.mcp.json after the session) and
+mcp_none fails when it is true, or when it was not recorded. The discovery and session-event conditions are unchanged.
+Same control script and same four setups as section 3 (only <project>/.mcp.json deleted after the install).
+
+[control, loopback-only namespace, untraced, run 1] 2026-11-17 19:03:09 JST
+$ unshare -rn sh -c 'ip link set lo up; python control_mcp.py'
+exit: 1
+PASS session-main: finished after 14 scripted model replies
+FAIL mcp-none: the project has a .mcp.json after the session: a hook put it back
+Result: FAIL (1 of 15 checks failed)
+project .mcp.json exists after the run: True
+
+[control, loopback-only namespace, untraced, run 2] 2026-11-17 19:03:15 JST
+$ unshare -rn sh -c 'ip link set lo up; python control_mcp.py'
+exit: 1
+PASS session-main: finished after 14 scripted model replies
+FAIL mcp-none: the project has a .mcp.json after the session: a hook put it back
+Result: FAIL (1 of 15 checks failed)
+project .mcp.json exists after the run: True
+
+[control, loopback-only namespace, traced with strace, run 3] 2026-11-17 19:03:21 JST
+$ unshare -rn sh -c 'ip link set lo up; strace -f -qq -e trace=connect,execve -s 300 -o <trace> python control_mcp.py'
+exit: 1
+PASS session-main: finished after 14 scripted model replies
+FAIL mcp-none: the session reported MCP server context7
+Result: FAIL (1 of 15 checks failed)
+project .mcp.json exists after the run: True
+
+[control, normal network, run 4] 2026-11-17 19:06:07 JST
+$ python control_mcp.py
+exit: 1
+PASS session-main: finished after 14 scripted model replies
+FAIL mcp-none: the project has a .mcp.json after the session: a hook put it back
+Result: FAIL (1 of 15 checks failed)
+project .mcp.json exists after the run: True
+
+[shipped probe, normal network, for comparison] 2026-11-17 19:06:13 JST
+$ uv run python scripts/check_copilot_runtime.py --require
+exit: 0
+PASS session-main: finished after 14 scripted model replies
+PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+Result: PASS (0 of 15 checks failed)
+
+Note: in run 3 the event condition fired first, so the message names the MCP server; the line
+'project .mcp.json exists after the run: True' shows the file was back there as well.
+(end of section 7)
