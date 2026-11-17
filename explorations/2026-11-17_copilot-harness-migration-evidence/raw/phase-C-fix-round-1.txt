@@ -190,3 +190,130 @@ uv run pytest tests/ -q --tb=short
 5756 passed, 1 skipped in 423.42s (0:07:03)
 exit=0
 wall clock (/usr/bin/time, includes uv start-up): 7:27.78
+
+
+=============================================================================
+Fix round 2 (2026-11-18): the 31-space second set is pinned, and the macOS CI leg runs it
+=============================================================================
+== 1. New test: test_json_escape_gives_tr_a_second_set_of_exactly_31_characters ==
+A stub `tr` first in PATH logs one line, exits 64 unless it got exactly two arguments, the first `\001-\037` and
+the second exactly 31 characters long, and otherwise runs the real `tr`. The test asserts that the stub was used
+once, printed nothing on stderr, and that deny_pretool gave valid JSON with "tab here newline" (top level and nested).
+The stub is 5 lines of shell (the test body is about 30 lines with its asserts). Source:
+
+def test_json_escape_gives_tr_a_second_set_of_exactly_31_characters(
+    tmp_path: Path,
+) -> None:
+    """A shorter second set (`' '`, `'[ *]'`) works on GNU `tr` but leans on a padding
+    rule that POSIX leaves unspecified and BusyBox `tr` reads differently. A stub
+    `tr` first in PATH refuses anything but the equal-length form, then runs the
+    real `tr`, so a Linux host with GNU `tr` can still see that regression."""
+    real_tr = shutil.which("tr")
+    assert real_tr is not None
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    log = tmp_path / "tr-calls"
+    stub = tools / "tr"
+    stub.write_text(
+        "#!/bin/sh\n"
+        f"echo called >> {shlex.quote(str(log))}\n"
+        '[ "$#" -eq 2 ] && [ "$1" = \'\\001-\\037\' ] && [ "${#2}" -eq 31 ] \\\n'
+        "  || { printf 'stub tr: refused: %s args, first %s, second set %s characters\\n'"
+        ' "$#" "$1" "${#2}" >&2; exit 64; }\n'
+        f'exec {shlex.quote(real_tr)} "$@"\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+    env.update(PATH=f"{tools}:{env['PATH']}", TARGET_ID=COPILOT)
+
+    result = subprocess.run(
+        ["bash", "-c", 'set -eu; . "$1"; shift; "$@"', "bash"]
+        + [
+            str(SCRIPT_SRC / "_lib-frontmatter.sh"),
+            "deny_pretool",
+            "tab\there\nnewline",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert log.read_text(encoding="utf-8") == "called\n", "the stub tr was not used"
+    assert result.stderr == ""
+    answer = json.loads(result.stdout)
+    assert answer["permissionDecisionReason"] == "tab here newline"
+    assert (
+        answer["hookSpecificOutput"]["permissionDecisionReason"] == "tab here newline"
+    )
+
+Can it fail? In a scratch copy of shared/ and the test file (the working copy was not touched), `json_escape` was
+switched back to each shorter form and the test was run, together with the existing control-character tests:
+
+=== mutant: second set switched back to '[ *]'; cases: -k "exactly_31"
+    result: 1 failed, 1094 deselected in 0.16s
+    tests/test_hook_gates.py:4778: in test_json_escape_gives_tr_a_second_set_of_exactly_31_characters
+    E   AssertionError: assert 'stub tr: ref... characters\n' == ''
+    E     
+    E     + stub tr: refused: 2 args, first \001-\037, second set 4 characters
+    FAILED tests/test_hook_gates.py::test_json_escape_gives_tr_a_second_set_of_exactly_31_characters
+=== mutant: second set switched back to '[ *]'; cases: -k "every_control_character or tab_and_a_newline"
+    result: 15 passed, 1080 deselected in 0.20s
+=== mutant: second set switched back to ' '; cases: -k "exactly_31"
+    result: 1 failed, 1094 deselected in 0.16s
+    tests/test_hook_gates.py:4778: in test_json_escape_gives_tr_a_second_set_of_exactly_31_characters
+    E   AssertionError: assert 'stub tr: ref... characters\n' == ''
+    E     
+    E     + stub tr: refused: 2 args, first \001-\037, second set 1 characters
+    FAILED tests/test_hook_gates.py::test_json_escape_gives_tr_a_second_set_of_exactly_31_characters
+=== mutant: second set switched back to ' '; cases: -k "every_control_character or tab_and_a_newline"
+    result: 15 passed, 1080 deselected in 0.20s
+=== mutant: second set one short (30 spaces); cases: -k "exactly_31"
+    result: 1 failed, 1094 deselected in 0.16s
+    tests/test_hook_gates.py:4778: in test_json_escape_gives_tr_a_second_set_of_exactly_31_characters
+    E   AssertionError: assert 'stub tr: ref... characters\n' == ''
+    E     
+    E     + stub tr: refused: 2 args, first \001-\037, second set 30 characters
+    FAILED tests/test_hook_gates.py::test_json_escape_gives_tr_a_second_set_of_exactly_31_characters
+=== mutant: second set one short (30 spaces); cases: -k "every_control_character or tab_and_a_newline"
+    result: 15 passed, 1080 deselected in 0.20s
+
+Reading it: all three mutants FAIL the new test with the stub's own message (4, 1, and 30 characters in the second
+set), while the 15 existing control-character tests still PASS on all three, because GNU `tr` pads a short second
+set. That is the gap the new test closes.
+
+== 2. macOS CI leg ==
+tests/test_hook_gates.py is run as a script by scripts/validate_targets.py (`validate_hook_gate_regression_tests`),
+on ubuntu-latest and macos-latest (.github/workflows/validate.yml). Calls added under `if __name__ == "__main__":`
+(now seven; the first five are unchanged):
+
+if __name__ == "__main__":
+    test_git_targets_nested_claude_detects_nested_claude_paths()
+    test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands()
+    test_protect_files_python_pass_ignores_slashy_free_text()
+    test_protect_files_allows_read_only_or_non_targeted_protected_paths(
+        "cat .codex/config.toml"
+    )
+    test_protect_files_blocks_mutation_targets("printf x > .env")
+    # The shell escaping on this host's `tr` (the macOS CI leg runs BSD `tr`).
+    test_every_control_character_in_a_reason_becomes_one_space("github-copilot")
+    test_every_control_character_in_a_reason_becomes_one_space("claude-code")
+
+test_every_control_character_in_a_reason_becomes_one_space takes only `client` (its helper `_library_call` runs
+`bash -c` on the shipped library); it uses no pytest fixture, so it can be called directly, and it was: the script form
+below exits 0. On macOS it runs with bash 3.2 (`printf -v` is available since bash 3.1) and BSD `tr`; that run happens in
+CI, not here. The new stub test uses `tmp_path`, so it is not in the script list.
+Statements of the count: only the docstring of `validate_hook_gate_regression_tests` said "five"
+(`rg` over shared/, docs/, scripts/, tests/, README.md and .github/ found no other). It no longer states a number:
+it says the tests listed under `__main__`, and that each CI leg runs them with that host's own `tr` and bash.
+
+== commands ==
+uv run python tests/test_hook_gates.py (script form)                     : exit 0
+six-file pytest line of the plan's Verification block                    : 3644 passed in 220.49s (0:03:40)   (was 3643; +1 new test)
+uv run python scripts/validate_targets.py                                : exit 0, PASS generated target is structurally valid
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases : Success: no issues found in 43 source files
+uv run ruff check shared scripts tests                                   : All checks passed
+uv run ruff format --check shared scripts tests                          : 43 files already formatted
+uv run python .claude/scripts/verify.py fast --format text               : fast: PASS
+Not run (as asked): regenerate (nothing under shared/ changed this round), the full suite.
