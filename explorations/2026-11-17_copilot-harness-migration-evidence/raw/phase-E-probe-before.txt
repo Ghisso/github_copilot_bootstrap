@@ -1,0 +1,120 @@
+Phase E probe with the new checks, install as at 3402601 (before steps 2 to 4): the new checks fail
+Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
+uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
+Command: uv run python scripts/check_copilot_runtime.py --require, run through probe_control.py before (phase-E-probe-control-harness.py.txt).
+The harness takes the camelCase copy first, then puts the install back to the state of 3402601 in the main project:
+the hook file (live file and restore copy) from `git show 3402601:shared/hooks/hooks.json` (3 SessionStart entries,
+no SubagentStart), no subagent-context.sh, and the old reporting-reminder.sh.
+Expected: session-reminder FAIL and subagent-context FAIL; every other check PASS (the three Phase D checks included).
+
+
+=== before, run 1 (wall time 0m15.493s)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 33 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session df3193d2
+PASS state-sync-once: 1 state-sync pull line in .claude/session_logs/hooks-errors.log
+FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS guards-both-sources: 2 questions of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+PASS helper-tools: helper-read: not denied; helper-list: not denied; helper-stop: not denied
+PASS read-agent-file: 1 steps succeeded with no hook question
+PASS search-secret-denied: Protected file blocked by policy: .env
+PASS search-glob-not-judged: the glob call got no hook denial and no hook question
+PASS deny-workflow-run: Tool blocked by policy: run_dynamic_workflow runs workflow code that the pre-tool hooks cannot see
+PASS deny-workflow-manage: Tool blocked by policy: dynamic_workflows_manage runs workflow code that the pre-tool hooks cannot see
+PASS sql-no-file-write: 2 steps refused by the tool: Blocked SQL statement
+PASS subagent-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS subagent-store-sql-refused: 1 steps refused by the tool: Blocked SQL statement
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS patch-plain-allowed: 1 steps succeeded with no hook question
+PASS patch-secret-denied: Protected file blocked by policy: .env
+PASS patch-hook-ask: 2 question(s) of kind hook; not denied
+PASS patch-server-ask: 2 question(s) of kind hook; not denied
+PASS patch-agent-ask: 2 question(s) of kind hook; not denied
+PASS patch-indented-hook-ask: 2 question(s) of kind hook; not denied
+PASS session-camel-rename: finished after 12 scripted model replies
+PASS camel-hooks-source: 14 hooks, all from .github/hooks/hooks.json
+PASS camel-events-renamed: events agentStop, postToolUse, preToolUse, sessionStart, subagentStart in both hook files; Claude settings still off
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (2 of 48 checks failed)
+MODE before: probe exit code 1
+
+=== before, run 2 (wall time 0m13.577s)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 33 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS single-session-log: 2 target=github-copilot line(s) and no target=claude-code line for session 529b204b
+PASS state-sync-once: 1 state-sync pull line in .claude/session_logs/hooks-errors.log
+FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS guards-both-sources: 2 questions of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+PASS helper-tools: helper-read: not denied; helper-list: not denied; helper-stop: not denied
+PASS read-agent-file: 1 steps succeeded with no hook question
+PASS search-secret-denied: Protected file blocked by policy: .env
+PASS search-glob-not-judged: the glob call got no hook denial and no hook question
+PASS deny-workflow-run: Tool blocked by policy: run_dynamic_workflow runs workflow code that the pre-tool hooks cannot see
+PASS deny-workflow-manage: Tool blocked by policy: dynamic_workflows_manage runs workflow code that the pre-tool hooks cannot see
+PASS sql-no-file-write: 2 steps refused by the tool: Blocked SQL statement
+PASS subagent-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS subagent-store-sql-refused: 1 steps refused by the tool: Blocked SQL statement
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+PASS session-codex-patch: finished after 7 scripted model replies
+PASS patch-plain-allowed: 1 steps succeeded with no hook question
+PASS patch-secret-denied: Protected file blocked by policy: .env
+PASS patch-hook-ask: 2 question(s) of kind hook; not denied
+PASS patch-server-ask: 2 question(s) of kind hook; not denied
+PASS patch-agent-ask: 2 question(s) of kind hook; not denied
+PASS patch-indented-hook-ask: 2 question(s) of kind hook; not denied
+PASS session-camel-rename: finished after 12 scripted model replies
+PASS camel-hooks-source: 14 hooks, all from .github/hooks/hooks.json
+PASS camel-events-renamed: events agentStop, postToolUse, preToolUse, sessionStart, subagentStart in both hook files; Claude settings still off
+PASS camel-mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS camel-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS camel-deny-secret-rm: Protected file blocked by policy: .env
+PASS camel-deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS camel-deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS camel-deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS camel-ask-vscode-settings: 1 question(s) of kind hook; not denied
+PASS camel-ask-agent-wrapper: 1 question(s) of kind hook; not denied
+PASS camel-allow-plain: 4 steps succeeded with no hook question
+Result: FAIL (2 of 48 checks failed)
+MODE before: probe exit code 1

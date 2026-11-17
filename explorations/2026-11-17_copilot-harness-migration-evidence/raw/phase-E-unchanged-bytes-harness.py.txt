@@ -1,0 +1,203 @@
+"""Compare 3402601 with the working copy (scratch tool, evidence for "unchanged bytes").
+
+Usage: python3 -I unchanged_bytes.py
+
+1. reporting-reminder.sh. The old script and library come from `git show 3402601:...`, the new ones
+   from the working copy. Each (mode, provider, input) case runs through both in identical temporary
+   repositories (real copies of the scripts). stdout, stderr (path and time normalized), and the
+   exit code are compared byte for byte.
+2. The generated hook files. The old generator is the one at 3402601 (git archive into a scratch
+   folder, then `generate_targets.py --all` there). The four hook files of `dist/multi-agent` are
+   compared with the working copy's: Codex, Claude, and Antigravity byte for byte; Copilot entry by
+   entry. Every file under `.claude/hooks/scripts/` is compared by SHA-256.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import io
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+SCRATCH = Path(
+    "/tmp/claude-1000/-home-ghisso-work-github-copilot-bootstrap/"
+    "815a8a58-3869-4731-9e52-b1353be105f7/scratchpad/phaseE"
+)
+BASE = "3402601"
+PYTHON = REPO / ".venv" / "bin" / "python"
+CLEAN_ENV = {k: v for k, v in os.environ.items() if not k.startswith(("COPILOT", "CLAUDE", "TARGET_ID", "GIT_", "AI_STATE_"))}
+
+
+def git_bytes(path: str) -> bytes:
+    return subprocess.run(["git", "-C", str(REPO), "show", f"{BASE}:{path}"], capture_output=True, check=True).stdout
+
+
+def make_repo(root: Path, script: bytes, library: bytes) -> Path:
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "reporting-reminder.sh").write_bytes(script)
+    (scripts / "_lib-frontmatter.sh").write_bytes(library)
+    subprocess.run(["git", "init", "-q", "-b", "dev", str(root)], check=True, env=CLEAN_ENV)
+    return scripts / "reporting-reminder.sh"
+
+
+def run(script: Path, args: tuple[str, ...], stdin: bytes):
+    done = subprocess.run(
+        ["bash", str(script), *args], input=stdin, capture_output=True, cwd=script.parents[3], env=CLEAN_ENV, check=False, timeout=30
+    )
+    norm = lambda b: re.sub(rb"/tmp/[^ \n]*/(old|new)", b"<repo>", b)  # noqa: E731
+    return done.returncode, done.stdout, norm(done.stderr)
+
+
+def bash_input(command: str) -> bytes:
+    return json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": command}, "tool_response": {}}).encode()
+
+
+INPUTS: dict[str, bytes] = {
+    "UserPromptSubmit event": b'{"hook_event_name":"UserPromptSubmit"}',
+    "empty input": b"",
+    "whitespace input": b"  \n",
+    "malformed text": b"not json",
+    "cut-off JSON": b"{",
+    "JSON array": b"[]",
+    "SessionStart event": b'{"hook_event_name":"SessionStart","source":"new"}',
+    "verify closeout": bash_input("uv run python .claude/scripts/verify.py closeout --format json --persist"),
+    "findings persistence": bash_input("uv run python .claude/scripts/record_findings.py shared --out findings.json"),
+    "findings without --out": bash_input("uv run python .claude/scripts/record_findings.py shared"),
+    "ordinary command": bash_input("echo hello"),
+    "closeout in a compound command": bash_input("uv run python .claude/scripts/verify.py closeout && echo done"),
+    "git commit (no plan)": bash_input("git commit -m x"),
+    "git status": bash_input("git status"),
+    "non-Bash tool": json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": {"file_path": "a"}}).encode(),
+    "Bash with no command": json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {}}).encode(),
+    "invalid bytes": b"\xff\xfe\x00",
+}
+EXISTING_CALLS = [
+    (mode, provider) for provider in ("claude-code", "openai-codex") for mode in ("prompt", "late-report")
+]
+REFUSED_CALLS = [
+    ("session", "claude-code"),
+    ("session", "openai-codex"),
+    ("invalid", "claude-code"),
+    ("", "claude-code"),
+    ("prompt", "unsupported"),
+    ("prompt", ""),
+    ("late-report", "google-antigravity"),
+    ("session", "google-antigravity"),
+]
+CHANGED_ON_PURPOSE = [("prompt", "github-copilot"), ("late-report", "github-copilot"), ("session", "github-copilot")]
+
+
+def reminder_section() -> int:
+    old_script, old_lib = git_bytes("shared/hooks/scripts/reporting-reminder.sh"), git_bytes("shared/hooks/scripts/_lib-frontmatter.sh")
+    new_script = (REPO / "shared/hooks/scripts/reporting-reminder.sh").read_bytes()
+    new_lib = (REPO / "shared/hooks/scripts/_lib-frontmatter.sh").read_bytes()
+    print("1. reporting-reminder.sh, 3402601 against the working copy")
+    print(f"   _lib-frontmatter.sh identical: {old_lib == new_lib}")
+    different = 0
+    with tempfile.TemporaryDirectory() as folder:
+        old = make_repo(Path(folder) / "old", old_script, old_lib)
+        new = make_repo(Path(folder) / "new", new_script, new_lib)
+        for title, calls, expect_same in (
+            ("existing modes (claude-code and openai-codex, prompt and late-report)", EXISTING_CALLS, True),
+            ("refused calls (unsupported provider or mode)", REFUSED_CALLS, True),
+        ):
+            same = total = 0
+            for mode, provider in calls:
+                for name, stdin in INPUTS.items():
+                    a, b = run(old, (mode, provider), stdin), run(new, (mode, provider), stdin)
+                    total += 1
+                    if a == b:
+                        same += 1
+                    else:
+                        different += 1
+                        print(f"   DIFFERENT {mode!r} {provider!r} {name}: old={a!r} new={b!r}")
+            print(f"   {title}: {same} of {total} runs identical (stdout, stderr, exit code)")
+        # The calls that change on purpose, for the record.
+        print("   calls that change on purpose (github-copilot):")
+        for mode, provider in CHANGED_ON_PURPOSE:
+            a = run(old, (mode, provider), INPUTS["SessionStart event"])
+            b = run(new, (mode, provider), INPUTS["SessionStart event"])
+            print(f"     {mode} {provider}: old exit {a[0]}, stdout {a[1][:60]!r}, stderr {a[2].decode().strip()!r}")
+            print(f"     {' ' * len(mode)} {' ' * len(provider)}  new exit {b[0]}, stdout {b[1][:120]!r}, stderr {b[2].decode().strip()!r}")
+    return different
+
+
+def old_dist() -> Path:
+    work = SCRATCH / "old-src"
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir()
+    archive = subprocess.run(["git", "-C", str(REPO), "archive", BASE], capture_output=True, check=True).stdout
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        tar.extractall(work, filter="data")
+    done = subprocess.run([str(PYTHON), "-B", "scripts/generate_targets.py", "--all"], cwd=work, capture_output=True, text=True, env=CLEAN_ENV)
+    if done.returncode != 0:
+        raise SystemExit(f"old generator failed: {done.stderr[-500:]}")
+    return work / "dist" / "multi-agent"
+
+
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def dist_section() -> int:
+    old_root, new_root = old_dist(), REPO / "dist" / "multi-agent"
+    problems = 0
+    print()
+    print("2. generated hook files, generator at 3402601 against the working copy's dist/multi-agent")
+    for name in (".codex/hooks.json", ".claude/settings.json", ".agents/hooks.json"):
+        same = (old_root / name).read_bytes() == (new_root / name).read_bytes()
+        print(f"   {name}: byte-identical = {same} ({sha(new_root / name)[:16]})")
+        problems += not same
+    old_hooks = json.loads((old_root / ".github/hooks/hooks.json").read_text())["hooks"]
+    new_hooks = json.loads((new_root / ".github/hooks/hooks.json").read_text())["hooks"]
+    print("   .github/hooks/hooks.json (entry by entry):")
+    for event in sorted(set(old_hooks) | set(new_hooks)):
+        old_entries, new_entries = old_hooks.get(event, []), new_hooks.get(event, [])
+        kept = new_entries[: len(old_entries)] == old_entries
+        added = new_entries[len(old_entries):]
+        label = ", ".join(e["bash"].split("run-hook.sh ")[1] for e in added) or "none"
+        print(f"     {event}: {len(old_entries)} old entries, all unchanged and in place = {kept}; added: {label}")
+        problems += not kept
+    expected_added = {"SessionStart": 1, "SubagentStart": 1}
+    actual_added = {e: len(new_hooks.get(e, [])) - len(old_hooks.get(e, [])) for e in set(old_hooks) | set(new_hooks)}
+    actual_added = {e: n for e, n in actual_added.items() if n}
+    print(f"   entries added per event: {actual_added} (expected {expected_added})")
+    problems += actual_added != expected_added
+    old_text = (old_root / ".github/hooks/hooks.json").read_text()
+    new_text = (new_root / ".github/hooks/hooks.json").read_text()
+    print(f"   Copilot file bytes: old {len(old_text.encode())}, new {len(new_text.encode())}")
+    print("   .claude/hooks/scripts/ (SHA-256 of every file):")
+    old_files = {p.name: sha(p) for p in (old_root / ".claude/hooks/scripts").iterdir() if p.is_file()}
+    new_files = {p.name: sha(p) for p in (new_root / ".claude/hooks/scripts").iterdir() if p.is_file()}
+    changed = sorted(n for n in old_files if n in new_files and old_files[n] != new_files[n])
+    added_files = sorted(set(new_files) - set(old_files))
+    removed = sorted(set(old_files) - set(new_files))
+    print(f"     {len(old_files)} files at 3402601, {len(new_files)} now; changed: {changed}; added: {added_files}; removed: {removed}")
+    problems += changed != ["reporting-reminder.sh"] or added_files != ["subagent-context.sh"] or bool(removed)
+    print("   the other generated files under .github, .codex, .claude, .agents (all of dist/multi-agent):")
+    old_all = {str(p.relative_to(old_root)): sha(p) for p in old_root.rglob("*") if p.is_file() and not p.is_symlink()}
+    new_all = {str(p.relative_to(new_root)): sha(p) for p in new_root.rglob("*") if p.is_file() and not p.is_symlink()}
+    changed_all = sorted(n for n in old_all if n in new_all and old_all[n] != new_all[n])
+    print(f"     {len(old_all)} files at 3402601, {len(new_all)} now; changed: {changed_all}; added: {sorted(set(new_all) - set(old_all))}; removed: {sorted(set(old_all) - set(new_all))}")
+    return problems
+
+
+def main() -> int:
+    print(f"Comparing {BASE} with the working copy of {subprocess.run(['git', '-C', str(REPO), 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True).stdout.strip()} + changes")
+    bad = reminder_section() + dist_section()
+    print()
+    print(f"Unexplained differences: {bad}")
+    return 1 if bad else 0
+
+
+sys.exit(main())

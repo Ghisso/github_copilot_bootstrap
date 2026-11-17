@@ -1,0 +1,39 @@
+Phase E unchanged bytes: 3402601 against the working copy
+Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
+uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
+Tool: phase-E-unchanged-bytes-harness.py.txt (git show 3402601 for the old scripts; git archive 3402601 and the old
+generate_targets.py for the old generated files). The only expected differences are the two new Copilot entries, the new
+script, and the changed reporting-reminder.sh and hook file.
+
+Comparing 3402601 with the working copy of 3402601 + changes
+1. reporting-reminder.sh, 3402601 against the working copy
+   _lib-frontmatter.sh identical: True
+   existing modes (claude-code and openai-codex, prompt and late-report): 68 of 68 runs identical (stdout, stderr, exit code)
+   refused calls (unsupported provider or mode): 136 of 136 runs identical (stdout, stderr, exit code)
+   calls that change on purpose (github-copilot):
+     prompt github-copilot: old exit 0, stdout b'', stderr 'WARN reporting-reminder: unsupported provider: github-copilot'
+                            new exit 0, stdout b'', stderr 'WARN reporting-reminder: unsupported mode: prompt'
+     late-report github-copilot: old exit 0, stdout b'', stderr 'WARN reporting-reminder: unsupported provider: github-copilot'
+                                 new exit 0, stdout b'', stderr 'WARN reporting-reminder: unsupported mode: late-report'
+     session github-copilot: old exit 0, stdout b'', stderr 'WARN reporting-reminder: unsupported provider: github-copilot'
+                             new exit 0, stdout b'{"additionalContext":"For user-facing updates, use direct language; explain internal labels and uncommon abbreviations, ', stderr ''
+
+2. generated hook files, generator at 3402601 against the working copy's dist/multi-agent
+   .codex/hooks.json: byte-identical = True (581e522ab9214647)
+   .claude/settings.json: byte-identical = True (52ae42c8eb362a94)
+   .agents/hooks.json: byte-identical = True (bc9e3b71947b64e5)
+   .github/hooks/hooks.json (entry by entry):
+     PostToolUse: 1 old entries, all unchanged and in place = True; added: none
+     PreToolUse: 5 old entries, all unchanged and in place = True; added: none
+     SessionStart: 3 old entries, all unchanged and in place = True; added: reporting-reminder.sh session github-copilot
+     Stop: 3 old entries, all unchanged and in place = True; added: none
+     SubagentStart: 0 old entries, all unchanged and in place = True; added: subagent-context.sh github-copilot
+   entries added per event: {'SessionStart': 1, 'SubagentStart': 1} (expected {'SessionStart': 1, 'SubagentStart': 1})
+   Copilot file bytes: old 4804, new 5655
+   .claude/hooks/scripts/ (SHA-256 of every file):
+     24 files at 3402601, 25 now; changed: ['reporting-reminder.sh']; added: ['subagent-context.sh']; removed: []
+   the other generated files under .github, .codex, .claude, .agents (all of dist/multi-agent):
+     235 files at 3402601, 236 now; changed: ['.claude/hooks/scripts/reporting-reminder.sh', '.github/hooks/hooks.json']; added: ['.claude/hooks/scripts/subagent-context.sh']; removed: []
+
+Unexplained differences: 0

@@ -1,0 +1,127 @@
+Phase E probe negative controls on the real runtime: each wrong setup fails its own check, two runs each
+Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
+uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
+Command: uv run python scripts/check_copilot_runtime.py --require, run through probe_control.py MODE (phase-E-probe-control-harness.py.txt). Only the FAIL lines, the
+result line, and the wall time are kept; every other line is PASS (checked by the count in the Result line).
+
+
+=== no-subagent-hook, run 1: the SubagentStart entry removed from both copies of the hook file
+expected: subagent-context FAIL only
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+Result: FAIL (1 of 48 checks failed)
+MODE no-subagent-hook: probe exit code 1
+wall time 0m15.708s
+
+=== no-subagent-hook, run 2: the SubagentStart entry removed from both copies of the hook file
+expected: subagent-context FAIL only
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+Result: FAIL (1 of 48 checks failed)
+MODE no-subagent-hook: probe exit code 1
+wall time 0m13.556s
+
+=== no-reminder-hook, run 1: the fourth SessionStart entry removed from both copies of the hook file
+expected: session-reminder FAIL only
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+Result: FAIL (1 of 48 checks failed)
+MODE no-reminder-hook: probe exit code 1
+wall time 0m15.663s
+
+=== no-reminder-hook, run 2: the fourth SessionStart entry removed from both copies of the hook file
+expected: session-reminder FAIL only
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+Result: FAIL (1 of 48 checks failed)
+MODE no-reminder-hook: probe exit code 1
+wall time 0m13.586s
+
+=== no-guidance-file, run 1: .github/copilot-instructions.md removed, with its restore copy and its manifest line
+expected: subagent-context FAIL only (the heading is missing; the fixed line is still given)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
+Result: FAIL (1 of 48 checks failed)
+MODE no-guidance-file: probe exit code 1
+wall time 0m15.660s
+
+=== no-guidance-file, run 2: .github/copilot-instructions.md removed, with its restore copy and its manifest line
+expected: subagent-context FAIL only (the heading is missing; the fixed line is still given)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
+Result: FAIL (1 of 48 checks failed)
+MODE no-guidance-file: probe exit code 1
+wall time 0m13.645s
+
+=== oversized-guidance, run 1: the guidance file made longer than 2048 bytes (live file and restore copy)
+expected: subagent-context FAIL only (the hook gives the fixed line alone)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
+Result: FAIL (1 of 48 checks failed)
+MODE oversized-guidance: probe exit code 1
+wall time 0m13.694s
+
+=== oversized-guidance, run 2: the guidance file made longer than 2048 bytes (live file and restore copy)
+expected: subagent-context FAIL only (the hook gives the fixed line alone)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter'
+Result: FAIL (1 of 48 checks failed)
+MODE oversized-guidance: probe exit code 1
+wall time 0m15.734s
+
+=== nested-only-subagent, run 1: the sub-agent hook prints only the nested copy of the context
+expected: subagent-context FAIL only (the runtime ignores the nested copy, P2)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+Result: FAIL (1 of 48 checks failed)
+MODE nested-only-subagent: probe exit code 1
+wall time 0m13.586s
+
+=== nested-only-subagent, run 2: the sub-agent hook prints only the nested copy of the context
+expected: subagent-context FAIL only (the runtime ignores the nested copy, P2)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL subagent-context: the first user message of sub-agent coder lacks the heading 'GitHub Copilot Workspace Adapter' and the fixed line
+Result: FAIL (1 of 48 checks failed)
+MODE nested-only-subagent: probe exit code 1
+wall time 0m15.784s
+
+=== nested-only-reminder, run 1: the reminder prints only the nested copy (the shape every other client gets)
+expected: session-reminder FAIL only (the runtime ignores the nested copy, P1/F13)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+Result: FAIL (1 of 48 checks failed)
+MODE nested-only-reminder: probe exit code 1
+wall time 0m13.508s
+
+=== nested-only-reminder, run 2: the reminder prints only the nested copy (the shape every other client gets)
+expected: session-reminder FAIL only (the runtime ignores the nested copy, P1/F13)
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+FAIL session-reminder: the reminder is in none of the 2 user message(s) of the first model request
+Result: FAIL (1 of 48 checks failed)
+MODE nested-only-reminder: probe exit code 1
+wall time 0m13.723s

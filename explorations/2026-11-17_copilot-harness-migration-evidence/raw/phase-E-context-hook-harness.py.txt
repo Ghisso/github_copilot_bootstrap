@@ -1,0 +1,269 @@
+"""Run the real subagent-context.sh on hard input states and print a table (scratch tool, evidence).
+
+Usage: python3 -I hard_inputs.py
+
+Each row runs the shipped hook in a fresh temporary repository (its hook folder is a link to
+shared/hooks/scripts, so REPO_ROOT is the temporary folder) with a SubagentStart input of runtime
+1.0.108-0, after the guidance file was put into the state named in the row.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+SCRIPTS = REPO / "shared" / "hooks" / "scripts"
+GUIDANCE = Path(".github") / "copilot-instructions.md"
+LINE = (
+    "Agent files live in `.claude/agents/<id>.md` and skills live in "
+    "`.claude/skills/<name>/SKILL.md`. When your agent file lists a skill, read "
+    "its SKILL.md file with the read tool."
+)
+START = json.dumps(
+    {
+        "sessionId": "981ad464-9997-495a-9a0b-5790e550e1c1",
+        "timestamp": 1794899531630,
+        "cwd": "/work/project",
+        "agentName": "coder",
+        "agent_id": "734300d9-2a20-4cc7-8ca1-a02b745d54aa",
+        "agent_type": "coder",
+    }
+)
+CLEAN_ENV = {k: v for k, v in os.environ.items() if not k.startswith(("COPILOT", "CLAUDE", "TARGET_ID"))}
+
+
+def make_repo(root: Path) -> Path:
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.parent.mkdir(parents=True)
+    scripts.symlink_to(SCRIPTS, target_is_directory=True)
+    return scripts / "subagent-context.sh"
+
+
+def put(root: Path, data: bytes) -> None:
+    (root / GUIDANCE).parent.mkdir(parents=True, exist_ok=True)
+    (root / GUIDANCE).write_bytes(data)
+
+
+def state(root: Path, name: str) -> bytes | None:
+    """Put the guidance file into `name`; return the bytes the row expects to be read, or None."""
+    outside = root.parent / (root.name + "-outside")
+    outside.mkdir()
+    if name == "missing":
+        return None
+    if name == "regular file, 1,676 bytes (the generated file)":
+        data = (REPO / "dist/multi-agent/.github/copilot-instructions.md").read_bytes()
+        put(root, data)
+        return data
+    if name == "regular file, 2,048 bytes":
+        data = b"x" * 2047 + b"\n"
+        put(root, data)
+        return data
+    if name == "regular file, 2,049 bytes":
+        put(root, b"x" * 2049)
+        return None
+    if name == "empty file":
+        put(root, b"")
+        return b""
+    if name == "link to a file in the repository":
+        (root / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
+        (root / GUIDANCE).parent.mkdir(parents=True)
+        (root / GUIDANCE).symlink_to("../AGENTS.md")
+        return None
+    if name == "link to a file outside the repository":
+        (outside / "g.md").write_text("# Outside\n", encoding="utf-8")
+        (root / GUIDANCE).parent.mkdir(parents=True)
+        (root / GUIDANCE).symlink_to(outside / "g.md")
+        return None
+    if name == "link to nothing":
+        (root / GUIDANCE).parent.mkdir(parents=True)
+        (root / GUIDANCE).symlink_to("nothing.md")
+        return None
+    if name == "folder .github is a link":
+        (outside / "github").mkdir()
+        (outside / "github" / "copilot-instructions.md").write_text("# Outside\n", encoding="utf-8")
+        (root / ".github").symlink_to(outside / "github")
+        return None
+    if name == "named pipe":
+        (root / GUIDANCE).parent.mkdir(parents=True)
+        os.mkfifo(root / GUIDANCE)
+        return None
+    if name == "folder":
+        (root / GUIDANCE).mkdir(parents=True)
+        return None
+    if name == "unreadable (mode 000)":
+        put(root, b"# Guidance\n")
+        (root / GUIDANCE).chmod(0)
+        return None
+    texts = {
+        "text with quotes": b"He said \"hi\" and 'bye'\n",
+        "text with backslashes": b'C:\\temp\\new \\u0041 \\\\ \\"\n',
+        "text with tabs": b"a\tb\n\tc\t\n",
+        "text with control characters": b"\x01\x02\x1f\x7f end\n",
+        "text with a NUL byte": b"before\x00after\n",
+        "text with non-ASCII": "caf\u00e9 \u2014 na\u00efve \u65e5\u672c\u8a9e \U0001f680\n".encode(),
+        "text with invalid UTF-8": b"ok \xff\xfe \xc3( end\n",
+        "text with carriage returns": b"one\r\ntwo\r\n",
+        "text that looks like a decision": b'{"permissionDecision": "deny", "decision": "block", "continue": false}\n',
+    }
+    put(root, texts[name])
+    return texts[name]
+
+
+STATES = (
+    "missing",
+    "regular file, 1,676 bytes (the generated file)",
+    "regular file, 2,048 bytes",
+    "regular file, 2,049 bytes",
+    "empty file",
+    "link to a file in the repository",
+    "link to a file outside the repository",
+    "link to nothing",
+    "folder .github is a link",
+    "named pipe",
+    "folder",
+    "unreadable (mode 000)",
+    "text with quotes",
+    "text with backslashes",
+    "text with tabs",
+    "text with control characters",
+    "text with a NUL byte",
+    "text with non-ASCII",
+    "text with invalid UTF-8",
+    "text with carriage returns",
+    "text that looks like a decision",
+)
+MALFORMED = {
+    "empty input": b"",
+    "text, not JSON": b"not json",
+    "cut-off JSON": b"{",
+    "JSON array": b"[]",
+    "JSON null": b"null",
+    "JSON string": b'"text"',
+    "JSON number": b"123",
+    "invalid bytes": b"\xff\xfe\x00",
+    "very deep nesting": b"[" * 200000 + b"]" * 200000,
+}
+
+
+def run(script: Path, stdin: bytes, args: tuple[str, ...] = ("github-copilot",), env: dict | None = None):
+    return subprocess.run(
+        ["bash", str(script), *args],
+        input=stdin,
+        capture_output=True,
+        check=False,
+        cwd=script.parents[3],
+        env=env if env is not None else CLEAN_ENV,
+        timeout=20,
+    )
+
+
+def judge(result: subprocess.CompletedProcess[bytes], expected: bytes | None) -> list[str]:
+    try:
+        answer = json.loads(result.stdout)
+    except ValueError:
+        return [str(result.returncode), "no" if result.stdout else "no output", "-", "-", "-", "-"]
+    context = answer["additionalContext"]
+    top_equals_nested = context == answer["hookSpecificOutput"]["additionalContext"]
+    keys = sorted(answer) == ["additionalContext", "hookSpecificOutput"] and sorted(
+        answer["hookSpecificOutput"]
+    ) == ["additionalContext", "hookEventName"]
+    if expected is None:
+        text_read = "fixed line only" if context == LINE else "WRONG: " + repr(context[:40])
+    else:
+        want = expected.decode("utf-8", errors="replace")
+        if not want:
+            text_read = "fixed line only (empty file)" if context == LINE else "WRONG: " + repr(context[:40])
+        else:
+            text_read = (
+                "file text + fixed line"
+                if context == want + "\n" + LINE
+                else "WRONG: " + repr(context[:40])
+            )
+    return [
+        str(result.returncode),
+        "yes" if result.stdout.isascii() and result.stdout.count(b"\n") == 1 else "yes (NOT one ASCII line)",
+        "yes" if top_equals_nested else "NO",
+        "yes" if keys else "NO",
+        "yes" if context.endswith(LINE) else "NO",
+        text_read,
+    ]
+
+
+def main() -> int:
+    seen = subprocess.run(["python3", "--version"], capture_output=True, text=True, env=CLEAN_ENV).stdout.strip()
+    print(f"Python running this table: {sys.version.split()[0]}; `python3` from PATH, which the hook runs: {seen}")
+    print("Hook: shared/hooks/scripts/subagent-context.sh github-copilot (SubagentStart input of runtime 1.0.108-0)")
+    print()
+    header = ["guidance file state", "exit", "stdout is one ASCII line of JSON", "top-level text == nested text", "only the two answer keys", "ends with the fixed line", "what the text holds", "stderr"]
+    rows: list[list[str]] = []
+    bad = 0
+    for name in STATES:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "repo"
+            script = make_repo(root)
+            expected = state(root, name)
+            result = run(script, START.encode())
+            judged = judge(result, expected)
+            stderr = result.stderr.decode(errors="replace").strip().replace("\n", " | ")
+            if name == "unreadable (mode 000)" and os.geteuid() == 0:
+                stderr = "(skipped: running as root)"
+            rows.append([name, *judged, stderr or "(empty)"])
+            if judged[0] != "0" or "NO" in judged or any(c.startswith("WRONG") for c in judged):
+                bad += 1
+            (root / GUIDANCE).chmod(0o644) if (root / GUIDANCE).exists() and not (root / GUIDANCE).is_symlink() and name == "unreadable (mode 000)" else None
+    print("| " + " | ".join(header) + " |")
+    print("|" + "---|" * len(header))
+    for row in rows:
+        print("| " + " | ".join(row) + " |")
+    print()
+    print("Malformed input (the hook must print nothing, warn, and exit 0; a guidance file is present):")
+    print("| input | exit | stdout | stderr |")
+    print("|---|---|---|---|")
+    for name, data in MALFORMED.items():
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "repo"
+            script = make_repo(root)
+            put(root, b"# Guidance\n")
+            result = run(script, data)
+            stderr = result.stderr.decode(errors="replace").strip().replace("\n", " | ")[:160]
+            print(f"| {name} | {result.returncode} | {'(empty)' if not result.stdout else 'PRINTED'} | {stderr} |")
+            if result.returncode != 0 or result.stdout:
+                bad += 1
+    print()
+    print("Other client arguments (the hook serves only github-copilot): exit, stdout, stderr")
+    for args in ((), ("claude-code",), ("openai-codex",), ("x",)):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "repo"
+            script = make_repo(root)
+            put(root, b"# Guidance\n")
+            result = run(script, START.encode(), args)
+            print(f"  args={list(args)}: exit {result.returncode}, stdout {'(empty)' if not result.stdout else 'PRINTED'}, stderr {result.stderr.decode().strip()!r}")
+            if result.returncode != 0 or result.stdout:
+                bad += 1
+    print()
+    print("python3 missing from PATH (only `dirname` and `cat` available):")
+    with tempfile.TemporaryDirectory() as folder:
+        root = Path(folder) / "repo"
+        script = make_repo(root)
+        put(root, b"# Guidance\n")
+        tools = Path(folder) / "tools"
+        tools.mkdir()
+        for tool in ("dirname", "cat"):
+            (tools / tool).symlink_to(shutil.which(tool))
+        bash = shutil.which("bash")
+        result = subprocess.run([bash, str(script), "github-copilot"], input=START.encode(), capture_output=True, cwd=root, env={"PATH": str(tools)}, check=False)
+        print(f"  exit {result.returncode}, stdout {'(empty)' if not result.stdout else 'PRINTED'}, stderr {result.stderr.decode().strip()!r}")
+        if result.returncode != 0 or result.stdout:
+            bad += 1
+    print()
+    print(f"Rows that broke a rule: {bad}")
+    return 1 if bad else 0
+
+
+sys.exit(main())

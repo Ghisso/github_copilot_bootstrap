@@ -1,0 +1,162 @@
+"""Before-state and negative controls for the Phase E probe checks (scratch tool, not shipped).
+
+Usage: probe_control.py MODE
+
+Runs the real probe (scripts/check_copilot_runtime.py, with the new checks) against a temporary
+project whose files were changed after the install, to show that the new checks fail on a wrong setup.
+The change is made after the camelCase copy is taken, so the third session is not affected.
+
+MODE
+  baseline            no change (the probe as shipped); prints the exact text each sub-agent and the
+                      main session received
+  before              the install as at 3402601: hook file without the two new entries, no
+                      sub-agent hook script, the old reminder script (the state before steps 2 to 4)
+  no-subagent-hook    the SubagentStart entry removed from both copies of the hook file
+  no-reminder-hook    the fourth SessionStart entry removed from both copies of the hook file
+  no-guidance-file    .github/copilot-instructions.md removed, with its restore copy and manifest line
+  oversized-guidance  the guidance file made longer than 2048 bytes (live file and restore copy)
+  nested-only-subagent  the sub-agent hook prints only the nested copy (the shape the runtime ignores, P2)
+  nested-only-reminder  the reminder prints only the nested copy (as it does for another client)
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from collections.abc import Callable
+from pathlib import Path
+
+REPO = Path("/home/ghisso/work/github_copilot_bootstrap")
+sys.path.insert(0, str(REPO / "scripts"))
+sys.dont_write_bytecode = True
+
+import check_copilot_runtime as probe  # noqa: E402
+
+mode = sys.argv[1]
+BASE = "3402601"
+HOOK_FILES = (
+    Path(".github/hooks/hooks.json"),
+    Path(".claude/bootstrap-root/.github/hooks/hooks.json"),
+)
+GUIDANCE_FILES = (
+    Path(".github/copilot-instructions.md"),
+    Path(".claude/bootstrap-root/.github/copilot-instructions.md"),
+)
+MANIFEST = Path(".claude/bootstrap-ownership.env")
+REMINDER_SCRIPT = Path(".claude/hooks/scripts/reporting-reminder.sh")
+SUBAGENT_SCRIPT = Path(".claude/hooks/scripts/subagent-context.sh")
+
+
+def git_show(path: str) -> str:
+    done = subprocess.run(
+        ["git", "-C", str(REPO), "show", f"{BASE}:{path}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return done.stdout
+
+
+def edit_hooks(project: Path, change: Callable[[dict], None]) -> None:
+    for relative in HOOK_FILES:
+        data = json.loads((project / relative).read_text(encoding="utf-8"))
+        change(data["hooks"])
+        (project / relative).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def drop_reminder(hooks: dict) -> None:
+    last = hooks["SessionStart"].pop()
+    assert "reporting-reminder.sh session github-copilot" in last["bash"], last
+
+
+def mutate(project: Path) -> None:
+    assert (project / SUBAGENT_SCRIPT).is_file(), "the installed project lacks the new hook script"
+    if mode == "before":
+        for relative in HOOK_FILES:
+            (project / relative).write_text(git_show("shared/hooks/hooks.json"), encoding="utf-8")
+        (project / SUBAGENT_SCRIPT).unlink()
+        (project / REMINDER_SCRIPT).write_text(
+            git_show("shared/hooks/scripts/reporting-reminder.sh"), encoding="utf-8"
+        )
+    elif mode == "no-subagent-hook":
+        edit_hooks(project, lambda hooks: hooks.pop("SubagentStart"))
+    elif mode == "no-reminder-hook":
+        edit_hooks(project, drop_reminder)
+    elif mode == "no-guidance-file":
+        for relative in GUIDANCE_FILES:
+            (project / relative).unlink()
+        manifest = project / MANIFEST
+        lines = manifest.read_text(encoding="utf-8").splitlines(keepends=True)
+        kept = [line for line in lines if not line.strip().endswith("copilot-instructions.md")]
+        assert len(kept) == len(lines) - 1, "expected exactly one manifest line for the guidance file"
+        manifest.write_text("".join(kept), encoding="utf-8")
+    elif mode == "oversized-guidance":
+        for relative in GUIDANCE_FILES:
+            path = project / relative
+            path.write_text(path.read_text(encoding="utf-8") + "\nextra line. " * 100, encoding="utf-8")
+            assert path.stat().st_size > 2048
+    elif mode == "nested-only-subagent":
+        script = project / SUBAGENT_SCRIPT
+        text = script.read_text(encoding="utf-8")
+        old = '        "additionalContext": context,\n        "hookSpecificOutput": {'
+        assert text.count(old) == 1
+        script.write_text(text.replace(old, '        "hookSpecificOutput": {'), encoding="utf-8")
+    elif mode == "nested-only-reminder":
+        script = project / REMINDER_SCRIPT
+        text = script.read_text(encoding="utf-8")
+        old = 'TARGET_ID="$PROVIDER"'
+        assert text.count(old) == 1
+        script.write_text(text.replace(old, 'TARGET_ID="claude-code"'), encoding="utf-8")
+    elif mode != "baseline":
+        raise SystemExit(f"unknown mode {mode}")
+
+
+original_camel = probe.prepare_camel_project
+original_run_session = probe.run_session
+records: dict[str, probe.SessionRecord] = {}
+
+
+def patched_camel(project: Path, work: Path) -> Path:
+    copy = original_camel(project, work)
+    mutate(project)
+    return copy
+
+
+def capture(runtime, project, scenario, home, timeout=probe.SESSION_LIMIT_SECONDS):  # type: ignore[no-untyped-def]
+    record = original_run_session(runtime, project, scenario, home, timeout)
+    records[str(scenario["name"])] = record
+    return record
+
+
+probe.prepare_camel_project = patched_camel
+probe.run_session = capture
+code = probe.main(["--require"])
+main = records.get("main")
+if mode == "baseline" and main is not None:
+    print("RECEIVED: user messages of the first model request of the main session")
+    for number, text in enumerate(main.summary.get("mainFirstRequestUser") or []):
+        print(f"--- main user message [{number}] ({len(text)} characters)")
+        print(text)
+    # The project's guidance file is the generated one, byte for byte (the installer copies it).
+    guidance = (REPO / "dist/multi-agent/.github/copilot-instructions.md").read_text(encoding="utf-8")
+    print(f"CONTAINMENT: the generated guidance file is {len(guidance.encode())} bytes and {guidance.count(chr(10))} lines")
+    for key in ("PROBE-CHILD-coder", "PROBE-CHILD-reviewer", "PROBE-CHILD-general"):
+        users = ((main.summary.get("subagentFirstRequests") or {}).get(key) or {}).get("user") or []
+        first = users[0] if users else ""
+        line = probe.SUBAGENT_LINE
+        ordered = key in first and guidance in first and line in first and first.index(guidance) < first.index(line) < first.index(key)
+        print(
+            f"CONTAINMENT {key}: user messages {len(users)}; whole file text, line breaks included, in the first user message: "
+            f"{guidance in first}; fixed line: {line in first}; order file text, fixed line, task prompt: {ordered}"
+        )
+    for key in ("PROBE-CHILD-coder", "PROBE-CHILD-reviewer", "PROBE-CHILD-general"):
+        request = (main.summary.get("subagentFirstRequests") or {}).get(key) or {}
+        users = request.get("user") or []
+        print(f"=== RECEIVED by {key}: {len(users)} user message(s), tools offered: {len(request.get('toolNames') or [])}")
+        for number, text in enumerate(users):
+            print(f"--- user message [{number}] ({len(text)} characters), exact:")
+            print(text)
+        print("=== end of " + key)
+print(f"MODE {mode}: probe exit code {code}")
+sys.exit(code)

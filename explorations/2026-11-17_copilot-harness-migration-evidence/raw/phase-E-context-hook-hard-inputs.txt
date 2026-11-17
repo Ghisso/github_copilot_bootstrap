@@ -1,0 +1,110 @@
+Phase E context hook on hard inputs: the real shared/hooks/scripts/subagent-context.sh
+Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
+uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
+Tool: phase-E-context-hook-harness.py.txt. Run twice, with python3 3.13.6 and with python3 3.9.0 (the lowest version the hooks
+must support; the CI job python_39_hooks uses 3.9). The two tables are identical apart from the version line.
+
+=== python3 = 3.13.6
+Python running this table: 3.13.6; `python3` from PATH, which the hook runs: Python 3.13.6
+Hook: shared/hooks/scripts/subagent-context.sh github-copilot (SubagentStart input of runtime 1.0.108-0)
+
+| guidance file state | exit | stdout is one ASCII line of JSON | top-level text == nested text | only the two answer keys | ends with the fixed line | what the text holds | stderr |
+|---|---|---|---|---|---|---|---|
+| missing | 0 | yes | yes | yes | yes | fixed line only | (empty) |
+| regular file, 1,676 bytes (the generated file) | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| regular file, 2,048 bytes | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| regular file, 2,049 bytes | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: over 2048 bytes |
+| empty file | 0 | yes | yes | yes | yes | fixed line only (empty file) | (empty) |
+| link to a file in the repository | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| link to a file outside the repository | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| link to nothing | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| folder .github is a link | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| named pipe | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: not a regular file |
+| folder | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: cannot read .github/copilot-instructions.md: Is a directory |
+| unreadable (mode 000) | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: cannot read .github/copilot-instructions.md: Permission denied |
+| text with quotes | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with backslashes | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with tabs | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with control characters | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with a NUL byte | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with non-ASCII | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with invalid UTF-8 | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with carriage returns | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text that looks like a decision | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+
+Malformed input (the hook must print nothing, warn, and exit 0; a guidance file is present):
+| input | exit | stdout | stderr |
+|---|---|---|---|
+| empty input | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| text, not JSON | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| cut-off JSON | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON array | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON null | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON string | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON number | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| invalid bytes | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| very deep nesting | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+
+Other client arguments (the hook serves only github-copilot): exit, stdout, stderr
+  args=[]: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: missing'
+  args=['claude-code']: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: claude-code'
+  args=['openai-codex']: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: openai-codex'
+  args=['x']: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: x'
+
+python3 missing from PATH (only `dirname` and `cat` available):
+  exit 0, stdout (empty), stderr 'WARN subagent-context: python3 is required to build the context; skipping'
+
+Rows that broke a rule: 0
+
+=== python3 = 3.9.0
+Python running this table: 3.9.0; `python3` from PATH, which the hook runs: Python 3.9.0
+Hook: shared/hooks/scripts/subagent-context.sh github-copilot (SubagentStart input of runtime 1.0.108-0)
+
+| guidance file state | exit | stdout is one ASCII line of JSON | top-level text == nested text | only the two answer keys | ends with the fixed line | what the text holds | stderr |
+|---|---|---|---|---|---|---|---|
+| missing | 0 | yes | yes | yes | yes | fixed line only | (empty) |
+| regular file, 1,676 bytes (the generated file) | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| regular file, 2,048 bytes | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| regular file, 2,049 bytes | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: over 2048 bytes |
+| empty file | 0 | yes | yes | yes | yes | fixed line only (empty file) | (empty) |
+| link to a file in the repository | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| link to a file outside the repository | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| link to nothing | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| folder .github is a link | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: a link, or outside the repository |
+| named pipe | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: not reading .github/copilot-instructions.md: not a regular file |
+| folder | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: cannot read .github/copilot-instructions.md: Is a directory |
+| unreadable (mode 000) | 0 | yes | yes | yes | yes | fixed line only | WARN subagent-context: cannot read .github/copilot-instructions.md: Permission denied |
+| text with quotes | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with backslashes | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with tabs | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with control characters | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with a NUL byte | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with non-ASCII | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with invalid UTF-8 | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text with carriage returns | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+| text that looks like a decision | 0 | yes | yes | yes | yes | file text + fixed line | (empty) |
+
+Malformed input (the hook must print nothing, warn, and exit 0; a guidance file is present):
+| input | exit | stdout | stderr |
+|---|---|---|---|
+| empty input | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| text, not JSON | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| cut-off JSON | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON array | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON null | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON string | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| JSON number | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| invalid bytes | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+| very deep nesting | 0 | (empty) | WARN subagent-context: malformed hook input; skipping context |
+
+Other client arguments (the hook serves only github-copilot): exit, stdout, stderr
+  args=[]: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: missing'
+  args=['claude-code']: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: claude-code'
+  args=['openai-codex']: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: openai-codex'
+  args=['x']: exit 0, stdout (empty), stderr 'WARN subagent-context: unsupported provider: x'
+
+python3 missing from PATH (only `dirname` and `cat` available):
+  exit 0, stdout (empty), stderr 'WARN subagent-context: python3 is required to build the context; skipping'
+
+Rows that broke a rule: 0

@@ -1,0 +1,36 @@
+Phase E generated files
+Date: 2026-11-18. VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab, SDK 1.0.30-preview.0, runtime 1.0.108-0.
+Tree: HEAD 3402601 plus the uncommitted Phase E changes (working copy), generated and installed with
+uv run python scripts/generate_targets.py --all and scripts/install_bootstrap.py . --allow-self --local-only.
+
+=== dist/multi-agent/.github/hooks/hooks.json: events now (in file order)
+SessionStart (4), PreToolUse (5), PostToolUse (1), Stop (3), SubagentStart (1)
+
+=== the new SessionStart entry (the 4th)
+{
+  "type": "command",
+  "bash": ".claude/hooks/scripts/run-hook.sh reporting-reminder.sh session github-copilot",
+  "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh reporting-reminder.sh session github-copilot",
+  "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh reporting-reminder.sh session github-copilot",
+  "cwd": ".",
+  "timeout": 10,
+  "timeoutSec": 10
+}
+
+=== the new SubagentStart entry
+[
+  {
+    "type": "command",
+    "bash": ".claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot",
+    "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot",
+    "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh subagent-context.sh github-copilot",
+    "cwd": ".",
+    "timeout": 10,
+    "timeoutSec": 10
+  }
+]
+
+=== .github/copilot-instructions.md against the 2048-byte limit
+generated (dist/multi-agent): 1676 bytes
+installed in this repository (.github): 1676 bytes, identical to the generated file: True
+limit: 2048 bytes (COPILOT_INSTRUCTIONS_MAX_BYTES in scripts/validate_targets.py); at 3402601 the file was 1676 bytes (REPORT.md F10); headroom: 372 bytes
