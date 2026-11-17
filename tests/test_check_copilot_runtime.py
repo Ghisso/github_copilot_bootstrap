@@ -9,6 +9,7 @@ not from the probe's own output.
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import re
@@ -154,12 +155,15 @@ EXPECTED_CHECK_NAMES = [
     "hooks-sources",
     "hooks-subfolder",
     "mcp-none",
+    "single-session-log",
+    "state-sync-once",
     "deny-git-reset",
     "deny-force-push",
     "deny-secret-rm",
     "deny-secret-view",
     "ask-vscode-settings",
     "ask-agent-wrapper",
+    "guards-both-sources",
     "deny-branch",
     "deny-commit",
     "deny-pr",
@@ -174,6 +178,46 @@ EXPECTED_CHECK_NAMES = [
     "subagent-deny-git-reset",
     "subagent-store-sql-refused",
 ]
+
+
+SESSION_ID = "2a8f5fb9-54e8-4b10-8f35-6ef6eeb121ec"
+CHILD_SESSION_ID = "e8cf30a5-88ca-47c1-8816-662fabc14ee3"
+SESSIONS_LOG = Path(".claude") / "session_logs" / "hooks-sessions.log"
+ERRORS_LOG = Path(".claude") / "session_logs" / "hooks-errors.log"
+# The exact text `state-sync.sh pull` logs with no state remote (see
+# `test_the_pull_line_the_check_counts_is_what_state_sync_writes`).
+PULL_LINE = "2026-11-17T15:58:48.000Z state-sync: no state remote configured; nothing to pull from."
+# Lines of a real probe run (evidence raw/phase-D-probe-output.txt) in which the
+# Claude-settings lifecycle hooks stood down: one session log entry per event and
+# one pull. The sub-agent has a session of its own, with only a stop.
+GOOD_SESSIONS_LOG = [
+    f"2026-11-17T15:58:49.000Z,event=SessionStart,target=github-copilot,sessionId={SESSION_ID},source=new",
+    f"2026-11-17T15:58:55.000Z,event=Stop,target=github-copilot,sessionId={CHILD_SESSION_ID}",
+    f"2026-11-17T15:58:55.000Z,event=Stop,target=github-copilot,sessionId={SESSION_ID}",
+]
+GOOD_ERRORS_LOG = [
+    "2026-11-17T15:58:47.000Z state-sync: no state remote configured (set AI_STATE_REMOTE, pass --state-remote at install time, or ensure this repo has an 'origin'); state will stay local-only until one is configured.",
+    PULL_LINE,
+    "2026-11-17T15:58:54.000Z state-sync: no state remote configured; local checkpoint remains unpublished.",
+    "2026-11-17T15:58:55Z WARN stop-session-log-check: worktree changed but no session log was updated today",
+]
+# Projects of records the caller did not give one: they hold the good logs and
+# live in a folder made before any test patches `tempfile`.
+RECORD_PROJECTS = Path(tempfile.mkdtemp(prefix="probe-test-records-"))
+atexit.register(shutil.rmtree, RECORD_PROJECTS, ignore_errors=True)
+
+
+def write_logs(
+    project: Path,
+    sessions: Sequence[str] | None = GOOD_SESSIONS_LOG,
+    errors: Sequence[str] | None = GOOD_ERRORS_LOG,
+) -> Path:
+    """Write the two hook logs a session leaves in its project; None writes no file."""
+    for relative, lines in ((SESSIONS_LOG, sessions), (ERRORS_LOG, errors)):
+        if lines is not None:
+            (project / relative).parent.mkdir(parents=True, exist_ok=True)
+            (project / relative).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return project
 
 
 def call_events(
@@ -268,10 +312,19 @@ def build_record(
     discovery: dict[str, Any] | None = None,
     extra_events: Sequence[dict[str, Any]] = (),
     name: str = "main",
+    project: Path | None = None,
 ) -> probe.SessionRecord:
-    """A record of a correct run, unless the caller passes wrong steps or discovery."""
+    """A record of a correct run, unless the caller passes wrong steps or discovery.
+
+    `project` is the folder whose hook logs the log checks read; without one the
+    record gets a folder that holds the good logs.
+    """
     steps = EXPECTED_STEPS if steps is None else steps
-    events: list[dict[str, Any]] = []
+    if project is None:
+        project = write_logs(Path(tempfile.mkdtemp(dir=RECORD_PROJECTS)))
+    events: list[dict[str, Any]] = [
+        {"type": "session.start", "data": {"sessionId": SESSION_ID}}
+    ]
     step_calls: dict[str, str] = {}
     for number, (label, step) in enumerate(steps.items(), start=1):
         call_id = f"call_probe_{number}"
@@ -311,7 +364,9 @@ def build_record(
         "mcpFileAfterSession": False,
         "errors": [],
     }
-    return probe.SessionRecord(name=name, events=events, summary=summary)
+    return probe.SessionRecord(
+        name=name, events=events, summary=summary, project=project
+    )
 
 
 def build_patch_record(
@@ -379,8 +434,9 @@ WRITE_RECORD = (
     "(out / 'record.json').write_text(json.dumps({'status': {'version': '1.0.108-0'},"
     " 'modelCalls': 2, 'errors': ERRORS, 'config': config,"
     " 'seenArgs': sys.argv[1:2], 'seenCwd': os.getcwd(),"
-    " 'seenEnv': sorted(k for k in os.environ if k.startswith(('CLAUDE', 'ANTHROPIC'))"
-    " or k in ('GITHUB_TOKEN', 'GH_TOKEN', 'COPILOT_GITHUB_TOKEN')),"
+    " 'seenEnv': sorted(k for k in os.environ"
+    " if k.startswith(('CLAUDE', 'ANTHROPIC', 'GIT_', 'GH_', 'AI_STATE_'))"
+    " or k in ('GITHUB_TOKEN', 'COPILOT_GITHUB_TOKEN')),"
     " 'discovery': DISCOVERY}))\n"
 )
 FINISHED_NODE = (
@@ -547,6 +603,40 @@ def test_runtime_environment_drops_claude_anthropic_and_github_tokens() -> None:
 
     assert env == {"PATH": "/usr/bin:/bin", "HOME": "/home/someone", "LANG": "C.UTF-8"}
     assert "CLAUDECODE" in base  # the input is not changed
+
+
+def test_runtime_environment_drops_every_git_gh_and_ai_state_variable() -> None:
+    """A command that a broken guard lets run must not reach another repository.
+
+    The probe sets nothing in the runtime's environment itself; its fixed Git
+    identity goes only to the installer, in `prepare_project`.
+    """
+    kept = {"PATH": "/usr/bin:/bin", "HOME": "/home/someone", "LANG": "C.UTF-8"}
+    aimed_elsewhere = {
+        "GIT_DIR": "/work/other/.git",
+        "GIT_WORK_TREE": "/work/other",
+        "GIT_INDEX_FILE": "/work/other/.git/index",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "url.https://example.invalid/.insteadOf",
+        "GIT_CONFIG_VALUE_0": "https://github.com/",
+        "GIT_AUTHOR_NAME": "Someone",
+        "GIT_EDITOR": "true",
+        "GH_REPO": "owner/other",
+        "GH_HOST": "example.invalid",
+        "GH_CONFIG_DIR": "/home/someone/.config/gh",
+        # They steer `state-sync.sh` in the session hooks.
+        "AI_STATE_REPO_ROOT": "/work/other",
+        "AI_STATE_LOCAL_ONLY": "1",
+        "AI_STATE_BRANCH": "other-branch",
+        "AI_STATE_REMOTE": "https://example.invalid/state.git",
+    }
+    # Names that only start with the same letters are not Git, GitHub CLI, or
+    # AI-state variables.
+    similar = {"GHOST": "boo", "GITLAB_CI": "true", "AI_STATEMENT": "kept"}
+
+    env = probe.runtime_environment({**kept, **aimed_elsewhere, **similar})
+
+    assert env == {**kept, **similar}
 
 
 # --- the temporary project ---------------------------------------------------
@@ -731,6 +821,11 @@ def test_the_patch_scenario_sends_the_five_evidence_patches_and_an_indented_one(
     assert indented[0] == "*** Begin Patch"
     assert indented[1] == "  *** Add File: .github/hooks/evil-indented.json"
     assert indented[-1] == "*** End Patch"
+
+
+# `guards-both-sources` (Phase D) judges the same step as `ask-vscode-settings`
+# and counts its questions, so a wrong step fails both.
+SAME_STEP_CHECKS = {"ask-vscode-settings": ["guards-both-sources"]}
 
 
 @pytest.mark.parametrize(
@@ -989,7 +1084,10 @@ def test_each_tool_check_fails_on_a_wrong_result_and_only_that_check(
 
     assert results[check].status == probe.FAIL
     assert results[check].detail
-    assert [n for n, r in results.items() if r.status == probe.FAIL] == [check]
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [
+        check,
+        *SAME_STEP_CHECKS.get(check, []),
+    ]
 
 
 def test_a_denial_whose_tool_still_completed_says_so() -> None:
@@ -1183,6 +1281,252 @@ def test_the_hook_asks_report_how_many_questions_the_runtime_raised() -> None:
 
     assert result.status == probe.PASS
     assert "2 question(s) of kind hook" in result.detail
+
+
+# --- Phase D: the Claude-settings lifecycle hooks stand down ------------------
+# Before the launcher change both hook sources log every session event and run
+# the state pull, so the logs show each twice. The expected values are the
+# plan's: one `github-copilot` entry per event, no `claude-code` entry, one pull
+# line, and two questions (one per source) for a protected config.
+
+BOTH_SOURCES_SESSIONS_LOG = [
+    f"2026-11-17T15:58:49.000Z,event=SessionStart,target=github-copilot,sessionId={SESSION_ID},source=new",
+    f"2026-11-17T15:58:50.000Z,event=SessionStart,target=claude-code,sessionId={SESSION_ID},source=new",
+    f"2026-11-17T15:58:55.000Z,event=Stop,target=github-copilot,sessionId={SESSION_ID}",
+    f"2026-11-17T15:58:55.000Z,event=Stop,target=claude-code,sessionId={SESSION_ID}",
+]
+STAND_DOWN_CHECKS = ["single-session-log", "state-sync-once", "guards-both-sources"]
+
+
+def failing(record: probe.SessionRecord) -> list[str]:
+    return [n for n, r in results_by_name(record).items() if r.status == probe.FAIL]
+
+
+def test_a_correct_run_passes_the_stand_down_checks_and_says_what_they_read() -> None:
+    results = results_by_name(build_record())
+
+    assert [results[name].status for name in STAND_DOWN_CHECKS] == [probe.PASS] * 3
+    assert results["single-session-log"].detail == (
+        "2 target=github-copilot line(s) and no target=claude-code line for session 2a8f5fb9"
+    )
+    assert results["state-sync-once"].detail == (
+        "1 state-sync pull line in .claude/session_logs/hooks-errors.log"
+    )
+    assert results["guards-both-sources"].detail == (
+        "2 questions of kind hook; not denied"
+    )
+
+
+def test_the_stand_down_checks_belong_to_the_main_session_only() -> None:
+    assert [c.name for c in probe.BASELINE_CHECKS if c.name in STAND_DOWN_CHECKS] == (
+        STAND_DOWN_CHECKS
+    )
+    for checks in (probe.CODEX_PATCH_CHECKS, probe.CAMEL_CHECKS):
+        assert not [c for c in checks if c.name in STAND_DOWN_CHECKS]
+
+
+def test_the_session_log_check_fails_when_both_hook_sources_log_the_session(
+    tmp_path: Path,
+) -> None:
+    record = build_record(
+        project=write_logs(tmp_path, sessions=BOTH_SOURCES_SESSIONS_LOG)
+    )
+
+    results = results_by_name(record)
+
+    assert failing(record) == ["single-session-log"]
+    assert results["single-session-log"].detail == (
+        "2 line(s) with target=claude-code for session 2a8f5fb9: "
+        "the Claude-settings hooks did not stand down"
+    )
+
+
+@pytest.mark.parametrize(
+    ("sessions", "expected_in_detail"),
+    [
+        pytest.param(
+            [GOOD_SESSIONS_LOG[0].replace("github-copilot", "claude-code")],
+            "1 line(s) with target=claude-code",
+            id="only-the-claude-settings-copy-logged",
+        ),
+        pytest.param(
+            [GOOD_SESSIONS_LOG[1]],
+            "no target=github-copilot line for session 2a8f5fb9",
+            id="the-session-has-no-line-at-all",
+        ),
+        pytest.param([], "no target=github-copilot line", id="the-log-is-empty"),
+    ],
+)
+def test_the_session_log_check_fails_unless_the_copilot_copy_logged_alone(
+    tmp_path: Path, sessions: list[str], expected_in_detail: str
+) -> None:
+    record = build_record(project=write_logs(tmp_path, sessions=sessions))
+
+    assert failing(record) == ["single-session-log"]
+    assert expected_in_detail in results_by_name(record)["single-session-log"].detail
+
+
+def test_the_session_log_check_judges_only_the_lines_of_its_own_session(
+    tmp_path: Path,
+) -> None:
+    other = BOTH_SOURCES_SESSIONS_LOG[1].replace(SESSION_ID, "another-session")
+    project = write_logs(tmp_path, sessions=[*GOOD_SESSIONS_LOG, other])
+
+    assert failing(build_record(project=project)) == []
+
+
+def test_the_session_log_check_fails_when_the_log_is_missing(tmp_path: Path) -> None:
+    record = build_record(project=write_logs(tmp_path, sessions=None))
+
+    assert failing(record) == ["single-session-log"]
+    assert "cannot read .claude/session_logs/hooks-sessions.log" in (
+        results_by_name(record)["single-session-log"].detail
+    )
+
+
+def test_the_session_log_check_needs_a_session_id_and_a_project() -> None:
+    no_id = build_record()
+    no_id.events = [e for e in no_id.events if e["type"] != "session.start"]
+    no_project = build_record()
+    no_project.project = None
+
+    assert (
+        "no session.start event" in results_by_name(no_id)["single-session-log"].detail
+    )
+    assert (
+        "no project folder" in results_by_name(no_project)["single-session-log"].detail
+    )
+    assert "no project folder" in results_by_name(no_project)["state-sync-once"].detail
+
+
+def test_the_pull_check_fails_when_both_hook_sources_ran_the_pull(
+    tmp_path: Path,
+) -> None:
+    second = PULL_LINE.replace("15:58:48", "15:58:49")
+    project = write_logs(tmp_path, errors=[*GOOD_ERRORS_LOG, second])
+
+    record = build_record(project=project)
+
+    assert failing(record) == ["state-sync-once"]
+    assert results_by_name(record)["state-sync-once"].detail == (
+        "2 state-sync pull line(s) in .claude/session_logs/hooks-errors.log, "
+        "expected exactly 1 (2 means both hook sources ran it)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("errors", "expected_in_detail"),
+    [
+        pytest.param(
+            [line for line in GOOD_ERRORS_LOG if line != PULL_LINE],
+            "0 state-sync pull line(s)",
+            id="no-pull-ran",
+        ),
+        pytest.param(
+            None, "cannot read .claude/session_logs/hooks-errors.log", id="no-log"
+        ),
+    ],
+)
+def test_the_pull_check_fails_without_exactly_one_pull_line(
+    tmp_path: Path, errors: list[str] | None, expected_in_detail: str
+) -> None:
+    record = build_record(project=write_logs(tmp_path, errors=errors))
+
+    assert failing(record) == ["state-sync-once"]
+    assert expected_in_detail in results_by_name(record)["state-sync-once"].detail
+
+
+def test_the_pull_check_counts_only_the_pull_line(tmp_path: Path) -> None:
+    """Setup, checkpoint, and stop-check lines in the same log are not pulls."""
+    assert len(GOOD_ERRORS_LOG) == 4
+    assert sum(line.endswith(probe.PULL_TEXT) for line in GOOD_ERRORS_LOG) == 1
+
+    assert failing(build_record(project=write_logs(tmp_path))) == []
+
+
+@pytest.mark.parametrize(
+    ("questions", "expected_in_detail"),
+    [
+        pytest.param(
+            ("hook", "write"), "1 question(s) of kind hook, expected 2", id="one-source"
+        ),
+        pytest.param(("write",), "0 question(s) of kind hook, expected 2", id="none"),
+        pytest.param(
+            ("hook", "hook", "hook", "write"),
+            "3 question(s) of kind hook, expected 2",
+            id="a-third-source",
+        ),
+    ],
+)
+def test_the_guard_check_fails_unless_each_hook_source_asked_once(
+    questions: tuple[str, ...], expected_in_detail: str
+) -> None:
+    steps = dict(EXPECTED_STEPS)
+    steps["ask-vscode-settings"] = {"tool": "create", "questions": questions}
+
+    results = results_by_name(build_record(steps))
+
+    assert results["guards-both-sources"].status == probe.FAIL
+    assert expected_in_detail in results["guards-both-sources"].detail
+    # `ask-vscode-settings` still passes a single question: only this check pins two.
+    expected_ask = probe.PASS if "hook" in questions else probe.FAIL
+    assert results["ask-vscode-settings"].status == expected_ask
+
+
+def test_the_guard_check_fails_when_the_step_never_ran() -> None:
+    steps = {k: v for k, v in EXPECTED_STEPS.items() if k != "ask-vscode-settings"}
+
+    results = results_by_name(build_record(steps))
+
+    assert results["guards-both-sources"].status == probe.FAIL
+    assert "did not run" in results["guards-both-sources"].detail
+
+
+def test_the_pull_line_the_check_counts_is_what_state_sync_writes(
+    tmp_path: Path,
+) -> None:
+    """The probe project has no state remote, so `state-sync.sh pull` logs one line.
+
+    The text comes from running the shipped script, not from the probe's constant.
+    """
+    project = probe.prepare_project(tmp_path)
+    errors = project / ERRORS_LOG
+    before = errors.read_text(encoding="utf-8").splitlines() if errors.exists() else []
+
+    done = subprocess.run(
+        [
+            "bash",
+            str(project / ".claude" / "hooks" / "scripts" / "state-sync.sh"),
+            "pull",
+        ],
+        cwd=project,
+        text=True,
+        capture_output=True,
+        input="{}",
+        check=False,
+        # No state remote, the project as root, no local-only mode, and a fixed
+        # identity, whatever the host sets (as tests/test_state_sync.py pins them).
+        env={
+            **os.environ,
+            "AI_STATE_REMOTE": "",
+            "AI_STATE_REPO_ROOT": str(project),
+            "AI_STATE_BRANCH": "ai-state",
+            "AI_STATE_LOCAL_ONLY": "0",
+            "GIT_AUTHOR_NAME": "Copilot Probe",
+            "GIT_AUTHOR_EMAIL": "probe@example.com",
+            "GIT_COMMITTER_NAME": "Copilot Probe",
+            "GIT_COMMITTER_EMAIL": "probe@example.com",
+        },
+    )
+
+    assert done.returncode == 0, done.stderr
+    added = errors.read_text(encoding="utf-8").splitlines()[len(before) :]
+    pulls = [line for line in added if line.endswith(probe.PULL_TEXT)]
+    assert len(pulls) == 1
+    assert pulls[0].endswith(" " + probe.PULL_TEXT)
+    assert re.fullmatch(
+        r"\d{4}-\d\d-\d\dT[\d:.]+Z " + re.escape(probe.PULL_TEXT), pulls[0]
+    )
 
 
 # --- the camel-rename session -------------------------------------------------
@@ -2237,6 +2581,12 @@ class TestRunSession:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-example")
         for token in ("GITHUB_TOKEN", "GH_TOKEN", "COPILOT_GITHUB_TOKEN"):
             monkeypatch.setenv(token, "ghp_example")
+        # Variables that aim a command at another repository.
+        monkeypatch.setenv("GIT_DIR", "/work/other/.git")
+        monkeypatch.setenv("GIT_WORK_TREE", "/work/other")
+        monkeypatch.setenv("GH_REPO", "owner/other")
+        monkeypatch.setenv("AI_STATE_REPO_ROOT", "/work/other")
+        monkeypatch.setenv("AI_STATE_LOCAL_ONLY", "1")
         runtime = make_fake_node(tmp_path / "vscode", FINISHED_NODE)
 
         record, out = self.run(runtime, tmp_path)
@@ -2463,13 +2813,13 @@ class TestPrepareProjectLimits:
             if name.startswith("GIT_"):
                 monkeypatch.delenv(name)
         monkeypatch.setenv("HOME", str(home))
-        monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
-        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
         # Never guess an identity from the user and host name: a missing
         # identity then fails on every host, not only on hosts that cannot guess.
-        monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
-        monkeypatch.setenv("GIT_CONFIG_KEY_0", "user.useConfigOnly")
-        monkeypatch.setenv("GIT_CONFIG_VALUE_0", "true")
+        # The setting is in the home folder's config file, because the probe now
+        # drops every GIT_ variable (so GIT_CONFIG_COUNT and GIT_CONFIG_NOSYSTEM
+        # would no longer arrive). A system-wide identity, on a host that has
+        # one, can no longer be switched off for the child.
+        (home / ".gitconfig").write_text("[user]\n\tuseConfigOnly = true\n")
         parent = tmp_path / "parent"
         parent.mkdir()
 
@@ -2482,6 +2832,81 @@ class TestPrepareProjectLimits:
             check=False,
         )
         assert nested.returncode == 0, nested.stderr
+
+    def test_the_installer_gets_the_filtered_environment_and_the_probes_own_values(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No `GIT_`, `GH_`, `AI_STATE_`, agent, or token variable reaches the
+        installer except the probe's own identity and empty state remote; other
+        variables still arrive."""
+        script = self.installer(
+            tmp_path,
+            "project = pathlib.Path(sys.argv[1])\n"
+            "(project / '.claude').mkdir()\n"
+            "(project / '.claude' / 'bootstrap-ownership.env').write_text("
+            "'BOOTSTRAP_ROOT_PATH=AGENTS.md\\n')\n"
+            "(project.parent / 'seen.json').write_text(json.dumps(dict(os.environ)))\n",
+        )
+        monkeypatch.setattr(probe, "INSTALLER", script)
+        for name, value in {
+            "GIT_DIR": "/work/other/.git",
+            "GIT_WORK_TREE": "/work/other",
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_AUTHOR_NAME": "Host Person",
+            "GH_REPO": "owner/other",
+            "GH_TOKEN": "ghp_example",
+            "GITHUB_TOKEN": "ghp_example",
+            "CLAUDE_PROJECT_DIR": "/work/agent",
+            "ANTHROPIC_API_KEY": "sk-ant-example",
+            "AI_STATE_REMOTE": "https://example.invalid/state.git",
+            "AI_STATE_REPO_ROOT": "/work/other",
+            "AI_STATE_LOCAL_ONLY": "1",
+            "AI_STATE_BRANCH": "other-branch",
+            "PROBE_KEPT_VARIABLE": "kept",
+        }.items():
+            monkeypatch.setenv(name, value)
+        parent = tmp_path / "parent"
+        parent.mkdir()
+
+        probe.prepare_project(parent)
+
+        seen = json.loads((parent / "seen.json").read_text("utf-8"))
+        assert [n for n in seen if n.startswith(("CLAUDE", "ANTHROPIC", "GH_"))] == []
+        assert "GITHUB_TOKEN" not in seen
+        assert sorted(n for n in seen if n.startswith("GIT_")) == [
+            "GIT_AUTHOR_EMAIL",
+            "GIT_AUTHOR_NAME",
+            "GIT_COMMITTER_EMAIL",
+            "GIT_COMMITTER_NAME",
+        ]
+        assert seen["GIT_AUTHOR_NAME"] == "Copilot Probe"
+        assert [n for n in seen if n.startswith("AI_STATE_")] == ["AI_STATE_REMOTE"]
+        assert seen["AI_STATE_REMOTE"] == ""
+        assert seen["PROBE_KEPT_VARIABLE"] == "kept"
+        assert seen["PATH"] == os.environ["PATH"]
+
+    def test_a_host_git_dir_and_work_tree_do_not_move_the_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With `GIT_DIR`, `GIT_WORK_TREE`, and `AI_STATE_REPO_ROOT` aimed at another
+        folder, `git init` and the real installer still work in the temporary
+        project and leave that folder alone."""
+        other = tmp_path / "other"
+        other.mkdir()
+        (other / "keep.txt").write_text("untouched\n", encoding="utf-8")
+        monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+        monkeypatch.setenv("GIT_WORK_TREE", str(other))
+        monkeypatch.setenv("GH_REPO", "owner/other")
+        monkeypatch.setenv("AI_STATE_REPO_ROOT", str(other))
+        parent = tmp_path / "parent"
+        parent.mkdir()
+
+        project = probe.prepare_project(parent)
+
+        assert project == parent / "project"
+        assert (project / ".git").is_dir()
+        assert (project / ".claude" / "bootstrap-ownership.env").is_file()
+        assert sorted(path.name for path in other.iterdir()) == ["keep.txt"]
 
     def test_a_command_past_the_deadline_is_killed_and_reported(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

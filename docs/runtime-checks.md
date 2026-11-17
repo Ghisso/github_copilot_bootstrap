@@ -561,10 +561,27 @@ baseline checks are:
 - no MCP server is discovered after trust, none is reported in the session
   events, and the project has no `.mcp.json` after the session (`mcp-none`; the
   file check does not depend on timing);
+- the Claude-settings lifecycle hooks stand down on the Copilot harness. After
+  the session, the project's `.claude/session_logs/hooks-sessions.log` has at
+  least one `target=github-copilot` line for the session and no
+  `target=claude-code` line (`single-session-log`), and
+  `.claude/session_logs/hooks-errors.log` has exactly one
+  `state-sync: no state remote configured; nothing to pull from.` line
+  (`state-sync-once`; the probe project has no state remote, and `main` is the
+  first session in it). Both read files after the run, so they do not depend on
+  when an event arrives. With both hook sources running, each log shows every
+  event twice;
 - the guards deny a hard reset, a force push, a secret file removal, a secret
   file read, a branch, a commit, and a pull request (`deny-*`), ask for the
   `.vscode/settings.json` and agent-wrapper edits (`ask-*`), and allow plain
   work (`allow-plain`);
+- the guards never stand down, so creating `.vscode/settings.json` raises
+  exactly two permission requests of kind `hook` (`guards-both-sources`). The
+  probe does not see which hook source raised which; with one source (the
+  `camel-rename` session) the runtime raises one. The probe answers every
+  request itself, so this shows nothing about what a user sees: in the one real
+  VS Code run, VS Code answered the second request itself (evidence A6). The
+  `ask-*` checks need at least one request; this check pins two;
 - the shell helpers `read_bash`, `list_bash`, and `stop_bash` are not denied
   (`helper-tools`; a helper call with no pre-tool hook event is not judged);
 - the read tool reads `.claude/agents/coder.md` with no guard question
@@ -618,11 +635,11 @@ the two `camel-ask-*` checks failed: the runtime ignored the nested answers unde
 camelCase names (evidence F4), so the denied commands ran and the protected edits
 raised no question.
 
-The `main` session has 23 checks, `codex-patch` has 6, and `camel-rename` has 11.
+The `main` session has 26 checks, `codex-patch` has 6, and `camel-rename` has 11.
 The probe also prints one line for each session, `session-main`,
 `session-codex-patch`, and `session-camel-rename`: it is `PASS` when the session
 finished, and `FAIL` for a timeout, a crash, a runtime error, or a run limit used
-up before the session could start. A run prints 43 lines. When it cannot build
+up before the session could start. A run prints 46 lines. When it cannot build
 the temporary project, or its camelCase copy, within the run limit, it prints
 `FAIL project` and runs no session. The counts of failed lines in the table
 below (for example "12 of 15") were measured with the first version of the
@@ -675,14 +692,27 @@ on VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK
 | Does deleting the project's `.mcp.json` keep MCP servers from starting? | No, not alone. The SessionStart hook `state-sync.sh pull` runs `restore-root-adapters.sh`, which copies `.mcp.json` back from `.claude/bootstrap-root/` during the session. In a control run that deleted only the project file, the traced process tree showed 2 such copies inside the session and 3 MCP server launches (`uvx` for `semble`, `npx` for `context7` and for `context-mode`). The only connection attempts outside loopback in that run were 16 DNS lookups (8 to 1.1.1.1 and 8 to 8.8.8.8, port 53), all refused because the namespace had no route. The file was back after the run in 4 of 4 control runs. The first version of `mcp-none` read only discovery and session events: it printed `FAIL` in 1 of those 4 runs (the traced run, which is slower) and `PASS` in the other 3, because no MCP event reached the session before it ended. The check now also reads the project file after the session, and the same control failed in 4 of 4 runs. The probe deletes the mirror copy and the manifest line too; the traced run of the shipped probe shows 0 copies inside the session and 0 launches. A test runs the restore script on the prepared project. | Probe note, sections 2, 3, and 7 |
 | Does the run leave 127.0.0.1? | In one run, no. It ran in a network namespace with only loopback, traced with `strace -f`, counting `connect` calls: the whole process tree (Python, git, node, the runtime, the hooks) made 2 `connect` calls, both to 127.0.0.1. Only that run was traced. | Probe note, section 2 |
 | Does the run write to `~/.copilot`? | Not observed. After a run, none of its session ids was under `~/.copilot/session-state`, and no file under `~/.copilot` mentioned a probe folder. | Probe note, section 5 |
-| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The version with two sessions and 31 lines took 13.61 and 11.72 seconds in two runs with a network. The current version, with three sessions and 43 lines, took 15.20 and 16.64 seconds in two runs with a network (Phase C). | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt` |
+| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The version with two sessions and 31 lines took 13.61 and 11.72 seconds in two runs with a network. The current version, with three sessions and 43 lines, took 15.20 and 16.64 seconds in two runs with a network (Phase C). The Phase D version, with 46 lines, took 14.99 and 12.74 seconds (`raw/phase-D-probe-run-times.txt`). | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt` |
 | Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the first version of the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. With the file guard from before the Copilot tool-input change put into the temporary project, 11 of 31 lines failed and the probe exited 1: `helper-tools`, `read-agent-file`, `search-secret-denied`, `deny-workflow-run`, `deny-workflow-manage`, and the six patch checks. Checks of behavior that did not change, such as `sql-no-file-write` and `subagent-deny-git-reset`, still passed. With the guards from before Phase C and the `camel-rename` session added, 7 of 43 lines failed: the five `camel-deny-*` and the two `camel-ask-*` checks. Three controls with a wrong camelCase setup each failed the matching setup check, in two runs each: only the live hook file renamed (`camel-events-renamed`; the restore hook put the original names back), the Claude settings left on (`camel-hooks-source` and `camel-events-renamed`), and no event renamed (`camel-events-renamed`). In all three, the deny checks still passed, because the denies came from PascalCase events or from the Claude settings source, which is why the setup checks exist. | Probe note, section 4; run of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt`, `raw/phase-C-probe-negative-controls.txt` |
+| Do the stand-down checks fail on a wrong setup? | Yes, in two runs each on the real runtime. With the launcher and Claude settings from before Phase D, 2 of 46 lines failed: `single-session-log` (2 `target=claude-code` lines for the session) and `state-sync-once` (2 pull lines). The same two failed with the new launcher and old settings (no marker), and with the old launcher and new settings (the prefix is ignored), and nothing else failed in those runs, so a mixed install runs every hook as before. A launcher that also stood down `protect-files.sh` failed only `guards-both-sources` (1 question instead of 2). With the marker exported to the whole runtime environment, the shipped launcher still passed all 46 lines, because `.github/hooks` hooks have `COPILOT_HOOK_DIR` set; a launcher without that condition stood both copies down and failed `single-session-log` and `state-sync-once` (no session log, 0 pull lines). `guards-both-sources` cannot fail on the stand-down change itself, because the guards do not change; it fails when a guard stands down or a hook source stops running. | `raw/phase-D-probe-output.txt`, `raw/phase-D-probe-negative-controls.txt`, `raw/phase-D-mixed-installs.txt` |
 
-The runtime's environment drops every variable whose name starts with `CLAUDE`
-or `ANTHROPIC`, and `GH_TOKEN`, `GITHUB_TOKEN`, and `COPILOT_GITHUB_TOKEN`.
-Hooks inherit the runtime's environment, so the agent that starts the probe
-must not look like the client under test, and the runtime has no token to sign
-in with.
+The runtime's environment drops every variable whose name starts with `CLAUDE`,
+`ANTHROPIC`, `GIT_`, `GH_`, or `AI_STATE_`, and `GITHUB_TOKEN` and
+`COPILOT_GITHUB_TOKEN`. Hooks inherit the runtime's environment, so the agent
+that starts the probe must not look like the client under test, and the runtime
+has no token to sign in with. `CLAUDECODE` is dropped too, so the launcher's
+condition 6 (no `CLAUDECODE`) holds in the probe as it does in VS Code. A `GIT_`
+or `GH_` variable such as `GIT_DIR`, `GIT_WORK_TREE`, or `GH_REPO` could point a
+command that a broken guard let run at another repository, so none reaches the
+runtime. The `AI_STATE_` variables steer `state-sync.sh` in the session hooks: an
+ambient `AI_STATE_REPO_ROOT` would aim it at another repository, and an ambient
+`AI_STATE_LOCAL_ONLY` would keep the pull line that `state-sync-once` counts from
+being written, which is a false `FAIL`. The same filtered environment goes to the
+two commands that build the temporary project (`git init` and the installer), so
+a host `GIT_DIR` cannot move the project into another folder. The probe adds a
+variable of its own only to those two commands: an empty `AI_STATE_REMOTE` and a
+fixed Git identity (`GIT_AUTHOR_*`, `GIT_COMMITTER_*`), because
+`state-sync.sh setup` makes a plain commit. The runtime gets neither.
 
 ### Google Antigravity ownership
 

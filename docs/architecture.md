@@ -299,7 +299,11 @@ then dispatches into the shared guard scripts under
 its static `.agents/hooks.json` adapter calls `antigravity-pretool.py`
 directly because its documented payload and response protocol require a
 Python bridge. Both routes converge on the same ordered Bash safety lane
-and the same protected-file classifier. See [Hook dispatcher and guardrail
+and the same protected-file classifier. On the Copilot harness, which loads
+both `.github/hooks/hooks.json` and `.claude/settings.json`, the launcher also
+stands the five lifecycle hooks reached through the Claude settings down, under
+seven conditions, and never a guard; see [Hooks on the Copilot
+harness](../README.md#hooks-on-the-copilot-harness) in the README. See [Hook dispatcher and guardrail
 scripts](../openwiki/architecture/hooks-and-guardrails.md) for the full
 `REPO_ROOT` resolution order, the per-target `PreToolUse` matcher groups,
 and the hook error log locations.

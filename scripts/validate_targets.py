@@ -18,7 +18,7 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path, PurePosixPath
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
@@ -1591,14 +1591,56 @@ def codex_hook_command(script: str, *args: str) -> str:
     return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
 
 
+# Only the generated Claude settings carry this. `run-hook.sh` stands a lifecycle
+# hook down on the Copilot harness only for a command that does.
+HOOK_SOURCE_MARKER = "BOOTSTRAP_HOOK_SOURCE=claude-settings"
+
+
+def hook_source_marker_errors(
+    claude_hooks: object, other_hook_files: Mapping[str, str]
+) -> list[str]:
+    """Return errors unless every Claude hook command has the source marker and no
+    other hook file does.
+
+    Args:
+        claude_hooks: The `hooks` object of the generated Claude settings.
+        other_hook_files: Hook file label (Codex, Copilot, Antigravity) to its text.
+    """
+    if not isinstance(claude_hooks, dict):
+        return ["Claude hooks must be an object to carry the hook source marker"]
+    commands = [
+        str(handler.get("command", ""))
+        for groups in claude_hooks.values()
+        if isinstance(groups, list)
+        for group in groups
+        if isinstance(group, dict)
+        for handler in group.get("hooks", [])
+        if isinstance(handler, dict)
+    ]
+    errors = [
+        f"Claude hook command must carry {HOOK_SOURCE_MARKER}: {command}"
+        for command in commands
+        if f" {HOOK_SOURCE_MARKER} " not in command
+    ]
+    if not commands:
+        errors.append("Claude settings have no hook command to carry the source marker")
+    errors.extend(
+        f"{label} hook file must not carry BOOTSTRAP_HOOK_SOURCE; only the generated "
+        "Claude settings set it"
+        for label, text in other_hook_files.items()
+        if "BOOTSTRAP_HOOK_SOURCE" in text
+    )
+    return errors
+
+
 def claude_hook_command(script: str, *args: str) -> str:
-    """Return the generated Claude repo-rooted hook command."""
+    """Return the generated Claude repo-rooted hook command, with its source marker."""
     root_expr = (
         "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
     )
     parts = [
         f'REPO_ROOT="{root_expr}"',
-        '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
+        f'{HOOK_SOURCE_MARKER} "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
         script,
         *args,
     ]
@@ -3789,6 +3831,16 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     errors.extend(context_mode_hook_errors(claude_settings, "claude-code"))
     validate_claude_lifecycle_hooks(claude_settings.get("hooks"), errors)
+    errors.extend(
+        hook_source_marker_errors(
+            claude_settings.get("hooks"),
+            {
+                "Codex": read(TARGET_ROOT / ".codex" / "hooks.json"),
+                "Copilot": read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"),
+                "Antigravity": read(TARGET_ROOT / ".agents" / "hooks.json"),
+            },
+        )
+    )
     errors.extend(pretool_routing_errors(claude_settings.get("hooks"), "claude-code"))
 
     check(

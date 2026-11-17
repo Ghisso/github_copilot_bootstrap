@@ -48,9 +48,15 @@ PASS, WARN, FAIL = "PASS", "WARN", "FAIL"
 SDK_ENTRY = Path("node_modules") / "@github" / "copilot-sdk" / "dist" / "index.js"
 # Names starting with these belong to the agent that started the probe (the
 # hooks inherit the runtime's environment); CLAUDECODE is covered by CLAUDE.
-DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC")
+# GIT_ and GH_ names can point a command at another repository (GIT_DIR,
+# GIT_WORK_TREE, GH_REPO), so a to-be-denied command that runs because of a
+# broken guard could act outside the temporary project. GH_TOKEN is covered.
+# AI_STATE_ names steer `state-sync.sh`: an ambient AI_STATE_REPO_ROOT would aim
+# the session hooks at another repository, and AI_STATE_LOCAL_ONLY would keep the
+# pull line that `state-sync-once` counts from being written.
+DROPPED_PREFIXES = ("CLAUDE", "ANTHROPIC", "GIT_", "GH_", "AI_STATE_")
 # Tokens that would give the runtime an account to sign in with.
-DROPPED_NAMES = frozenset({"GH_TOKEN", "GITHUB_TOKEN", "COPILOT_GITHUB_TOKEN"})
+DROPPED_NAMES = frozenset({"GITHUB_TOKEN", "COPILOT_GITHUB_TOKEN"})
 HOOK_FILES = (".github/hooks/hooks.json", ".claude/settings.json")
 GUARD_EVENT = "preToolUse"
 DENIED_PREFIX = "Denied by preToolUse hook: "
@@ -78,6 +84,14 @@ LIVE_HOOK_FILE = Path(".github/hooks/hooks.json")
 RESTORE_HOOK_FILE = Path(".claude/bootstrap-root/.github/hooks/hooks.json")
 CLAUDE_SETTINGS_FILE = Path(".claude/settings.json")
 CLAUDE_SETTINGS_OFF = Path(".claude/settings.json.off")
+HOOKS_SESSIONS_LOG = Path(".claude/session_logs/hooks-sessions.log")
+HOOKS_ERRORS_LOG = Path(".claude/session_logs/hooks-errors.log")
+# What `state-sync.sh pull` appends to the errors log, after a timestamp, in a
+# project with no state remote (the probe project has none): one line per run.
+PULL_TEXT = "state-sync: no state remote configured; nothing to pull from."
+# The step that creates `.vscode/settings.json`: a protected config, so each
+# hook source that runs the guard raises one question for it.
+PROTECTED_CREATE_STEP = "ask-vscode-settings"
 
 
 @dataclass(frozen=True)
@@ -203,7 +217,10 @@ def find_runtime(vscode_bin: Path | None = None) -> RuntimeInfo | None:
 
 
 def runtime_environment(base: Mapping[str, str]) -> dict[str, str]:
-    """Return `base` without the agent's variables and without GitHub tokens."""
+    """Return `base` without agent, Git, GitHub CLI, and AI-state variables or tokens.
+
+    The runtime, the temporary project's `git init`, and its installer all get this.
+    """
     return {
         key: value
         for key, value in base.items()
@@ -231,9 +248,12 @@ def prepare_project(parent: Path, deadline: float | None = None) -> Path:
     project.mkdir()
     if deadline is None:
         deadline = time.monotonic() + RUN_LIMIT_SECONDS
-    # `state-sync.sh setup` makes a plain `git commit`; do not need a host identity.
+    # The runtime's filtered environment, so a host GIT_DIR, GIT_WORK_TREE, or
+    # GH_REPO cannot aim `git init` or the installer at another repository. Then
+    # what is set on purpose: no state remote, and a fixed identity because
+    # `state-sync.sh setup` makes a plain `git commit` and a host may have none.
     env = {
-        **os.environ,
+        **runtime_environment(os.environ),
         "AI_STATE_REMOTE": "",
         "GIT_AUTHOR_NAME": "Copilot Probe",
         "GIT_AUTHOR_EMAIL": "probe@example.com",
@@ -751,6 +771,101 @@ def events_renamed(record: SessionRecord) -> tuple[bool, str]:
     )
 
 
+def _read_log(record: SessionRecord, relative: Path) -> tuple[list[str], str]:
+    """The lines of a log the session left in its project, or `[]` and why not."""
+    if record.project is None:
+        return [], "no project folder was recorded"
+    try:
+        text = (record.project / relative).read_text(encoding="utf-8")
+    except OSError as error:
+        return [], f"cannot read {relative} after the session: {error}"
+    return text.splitlines(), ""
+
+
+def _session_id(record: SessionRecord) -> str:
+    for event in record.events:
+        if event.get("type") == "session.start":
+            return str(_dict(event.get("data")).get("sessionId") or "")
+    return ""
+
+
+def single_session_log(record: SessionRecord) -> tuple[bool, str]:
+    """The session is in the session log under `github-copilot` only.
+
+    Both hook sources log the session start and every stop, the Copilot file as
+    `target=github-copilot` and the Claude settings as `target=claude-code` (F2).
+    Once the Claude-settings lifecycle hooks stand down, only the first remains.
+    The log is read after the run, so the check does not depend on when an
+    event arrives.
+    """
+    session = _session_id(record)
+    if not session:
+        return False, "the session recorded no session.start event with an id"
+    lines, problem = _read_log(record, HOOKS_SESSIONS_LOG)
+    if problem:
+        return False, problem
+    targets: Counter[str] = Counter()
+    for line in lines:
+        fields = line.split(",")
+        if f"sessionId={session}" in fields:
+            targets.update(
+                f.removeprefix("target=") for f in fields if f.startswith("target=")
+            )
+    claude, copilot = targets["claude-code"], targets["github-copilot"]
+    if claude:
+        return False, (
+            f"{claude} line(s) with target=claude-code for session {session[:8]}: "
+            "the Claude-settings hooks did not stand down"
+        )
+    if not copilot:
+        return False, f"no target=github-copilot line for session {session[:8]}"
+    return True, (
+        f"{copilot} target=github-copilot line(s) and no target=claude-code line "
+        f"for session {session[:8]}"
+    )
+
+
+def state_sync_once(record: SessionRecord) -> tuple[bool, str]:
+    """The errors log has exactly one state-sync pull line.
+
+    The log carries no session id. The check relies on `main` being the first
+    session to run in the probe project, so the log holds only its pulls: one
+    per hook source before the Claude-settings hooks stood down, one after.
+    """
+    lines, problem = _read_log(record, HOOKS_ERRORS_LOG)
+    if problem:
+        return False, problem
+    pulls = sum(line.endswith(" " + PULL_TEXT) for line in lines)
+    if pulls != 1:
+        return False, (
+            f"{pulls} state-sync pull line(s) in {HOOKS_ERRORS_LOG}, expected exactly "
+            "1 (2 means both hook sources ran it)"
+        )
+    return True, f"1 state-sync pull line in {HOOKS_ERRORS_LOG}"
+
+
+def guards_both_sources(record: SessionRecord) -> tuple[bool, str]:
+    """Creating a protected config raises one hook question per hook source.
+
+    The guards never stand down (option B), so with both sources loaded the
+    runtime raises two permission requests of kind `hook` for one protected
+    create (the one-source `camel-rename` session raises one). The probe does not
+    see which source raised which.
+    """
+    run, problem = _scripted_run(record, PROTECTED_CREATE_STEP)
+    if run is None:
+        return False, problem
+    if run.deny is not None:
+        return False, f"denied instead of asked: {run.deny}"
+    count, expected = run.questions.count("hook"), len(HOOK_FILES)
+    if count != expected:
+        return False, (
+            f"{count} question(s) of kind hook, expected {expected} "
+            f"(questions: {run.questions or 'none'})"
+        )
+    return True, f"{count} questions of kind hook; not denied"
+
+
 def mcp_none(record: SessionRecord) -> tuple[bool, str]:
     """No MCP server after trust or in the session, and no MCP file after the session.
 
@@ -972,6 +1087,8 @@ BASELINE_CHECKS = (
     Check("hooks-sources", hooks_from_both_sources("trusted")),
     Check("hooks-subfolder", hooks_from_both_sources("subfolder")),
     Check("mcp-none", mcp_none),
+    Check("single-session-log", single_session_log),
+    Check("state-sync-once", state_sync_once),
     denied("deny-git-reset", "deny-git-reset", "Blocked dangerous git operation"),
     denied("deny-force-push", "deny-force-push", "Blocked dangerous git operation"),
     denied(
@@ -982,6 +1099,7 @@ BASELINE_CHECKS = (
     ),
     asked("ask-vscode-settings", "ask-vscode-settings"),
     asked("ask-agent-wrapper", "ask-agent-wrapper"),
+    Check("guards-both-sources", guards_both_sources),
     denied("deny-branch", "deny-branch", *BRANCH_GUARD_REASONS),
     denied("deny-commit", "deny-commit", "commit gate failed for github-copilot"),
     denied("deny-pr", "deny-pr", "PR/push gate only allows implementation branches"),

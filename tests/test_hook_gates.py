@@ -9,6 +9,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -4893,6 +4895,416 @@ def test_a_guard_reason_with_a_tab_from_a_real_caller_is_valid_json(
     )
 
 
+# --- Lifecycle stand-down on the Copilot harness (Phase D, option B) ------
+#
+# The Copilot runtime loads `.github/hooks/hooks.json` and `.claude/settings.json`,
+# so the lifecycle hooks run twice (evidence F2, A3). The launcher `run-hook.sh` stands a
+# lifecycle hook down (reads and drops its input, prints nothing, exits 0) only
+# when seven conditions hold. A guard never stands down. The expected values are
+# written from the plan's list of conditions, never from the launcher's output.
+
+# The five scripts that may stand down, each with a realistic argument list.
+LIFECYCLE_CALLS: dict[str, tuple[str, ...]] = {
+    "state-sync.sh": ("pull",),
+    "session-log.sh": ("claude-code",),
+    "session-start-state.sh": ("claude-code",),
+    "claude-stop.sh": (),
+    "reporting-reminder.sh": ("prompt", "claude-code"),
+}
+GUARD_SCRIPTS = (
+    "protect-files.sh",
+    "pretool-bash-guard.sh",
+    "git-protection.sh",
+    "enforce-branch-state.sh",
+    "enforce-commit-gate.sh",
+    "enforce-pr-gate.sh",
+    "openwiki-guard.sh",
+    "record-branch-state.sh",
+)
+# The launcher itself is not a hook it runs.
+OTHER_SCRIPTS = sorted(
+    path.name
+    for path in SCRIPT_SRC.glob("*.sh")
+    if path.name not in (*LIFECYCLE_CALLS, "run-hook.sh")
+)
+CLIENT_VARIABLE_PREFIXES = ("COPILOT", "CLAUDE", "BOOTSTRAP_HOOK", "TARGET_ID")
+# What a hook sees when the Copilot runtime starts it from `.claude/settings.json`:
+# conditions 2 to 6 (A3, P1). Condition 7 is the hook file.
+STAND_DOWN_ENV = {
+    "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+    "COPILOT_CLI": "1",
+    "COPILOT_HOOK_DEPTH": "1",
+}
+# One broken condition each; None removes the variable.
+BROKEN_ENVIRONMENT: dict[str, dict[str, str | None]] = {
+    "no-marker": {"BOOTSTRAP_HOOK_SOURCE": None},
+    "another-marker": {"BOOTSTRAP_HOOK_SOURCE": "copilot-hooks"},
+    "copilot-cli-unset": {"COPILOT_CLI": None},
+    "copilot-cli-not-one": {"COPILOT_CLI": "0"},
+    "hook-depth-unset": {"COPILOT_HOOK_DEPTH": None},
+    "hook-depth-empty": {"COPILOT_HOOK_DEPTH": ""},
+    "hook-dir-set": {"COPILOT_HOOK_DIR": "/work/.github/hooks"},
+    "claudecode-set": {"CLAUDECODE": "1"},
+}
+BROKEN_HOOK_FILE = (
+    "missing",
+    "link",
+    "disable-all-hooks",
+    "no-session-log-copilot",
+    "no-state-sync-push",
+)
+# Whole environments of real clients, each with the marker (the new Claude settings
+# carry it whatever runs them). Each lacks COPILOT_HOOK_DEPTH, and so is not a
+# Copilot hook process.
+CLIENT_ENVIRONMENTS: dict[str, dict[str, str]] = {
+    # Claude Code started by VS Code's extension host (the planning session).
+    "claude-code-session": {
+        "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+        "COPILOT_CLI_ENABLED_FEATURE_FLAGS": "feature-a",
+        "COPILOT_OTEL_FILE_EXPORTER_PATH": "/tmp/otel.jsonl",
+        "CLAUDECODE": "1",
+    },
+    # Claude Code started from a shell of the Copilot runtime (probe P1): the shell
+    # tool passes COPILOT_CLI=1 but not COPILOT_HOOK_DEPTH.
+    "claude-code-from-a-copilot-shell": {
+        "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+        "COPILOT_CLI": "1",
+        "COPILOT_AGENT_SESSION_ID": "5b0e0b9e-3b7e-4d7c-9d1e-0c5d6a6f6a11",
+        "COPILOT_HOME": "/home/user/.copilot",
+    },
+    # The Local harness with `chat.useClaudeHooks` on (A2): no COPILOT_CLI.
+    "local-harness-claude-hooks": {
+        "BOOTSTRAP_HOOK_SOURCE": "claude-settings",
+        "COPILOT_CLI_ENABLED_FEATURE_FLAGS": "feature-a",
+        "COPILOT_OTEL_FILE_EXPORTER_PATH": "/tmp/otel.jsonl",
+    },
+}
+
+
+def _host_env(variables: Mapping[str, str | None]) -> dict[str, str]:
+    """The host environment with no client variable, then `variables` applied."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(CLIENT_VARIABLE_PREFIXES)
+    }
+    for key, value in variables.items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value
+    return env
+
+
+def _stand_down_env(changes: Mapping[str, str | None] | None = None) -> dict[str, str]:
+    return _host_env({**STAND_DOWN_ENV, **(changes or {})})
+
+
+def _write_copilot_hook_file(root: Path, case: str) -> None:
+    """Write `.github/hooks/hooks.json` as the generator copies it, broken as `case` says."""
+    hooks = root / ".github" / "hooks"
+    hooks.mkdir(parents=True)
+    original = (REPO_ROOT / "shared" / "hooks" / "hooks.json").read_text("utf-8")
+    text = original
+    if case == "disable-all-hooks":
+        text = original.replace(
+            '"version": 1,', '"version": 1,\n  "disableAllHooks": true,'
+        )
+    elif case == "no-session-log-copilot":
+        text = original.replace("session-log.sh github-copilot", "session-log.sh x")
+    elif case == "no-state-sync-push":
+        text = original.replace("state-sync.sh push", "state-sync.sh status")
+    # A case that changes nothing would pass for the wrong reason.
+    assert (text != original) == (case not in ("valid", "missing", "link"))
+    if case == "missing":
+        return
+    if case == "link":
+        (hooks / "real-hooks.json").write_text(text, encoding="utf-8")
+        (hooks / "hooks.json").symlink_to("real-hooks.json")
+    else:
+        (hooks / "hooks.json").write_text(text, encoding="utf-8")
+
+
+def _stub_launcher_repo(root: Path, hook_file: str = "valid") -> Path:
+    """A repository holding the real launcher and one stub per shipped script.
+
+    A stub prints `RAN <name> <arguments>` and then its input, so a test sees
+    whether the launcher handed over, and with what input.
+    """
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True)
+    shutil.copy(SCRIPT_SRC / "run-hook.sh", scripts / "run-hook.sh")
+    for path in SCRIPT_SRC.glob("*.sh"):
+        if path.name != "run-hook.sh":
+            (scripts / path.name).write_text(
+                '#!/usr/bin/env bash\nprintf "RAN %s %s\\n" "${0##*/}" "$*"\ncat\n',
+                encoding="utf-8",
+            )
+    _write_copilot_hook_file(root, hook_file)
+    return scripts / "run-hook.sh"
+
+
+def _real_launcher_repo(root: Path) -> Path:
+    """A repository whose hook scripts are the shipped ones, reached by a link.
+
+    Bash keeps the logical path, so the scripts still resolve `REPO_ROOT` to `root`.
+    """
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.parent.mkdir(parents=True)
+    scripts.symlink_to(SCRIPT_SRC, target_is_directory=True)
+    _write_copilot_hook_file(root, "valid")
+    return scripts / "run-hook.sh"
+
+
+def _run_launcher(
+    launcher: Path,
+    script: str,
+    *args: str,
+    env: Mapping[str, str],
+    stdin: str = '{"hook_event_name":"SessionStart"}\n',
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(launcher), script, *args],
+        cwd=launcher.parents[3],
+        input=stdin,
+        text=True,
+        capture_output=True,
+        check=False,
+        env=dict(env),
+    )
+
+
+def _assert_stood_down(result: subprocess.CompletedProcess[str], label: str) -> None:
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", ""), label
+
+
+def _assert_ran(
+    result: subprocess.CompletedProcess[str], script: str, *args: str, label: str
+) -> None:
+    expected = (
+        f"RAN {script} {' '.join(args)}\n" + '{"hook_event_name":"SessionStart"}\n'
+    )
+    assert (result.returncode, result.stdout) == (0, expected), label
+
+
+@pytest.mark.parametrize("script", LIFECYCLE_CALLS)
+def test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold(
+    tmp_path: Path, script: str
+) -> None:
+    launcher = _stub_launcher_repo(tmp_path)
+
+    result = _run_launcher(
+        launcher, script, *LIFECYCLE_CALLS[script], env=_stand_down_env()
+    )
+
+    _assert_stood_down(result, script)
+
+
+def test_the_guard_scripts_the_plan_names_are_all_shipped() -> None:
+    """Keeps the guard test below from passing with an empty or renamed list."""
+    assert set(GUARD_SCRIPTS) <= set(OTHER_SCRIPTS)
+    assert not set(LIFECYCLE_CALLS) & set(GUARD_SCRIPTS)
+
+
+@pytest.mark.parametrize("script", OTHER_SCRIPTS)
+def test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five(
+    tmp_path: Path, script: str
+) -> None:
+    """Every shipped script that is not one of the five runs, guards included,
+    with all conditions holding. A control in the same repository stands down."""
+    launcher = _stub_launcher_repo(tmp_path)
+    _assert_stood_down(
+        _run_launcher(launcher, "session-log.sh", "claude-code", env=_stand_down_env()),
+        "control",
+    )
+
+    result = _run_launcher(launcher, script, "github-copilot", env=_stand_down_env())
+
+    _assert_ran(result, script, "github-copilot", label=script)
+
+
+@pytest.mark.parametrize("condition", BROKEN_ENVIRONMENT)
+def test_a_lifecycle_script_runs_when_one_environment_condition_fails(
+    tmp_path: Path, condition: str
+) -> None:
+    launcher = _stub_launcher_repo(tmp_path)
+    for script, args in LIFECYCLE_CALLS.items():
+        _assert_stood_down(
+            _run_launcher(launcher, script, *args, env=_stand_down_env()),
+            f"control {script}",
+        )
+
+        result = _run_launcher(
+            launcher,
+            script,
+            *args,
+            env=_stand_down_env(BROKEN_ENVIRONMENT[condition]),
+        )
+
+        _assert_ran(result, script, *args, label=f"{condition}: {script}")
+
+
+@pytest.mark.parametrize("case", BROKEN_HOOK_FILE)
+def test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy(
+    tmp_path: Path, case: str
+) -> None:
+    valid = _stub_launcher_repo(tmp_path / "valid")
+    broken = _stub_launcher_repo(tmp_path / "broken", case)
+    for script, args in LIFECYCLE_CALLS.items():
+        _assert_stood_down(
+            _run_launcher(valid, script, *args, env=_stand_down_env()),
+            f"control {script}",
+        )
+
+        result = _run_launcher(broken, script, *args, env=_stand_down_env())
+
+        _assert_ran(result, script, *args, label=f"{case}: {script}")
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root can read a mode 000 file")
+def test_a_lifecycle_script_runs_silently_when_the_copilot_hook_file_is_unreadable(
+    tmp_path: Path,
+) -> None:
+    """Conditions 1 to 6 hold, but the hook file cannot be read: the hook runs, with
+    the stdout and exit code the old launcher gave, and nothing on stderr (`grep -q`
+    still prints a read error unless it is silenced)."""
+    launcher = _stub_launcher_repo(tmp_path)
+    hook_file = tmp_path / ".github" / "hooks" / "hooks.json"
+    for script, args in LIFECYCLE_CALLS.items():
+        _assert_stood_down(
+            _run_launcher(launcher, script, *args, env=_stand_down_env()),
+            f"control {script}",
+        )
+    hook_file.chmod(0)
+    try:
+        for script, args in LIFECYCLE_CALLS.items():
+            result = _run_launcher(launcher, script, *args, env=_stand_down_env())
+
+            _assert_ran(result, script, *args, label=f"unreadable: {script}")
+            assert result.stderr == "", f"unreadable: {script}: {result.stderr!r}"
+    finally:
+        hook_file.chmod(0o644)
+
+
+@pytest.mark.parametrize("name", CLIENT_ENVIRONMENTS)
+def test_a_lifecycle_script_runs_in_the_environment_of_a_real_non_copilot_session(
+    tmp_path: Path, name: str
+) -> None:
+    """This Claude Code session, Claude Code started from a Copilot shell, and the
+    Local harness with `chat.useClaudeHooks` on are never stood down."""
+    launcher = _stub_launcher_repo(tmp_path)
+    for script, args in LIFECYCLE_CALLS.items():
+        _assert_stood_down(
+            _run_launcher(launcher, script, *args, env=_stand_down_env()),
+            f"control {script}",
+        )
+
+        result = _run_launcher(
+            launcher, script, *args, env=_host_env(CLIENT_ENVIRONMENTS[name])
+        )
+
+        _assert_ran(result, script, *args, label=f"{name}: {script}")
+
+
+def test_the_stand_down_reads_all_of_its_input(tmp_path: Path) -> None:
+    """A writer that gets no reader would be cut off; the launcher drains the input.
+
+    A file is the input, and the child shares its open file description, so the
+    offset after the run shows how much the launcher read.
+    """
+    launcher = _stub_launcher_repo(tmp_path)
+    payload = tmp_path / "payload.bin"
+    payload.write_bytes(b"not json at all\x00\xff" * 100_000)
+    with payload.open("rb", buffering=0) as handle:
+        result = subprocess.run(
+            ["bash", str(launcher), "session-log.sh", "claude-code"],
+            stdin=handle,
+            capture_output=True,
+            check=False,
+            env=_stand_down_env(),
+        )
+        offset = handle.tell()
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, b"", b"")
+    assert offset == payload.stat().st_size
+
+
+def test_the_stand_down_exits_zero_even_when_stdin_is_closed(tmp_path: Path) -> None:
+    launcher = _stub_launcher_repo(tmp_path)
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'bash "$@" <&-',
+            "bash",
+            str(launcher),
+            "session-log.sh",
+            "claude-code",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_stand_down_env(),
+    )
+
+    _assert_stood_down(result, "closed stdin")
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="session-log.sh runs through uv")
+def test_the_launcher_stands_the_session_log_down_and_a_guard_still_denies(
+    tmp_path: Path,
+) -> None:
+    """With the real scripts: the session log gets no line and the dangerous Git
+    command is still denied, byte for byte as it is without the marker."""
+    launcher = _real_launcher_repo(tmp_path)
+    log = tmp_path / ".claude" / "session_logs" / "hooks-sessions.log"
+    start = json.dumps(
+        {
+            "hook_event_name": "SessionStart",
+            "session_id": "copilot-1",
+            "source": "startup",
+        }
+    )
+
+    standing = _run_launcher(
+        launcher, "session-log.sh", "claude-code", env=_stand_down_env(), stdin=start
+    )
+
+    _assert_stood_down(standing, "session-log.sh")
+    assert not log.exists()
+    running = _run_launcher(
+        launcher,
+        "session-log.sh",
+        "claude-code",
+        env=_stand_down_env({"BOOTSTRAP_HOOK_SOURCE": None}),
+        stdin=start,
+    )
+    assert running.returncode == 0
+    (line,) = log.read_text(encoding="utf-8").splitlines()
+    assert "target=claude-code" in line
+    assert "sessionId=copilot-1" in line
+
+    answers = [
+        _run_launcher(
+            launcher,
+            "git-protection.sh",
+            "github-copilot",
+            env=env,
+            stdin=_bash_stdin("git reset --hard HEAD"),
+        )
+        for env in (_stand_down_env(), _stand_down_env({"BOOTSTRAP_HOOK_SOURCE": None}))
+    ]
+    assert answers[0].stdout == answers[1].stdout
+    assert answers[0].returncode == 0
+    answer = json.loads(answers[0].stdout)
+    assert answer["permissionDecision"] == "deny"
+    assert (
+        "Blocked dangerous git operation: git reset --hard"
+        in (answer["permissionDecisionReason"])
+    )
+
+
 if __name__ == "__main__":
     test_git_targets_nested_claude_detects_nested_claude_paths()
     test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands()
@@ -4904,3 +5316,19 @@ if __name__ == "__main__":
     # The shell escaping on this host's `tr` (the macOS CI leg runs BSD `tr`).
     test_every_control_character_in_a_reason_becomes_one_space("github-copilot")
     test_every_control_character_in_a_reason_becomes_one_space("claude-code")
+    # The launcher's stand-down uses `[[`, `case`, `grep -q -F`, and `cat` on this
+    # host's own bash and tools (the macOS CI leg starts `bash` from its PATH; the
+    # workflow does not pin a bash version).
+    with tempfile.TemporaryDirectory() as folder:
+        test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold(
+            Path(folder) / "lifecycle", "session-log.sh"
+        )
+        test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five(
+            Path(folder) / "guard", "git-protection.sh"
+        )
+        test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy(
+            Path(folder) / "file", "disable-all-hooks"
+        )
+        test_a_lifecycle_script_runs_when_one_environment_condition_fails(
+            Path(folder) / "env", "no-marker"
+        )

@@ -1467,6 +1467,54 @@ Design intent:
 - keep audit trails lightweight and local
 - leave nuanced coaching (reminders/cadence) to instruction files
 
+### Hooks on the Copilot harness
+
+VS Code runs Copilot chats in one of two harnesses. The Copilot harness is the
+default since VS Code 1.143. The older Local harness is deprecated, and VS Code
+removes it in February 2027. The Copilot harness loads both
+`.github/hooks/hooks.json` and `.claude/settings.json`, so every hook would run
+twice: one session logged as two, the AI state synced twice, and two permission
+requests for one protected edit.
+
+- **What stands down.** On the Copilot harness, the five lifecycle hooks that
+  `.claude/settings.json` calls stand down: `state-sync.sh`, `session-log.sh`,
+  `session-start-state.sh`, `claude-stop.sh`, and `reporting-reminder.sh`. A
+  hook that stands down reads its input, prints nothing, and exits 0. The copy
+  in `.github/hooks/hooks.json` runs its own lifecycle hooks once.
+- **The guards never stand down.** They run from both files, and a deny from
+  either file blocks the call. For one protected edit the runtime raises two
+  hook questions. In the one real VS Code run, VS Code answered the second one
+  itself, so the user saw one question (evidence A6). No recorded run shows
+  whether a deny is shown twice.
+- **When.** The launcher [run-hook.sh](shared/hooks/scripts/run-hook.sh) stands
+  a hook down only when all seven conditions hold:
+  1. the script is one of the five above;
+  2. the command carries `BOOTSTRAP_HOOK_SOURCE=claude-settings`, which only the
+     generated `.claude/settings.json` sets;
+  3. `COPILOT_CLI` is `1`;
+  4. `COPILOT_HOOK_DEPTH` is set, which the Copilot runtime sets only for hook
+     processes (a command from its shell tool does not have it);
+  5. `COPILOT_HOOK_DIR` is empty, because the runtime sets it only for
+     `.github/hooks` hooks;
+  6. `CLAUDECODE` is empty;
+  7. `.github/hooks/hooks.json` is a regular file and not a link, has no
+     `disableAllHooks`, and contains `session-log.sh github-copilot` and
+     `state-sync.sh push`.
+
+  A real Claude Code session, Claude Code started from a Copilot shell, and the
+  Local harness never meet all seven.
+- **What a wrong stand-down costs.** If a lifecycle hook stands down while the
+  `.github/hooks` copy does not run, that session loses its session-log
+  entries, the session-start context, the AI-state pull and push, and the
+  reminder. It loses no guard.
+- **Lost on purpose.** The Copilot harness no longer gets the Claude-settings
+  state push at `UserPromptSubmit` and `SessionEnd`, or the checkpoint at
+  `StopFailure`. The Copilot file still pushes at every `Stop`. The Copilot
+  file has no reporting reminder, so that reminder does not run there.
+- **Local harness.** With the VS Code setting `chat.useClaudeHooks: true`, the
+  Local harness also runs `.claude/settings.json`, and every hook runs twice.
+  Nothing stands down there. Turn that setting off for this bootstrap.
+
 ### Deterministic Commit And Push Gates (Git Hooks)
 
 `enforce-commit-gate.sh` and `enforce-pr-gate.sh` above are `PreToolUse` hooks: they can only gate the AI agent's own Bash tool calls, so a human `git commit`/`git push`, an IDE button, a script, or a `git ci` alias never pass through them. Two generated git hooks close that gap — [commit-msg](shared/hooks/git-hooks/commit-msg) for the commit invariant and [pre-push](shared/hooks/git-hooks/pre-push) for the push invariant — both installed via `core.hooksPath`. Because they fire from git's own lifecycle, every commit or push reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on. See [Hook dispatcher and guardrail scripts](openwiki/architecture/hooks-and-guardrails.md) for the full two-layer contract, including how each guard scopes to the repository a command targets.

@@ -217,6 +217,114 @@ def test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list(
     assert target_validator.copilot_guard_target_errors(events)
 
 
+# The Copilot runtime also loads `.claude/settings.json`, so the launcher stands a
+# lifecycle hook down only for a command that carries this marker (Phase D). Only
+# the generated Claude settings carry it.
+HOOK_SOURCE_MARKER = "BOOTSTRAP_HOOK_SOURCE=claude-settings"
+MARKED_CLAUDE_COMMAND = (
+    'REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null '
+    '|| pwd)}"; BOOTSTRAP_HOOK_SOURCE=claude-settings '
+    '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" '
+)
+
+
+def _claude_hook_commands(hooks: dict[str, Any]) -> list[str]:
+    return [
+        handler["command"]
+        for groups in hooks.values()
+        for group in groups
+        for handler in group["hooks"]
+    ]
+
+
+def _generated_hook_files(tmp_path: Path) -> tuple[dict[str, Any], dict[str, str]]:
+    """The generated Claude hooks, and the text of the other three hook files."""
+    claude = tmp_path / "settings.json"
+    codex = tmp_path / "codex-hooks.json"
+    antigravity = tmp_path / "agents-hooks.json"
+    target_generator.render_claude_settings(claude)
+    target_generator.render_codex_hooks(codex)
+    target_generator.render_antigravity_hooks(antigravity)
+    others = {
+        "Codex": codex.read_text(encoding="utf-8"),
+        "Copilot": (REPO_ROOT / "shared" / "hooks" / "hooks.json").read_text(
+            encoding="utf-8"
+        ),
+        "Antigravity": antigravity.read_text(encoding="utf-8"),
+    }
+    hooks: dict[str, Any] = json.loads(claude.read_text(encoding="utf-8"))["hooks"]
+    return hooks, others
+
+
+def test_every_generated_claude_hook_command_carries_the_source_marker(
+    tmp_path: Path,
+) -> None:
+    hooks, _ = _generated_hook_files(tmp_path)
+
+    commands = _claude_hook_commands(hooks)
+
+    # Not vacuous: every handler of `render_claude_settings`, counted by hand.
+    assert len(commands) == 15
+    for command in commands:
+        assert command.startswith(MARKED_CLAUDE_COMMAND), command
+
+
+def test_the_other_three_generated_hook_files_never_carry_the_marker(
+    tmp_path: Path,
+) -> None:
+    _, others = _generated_hook_files(tmp_path)
+
+    assert set(others) == {"Codex", "Copilot", "Antigravity"}
+    for name, text in others.items():
+        assert text.strip(), name
+        assert "BOOTSTRAP_HOOK_SOURCE" not in text, name
+
+
+def test_the_validator_expects_the_marked_claude_command() -> None:
+    assert (
+        target_validator.claude_hook_command("state-sync.sh", "pull")
+        == MARKED_CLAUDE_COMMAND + "state-sync.sh pull"
+    )
+
+
+def test_the_marker_check_accepts_the_generated_hook_files(tmp_path: Path) -> None:
+    hooks, others = _generated_hook_files(tmp_path)
+
+    assert target_validator.hook_source_marker_errors(hooks, others) == []
+
+
+def test_the_marker_check_names_a_claude_command_without_the_marker(
+    tmp_path: Path,
+) -> None:
+    hooks, others = _generated_hook_files(tmp_path)
+    handler = hooks["SessionStart"][0]["hooks"][1]
+    handler["command"] = handler["command"].replace(HOOK_SOURCE_MARKER + " ", "")
+
+    errors = target_validator.hook_source_marker_errors(hooks, others)
+
+    assert len(errors) == 1
+    assert "session-log.sh claude-code" in errors[0]
+    assert HOOK_SOURCE_MARKER in errors[0]
+
+
+@pytest.mark.parametrize("name", ("Codex", "Copilot", "Antigravity"))
+def test_the_marker_check_names_another_hook_file_that_carries_the_marker(
+    tmp_path: Path, name: str
+) -> None:
+    hooks, others = _generated_hook_files(tmp_path)
+    others[name] += "\n" + HOOK_SOURCE_MARKER
+
+    errors = target_validator.hook_source_marker_errors(hooks, others)
+
+    assert len(errors) == 1
+    assert name in errors[0]
+
+
+@pytest.mark.parametrize("hooks", (None, {}, {"Stop": "not a list"}))
+def test_the_marker_check_rejects_claude_hooks_with_no_commands(hooks: object) -> None:
+    assert target_validator.hook_source_marker_errors(hooks, {})
+
+
 @pytest.mark.parametrize(
     ("skill", "old", "replacement"),
     (

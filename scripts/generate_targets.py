@@ -1087,12 +1087,14 @@ def render_codex_config(path: Path) -> None:
 
 
 def _claude_hook_cmd(script: str, *args: str) -> str:
+    # The marker lets run-hook.sh tell a hook reached through these settings from
+    # one in .github/hooks/hooks.json when the Copilot runtime loads both.
     root_expr = (
         "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
     )
     parts = [
         f'REPO_ROOT="{root_expr}"',
-        '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
+        'BOOTSTRAP_HOOK_SOURCE=claude-settings "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
         script,
         *args,
     ]
