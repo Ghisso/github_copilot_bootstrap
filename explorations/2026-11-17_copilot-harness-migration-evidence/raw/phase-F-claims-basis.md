@@ -332,6 +332,6 @@ How to read the basis column. All paths without a prefix are in this evidence fo
 
 | File | Short quote | Basis |
 | --- | --- | --- |
-| docs/smoke-tests.md | On 2026-11-17 the command ran after the user approved the | REPORT A6 (real VS Code, session `db2427a6…`: for `echo '{}' > .vscode/settings.json` the user answered the first hook question, VS Code approved the second itself, and the agent then read the file back with the read tool). |
+| docs/smoke-tests.md | On 2026-11-17 the user answered the first question, VS Code | REPORT A6 (real VS Code, session `db2427a6…`: for `echo '{}' > .vscode/settings.json` the user answered the first hook question, VS Code approved the second itself, and the agent then read the file back with the read tool). |
 | docs/smoke-tests.md | With "Allow all" and Autopilot off, the command should run only after you approve such a | The pass rule of the item; "Allow all" and Autopilot were never run, so the rule is limited to the case with both off, which is the case the 2026-11-17 run (`"permissionMode":"manual"`, REPORT A6) covers. |
 | docs/smoke-tests.md | **What has run, and the three marks.** | Heading; the three marks are defined in the text below it. |

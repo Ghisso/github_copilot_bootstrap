@@ -1500,6 +1500,22 @@
   ones: `find /tmp -maxdepth 1 -type f -user "$(id -u)" -name
   'tmp.??????????' -size 0 -mmin +30 -delete`. The fix (remove the file on
   the success path) is an open follow-up, told to the user.
+- [LEARN:documentation] A check that counts the cells of each table row
+  does not see a table cut in two. In Phase F a new paragraph was put
+  between two rows of a table in `docs/target-mapping.md`, and the last
+  row rendered as plain text. Check that the rows of one table are
+  contiguous, and put a paragraph "below the table" after its last row.
+- [LEARN:documentation] A manual checklist item needs six things: a mark
+  that says what was seen before (never run, seen in part, seen before the
+  change), the mode to run it in, the answer to give a dialog, a pass rule
+  that the evidence supports, a result word for an item that only records
+  an observation, and a safety note when a failed guard would lose work.
+  The Phase F review asked for each of them (`docs/smoke-tests.md`,
+  section "VS Code Copilot harness (manual)").
+- [LEARN:documentation] Docs in the repository must not cite the evidence
+  report by bare labels such as "A6": the report is in `.claude/explorations/`,
+  which readers of the repository do not have. Describe what was seen,
+  where, and when; a label in brackets may follow.
 - [LEARN:testing] For a new script, a failing-first run only shows that
   the file was missing. Follow it with one mutation for each stated
   property. In Phase E this found three weak tests: one matched a single

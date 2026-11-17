@@ -249,3 +249,12 @@ new: "Write these words for each item, with the VS Code version, the runtime ver
 ## Checks of this round (after the last edit)
 generate_targets --all, validate_targets (49.2 s), check_runtime, validate_plan_frontmatter and the plan Verification block except verify.py phase: PASS.
 Link check: 133 relative links, 0 broken. Table check (contiguity and cell count): 26 tables, 0 problems. Claims table: 265 rows, every quote found. ruff check: clean. verify.py fast: PASS.
+
+## Fix round 4 (orchestrator, 2026-11-18)
+
+Review round 4 finding (MINOR): item 2 of the checklist in docs/smoke-tests.md said
+"On 2026-11-17 the command ran after the user approved the question [A6]", which A6
+does not state. Replaced with the reviewer's wording, which is what A6 records:
+"On 2026-11-17 the user answered the first question, VS Code approved the second
+itself, and the agent then read the file back [A6]."
+The matching row of phase-F-claims-basis.md carries the new quote.
