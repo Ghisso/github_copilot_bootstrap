@@ -3636,20 +3636,25 @@ def native_targets(
         paths.append(value)
 
 
-def print_decision(decision: str, reason: str) -> None:
-    """Print one pre-tool decision: the only place the output shape is written."""
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": decision,
-                    "permissionDecisionReason": reason,
-                }
-            },
-            separators=(",", ":"),
-        )
-    )
+def print_decision(target_id: str, decision: str, reason: str) -> None:
+    """Print one pre-tool decision: the only place the output shape is written.
+
+    Only `github-copilot` also gets the decision at the top level, the shape
+    Copilot documents; its runtime honors the nested object only under PascalCase
+    event names. There is no top-level `hookEventName`: the Local harness drops a
+    result whose top-level event name is another event. Every other client keeps
+    the nested-only line.
+    """
+    answer: dict[str, object] = {}
+    if target_id == "github-copilot":
+        answer["permissionDecision"] = decision
+        answer["permissionDecisionReason"] = reason
+    answer["hookSpecificOutput"] = {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": decision,
+        "permissionDecisionReason": reason,
+    }
+    print(json.dumps(answer, separators=(",", ":")))
 
 
 def emit(
@@ -3693,7 +3698,7 @@ def emit(
         )
     else:
         return
-    print_decision(decision, reason)
+    print_decision(target_id, decision, reason)
 
 
 def main() -> int:
@@ -3702,6 +3707,7 @@ def main() -> int:
     tool_name = str(payload.get("tool_name") or payload.get("toolName") or "").lower()
     if target_id == "github-copilot" and tool_name in UNVERIFIED_CODE_TOOLS:
         print_decision(
+            target_id,
             "deny",
             "Tool blocked by policy: %s runs workflow code that the pre-tool "
             "hooks cannot see" % tool_name,

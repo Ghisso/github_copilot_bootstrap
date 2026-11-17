@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -321,10 +322,14 @@ def build_patch_record(
     return build_record(steps, name="codex-patch")
 
 
-def record_for(scenario: dict[str, object]) -> probe.SessionRecord:
+def record_for(
+    scenario: dict[str, object], project: Path | None = None
+) -> probe.SessionRecord:
     """The record of a correct run of the scenario a fake session was given."""
     if scenario["name"] == "codex-patch":
         return build_patch_record()
+    if scenario["name"] == "camel-rename":
+        return build_camel_record(project=project)
     return build_record()
 
 
@@ -1132,7 +1137,7 @@ WRONG_PATCH_RESULTS = {
 
 def test_the_patch_session_has_the_planned_checks_in_order() -> None:
     assert [c.name for c in probe.CODEX_PATCH_CHECKS] == EXPECTED_PATCH_CHECK_NAMES
-    assert [session.name for session in probe.SESSIONS] == ["main", "codex-patch"]
+    assert [session.name for session in probe.SESSIONS[:2]] == ["main", "codex-patch"]
     assert probe.SESSIONS[1].checks == probe.CODEX_PATCH_CHECKS
 
 
@@ -1178,6 +1183,513 @@ def test_the_hook_asks_report_how_many_questions_the_runtime_raised() -> None:
 
     assert result.status == probe.PASS
     assert "2 question(s) of kind hook" in result.detail
+
+
+# --- the camel-rename session -------------------------------------------------
+# Phase C: the Copilot hook file's events are renamed to the documented camelCase
+# names in a copy of the project, and the Claude settings source is switched off
+# there, so only the Copilot file runs. The nested-only answer is ignored under
+# camelCase names (F4), so before the guards print the top-level answer these
+# denies fail.
+
+CAMEL_EVENT_NAMES = {
+    "SessionStart": "sessionStart",
+    "PreToolUse": "preToolUse",
+    "PostToolUse": "postToolUse",
+    "Stop": "agentStop",
+}
+# Each camel step has the same expected value as its twin in the baseline
+# (Phase A). With one hook source the runtime raises one question, not two.
+CAMEL_TWINS = {
+    "camel-deny-git-reset": "deny-git-reset",
+    "camel-deny-secret-rm": "deny-secret-rm",
+    "camel-ask-vscode-settings": "ask-vscode-settings",
+    "camel-ask-agent-wrapper": "ask-agent-wrapper",
+    "camel-deny-branch": "deny-branch",
+    "camel-deny-commit": "deny-commit",
+    "camel-deny-pr": "deny-pr",
+    "camel-allow-plain-bash": "allow-plain-bash",
+    "camel-allow-plain-view": "allow-plain-view",
+    "camel-allow-plain-create": "allow-plain-create",
+    "camel-allow-plain-edit": "allow-plain-edit",
+}
+EXPECTED_CAMEL_STEPS: dict[str, dict[str, Any]] = {
+    label: dict(EXPECTED_STEPS[twin]) for label, twin in CAMEL_TWINS.items()
+}
+EXPECTED_CAMEL_STEPS["camel-ask-vscode-settings"]["questions"] = ("hook", "write")
+EXPECTED_CAMEL_STEPS["camel-ask-agent-wrapper"]["questions"] = ("hook",)
+CAMEL_CHECK_STEPS = {
+    "camel-deny-git-reset": "camel-deny-git-reset",
+    "camel-deny-secret-rm": "camel-deny-secret-rm",
+    "camel-deny-commit": "camel-deny-commit",
+    "camel-deny-branch": "camel-deny-branch",
+    "camel-deny-pr": "camel-deny-pr",
+    "camel-ask-vscode-settings": "camel-ask-vscode-settings",
+    "camel-ask-agent-wrapper": "camel-ask-agent-wrapper",
+    "camel-allow-plain": "camel-allow-plain-edit",
+}
+EXPECTED_CAMEL_CHECK_NAMES = [
+    "camel-hooks-source",
+    "camel-events-renamed",
+    "camel-mcp-none",
+    *CAMEL_CHECK_STEPS,
+]
+RESTORE_COPY = Path(".claude") / "bootstrap-root" / ".github" / "hooks" / "hooks.json"
+LIVE_COPY = Path(".github") / "hooks" / "hooks.json"
+
+
+def camel_discovery(**parts: dict[str, Any]) -> dict[str, Any]:
+    """Discovery of a run whose Claude settings source is off: Copilot file only."""
+    github_only = {
+        "hooks": {
+            "hooks": [hook_row(GITHUB_HOOKS), hook_row(GITHUB_HOOKS, "sessionStart")],
+            "warnings": [],
+            "errors": [],
+        },
+        "mcp": {"servers": []},
+    }
+    base = {
+        "untrusted": {"hooks": {"hooks": []}, "mcp": {"servers": []}},
+        "trusted": github_only,
+        "subfolder": github_only,
+    }
+    base.update(parts)
+    return base
+
+
+def write_camel_project(folder: Path, *, settings: str = "off") -> Path:
+    """The files a camel session leaves behind when the setup survived."""
+    for relative in (LIVE_COPY, RESTORE_COPY):
+        (folder / relative).parent.mkdir(parents=True, exist_ok=True)
+        (folder / relative).write_text(
+            json.dumps(
+                {"version": 1, "hooks": dict.fromkeys(CAMEL_EVENT_NAMES.values(), [])}
+            ),
+            encoding="utf-8",
+        )
+    claude = folder / ".claude"
+    claude.mkdir(exist_ok=True)
+    if settings == "off":
+        (claude / "settings.json.off").write_text("{}", encoding="utf-8")
+    elif settings == "on":
+        (claude / "settings.json").write_text("{}", encoding="utf-8")
+    return folder
+
+
+def build_camel_record(
+    steps: dict[str, dict[str, Any]] | None = None,
+    discovery: dict[str, Any] | None = None,
+    project: Path | None = None,
+) -> probe.SessionRecord:
+    """A record of a correct `camel-rename` run, unless the caller passes wrong parts."""
+    steps = EXPECTED_CAMEL_STEPS if steps is None else steps
+    record = build_record(steps, discovery or camel_discovery(), name="camel-rename")
+    record.project = project
+    return record
+
+
+def camel_results_by_name(
+    record: probe.SessionRecord,
+) -> dict[str, probe.CheckResult]:
+    return {r.name: r for r in probe.evaluate(record, probe.CAMEL_CHECKS)}
+
+
+def test_the_camel_session_is_the_third_session_and_renames_events() -> None:
+    assert [session.name for session in probe.SESSIONS] == [
+        "main",
+        "codex-patch",
+        "camel-rename",
+    ]
+    assert probe.SESSIONS[2].checks == probe.CAMEL_CHECKS
+    assert probe.SESSIONS[2].renamed_events is True
+    assert not any(session.renamed_events for session in probe.SESSIONS[:2])
+    assert probe.CAMEL_EVENT_NAMES == CAMEL_EVENT_NAMES
+
+
+def test_the_camel_session_has_the_planned_checks_in_order() -> None:
+    assert [c.name for c in probe.CAMEL_CHECKS] == EXPECTED_CAMEL_CHECK_NAMES
+
+
+def test_the_camel_scenario_has_one_step_per_twin_of_the_baseline_step() -> None:
+    project = Path("/work/project-camel")
+    baseline = probe.baseline_scenario(project)
+    scenario = probe.camel_rename_scenario(project)
+    steps: dict[str, dict[str, Any]] = {
+        step["label"]: step  # type: ignore[index]
+        for step in scenario["steps"]  # type: ignore[attr-defined]
+    }
+    twins: dict[str, dict[str, Any]] = {
+        step["label"]: step  # type: ignore[index]
+        for step in baseline["steps"]  # type: ignore[attr-defined]
+    }
+
+    assert scenario["name"] == "camel-rename"
+    assert list(steps) == list(CAMEL_TWINS)
+    for label, twin in CAMEL_TWINS.items():
+        assert steps[label]["tool"] == twins[twin]["tool"]
+        assert steps[label]["args"] == twins[twin]["args"]
+    # The paths name the copy the session runs in, not another project.
+    assert steps["camel-deny-secret-rm"]["args"]["command"] == "rm -f .env"
+    assert steps["camel-ask-vscode-settings"]["args"]["path"] == str(
+        project / ".vscode" / "settings.json"
+    )
+
+
+def test_a_correct_camel_run_passes_every_check(tmp_path: Path) -> None:
+    record = build_camel_record(project=write_camel_project(tmp_path))
+
+    results = probe.evaluate(record, probe.CAMEL_CHECKS)
+
+    assert [r.name for r in results] == EXPECTED_CAMEL_CHECK_NAMES
+    assert [r.status for r in results] == [probe.PASS] * len(EXPECTED_CAMEL_CHECK_NAMES)
+
+
+# The nested-only answer is ignored under camelCase names (F4): the tool runs.
+WRONG_CAMEL_DENY_RESULTS = {
+    "ran": {"tool": "bash", "success": True},
+    "other-reason": {"tool": "bash", "reason": "some other reason"},
+}
+WRONG_CAMEL_RESULTS = {
+    **dict.fromkeys(
+        (
+            "camel-deny-git-reset",
+            "camel-deny-secret-rm",
+            "camel-deny-commit",
+            "camel-deny-branch",
+            "camel-deny-pr",
+        ),
+        WRONG_CAMEL_DENY_RESULTS,
+    ),
+    "camel-ask-vscode-settings": {
+        "denied": {"tool": "create", "reason": "Protected"},
+        "no-question": {"tool": "create", "questions": ("write",)},
+    },
+    "camel-ask-agent-wrapper": {
+        "denied": {"tool": "edit", "reason": "Protected"},
+        "no-question": {"tool": "edit", "success": False},
+    },
+    "camel-allow-plain": {
+        "denied": {"tool": "edit", "reason": "Protected"},
+        "asked": {"tool": "edit", "questions": ("hook", "write")},
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("check", "wrong_step"),
+    [
+        pytest.param(check, wrong, id=f"{check}-{kind}")
+        for check, variants in WRONG_CAMEL_RESULTS.items()
+        for kind, wrong in variants.items()
+    ],
+)
+def test_each_camel_check_fails_on_a_wrong_result_and_only_that_check(
+    check: str, wrong_step: dict[str, Any], tmp_path: Path
+) -> None:
+    steps = dict(EXPECTED_CAMEL_STEPS)
+    steps[CAMEL_CHECK_STEPS[check]] = wrong_step
+    record = build_camel_record(steps, project=write_camel_project(tmp_path))
+
+    results = camel_results_by_name(record)
+
+    assert results[check].status == probe.FAIL
+    assert results[check].detail
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [check]
+
+
+def test_a_camel_step_that_never_ran_fails_its_check(tmp_path: Path) -> None:
+    steps = {k: v for k, v in EXPECTED_CAMEL_STEPS.items() if k != "camel-deny-pr"}
+    record = build_camel_record(steps, project=write_camel_project(tmp_path))
+
+    results = camel_results_by_name(record)
+
+    assert results["camel-deny-pr"].status == probe.FAIL
+    assert "did not run" in results["camel-deny-pr"].detail
+
+
+def test_the_camel_ask_checks_pass_with_the_single_question_of_one_source(
+    tmp_path: Path,
+) -> None:
+    record = build_camel_record(project=write_camel_project(tmp_path))
+
+    result = camel_results_by_name(record)["camel-ask-agent-wrapper"]
+
+    assert result.status == probe.PASS
+    assert "1 question(s) of kind hook" in result.detail
+
+
+@pytest.mark.parametrize(
+    ("wrong", "expected_in_detail"),
+    [
+        pytest.param(
+            {
+                "hooks": {"hooks": [hook_row(GITHUB_HOOKS), hook_row(CLAUDE_SETTINGS)]},
+                "mcp": {"servers": []},
+            },
+            "still load from .claude/settings.json",
+            id="the-claude-settings-source-is-still-on",
+        ),
+        pytest.param(
+            {"hooks": {"hooks": []}, "mcp": {"servers": []}},
+            "no preToolUse hook from .github/hooks/hooks.json",
+            id="no-hooks-at-all",
+        ),
+        pytest.param(
+            {
+                "hooks": {"hooks": [hook_row(GITHUB_HOOKS, "sessionStart")]},
+                "mcp": {"servers": []},
+            },
+            "no preToolUse hook from .github/hooks/hooks.json",
+            id="no-guard-event",
+        ),
+        pytest.param(
+            {
+                "hooks": {
+                    "hooks": [
+                        hook_row(GITHUB_HOOKS),
+                        hook_row("file:///work/project/.github/hooks/evil.json"),
+                    ]
+                },
+                "mcp": {"servers": []},
+            },
+            "another file",
+            id="a-third-hook-file",
+        ),
+    ],
+)
+def test_camel_hooks_source_fails_unless_only_the_copilot_file_loads(
+    wrong: dict[str, Any], expected_in_detail: str, tmp_path: Path
+) -> None:
+    record = build_camel_record(
+        discovery=camel_discovery(trusted=wrong), project=write_camel_project(tmp_path)
+    )
+
+    results = camel_results_by_name(record)
+
+    assert results["camel-hooks-source"].status == probe.FAIL
+    assert expected_in_detail in results["camel-hooks-source"].detail
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [
+        "camel-hooks-source"
+    ]
+
+
+def test_camel_hooks_source_fails_without_a_recorded_discovery(tmp_path: Path) -> None:
+    discovery = {k: v for k, v in camel_discovery().items() if k != "trusted"}
+    record = build_camel_record(
+        discovery=discovery, project=write_camel_project(tmp_path)
+    )
+
+    result = camel_results_by_name(record)["camel-hooks-source"]
+
+    assert result.status == probe.FAIL
+    assert "no hook list was recorded" in result.detail
+
+
+def test_camel_events_renamed_reads_the_files_left_after_the_session(
+    tmp_path: Path,
+) -> None:
+    result = camel_results_by_name(
+        build_camel_record(project=write_camel_project(tmp_path))
+    )["camel-events-renamed"]
+
+    assert result.status == probe.PASS
+    assert "sessionStart" in result.detail
+
+
+def pascal_case(path: Path) -> None:
+    """Put the original event names back, as the restore script would."""
+    path.write_text(
+        json.dumps({"version": 1, "hooks": dict.fromkeys(CAMEL_EVENT_NAMES, [])}),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(
+    ("damage", "expected_in_detail"),
+    [
+        pytest.param(
+            lambda root: pascal_case(root / LIVE_COPY),
+            "hooks/hooks.json has events",
+            id="the-live-file-went-back-to-pascal-case",
+        ),
+        pytest.param(
+            lambda root: pascal_case(root / RESTORE_COPY),
+            "bootstrap-root",
+            id="the-restore-copy-would-undo-the-rename-at-the-next-start",
+        ),
+        pytest.param(
+            lambda root: (root / LIVE_COPY).write_text("{", encoding="utf-8"),
+            "cannot read",
+            id="the-live-file-is-not-json",
+        ),
+        pytest.param(
+            lambda root: (root / LIVE_COPY).unlink(),
+            "cannot read",
+            id="the-live-file-is-gone",
+        ),
+        pytest.param(
+            lambda root: (root / ".claude" / "settings.json").write_text(
+                "{}", encoding="utf-8"
+            ),
+            "settings.json is back",
+            id="the-claude-settings-came-back",
+        ),
+        pytest.param(
+            lambda root: (root / ".claude" / "settings.json.off").unlink(),
+            "settings.json.off",
+            id="the-claude-settings-were-never-switched-off",
+        ),
+    ],
+)
+def test_camel_events_renamed_fails_when_the_setup_did_not_survive(
+    damage: Any, expected_in_detail: str, tmp_path: Path
+) -> None:
+    project = write_camel_project(tmp_path)
+    damage(project)
+
+    results = camel_results_by_name(build_camel_record(project=project))
+
+    assert results["camel-events-renamed"].status == probe.FAIL
+    assert expected_in_detail in results["camel-events-renamed"].detail
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [
+        "camel-events-renamed"
+    ]
+
+
+def test_camel_events_renamed_fails_when_no_project_was_recorded() -> None:
+    result = camel_results_by_name(build_camel_record(project=None))[
+        "camel-events-renamed"
+    ]
+
+    assert result.status == probe.FAIL
+    assert "no project folder was recorded" in result.detail
+
+
+@pytest.fixture(scope="module")
+def installed_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A project from the real installer. The tests below only copy it."""
+    return probe.prepare_project(tmp_path_factory.mktemp("installed"))
+
+
+def hook_events(path: Path) -> list[str]:
+    events: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))["hooks"]
+    return list(events)
+
+
+def test_prepare_camel_project_renames_the_events_in_a_copy_only(
+    installed_project: Path, tmp_path: Path
+) -> None:
+    before = {
+        relative: (installed_project / relative).read_text(encoding="utf-8")
+        for relative in (LIVE_COPY, RESTORE_COPY)
+    }
+
+    copy = probe.prepare_camel_project(installed_project, tmp_path)
+
+    assert copy.parent == tmp_path
+    assert copy != installed_project
+    for relative in (LIVE_COPY, RESTORE_COPY):
+        assert hook_events(copy / relative) == list(CAMEL_EVENT_NAMES.values())
+        # Only the keys change: every hook command is the one of the original.
+        original = json.loads(before[relative])["hooks"]
+        renamed = json.loads((copy / relative).read_text(encoding="utf-8"))["hooks"]
+        assert list(renamed.values()) == list(original.values())
+        # The original project keeps its names.
+        assert (installed_project / relative).read_text(encoding="utf-8") == before[
+            relative
+        ]
+    assert not (copy / ".claude" / "settings.json").exists()
+    assert (copy / ".claude" / "settings.json.off").is_file()
+    assert (installed_project / ".claude" / "settings.json").is_file()
+    assert not (installed_project / ".claude" / "settings.json.off").exists()
+    assert not (copy / ".mcp.json").exists()
+
+
+def test_the_session_start_restore_hook_keeps_the_camel_rename(
+    installed_project: Path, tmp_path: Path
+) -> None:
+    """Regression: `state-sync.sh pull` runs the restore script at SessionStart,
+    and the restore script copies `.claude/bootstrap-root/.github/hooks` back over
+    the live file. The rename is applied to both, so it survives."""
+    copy = probe.prepare_camel_project(installed_project, tmp_path)
+    restore = copy / ".claude" / "hooks" / "scripts" / "restore-root-adapters.sh"
+
+    done = subprocess.run(
+        ["bash", str(restore)], cwd=copy, text=True, capture_output=True, check=False
+    )
+
+    assert done.returncode == 0, done.stderr
+    assert hook_events(copy / LIVE_COPY) == list(CAMEL_EVENT_NAMES.values())
+    assert not (copy / ".claude" / "settings.json").exists()
+    assert not (copy / ".mcp.json").exists()
+
+
+def test_a_rename_of_only_the_live_file_is_undone_by_the_restore_hook(
+    installed_project: Path, tmp_path: Path
+) -> None:
+    """The control for the test above: with the restore copy left alone, the
+    restore script puts the original names back, so renaming the live file
+    alone would not make a camelCase session."""
+    copy = tmp_path / "copy"
+    shutil.copytree(installed_project, copy, symlinks=True)
+    live = copy / LIVE_COPY
+    hooks = json.loads(live.read_text(encoding="utf-8"))
+    hooks["hooks"] = {
+        CAMEL_EVENT_NAMES[name]: value for name, value in hooks["hooks"].items()
+    }
+    live.write_text(json.dumps(hooks), encoding="utf-8")
+    assert hook_events(live) == list(CAMEL_EVENT_NAMES.values())  # renamed first
+    restore = copy / ".claude" / "hooks" / "scripts" / "restore-root-adapters.sh"
+
+    done = subprocess.run(
+        ["bash", str(restore)], cwd=copy, text=True, capture_output=True, check=False
+    )
+
+    assert done.returncode == 0, done.stderr
+    assert hook_events(live) == list(CAMEL_EVENT_NAMES)
+
+
+@pytest.mark.parametrize("missing", sorted(CAMEL_EVENT_NAMES))
+def test_prepare_camel_project_refuses_a_hook_file_without_an_expected_event(
+    missing: str, tmp_path: Path
+) -> None:
+    project = tmp_path / "project"
+    for relative in (LIVE_COPY, RESTORE_COPY):
+        (project / relative).parent.mkdir(parents=True)
+        hooks: dict[str, list[Any]] = {
+            name: [] for name in CAMEL_EVENT_NAMES if name != missing
+        }
+        (project / relative).write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
+    (project / ".claude" / "settings.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match=missing):
+        probe.prepare_camel_project(project, tmp_path / "work")
+
+
+@pytest.mark.parametrize(
+    "content",
+    ("{", "[]", '{"hooks": []}', '{"version": 1}'),
+    ids=lambda c: c or "empty",
+)
+def test_prepare_camel_project_refuses_a_hook_file_it_cannot_read(
+    content: str, tmp_path: Path
+) -> None:
+    project = write_camel_project(tmp_path / "project")
+    (project / LIVE_COPY).write_text(content, encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="cannot read the events of"):
+        probe.prepare_camel_project(project, tmp_path / "work")
+
+
+def test_prepare_camel_project_refuses_a_project_whose_settings_are_missing(
+    tmp_path: Path,
+) -> None:
+    project = write_camel_project(tmp_path / "project", settings="none")
+    for relative in (LIVE_COPY, RESTORE_COPY):
+        pascal_case(project / relative)
+
+    with pytest.raises(RuntimeError, match="settings.json"):
+        probe.prepare_camel_project(project, tmp_path / "work")
 
 
 # --- evaluate: discovery checks ----------------------------------------------
@@ -1454,7 +1966,11 @@ class TestMainOrchestration:
             project.mkdir()
             return project
 
+        def fake_prepare_camel(project: Path, work: Path) -> Path:
+            return write_camel_project(work / "project-camel")
+
         monkeypatch.setattr(probe, "prepare_project", fake_prepare)
+        monkeypatch.setattr(probe, "prepare_camel_project", fake_prepare_camel)
         return runtime
 
     def test_a_correct_run_prints_versions_checks_and_inventory(
@@ -1473,7 +1989,7 @@ class TestMainOrchestration:
             timeout: float = probe.SESSION_LIMIT_SECONDS,
         ) -> probe.SessionRecord:
             calls.append((project, home, runtime.node))
-            return record_for(scenario)
+            return record_for(scenario, project)
 
         monkeypatch.setattr(probe, "run_session", fake_session)
 
@@ -1481,19 +1997,31 @@ class TestMainOrchestration:
 
         out = capsys.readouterr().out
         assert code == 0
-        assert len(calls) == 2  # main, then codex-patch; one project and one home
-        assert len({(project, home) for project, home, _ in calls}) == 1
+        # main and codex-patch share a project; camel-rename has its own copy
+        assert len(calls) == 3
+        assert [project.name for project, _, _ in calls] == [
+            "project",
+            "project",
+            "project-camel",
+        ]
+        assert len({home for _, home, _ in calls}) == 1
         assert "VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab" in out
         assert "SDK version: 1.0.30-preview.0" in out
         assert "runtime version: 1.0.108-0" in out
         assert len(re.findall(r"^PASS ", out, re.MULTILINE)) == (
-            2 + len(EXPECTED_CHECK_NAMES) + len(EXPECTED_PATCH_CHECK_NAMES)
+            3
+            + len(EXPECTED_CHECK_NAMES)
+            + len(EXPECTED_PATCH_CHECK_NAMES)
+            + len(EXPECTED_CAMEL_CHECK_NAMES)
         )
         assert "FAIL" not in out
         assert "PASS session-main:" in out
         assert "PASS session-codex-patch:" in out
+        assert "PASS session-camel-rename:" in out
+        assert "PASS camel-deny-git-reset:" in out
         assert "Tool inventory, session main" in out
         assert "Tool inventory, session codex-patch" in out
+        assert "Tool inventory, session camel-rename" in out
         assert "bash: command, description" in out
         assert "Result: PASS (0 of " in out
 
@@ -1511,7 +2039,7 @@ class TestMainOrchestration:
             lambda runtime, project, scenario, home, timeout=0: (
                 build_record(steps)
                 if scenario["name"] == "main"
-                else record_for(scenario)
+                else record_for(scenario, project)
             ),
         )
 
@@ -1539,7 +2067,7 @@ class TestMainOrchestration:
             lambda runtime, project, scenario, home, timeout=0: (
                 build_patch_record(crashed)
                 if scenario["name"] == "codex-patch"
-                else record_for(scenario)
+                else record_for(scenario, project)
             ),
         )
 
@@ -1589,6 +2117,63 @@ class TestMainOrchestration:
             r"^FAIL session-main.*run limit", capsys.readouterr().out, re.MULTILINE
         )
 
+    def test_the_camel_copy_is_made_before_any_session_touches_the_project(
+        self,
+        fake_runtime: probe.RuntimeInfo,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        order: list[str] = []
+        make_copy = probe.prepare_camel_project
+
+        def copy_first(project: Path, work: Path) -> Path:
+            order.append("copy")
+            return make_copy(project, work)
+
+        def fake_session(
+            runtime: probe.RuntimeInfo,
+            project: Path,
+            scenario: dict[str, object],
+            home: Path,
+            timeout: float = 0,
+        ) -> probe.SessionRecord:
+            order.append(str(scenario["name"]))
+            return record_for(scenario, project)
+
+        monkeypatch.setattr(probe, "prepare_camel_project", copy_first)
+        monkeypatch.setattr(probe, "run_session", fake_session)
+
+        probe.main([])
+
+        # The first sessions leave files behind (`probe-plain.txt`), so a copy made
+        # later would not be a fresh project.
+        assert order == ["copy", "main", "codex-patch", "camel-rename"]
+
+    def test_a_camel_copy_that_cannot_be_made_is_a_project_fail(
+        self,
+        fake_runtime: probe.RuntimeInfo,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        started: list[str] = []
+
+        def broken(project: Path, work: Path) -> Path:
+            raise RuntimeError("the hook file has no PreToolUse event")
+
+        monkeypatch.setattr(probe, "prepare_camel_project", broken)
+        monkeypatch.setattr(
+            probe, "run_session", lambda *args, **kwargs: started.append("x")
+        )
+
+        code = probe.main([])
+
+        assert code == 1
+        assert started == []
+        assert re.search(
+            r"^FAIL project: the hook file has no PreToolUse event",
+            capsys.readouterr().out,
+            re.MULTILINE,
+        )
+
     def test_the_session_gets_at_most_the_session_limit(
         self,
         fake_runtime: probe.RuntimeInfo,
@@ -1598,13 +2183,13 @@ class TestMainOrchestration:
 
         def fake_session(*args: Any, **kwargs: Any) -> probe.SessionRecord:
             timeouts.append(kwargs["timeout"])
-            return record_for(args[2])
+            return record_for(args[2], args[1])
 
         monkeypatch.setattr(probe, "run_session", fake_session)
 
         probe.main([])
 
-        assert len(timeouts) == 2
+        assert len(timeouts) == 3
         assert all(0 < t <= probe.SESSION_LIMIT_SECONDS == 150 for t in timeouts)
         assert sum(timeouts) <= probe.RUN_LIMIT_SECONDS == 480
 

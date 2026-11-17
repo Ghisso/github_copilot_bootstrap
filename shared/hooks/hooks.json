@@ -42,9 +42,9 @@
       },
       {
         "type": "command",
-        "bash": ".claude/hooks/scripts/run-hook.sh git-protection.sh",
-        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh git-protection.sh",
-        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh git-protection.sh",
+        "bash": ".claude/hooks/scripts/run-hook.sh git-protection.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh git-protection.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh git-protection.sh github-copilot",
         "cwd": ".",
         "timeout": 10,
         "timeoutSec": 10

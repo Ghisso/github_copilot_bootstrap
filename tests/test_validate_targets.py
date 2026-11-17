@@ -162,6 +162,61 @@ def test_pretool_routing_accepts_three_groups_and_rejects_drift() -> None:
         )
 
 
+def _copilot_hook_events() -> dict[str, Any]:
+    text = (REPO_ROOT / "shared" / "hooks" / "hooks.json").read_text(encoding="utf-8")
+    events: dict[str, Any] = json.loads(text)["hooks"]
+    return events
+
+
+def test_copilot_guard_check_accepts_the_shared_hook_file() -> None:
+    """Every guard under PreToolUse passes `github-copilot` in all three command
+    fields, so its answer carries the top-level shape."""
+    events = _copilot_hook_events()
+    guards = [
+        hook["bash"].split()[-2]
+        for hook in events["PreToolUse"]
+        if isinstance(hook, dict)
+    ]
+
+    # Not vacuous: the five guards, including the one that took no argument.
+    assert guards == [
+        "protect-files.sh",
+        "git-protection.sh",
+        "enforce-branch-state.sh",
+        "enforce-commit-gate.sh",
+        "enforce-pr-gate.sh",
+    ]
+    assert target_validator.copilot_guard_target_errors(events) == []
+
+
+@pytest.mark.parametrize("field", ("bash", "linux", "osx"))
+def test_copilot_guard_check_names_a_guard_that_drops_the_client_argument(
+    field: str,
+) -> None:
+    events = deepcopy(_copilot_hook_events())
+    guard = next(
+        hook for hook in events["PreToolUse"] if "git-protection.sh" in hook["bash"]
+    )
+    guard[field] = guard[field].removesuffix(" github-copilot")
+
+    errors = target_validator.copilot_guard_target_errors(events)
+
+    assert len(errors) == 1
+    assert "git-protection.sh" in errors[0]
+    assert field in errors[0]
+
+
+@pytest.mark.parametrize(
+    "events",
+    (None, {}, {"PreToolUse": []}, {"PreToolUse": ["not a hook"]}),
+    ids=("not-an-object", "no-event", "no-guards", "guard-not-an-object"),
+)
+def test_copilot_guard_check_rejects_a_missing_or_malformed_pretool_list(
+    events: object,
+) -> None:
+    assert target_validator.copilot_guard_target_errors(events)
+
+
 @pytest.mark.parametrize(
     ("skill", "old", "replacement"),
     (

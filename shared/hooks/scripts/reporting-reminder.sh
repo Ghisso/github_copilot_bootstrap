@@ -20,6 +20,8 @@ REMINDER="For user-facing updates, use direct language; explain internal labels 
 REPO_ROOT="$(repo_root_from_script)"
 MODE="${1:-}"
 PROVIDER="${2:-}"
+# Names the client for the answer shape in _lib-frontmatter.sh; never inherited.
+TARGET_ID="$PROVIDER"
 INPUT="$(cat)"
 
 if [[ "$PROVIDER" != "claude-code" && "$PROVIDER" != "openai-codex" ]]; then

@@ -5,8 +5,18 @@ if ! command -v awk >/dev/null 2>&1; then
   return 127 2>/dev/null || exit 127
 fi
 
+# Control characters (\001-\037, tab and newline included) are not allowed raw
+# in a JSON string, and a hook answer that is not valid JSON lets the tool run
+# on Copilot. They become spaces first. The second set has one space for each of
+# the 31 characters, so the mapping is position for position and needs no
+# padding rule (POSIX leaves a shorter second set unspecified, and BusyBox `tr`
+# does not read `[c*]`). Run on GNU `tr` and BusyBox `tr` 1.36.1; not run on
+# macOS or BSD `tr`. Stays free of python3: fail_closed runs when python3 is
+# missing.
 json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+  local spaces
+  printf -v spaces '%31s' ''
+  printf '%s' "$1" | tr '\001-\037' "$spaces" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 # Single home for the implementation-branch shape used by every lifecycle gate.
@@ -33,16 +43,28 @@ run_python() {
   return 127
 }
 
+# One home for the pre-tool answer. Only for `github-copilot` the decision is
+# also printed at the top level, the shape Copilot documents (the runtime honors
+# the nested object only under PascalCase event names). There is no top-level
+# hookEventName: the Local harness drops a result whose top-level event name is
+# another event. Every other client keeps today's nested-only line. Each script
+# that prints assigns TARGET_ID itself, so an exported value cannot switch the
+# Copilot shape on for another client.
+pretool_decision() {
+  local decision="$1" reason top=""
+  reason="$(json_escape "$2")"
+  if [[ "${TARGET_ID:-}" == "github-copilot" ]]; then
+    top="\"permissionDecision\":\"$decision\",\"permissionDecisionReason\":\"$reason\","
+  fi
+  printf '{%s"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$top" "$decision" "$reason"
+}
+
 deny_pretool() {
-  local reason
-  reason="$(json_escape "$1")"
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+  pretool_decision deny "$1"
 }
 
 ask_pretool() {
-  local reason
-  reason="$(json_escape "$1")"
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$reason"
+  pretool_decision ask "$1"
 }
 
 # True if the payload is empty (some events send nothing) or valid JSON. A
@@ -98,11 +120,16 @@ file_mtime() {
   return 1
 }
 
+# Same two shapes as pretool_decision: only `github-copilot` also gets the text
+# at the top level, which is where the Copilot runtime reads it.
 additional_context() {
-  local event message
+  local event message top=""
   event="$(json_escape "$1")"
   message="$(json_escape "$2")"
-  printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$event" "$message"
+  if [[ "${TARGET_ID:-}" == "github-copilot" ]]; then
+    top="\"additionalContext\":\"$message\","
+  fi
+  printf '{%s"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$top" "$event" "$message"
 }
 
 json_string_value() {

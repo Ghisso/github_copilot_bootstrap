@@ -4093,6 +4093,806 @@ def test_protect_files_read_exemption_is_exact_names_only(tmp_path: Path) -> Non
     assert _protect_decision(process) == "ask", process.stdout
 
 
+# --- Phase C of copilot-harness-migration: the Copilot answer shape ----------
+#
+# For the client `github-copilot` every guard prints one single-line object
+# that carries the decision at the top level (the documented Copilot shape) and
+# nested in `hookSpecificOutput`, with no top-level `hookEventName`. The other
+# clients keep today's nested-only line, byte for byte. The expected lines are
+# written out here from the documented shape; they are never computed from a
+# guard's own output. The Copilot runtime honors the nested object only under
+# PascalCase event names (evidence F4), the top-level one under both spellings.
+
+COPILOT = "github-copilot"
+OTHER_CLIENTS = ("claude-code", "openai-codex", "google-antigravity")
+ALL_CLIENTS = (COPILOT, *OTHER_CLIENTS)
+REMINDER_TEXT = (
+    "For user-facing updates, use direct language; explain internal labels and "
+    "uncommon abbreviations, and avoid idioms. State what options mean in "
+    "practice. Preserve exact technical text."
+)
+UNPARSEABLE_REASON = (
+    "hook could not evaluate the request safely, denying: unparseable tool payload"
+)
+PROTECT_CONFIG_ASK = (
+    "Editing agent, hook, or server configuration requires approval: .mcp.json"
+)
+PROTECT_CONFIG_DENY = (
+    "Editing agent, hook, or server configuration is blocked because PreToolUse "
+    "cannot request approval: .mcp.json"
+)
+
+
+def _nested_decision(decision: str, reason: str) -> str:
+    """The line every client but `github-copilot` gets today."""
+    return (
+        '{"hookSpecificOutput":{"hookEventName":"PreToolUse",'
+        f'"permissionDecision":"{decision}","permissionDecisionReason":"{reason}"}}}}\n'
+    )
+
+
+def _combined_decision(decision: str, reason: str) -> str:
+    """The `github-copilot` line: top-level fields, then today's nested object."""
+    return (
+        f'{{"permissionDecision":"{decision}","permissionDecisionReason":"{reason}",'
+        '"hookSpecificOutput":{"hookEventName":"PreToolUse",'
+        f'"permissionDecision":"{decision}","permissionDecisionReason":"{reason}"}}}}\n'
+    )
+
+
+def _nested_context(event: str, text: str) -> str:
+    return (
+        f'{{"hookSpecificOutput":{{"hookEventName":"{event}",'
+        f'"additionalContext":"{text}"}}}}\n'
+    )
+
+
+def _combined_context(event: str, text: str) -> str:
+    return (
+        f'{{"additionalContext":"{text}","hookSpecificOutput":'
+        f'{{"hookEventName":"{event}","additionalContext":"{text}"}}}}\n'
+    )
+
+
+def _same_for_every_client(decision: str, reason: str) -> dict[str, tuple[str, str]]:
+    return dict.fromkeys(ALL_CLIENTS, (decision, reason))
+
+
+def _commit_gate_reason(client: str) -> str:
+    return (
+        f"commit gate failed for {client}: commits must happen on a "
+        "<plan_name>_implementation branch, not main; missing big-plan file: "
+        ".claude/plans/main.md; missing plan-frontmatter validator: "
+        ".claude/scripts/validate_plan_frontmatter.py; missing small-plan file: "
+        ".claude/plans/unknown.md; missing provider-neutral closeout receipt "
+        "reader: .claude/scripts/verify.py"
+    )
+
+
+def _bash_stdin(command: str) -> str:
+    return json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+
+
+# gate -> (script, stdin, exit code, {client: (decision, reason)}) for a guard
+# run in a synthetic repository on `main`.
+PRETOOL_GATES: dict[str, tuple[str, str, int, dict[str, tuple[str, str]]]] = {
+    "git-protection": (
+        "git-protection.sh",
+        _bash_stdin("git reset --hard HEAD"),
+        0,
+        _same_for_every_client(
+            "deny", "Blocked dangerous git operation: git reset --hard"
+        ),
+    ),
+    "branch-state": (
+        "enforce-branch-state.sh",
+        _bash_stdin("git checkout -b not-an-implementation-name"),
+        0,
+        _same_for_every_client(
+            "deny",
+            "implementation branch must be named <plan_name>_implementation using "
+            "only letters, numbers, dot, underscore, and dash",
+        ),
+    ),
+    "commit-gate": (
+        "enforce-commit-gate.sh",
+        _bash_stdin("git commit -m x"),
+        0,
+        {client: ("deny", _commit_gate_reason(client)) for client in ALL_CLIENTS},
+    ),
+    "pr-gate": (
+        "enforce-pr-gate.sh",
+        _bash_stdin("gh pr create --base dev --title t --body b"),
+        0,
+        _same_for_every_client(
+            "deny",
+            "PR/push gate only allows implementation branches; current branch is main",
+        ),
+    ),
+    "protect-deny": (
+        "protect-files.sh",
+        _bash_stdin("rm -f .env"),
+        0,
+        _same_for_every_client("deny", "Protected file blocked by policy: .env"),
+    ),
+    "protect-ask": (
+        "protect-files.sh",
+        _bash_stdin("echo x > .mcp.json"),
+        0,
+        {
+            "claude-code": ("ask", PROTECT_CONFIG_ASK),
+            COPILOT: ("ask", PROTECT_CONFIG_ASK),
+            "openai-codex": ("deny", PROTECT_CONFIG_DENY),
+            "google-antigravity": ("deny", PROTECT_CONFIG_DENY),
+        },
+    ),
+    # `fail_closed`: the payload cannot be read, so each guard denies and exits 2.
+    # This is the early call of every guard, before its own work.
+    **{
+        f"fail-closed-{name}": (
+            script,
+            "not json",
+            2,
+            _same_for_every_client("deny", UNPARSEABLE_REASON),
+        )
+        for name, script in (
+            ("git-protection", "git-protection.sh"),
+            ("branch-state", "enforce-branch-state.sh"),
+            ("commit-gate", "enforce-commit-gate.sh"),
+            ("pr-gate", "enforce-pr-gate.sh"),
+            ("protect-files", "protect-files.sh"),
+        )
+    },
+    # The wrapper's own `fail_closed`: a child guard (here the file guard, which
+    # cannot read a Bash payload with no command) exits 2.
+    "fail-closed-bash-wrapper": (
+        "pretool-bash-guard.sh",
+        json.dumps({"tool_name": "Bash", "tool_input": {}}),
+        2,
+        _same_for_every_client(
+            "deny",
+            "hook could not evaluate the request safely, denying: "
+            "protect-files.sh exited with status 2",
+        ),
+    ),
+}
+# gate -> (script, stdin, branch, event, context text) for the guards that print
+# context for the model.
+CONTEXT_GATES: dict[str, tuple[str, str, str, str, str]] = {
+    "session-start-state": (
+        "session-start-state.sh",
+        "",
+        "phase_implementation",
+        "SessionStart",
+        "Implementation branch phase_implementation: big plan phase, phases "
+        "done=0 pending=0, current_phase=phase-one",
+    ),
+    "record-branch-state": (
+        "record-branch-state.sh",
+        _bash_stdin("git checkout -b foo_implementation"),
+        "main",
+        "PostToolUse",
+        "branch state not recorded because current branch is main, not "
+        "foo_implementation",
+    ),
+}
+
+
+def _gate_repo(tmp_path: Path, branch: str = "main") -> Path:
+    """The isolated hook-script tree inside a Git repository on `branch`.
+
+    The repository has one commit that ignores the tree, so its working copy is
+    clean. A `*_implementation` branch also gets the big plan that
+    `session-start-state.sh` reads.
+    """
+    _isolated_hook_scripts_dir(tmp_path)
+    _git_in(tmp_path, "init", "-q", "-b", branch)
+    (tmp_path / ".gitignore").write_text(".claude/\nshared\n", encoding="utf-8")
+    _git_in(tmp_path, "add", ".gitignore")
+    _git_in(tmp_path, "commit", "-q", "-m", "seed")
+    if branch.endswith("_implementation"):
+        plans = tmp_path / ".claude" / "plans"
+        plans.mkdir(parents=True)
+        (plans / "phase.md").write_text(
+            "---\nstatus: in-progress\ncurrent_phase: phase-one\n---\n",
+            encoding="utf-8",
+        )
+    return tmp_path / "shared" / "hooks" / "scripts"
+
+
+def _git_in(cwd: Path, *args: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Hook Test",
+            "-c",
+            "user.email=hook@example.com",
+            *args,
+        ],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_gate(
+    tmp_path: Path,
+    script: str,
+    stdin: str,
+    *args: str,
+    branch: str = "main",
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run one shipped script in a synthetic repository, with no `TARGET_ID` in
+    its environment unless `env` sets one."""
+    scripts = _gate_repo(tmp_path, branch)
+    clean = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+    return subprocess.run(
+        ["bash", str(scripts / script), *args],
+        cwd=tmp_path,
+        input=stdin,
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**clean, **(env or {})},
+    )
+
+
+def _library_call(client: str | None, *call: str) -> subprocess.CompletedProcess[str]:
+    """Call one `_lib-frontmatter.sh` function under `set -eu`, as the guards do."""
+    clean = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+    if client is not None:
+        clean["TARGET_ID"] = client
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            'set -eu; . "$1"; shift; "$@"',
+            "bash",
+            str(SCRIPT_SRC / "_lib-frontmatter.sh"),
+            *call,
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=clean,
+    )
+
+
+@pytest.mark.parametrize("gate", PRETOOL_GATES)
+def test_copilot_guards_print_the_decision_at_the_top_level_and_nested(
+    tmp_path: Path, gate: str
+) -> None:
+    script, stdin, code, expected = PRETOOL_GATES[gate]
+    decision, reason = expected[COPILOT]
+
+    result = _run_gate(tmp_path, script, stdin, COPILOT)
+
+    assert result.returncode == code, result.stderr
+    assert result.stdout == _combined_decision(decision, reason)
+    answer = json.loads(result.stdout)
+    assert "hookEventName" not in answer
+    assert answer["permissionDecision"] == decision
+    assert answer["permissionDecisionReason"] == reason
+    nested = answer["hookSpecificOutput"]
+    assert nested["permissionDecision"] == answer["permissionDecision"]
+    assert nested["permissionDecisionReason"] == answer["permissionDecisionReason"]
+
+
+@pytest.mark.parametrize("client", OTHER_CLIENTS)
+@pytest.mark.parametrize("gate", PRETOOL_GATES)
+def test_the_other_clients_keep_todays_exact_bytes_for_a_decision(
+    tmp_path: Path, gate: str, client: str
+) -> None:
+    script, stdin, code, expected = PRETOOL_GATES[gate]
+    decision, reason = expected[client]
+
+    result = _run_gate(tmp_path, script, stdin, client)
+
+    assert result.returncode == code, result.stderr
+    assert result.stdout == _nested_decision(decision, reason)
+
+
+@pytest.mark.parametrize("gate", CONTEXT_GATES)
+def test_copilot_context_is_printed_at_the_top_level_and_nested(
+    tmp_path: Path, gate: str
+) -> None:
+    script, stdin, branch, event, text = CONTEXT_GATES[gate]
+
+    result = _run_gate(tmp_path, script, stdin, COPILOT, branch=branch)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _combined_context(event, text)
+    answer = json.loads(result.stdout)
+    assert "hookEventName" not in answer
+    assert (
+        answer["additionalContext"] == answer["hookSpecificOutput"]["additionalContext"]
+    )
+
+
+@pytest.mark.parametrize("client", OTHER_CLIENTS)
+@pytest.mark.parametrize("gate", CONTEXT_GATES)
+def test_the_other_clients_keep_todays_exact_bytes_for_context(
+    tmp_path: Path, gate: str, client: str
+) -> None:
+    script, stdin, branch, event, text = CONTEXT_GATES[gate]
+
+    result = _run_gate(tmp_path, script, stdin, client, branch=branch)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _nested_context(event, text)
+
+
+@pytest.mark.parametrize("argument", ("claude-code", "openai-codex"))
+@pytest.mark.parametrize("gate", list(PRETOOL_GATES) + list(CONTEXT_GATES))
+def test_an_exported_target_id_never_changes_another_clients_output(
+    tmp_path: Path, gate: str, argument: str
+) -> None:
+    """Every script names its own client, so an exported `TARGET_ID` that says
+    `github-copilot` cannot turn on the Copilot shape for a Claude Code or
+    Codex hook."""
+    if gate in PRETOOL_GATES:
+        script, stdin, code, expected = PRETOOL_GATES[gate]
+        decision, reason = expected[argument]
+        line = _nested_decision(decision, reason)
+        branch = "main"
+    else:
+        script, stdin, branch, event, text = CONTEXT_GATES[gate]
+        code, line = 0, _nested_context(event, text)
+
+    result = _run_gate(
+        tmp_path,
+        script,
+        stdin,
+        argument,
+        branch=branch,
+        env={"TARGET_ID": COPILOT},
+    )
+
+    assert result.returncode == code, result.stderr
+    assert result.stdout == line
+
+
+@pytest.mark.parametrize(
+    "script, stdin, expected_line",
+    (
+        pytest.param(
+            "enforce-pr-gate.sh",
+            _bash_stdin("gh pr create --base dev --title t --body b"),
+            _nested_decision(
+                "deny",
+                "PR/push gate only allows implementation branches; "
+                "current branch is main",
+            ),
+            id="pr-gate",
+        ),
+        pytest.param(
+            "record-branch-state.sh",
+            _bash_stdin("git checkout -b foo_implementation"),
+            _nested_context(
+                "PostToolUse",
+                "branch state not recorded because current branch is main, not "
+                "foo_implementation",
+            ),
+            id="record-branch-state",
+        ),
+    ),
+)
+def test_a_script_started_without_a_client_ignores_an_exported_target_id(
+    tmp_path: Path, script: str, stdin: str, expected_line: str
+) -> None:
+    result = _run_gate(tmp_path, script, stdin, env={"TARGET_ID": COPILOT})
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == expected_line
+
+
+def test_session_start_state_started_without_a_client_ignores_an_exported_target_id(
+    tmp_path: Path,
+) -> None:
+    script, stdin, branch, event, text = CONTEXT_GATES["session-start-state"]
+
+    result = _run_gate(
+        tmp_path, script, stdin, branch=branch, env={"TARGET_ID": COPILOT}
+    )
+
+    assert result.stdout == _nested_context(event, text)
+
+
+def test_the_openwiki_guard_and_the_reporting_reminder_ignore_an_exported_target_id(
+    tmp_path: Path,
+) -> None:
+    env = {"TARGET_ID": COPILOT}
+
+    guard = _run_gate(
+        tmp_path / "guard", "openwiki-guard.sh", "not json", "pre", env=env
+    )
+    reminder = _run_gate(
+        tmp_path / "reminder",
+        "reporting-reminder.sh",
+        '{"hook_event_name":"UserPromptSubmit"}',
+        "prompt",
+        "claude-code",
+        env=env,
+    )
+
+    assert guard.returncode == 2, guard.stderr
+    assert guard.stdout == _nested_decision("deny", UNPARSEABLE_REASON)
+    assert reminder.returncode == 0, reminder.stderr
+    assert reminder.stdout == _nested_context("UserPromptSubmit", REMINDER_TEXT)
+
+
+@pytest.mark.parametrize("tool", ("run_dynamic_workflow", "dynamic_workflows_manage"))
+def test_the_workflow_tool_deny_prints_the_combined_answer(
+    tmp_path: Path, tool: str
+) -> None:
+    """`protect-files.py` writes both its decisions through one function, so the
+    deny of a workflow tool carries the top-level fields too."""
+    process = _run_protect_files(
+        {"toolName": tool, "toolArgs": json.dumps({"name": "probe"})},
+        tmp_path,
+        COPILOT,
+    )
+
+    assert process.returncode == 0, process.stderr
+    reason = (
+        f"Tool blocked by policy: {tool} runs workflow code that the pre-tool "
+        "hooks cannot see"
+    )
+    assert process.stdout == _combined_decision("deny", reason)
+
+
+def test_the_bash_wrapper_passes_the_combined_deny_through(tmp_path: Path) -> None:
+    """`pretool-bash-guard.sh` reads only the nested object to check a guard's
+    answer, then prints the whole line."""
+    script, stdin, code, expected = PRETOOL_GATES["git-protection"]
+    decision, reason = expected[COPILOT]
+
+    result = _run_gate(tmp_path, "pretool-bash-guard.sh", stdin, COPILOT)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _combined_decision(decision, reason)
+
+
+@pytest.mark.parametrize("client", OTHER_CLIENTS)
+def test_the_bash_wrapper_keeps_todays_bytes_for_the_other_clients(
+    tmp_path: Path, client: str
+) -> None:
+    script, stdin, code, expected = PRETOOL_GATES["git-protection"]
+    decision, reason = expected[client]
+
+    result = _run_gate(tmp_path, "pretool-bash-guard.sh", stdin, client)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _nested_decision(decision, reason)
+
+
+def test_the_antigravity_bridge_output_for_a_denied_write_is_unchanged(
+    tmp_path: Path,
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+
+    process = _run_antigravity_pretool(
+        {"toolCall": {"name": "write_to_file", "args": {"TargetFile": ".env"}}}, root
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == (
+        '{"decision":"deny","reason":"Protected file blocked by policy: .env"}\n'
+    )
+
+
+def _assert_fail_closed_shape(
+    result: subprocess.CompletedProcess[str], client: str, reason_start: str
+) -> None:
+    """A guard that failed closed printed one deny object in its client's shape."""
+    assert result.returncode == 2, result.stderr
+    assert result.stdout.count("\n") == 1
+    answer = json.loads(result.stdout)
+    nested = answer["hookSpecificOutput"]
+    assert nested["hookEventName"] == "PreToolUse"
+    assert nested["permissionDecision"] == "deny"
+    assert nested["permissionDecisionReason"].startswith(reason_start)
+    if client == COPILOT:
+        assert "hookEventName" not in answer
+        assert answer["permissionDecision"] == nested["permissionDecision"]
+        assert answer["permissionDecisionReason"] == nested["permissionDecisionReason"]
+    else:
+        assert set(answer) == {"hookSpecificOutput"}
+
+
+@pytest.mark.parametrize("client", ALL_CLIENTS)
+def test_protect_files_prints_the_client_shape_when_the_classifier_fails(
+    tmp_path: Path, client: str
+) -> None:
+    """A Bash payload with no command makes the classifier exit 2, and the shell
+    wrapper fails closed with the classifier's diagnostic in the reason."""
+    stdin = json.dumps({"tool_name": "Bash", "tool_input": {}})
+
+    result = _run_gate(tmp_path, "protect-files.sh", stdin, client)
+
+    _assert_fail_closed_shape(
+        result,
+        client,
+        "hook could not evaluate the request safely, denying: protected-file "
+        "classifier exited with status 2",
+    )
+
+
+@pytest.mark.parametrize("client", ALL_CLIENTS)
+def test_protect_files_prints_the_client_shape_when_python3_is_missing(
+    tmp_path: Path, client: str
+) -> None:
+    """The `fail_closed` that runs when python3 is missing, reached with a PATH
+    that holds only the tools the script needs before that point."""
+    scripts = _gate_repo(tmp_path)
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    for name in ("awk", "sed", "tr", "cat", "dirname", "date", "mkdir"):
+        found = shutil.which(name)
+        assert found is not None
+        (tools / name).symlink_to(Path(found).resolve())
+    assert shutil.which("python3", path=str(tools)) is None
+
+    result = subprocess.run(
+        ["/bin/bash", str(scripts / "protect-files.sh"), client],
+        cwd=tmp_path,
+        input=_bash_stdin("echo hi"),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={"PATH": str(tools)},
+    )
+
+    assert result.returncode == 2, result.stderr
+    reason = (
+        "hook could not evaluate the request safely, denying: python3 is "
+        "unavailable for protected-file classification"
+    )
+    assert result.stdout == (
+        _combined_decision("deny", reason)
+        if client == COPILOT
+        else _nested_decision("deny", reason)
+    )
+
+
+@pytest.mark.parametrize("client", ALL_CLIENTS)
+def test_the_bash_wrapper_prints_the_client_shape_for_malformed_child_output(
+    tmp_path: Path, client: str
+) -> None:
+    """The wrapper's second `fail_closed`: a child guard exits 0 but prints
+    something that is not a decision. Fixture children stand in for the guards."""
+    scripts = tmp_path / "shared" / "hooks" / "scripts"
+    scripts.mkdir(parents=True)
+    (tmp_path / ".claude" / "session_logs").mkdir(parents=True)
+    for name in ("pretool-bash-guard.sh", "_lib-frontmatter.sh"):
+        shutil.copy2(SCRIPT_SRC / name, scripts / name)
+    for name in (
+        "protect-files.sh",
+        "git-protection.sh",
+        "enforce-branch-state.sh",
+        "enforce-commit-gate.sh",
+        "enforce-pr-gate.sh",
+    ):
+        (scripts / name).write_text(
+            "#!/usr/bin/env bash\ncat >/dev/null\nprintf 'not-json'\n", encoding="utf-8"
+        )
+    clean = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+
+    result = subprocess.run(
+        ["bash", str(scripts / "pretool-bash-guard.sh"), client],
+        cwd=tmp_path,
+        input=_bash_stdin("true"),
+        text=True,
+        capture_output=True,
+        check=False,
+        env=clean,
+    )
+
+    _assert_fail_closed_shape(
+        result,
+        client,
+        "hook could not evaluate the request safely, denying: protect-files.sh "
+        "returned malformed safety output",
+    )
+
+
+# Row T3 of the decision-change table: a control character in a reason used to
+# make the whole line invalid JSON, and on the Copilot runtime invalid JSON lets
+# the tool run (evidence F5). Characters 1 to 31 now become spaces.
+CONTROL_CHARACTERS = "".join(chr(code) for code in range(1, 32))
+TEXT_WITH_TAB_AND_NEWLINE = "tab\there\nnewline"
+
+
+@pytest.mark.parametrize("client", (None, *ALL_CLIENTS))
+@pytest.mark.parametrize("function", ("deny_pretool", "ask_pretool"))
+def test_a_reason_with_a_tab_and_a_newline_is_valid_json_with_spaces(
+    function: str, client: str | None
+) -> None:
+    result = _library_call(client, function, TEXT_WITH_TAB_AND_NEWLINE)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("\n") == 1  # one line, ending the object
+    answer = json.loads(result.stdout)
+    nested = answer["hookSpecificOutput"]
+    assert nested["permissionDecisionReason"] == "tab here newline"
+    if client == COPILOT:
+        assert answer["permissionDecisionReason"] == "tab here newline"
+    else:
+        assert set(answer) == {"hookSpecificOutput"}
+
+
+@pytest.mark.parametrize("client", (None, *ALL_CLIENTS))
+def test_every_control_character_in_a_reason_becomes_one_space(
+    client: str | None,
+) -> None:
+    result = _library_call(client, "deny_pretool", CONTROL_CHARACTERS)
+
+    answer = json.loads(result.stdout)
+    reason = answer["hookSpecificOutput"]["permissionDecisionReason"]
+    assert reason == " " * 31
+
+
+def test_json_escape_gives_tr_a_second_set_of_exactly_31_characters(
+    tmp_path: Path,
+) -> None:
+    """A shorter second set (`' '`, `'[ *]'`) works on GNU `tr` but leans on a padding
+    rule that POSIX leaves unspecified and BusyBox `tr` reads differently. A stub
+    `tr` first in PATH refuses anything but the equal-length form, then runs the
+    real `tr`, so a Linux host with GNU `tr` can still see that regression."""
+    real_tr = shutil.which("tr")
+    assert real_tr is not None
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    log = tmp_path / "tr-calls"
+    stub = tools / "tr"
+    stub.write_text(
+        "#!/bin/sh\n"
+        f"echo called >> {shlex.quote(str(log))}\n"
+        '[ "$#" -eq 2 ] && [ "$1" = \'\\001-\\037\' ] && [ "${#2}" -eq 31 ] \\\n'
+        "  || { printf 'stub tr: refused: %s args, first %s, second set %s characters\\n'"
+        ' "$#" "$1" "${#2}" >&2; exit 64; }\n'
+        f'exec {shlex.quote(real_tr)} "$@"\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k != "TARGET_ID"}
+    env.update(PATH=f"{tools}:{env['PATH']}", TARGET_ID=COPILOT)
+
+    result = subprocess.run(
+        ["bash", "-c", 'set -eu; . "$1"; shift; "$@"', "bash"]
+        + [
+            str(SCRIPT_SRC / "_lib-frontmatter.sh"),
+            "deny_pretool",
+            "tab\there\nnewline",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert log.read_text(encoding="utf-8") == "called\n", "the stub tr was not used"
+    assert result.stderr == ""
+    answer = json.loads(result.stdout)
+    assert answer["permissionDecisionReason"] == "tab here newline"
+    assert (
+        answer["hookSpecificOutput"]["permissionDecisionReason"] == "tab here newline"
+    )
+
+
+@pytest.mark.parametrize("client", (None, *ALL_CLIENTS))
+def test_a_failed_closed_reason_with_a_control_character_is_valid_json(
+    client: str | None,
+) -> None:
+    result = _library_call(client, "fail_closed", "tab\there")
+
+    assert result.returncode == 2
+    answer = json.loads(result.stdout)
+    assert answer["hookSpecificOutput"]["permissionDecisionReason"] == (
+        "hook could not evaluate the request safely, denying: tab here"
+    )
+
+
+@pytest.mark.parametrize("client", (None, *ALL_CLIENTS))
+def test_context_with_control_characters_is_valid_json_with_spaces(
+    client: str | None,
+) -> None:
+    result = _library_call(client, "additional_context", "SessionStart", "a\tb\nc")
+
+    answer = json.loads(result.stdout)
+    assert answer["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    assert answer["hookSpecificOutput"]["additionalContext"] == "a b c"
+    if client == COPILOT:
+        assert answer["additionalContext"] == "a b c"
+    else:
+        assert set(answer) == {"hookSpecificOutput"}
+
+
+@pytest.mark.parametrize("client", (None, *ALL_CLIENTS))
+def test_backslashes_and_quotes_in_a_reason_are_escaped_as_before(
+    client: str | None,
+) -> None:
+    result = _library_call(client, "deny_pretool", 'say "hi" \\ done')
+
+    expected = _nested_decision("deny", 'say \\"hi\\" \\\\ done')
+    if client == COPILOT:
+        expected = _combined_decision("deny", 'say \\"hi\\" \\\\ done')
+    assert result.stdout == expected
+
+
+def test_the_answer_functions_need_no_python3(tmp_path: Path) -> None:
+    """`fail_closed` runs when python3 is missing, so the escaping and both
+    answer shapes use only `tr` and `sed`."""
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    for name in ("awk", "sed", "tr"):
+        found = shutil.which(name)
+        assert found is not None
+        (tools / name).symlink_to(Path(found).resolve())
+    env = {"PATH": str(tools), "TARGET_ID": COPILOT}
+    assert shutil.which("python3", path=str(tools)) is None
+
+    for call in (
+        ("deny_pretool", "a\tb"),
+        ("ask_pretool", "a\tb"),
+        ("additional_context", "SessionStart", "a\tb"),
+        ("fail_closed", "a\tb"),
+    ):
+        result = subprocess.run(
+            [
+                "/bin/bash",
+                "-c",
+                'set -eu; . "$1"; shift; "$@"',
+                "bash",
+                str(SCRIPT_SRC / "_lib-frontmatter.sh"),
+                *call,
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+
+        answer = json.loads(result.stdout)
+        assert "a b" in json.dumps(answer), call
+        assert "hookEventName" not in answer, call
+        assert set(answer) > {"hookSpecificOutput"}, call
+
+
+def test_a_guard_reason_with_a_tab_from_a_real_caller_is_valid_json(
+    tmp_path: Path,
+) -> None:
+    """End to end: a phase name with a tab in a big plan reaches the branch
+    gate's reason through `deny_pretool`."""
+    scripts = _gate_repo(tmp_path, "dev")
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "foo.md").write_text(
+        "---\nname: foo\ntype: big-plan\nstatus: planning\nphases:\n"
+        "  - bad\tname\n---\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", str(scripts / "enforce-branch-state.sh"), COPILOT],
+        cwd=tmp_path,
+        input=_bash_stdin("git checkout -b foo_implementation"),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    answer = json.loads(result.stdout)
+    assert answer["permissionDecision"] == "deny"
+    assert answer["permissionDecisionReason"].endswith(
+        "lists a phase that is not a safe plan name: bad name"
+    )
+
+
 if __name__ == "__main__":
     test_git_targets_nested_claude_detects_nested_claude_paths()
     test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands()
@@ -4101,3 +4901,6 @@ if __name__ == "__main__":
         "cat .codex/config.toml"
     )
     test_protect_files_blocks_mutation_targets("printf x > .env")
+    # The shell escaping on this host's `tr` (the macOS CI leg runs BSD `tr`).
+    test_every_control_character_in_a_reason_becomes_one_space("github-copilot")
+    test_every_control_character_in_a_reason_becomes_one_space("claude-code")

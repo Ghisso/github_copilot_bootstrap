@@ -532,7 +532,8 @@ account, and uses no network beyond 127.0.0.1 in its own code. It installs a
 fresh full copy of this bootstrap into a temporary folder (`git init -b dev`, no
 commit) and removes the project's `.mcp.json`, its restore copy, and its manifest
 line, so no MCP server starts (see the evidence table). It removes the temporary
-folder when it ends, unless you pass `--keep`. A session stops
+folder when it ends, unless you pass `--keep`. It runs three sessions, one
+of them in a copy of the project (see `camel-rename` below). A session stops
 after 150 seconds and the whole run after 480 seconds; either is reported as
 `FAIL`.
 
@@ -588,11 +589,41 @@ agent file, and an indented hook file each raise at least one question of kind
 `patch-agent-ask`, `patch-indented-hook-ask`). The runtime raises two questions
 for each, because both hook sources run.
 
-The `main` session has 23 checks and `codex-patch` has 6. The probe also prints
-one line for each session, `session-main` and `session-codex-patch`: it is `PASS`
-when the session finished, and `FAIL` for a timeout, a crash, a runtime error,
-or a run limit used up before the session could start. A run prints 31 lines.
-When it cannot build the temporary project within the run limit, it prints
+A third session, `camel-rename`, runs in a copy of the project. The probe makes
+the copy before any session runs, because the first sessions leave files behind
+(`probe-plain.txt`, the patch files). In the copy, the events of
+`.github/hooks/hooks.json` have the documented camelCase names (`sessionStart`,
+`preToolUse`, `postToolUse`, `agentStop`), and `.claude/settings.json` is
+renamed to `.claude/settings.json.off`, so only the Copilot hook file runs. The
+rename is applied to the hook file and to its restore copy in
+`.claude/bootstrap-root/`. The SessionStart hook `state-sync.sh pull` copies that
+restore copy back over the live file, so a rename of the live file alone is
+undone in the first session; a test runs the restore script to show it.
+
+The session repeats the gate steps of `main` with the same expected results:
+`camel-deny-git-reset`, `camel-deny-secret-rm`, `camel-deny-commit`,
+`camel-deny-branch`, `camel-deny-pr`, `camel-ask-vscode-settings`,
+`camel-ask-agent-wrapper`, and `camel-allow-plain`. With one hook source, a guard
+question is raised once, not twice. Three more checks show that the setup held:
+
+- `camel-hooks-source`: after trust, every hook comes from
+  `.github/hooks/hooks.json`, and none from `.claude/settings.json`;
+- `camel-events-renamed`: after the session, both hook files still have the
+  camelCase events and the Claude settings are still off. It reads the files, so
+  it does not depend on when an event arrives;
+- `camel-mcp-none`: the same check as `mcp-none`, for the copy.
+
+Before the guards printed the top-level answer, the five `camel-deny-*` checks and
+the two `camel-ask-*` checks failed: the runtime ignored the nested answers under
+camelCase names (evidence F4), so the denied commands ran and the protected edits
+raised no question.
+
+The `main` session has 23 checks, `codex-patch` has 6, and `camel-rename` has 11.
+The probe also prints one line for each session, `session-main`,
+`session-codex-patch`, and `session-camel-rename`: it is `PASS` when the session
+finished, and `FAIL` for a timeout, a crash, a runtime error, or a run limit used
+up before the session could start. A run prints 43 lines. When it cannot build
+the temporary project, or its camelCase copy, within the run limit, it prints
 `FAIL project` and runs no session. The counts of failed lines in the table
 below (for example "12 of 15") were measured with the first version of the
 probe, which had one session and printed 15 lines (14 checks and
@@ -604,7 +635,8 @@ VS Code can give a model a different tool set than the runtime's own list for th
 In the real VS Code, Auto chose `gpt-6-luna` and VS Code gave it the patch tool
 `apply_patch`, while the runtime's own list gives that model `create` and `edit`
 (evidence A4). Each printed inventory is the runtime's list for the model name of
-its session: `probe-model` for `main` and `gpt-5.2-codex` for `codex-patch`. The
+its session: `probe-model` for `main` and `camel-rename`, and `gpt-5.2-codex` for
+`codex-patch`. The
 probe makes no claim about Copilot CLI, Copilot
 cloud agents, or any runtime version other than the one it prints.
 
@@ -643,8 +675,8 @@ on VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK
 | Does deleting the project's `.mcp.json` keep MCP servers from starting? | No, not alone. The SessionStart hook `state-sync.sh pull` runs `restore-root-adapters.sh`, which copies `.mcp.json` back from `.claude/bootstrap-root/` during the session. In a control run that deleted only the project file, the traced process tree showed 2 such copies inside the session and 3 MCP server launches (`uvx` for `semble`, `npx` for `context7` and for `context-mode`). The only connection attempts outside loopback in that run were 16 DNS lookups (8 to 1.1.1.1 and 8 to 8.8.8.8, port 53), all refused because the namespace had no route. The file was back after the run in 4 of 4 control runs. The first version of `mcp-none` read only discovery and session events: it printed `FAIL` in 1 of those 4 runs (the traced run, which is slower) and `PASS` in the other 3, because no MCP event reached the session before it ended. The check now also reads the project file after the session, and the same control failed in 4 of 4 runs. The probe deletes the mirror copy and the manifest line too; the traced run of the shipped probe shows 0 copies inside the session and 0 launches. A test runs the restore script on the prepared project. | Probe note, sections 2, 3, and 7 |
 | Does the run leave 127.0.0.1? | In one run, no. It ran in a network namespace with only loopback, traced with `strace -f`, counting `connect` calls: the whole process tree (Python, git, node, the runtime, the hooks) made 2 `connect` calls, both to 127.0.0.1. Only that run was traced. | Probe note, section 2 |
 | Does the run write to `~/.copilot`? | Not observed. After a run, none of its session ids was under `~/.copilot/session-state`, and no file under `~/.copilot` mentioned a probe folder. | Probe note, section 5 |
-| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The current version, with two sessions and 31 lines, took 13.61 and 11.72 seconds in two runs with a network. | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change |
-| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the first version of the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. With the file guard from before the Copilot tool-input change put into the temporary project, 11 of 31 lines failed and the probe exited 1: `helper-tools`, `read-agent-file`, `search-secret-denied`, `deny-workflow-run`, `deny-workflow-manage`, and the six patch checks. Checks of behavior that did not change, such as `sql-no-file-write` and `subagent-deny-git-reset`, still passed. | Probe note, section 4; run of 2026-11-17 for the Copilot tool-input change |
+| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The version with two sessions and 31 lines took 13.61 and 11.72 seconds in two runs with a network. The current version, with three sessions and 43 lines, took 15.20 and 16.64 seconds in two runs with a network (Phase C). | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt` |
+| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the first version of the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. With the file guard from before the Copilot tool-input change put into the temporary project, 11 of 31 lines failed and the probe exited 1: `helper-tools`, `read-agent-file`, `search-secret-denied`, `deny-workflow-run`, `deny-workflow-manage`, and the six patch checks. Checks of behavior that did not change, such as `sql-no-file-write` and `subagent-deny-git-reset`, still passed. With the guards from before Phase C and the `camel-rename` session added, 7 of 43 lines failed: the five `camel-deny-*` and the two `camel-ask-*` checks. Three controls with a wrong camelCase setup each failed the matching setup check, in two runs each: only the live hook file renamed (`camel-events-renamed`; the restore hook put the original names back), the Claude settings left on (`camel-hooks-source` and `camel-events-renamed`), and no event renamed (`camel-events-renamed`). In all three, the deny checks still passed, because the denies came from PascalCase events or from the Claude settings source, which is why the setup checks exist. | Probe note, section 4; run of 2026-11-17 for the Copilot tool-input change; `raw/phase-C-probe-output.txt`, `raw/phase-C-probe-negative-controls.txt` |
 
 The runtime's environment drops every variable whose name starts with `CLAUDE`
 or `ANTHROPIC`, and `GH_TOKEN`, `GITHUB_TOKEN`, and `COPILOT_GITHUB_TOKEN`.

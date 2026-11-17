@@ -5,7 +5,9 @@ The probe starts the runtime through its own SDK, with VS Code's `node`, a
 private data folder, and no login. A small server on 127.0.0.1 plays the model
 and returns scripted tool calls, so no model call is made and no account is
 needed. The runtime works in a fresh full install of this bootstrap in a
-temporary folder whose `.mcp.json` is removed, so no MCP server starts.
+temporary folder whose `.mcp.json` is removed, so no MCP server starts. A third
+session runs in a copy of that folder whose hook events have the documented
+camelCase names and whose Claude settings source is off.
 
 It does not exercise VS Code's own layer: approval dialogs, "Allow all", or the
 tool set VS Code gives each model. Nothing in the test suite, a hook, or
@@ -62,6 +64,20 @@ ABSENT = "no pre-tool hook event"
 CHILD_MARKER = "PROBE-CHILD-general"
 WORKFLOW_DENIAL = "Tool blocked by policy"
 SQL_REFUSAL = "Blocked SQL statement"
+# The documented camelCase names of the events the hook file uses (Phase C).
+CAMEL_EVENT_NAMES = {
+    "SessionStart": "sessionStart",
+    "PreToolUse": "preToolUse",
+    "PostToolUse": "postToolUse",
+    "Stop": "agentStop",
+}
+LIVE_HOOK_FILE = Path(".github/hooks/hooks.json")
+# `state-sync.sh pull` (a SessionStart hook) runs `restore-root-adapters.sh`, which
+# copies this mirror over the live file; a rename of the live file alone is undone
+# during the first session. The rename is applied to both.
+RESTORE_HOOK_FILE = Path(".claude/bootstrap-root/.github/hooks/hooks.json")
+CLAUDE_SETTINGS_FILE = Path(".claude/settings.json")
+CLAUDE_SETTINGS_OFF = Path(".claude/settings.json.off")
 
 
 @dataclass(frozen=True)
@@ -83,12 +99,15 @@ class SessionRecord:
         events: Every session event, as the runtime emitted it.
         summary: The runner's `record.json` (status, discovery, step ids, tools).
         failure: Why the session did not finish (limit, crash, runtime error), or "".
+        project: The folder the session ran in, so a check can read the files the
+            session left behind.
     """
 
     name: str = "main"
     events: list[dict[str, Any]] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
     failure: str = ""
+    project: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -110,11 +129,16 @@ class Check:
 
 @dataclass(frozen=True)
 class Session:
-    """One scripted session: how to build its scenario and what to check."""
+    """One scripted session: how to build its scenario and what to check.
+
+    `renamed_events` runs the session in the copy of the project that has
+    camelCase hook events and no Claude settings source.
+    """
 
     name: str
     scenario: Callable[[Path], dict[str, object]]
     checks: tuple[Check, ...]
+    renamed_events: bool = False
 
 
 @dataclass(frozen=True)
@@ -267,6 +291,54 @@ def _remove_mcp_file(project: Path) -> None:
     manifest.write_text("".join(kept), encoding="utf-8")
 
 
+def _rename_events(path: Path, relative: Path) -> None:
+    """Give the hook file at `path` the camelCase event names, keeping its hooks."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        hooks = data["hooks"]
+        if not isinstance(hooks, dict):
+            raise TypeError("`hooks` is not an object")
+        missing = sorted(set(CAMEL_EVENT_NAMES) - set(hooks))
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise RuntimeError(f"cannot read the events of {relative}: {error}") from error
+    if missing:
+        raise RuntimeError(f"{relative} has no {', '.join(missing)} event")
+    data["hooks"] = {
+        CAMEL_EVENT_NAMES.get(name, name): value for name, value in hooks.items()
+    }
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def prepare_camel_project(project: Path, work: Path) -> Path:
+    """Copy `project` and rename its hook events to camelCase, in the copy only.
+
+    The Claude settings file is renamed to `settings.json.off` in the copy, so only
+    the Copilot hook file runs: the runtime reads `.claude/settings.json` too, and
+    its PascalCase hooks would deny the same calls on their own.
+
+    Args:
+        project: The prepared project. Copy it before any session has run in it.
+        work: An existing folder; the copy is created inside it.
+
+    Returns:
+        The copy, `work/project-camel`.
+
+    Raises:
+        RuntimeError: If a hook file lacks an event to rename, or the Claude
+            settings file is missing.
+        OSError: If the copy fails.
+    """
+    copy = work / "project-camel"
+    shutil.copytree(project, copy, symlinks=True)
+    for relative in (LIVE_HOOK_FILE, RESTORE_HOOK_FILE):
+        _rename_events(copy / relative, relative)
+    settings = copy / CLAUDE_SETTINGS_FILE
+    if not settings.is_file():
+        raise RuntimeError(f"{CLAUDE_SETTINGS_FILE} is missing from the project")
+    settings.rename(copy / CLAUDE_SETTINGS_OFF)
+    return copy
+
+
 # --- running the runtime ---------------------------------------------------
 
 
@@ -389,7 +461,9 @@ def run_session(
         "scenario": scenario,
     }
     summary, failure = _launch(runtime, config, timeout)
-    return SessionRecord(name, _read_events(out / "events.jsonl"), summary, failure)
+    return SessionRecord(
+        name, _read_events(out / "events.jsonl"), summary, failure, project
+    )
 
 
 # --- reading events --------------------------------------------------------
@@ -630,6 +704,53 @@ def hooks_from_both_sources(phase: str) -> Callable[[SessionRecord], tuple[bool,
     return judge
 
 
+def only_copilot_hook_file(record: SessionRecord) -> tuple[bool, str]:
+    """After trust, the Copilot hook file loads and the Claude settings do not."""
+    rows = _hook_rows(_dict(record.summary.get("discovery")).get("trusted"))
+    if rows is None:
+        return False, "no hook list was recorded for trusted"
+    counts = Counter(_hook_file(row) for row in rows)
+    github, claude = HOOK_FILES
+    if counts[claude]:
+        return False, f"{counts[claude]} hooks still load from {claude}"
+    if counts["other"]:
+        return False, f"{counts['other']} hooks load from another file"
+    if not any(
+        _hook_file(row) == github and _dict(row).get("hookType") == GUARD_EVENT
+        for row in rows
+    ):
+        return False, f"no {GUARD_EVENT} hook from {github} (found {len(rows)} hooks)"
+    return True, f"{len(rows)} hooks, all from {github}"
+
+
+def events_renamed(record: SessionRecord) -> tuple[bool, str]:
+    """After the session, the camelCase rename and the switched-off Claude settings stand.
+
+    The files are read after the run, so the check does not depend on when an
+    event arrives. A hook that restores the original hook file would show here.
+    """
+    project = record.project
+    if project is None:
+        return False, "no project folder was recorded"
+    expected = sorted(CAMEL_EVENT_NAMES.values())
+    for relative in (LIVE_HOOK_FILE, RESTORE_HOOK_FILE):
+        try:
+            found = sorted(json.loads((project / relative).read_text("utf-8"))["hooks"])
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            return False, f"cannot read {relative} after the session: {error}"
+        if found != expected:
+            return False, (
+                f"{relative} has events {found} after the session, expected {expected}"
+            )
+    if (project / CLAUDE_SETTINGS_FILE).exists():
+        return False, f"{CLAUDE_SETTINGS_FILE} is back after the session"
+    if not (project / CLAUDE_SETTINGS_OFF).is_file():
+        return False, f"{CLAUDE_SETTINGS_OFF} is missing after the session"
+    return True, (
+        f"events {', '.join(expected)} in both hook files; Claude settings still off"
+    )
+
+
 def mcp_none(record: SessionRecord) -> tuple[bool, str]:
     """No MCP server after trust or in the session, and no MCP file after the session.
 
@@ -814,6 +935,38 @@ def codex_patch_scenario(project: Path) -> dict[str, object]:
     }
 
 
+# Each `camel-rename` step repeats the baseline step named here, with the same input.
+CAMEL_TWINS = {
+    "camel-deny-git-reset": "deny-git-reset",
+    "camel-deny-secret-rm": "deny-secret-rm",
+    "camel-ask-vscode-settings": "ask-vscode-settings",
+    "camel-ask-agent-wrapper": "ask-agent-wrapper",
+    "camel-deny-branch": "deny-branch",
+    "camel-deny-commit": "deny-commit",
+    "camel-deny-pr": "deny-pr",
+    "camel-allow-plain-bash": "allow-plain-bash",
+    "camel-allow-plain-view": "allow-plain-view",
+    "camel-allow-plain-create": "allow-plain-create",
+    "camel-allow-plain-edit": "allow-plain-edit",
+}
+
+
+def camel_rename_scenario(project: Path) -> dict[str, object]:
+    """The baseline's gate steps, run where the hook events have camelCase names."""
+    baseline: Any = baseline_scenario(project)["steps"]
+    twins = {step["label"]: step for step in baseline}
+    return {
+        "name": "camel-rename",
+        "model": "probe-model",
+        "marker": "PROBE-MARKER",
+        "subfolder": "docs/deeper",
+        "timeoutMs": SEND_TIMEOUT_MS,
+        "steps": [
+            {**twins[twin], "label": label} for label, twin in CAMEL_TWINS.items()
+        ],
+    }
+
+
 BASELINE_CHECKS = (
     Check("hooks-untrusted", hooks_untrusted),
     Check("hooks-sources", hooks_from_both_sources("trusted")),
@@ -869,9 +1022,48 @@ CODEX_PATCH_CHECKS = (
     asked("patch-agent-ask", "patch-agent"),
     asked("patch-indented-hook-ask", "patch-indented-hook"),
 )
+# Same expected values as the baseline twins. The nested-only answer is ignored
+# under camelCase event names (F4), so these fail until the guards also print the
+# top-level answer. With one hook source the runtime raises one question, not two.
+CAMEL_CHECKS = (
+    Check("camel-hooks-source", only_copilot_hook_file),
+    Check("camel-events-renamed", events_renamed),
+    Check("camel-mcp-none", mcp_none),
+    denied(
+        "camel-deny-git-reset",
+        "camel-deny-git-reset",
+        "Blocked dangerous git operation",
+    ),
+    denied(
+        "camel-deny-secret-rm",
+        "camel-deny-secret-rm",
+        "Protected file blocked by policy: .env",
+    ),
+    denied(
+        "camel-deny-commit",
+        "camel-deny-commit",
+        "commit gate failed for github-copilot",
+    ),
+    denied("camel-deny-branch", "camel-deny-branch", *BRANCH_GUARD_REASONS),
+    denied(
+        "camel-deny-pr",
+        "camel-deny-pr",
+        "PR/push gate only allows implementation branches",
+    ),
+    asked("camel-ask-vscode-settings", "camel-ask-vscode-settings"),
+    asked("camel-ask-agent-wrapper", "camel-ask-agent-wrapper"),
+    allowed(
+        "camel-allow-plain",
+        "camel-allow-plain-bash",
+        "camel-allow-plain-view",
+        "camel-allow-plain-create",
+        "camel-allow-plain-edit",
+    ),
+)
 SESSIONS = (
     Session("main", baseline_scenario, BASELINE_CHECKS),
     Session("codex-patch", codex_patch_scenario, CODEX_PATCH_CHECKS),
+    Session("camel-rename", camel_rename_scenario, CAMEL_CHECKS, renamed_events=True),
 )
 
 
@@ -955,6 +1147,8 @@ def run_probe(runtime: RuntimeInfo, work: Path) -> int:
     deadline = time.monotonic() + RUN_LIMIT_SECONDS
     try:
         project = prepare_project(work, deadline)
+        # Copied before any session runs: the sessions leave files behind.
+        camel_project = prepare_camel_project(project, work)
     except (RuntimeError, OSError) as error:
         print(f"{FAIL} project: {error}")
         return 1
@@ -974,8 +1168,9 @@ def run_probe(runtime: RuntimeInfo, work: Path) -> int:
                 )
             )
             continue
+        folder = camel_project if session.renamed_events else project
         record = run_session(
-            runtime, project, session.scenario(project), home, timeout=budget
+            runtime, folder, session.scenario(folder), home, timeout=budget
         )
         if runtime_version == "unknown":
             runtime_version = _version_of(record.summary)

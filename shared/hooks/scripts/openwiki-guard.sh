@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=_lib-frontmatter.sh
 . "$SCRIPT_DIR/_lib-frontmatter.sh"
 
+# This guard has no client argument. An empty id keeps the answer shape of
+# _lib-frontmatter.sh the same for every client; never inherited.
+TARGET_ID=""
 MODE="${1:-}"
 INPUT="$(cat)"
 

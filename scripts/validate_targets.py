@@ -1809,6 +1809,33 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
     return errors
 
 
+def copilot_guard_target_errors(hooks: object) -> list[str]:
+    """Return an error for each Copilot guard that does not name its client.
+
+    Every guard under `PreToolUse` takes `github-copilot` as its last argument in
+    the `bash`, `linux`, and `osx` fields. Without it a guard answers with the
+    nested object only, which the Copilot runtime ignores under camelCase event
+    names, so a rename of the events would switch that guard's denies off.
+    """
+    guards = hooks.get("PreToolUse") if isinstance(hooks, dict) else None
+    if not isinstance(guards, list) or not guards:
+        return ["Copilot hooks need a non-empty PreToolUse list of guards"]
+    errors: list[str] = []
+    for guard in guards:
+        if not isinstance(guard, dict):
+            errors.append("Copilot PreToolUse guard must be an object")
+            continue
+        for field in ("bash", "linux", "osx"):
+            words = str(guard.get(field, "")).split()
+            if words[-1:] != ["github-copilot"]:
+                script = words[-1] if words else "?"
+                errors.append(
+                    f"Copilot PreToolUse guard {script} must end its {field} "
+                    "command with github-copilot"
+                )
+    return errors
+
+
 def antigravity_hook_errors(hooks: object) -> list[str]:
     """Return structural errors for the intentionally minimal safety hook."""
     if not isinstance(hooks, dict) or set(hooks) != {"bootstrap-safety"}:
@@ -3677,6 +3704,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
     github_hook_text = json.dumps(github_hooks)
+    errors.extend(copilot_guard_target_errors(github_hooks.get("hooks")))
     check(
         ".claude/hooks/scripts/" in github_hook_text,
         "GitHub hooks should invoke shared .claude hook scripts",
@@ -12607,7 +12635,11 @@ def validate_runtime_drift_cases(errors: list[str]) -> None:
 
 
 def validate_hook_gate_regression_tests(errors: list[str]) -> None:
-    """Run the five required hook-gate smoke tests when `pytest` is available."""
+    """Run the hook-gate smoke tests listed under `__main__` in `tests/test_hook_gates.py`.
+
+    They run when `pytest` is available, as a script, so each CI leg (Linux and
+    macOS) runs them with that host's own `tr` and bash.
+    """
     if importlib.util.find_spec("pytest") is None:
         errors.append(
             "tests/test_hook_gates.py requires pytest; run in the repository "
