@@ -505,6 +505,121 @@ An update retains that mode unless you explicitly select the opposite
 are bootstrap-owned by the active mode are removed safely; consumer state and
 the nested repository metadata are retained.
 
+#### Copilot runtime probe
+
+VS Code hooks are "in preview". The Copilot runtime that ships inside VS Code
+runs repository hooks, and its version changes with VS Code. The probe is an
+opt-in check that runs that real runtime offline, so a change in what the
+guards do on it shows up as a failed check.
+
+```bash
+uv run python scripts/check_copilot_runtime.py --require
+```
+
+It is opt-in. `verify.py`, the hooks, and the pytest suite never call it. The
+pytest file `tests/test_check_copilot_runtime.py` tests the probe's own logic on
+recorded event shapes and never starts Node or the runtime.
+
+**What it does.** It starts the runtime through its own SDK, with VS Code's
+`node`, a private data folder, and no login. A small server on 127.0.0.1 plays
+the model and returns scripted tool calls. So it makes no model call, needs no
+account, and uses no network beyond 127.0.0.1 in its own code. It installs a
+fresh full copy of this bootstrap into a temporary folder (`git init -b dev`, no
+commit) and removes the project's `.mcp.json`, its restore copy, and its manifest
+line, so no MCP server starts (see the evidence table). It removes the temporary
+folder when it ends, unless you pass `--keep`. A session stops
+after 150 seconds and the whole run after 480 seconds; either is reported as
+`FAIL`.
+
+```mermaid
+flowchart LR
+    P[check_copilot_runtime.py] --> N[VS Code node]
+    N --> R[Copilot runtime]
+    R <--> M[Scripted model<br>127.0.0.1]
+    R --> H[Project hooks]
+    P --> T[Temporary project]
+```
+
+The diagram shows what one run starts. The temporary project is where the
+runtime and its hooks work.
+
+It prints the VS Code commit, the SDK version, and the runtime version from
+`client.getStatus()`. Then it prints one line per check and, for each session,
+the tool inventory: each tool the model was offered, with its input keys. The
+baseline checks are:
+
+- before folder trust, discovery lists 0 hooks (`hooks-untrusted`);
+- after trust, hooks load from both `.github/hooks/hooks.json` and
+  `.claude/settings.json`, from the project root and from a folder two levels
+  below it (`hooks-sources`, `hooks-subfolder`);
+- no MCP server is discovered after trust, none is reported in the session
+  events, and the project has no `.mcp.json` after the session (`mcp-none`; the
+  file check does not depend on timing);
+- the guards deny a hard reset, a force push, a secret file removal, a secret
+  file read, a branch, a commit, and a pull request (`deny-*`), ask for the
+  `.vscode/settings.json` and agent-wrapper edits (`ask-*`), and allow plain
+  work (`allow-plain`).
+
+These are 14 checks. The probe also prints a fifteenth line, `session-main`: it
+is `PASS` when the session finished, and `FAIL` for a timeout, a crash, a
+runtime error, or a run limit used up before the session could start. When it
+cannot build the temporary project within the run limit, it prints
+`FAIL project` and runs no session. So the counts of failed lines in the table
+below (for example "12 of 15") are out of 15 lines.
+
+**What it does not prove.** It does not run VS Code's own layer: approval
+dialogs, "Allow all", Autopilot, or the tool set VS Code gives each model.
+VS Code can give a model a different tool set than the runtime's own list for that model.
+In the real VS Code, Auto chose `gpt-6-luna` and VS Code gave it the patch tool
+`apply_patch`, while the runtime's own list gives that model `create` and `edit`
+(evidence A4). The printed inventory is the runtime's list for the model name
+`probe-model`. The probe makes no claim about Copilot CLI, Copilot
+cloud agents, or any runtime version other than the one it prints.
+
+**Finding the runtime.** Without `--vscode-bin`, it takes the folder under
+`~/.vscode-server/bin/` with the newest modification time that holds both `node`
+and `node_modules/@github/copilot-sdk/dist/index.js`. Only a VS Code server
+folder is known to ship a separate `node`. A desktop install needs
+`--vscode-bin DIR`, where `DIR` holds both files. With no runtime found, it
+prints `WARN` and exits 0, or prints `FAIL` and exits 1 with `--require`.
+`--discover DIR` prints what the runtime finds in `DIR` (hooks, MCP servers,
+instructions, skills, agents) and starts no session. It adds no folder trust, so
+it lists no repository hooks or MCP servers.
+
+**Not the agent host.** The probe starts the runtime through the SDK, not
+through VS Code's agent host. So the missing `/run/user/<uid>` folder that
+freezes a Copilot chat in VS Code (evidence A1) does not stop it, and the probe
+cannot detect that fault.
+
+**Evidence behind the design.** Evidence folder:
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`. The
+"probe note" is
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/raw/phase-A-probe-evidence.txt`.
+It holds the command, the date and time, and the output lines for each figure
+below that comes from a run of this script. Those runs were made on 2026-11-17
+on VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK
+`1.0.30-preview.0`, runtime `1.0.108-0`.
+
+| Unknown | Result | Evidence |
+| --- | --- | --- |
+| Can the SDK start the runtime with no account and a private data folder? | Yes. `getStatus()` returned the runtime version; sessions ran. | `raw/outcomes-g-both.txt`; probe note, section 1 |
+| Can a scripted model on 127.0.0.1 drive real tool calls? | Yes. 13 scripted calls ran in 14 model replies. | `raw/outcomes-g-both.txt`; probe note, section 1 |
+| Do repository hooks load only for a trusted folder? | Yes. In a fresh install the probe counted 0 hooks before trust and 26 after trust (12 from `.github/hooks/hooks.json`, 14 from `.claude/settings.json`). The raw files show the same 12 and 14 for the two sources in an older test project, which also had two logging hook files (54 hooks in total). | Probe note, sections 1 and 6; `raw/discover-before-trust.txt`; `raw/discover-after-trust-hooks-and-mcp.txt` |
+| Do both hook files load from a subfolder two levels down? | Yes, on `1.0.108-0`. | P4; `raw/planning-probe-p4-subfolder-discovery.txt` |
+| How do a deny and a guard question appear in session events? | A deny is a `hook.end` of `preToolUse` whose output reads `Denied by preToolUse hook: <reason>`, with `tool.execution_complete` `success: false`. A question is a `permission.requested` of kind `hook`; with both hook files, a protected edit raises two. | `raw/outcomes-g-both.txt`; F3 |
+| Does every tool run have a pre-tool hook event? | No. The runtime's own read of a finished shell has none. The probe judges only its scripted steps, and a scripted step with no hook event is a `FAIL`. | P3 |
+| Does deleting the project's `.mcp.json` keep MCP servers from starting? | No, not alone. The SessionStart hook `state-sync.sh pull` runs `restore-root-adapters.sh`, which copies `.mcp.json` back from `.claude/bootstrap-root/` during the session. In a control run that deleted only the project file, the traced process tree showed 2 such copies inside the session and 3 MCP server launches (`uvx` for `semble`, `npx` for `context7` and for `context-mode`). The only connection attempts outside loopback in that run were 16 DNS lookups (8 to 1.1.1.1 and 8 to 8.8.8.8, port 53), all refused because the namespace had no route. The file was back after the run in 4 of 4 control runs. The first version of `mcp-none` read only discovery and session events: it printed `FAIL` in 1 of those 4 runs (the traced run, which is slower) and `PASS` in the other 3, because no MCP event reached the session before it ended. The check now also reads the project file after the session, and the same control failed in 4 of 4 runs. The probe deletes the mirror copy and the manifest line too; the traced run of the shipped probe shows 0 copies inside the session and 0 launches. A test runs the restore script on the prepared project. | Probe note, sections 2, 3, and 7 |
+| Does the run leave 127.0.0.1? | In one run, no. It ran in a network namespace with only loopback, traced with `strace -f`, counting `connect` calls: the whole process tree (Python, git, node, the runtime, the hooks) made 2 `connect` calls, both to 127.0.0.1. Only that run was traced. | Probe note, section 2 |
+| Does the run write to `~/.copilot`? | Not observed. After a run, none of its session ids was under `~/.copilot/session-state`, and no file under `~/.copilot` mentioned a probe folder. | Probe note, section 5 |
+| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. | Probe note, sections 1 and 2 |
+| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. | Probe note, section 4 |
+
+The runtime's environment drops every variable whose name starts with `CLAUDE`
+or `ANTHROPIC`, and `GH_TOKEN`, `GITHUB_TOKEN`, and `COPILOT_GITHUB_TOKEN`.
+Hooks inherit the runtime's environment, so the agent that starts the probe
+must not look like the client under test, and the runtime has no token to sign
+in with.
+
 ### Google Antigravity ownership
 
 `.agents/` is a bootstrap-owned root adapter, like `.codex/`. A consumer has one
