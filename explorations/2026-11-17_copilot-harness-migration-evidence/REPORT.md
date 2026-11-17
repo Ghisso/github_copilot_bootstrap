@@ -401,6 +401,40 @@ hooklog.sh> both` adds the logging hooks used here.
 6. Whether text from a `userPromptSubmitted` hook reaches the model.
 7. When `sessionEnd` fires (closing the chat, closing the window).
 
+## Addendum, 2026-11-17 16:40: first attempt at the VS Code checks
+
+The user opened the test folder `~/copilot-harness-probe-20261117` in VS Code
+1.146.0. The Local harness worked; switching to the Copilot harness or
+opening a new session froze. Two facts came out of the logs.
+
+**A1. The freeze is an environment fault, not a bootstrap fault (Source:
+VS Code's own logs).** The VS Code process that runs Copilot-harness
+sessions (the "agent host") could not start. `agenthost.log` under
+`~/.vscode-server/data/logs/20261117T151427/` shows 198 starts, each ending
+in `listen EACCES: permission denied
+/run/user/1000/vscode-ipc-<id>.sock`. The folder `/run/user/1000` did not
+exist in that WSL session (`XDG_RUNTIME_DIR` pointed at it;
+`user-runtime-dir@1000.service` and `user@1000.service` were inactive;
+`loginctl` listed no session). The same loop is in the logs of 2026-10-26 and
+2026-11-12, and absent from seven other VS Code server sessions, where the
+agent host listened on a socket under `/tmp`. No hook ran in any
+Copilot-harness session on this computer during the attempt, so the three
+checks are still open.
+
+**A2. On this computer the Local harness also runs the Claude Code hooks
+(Run, in the real VS Code).** The user's VS Code settings contain
+`"chat.useClaudeHooks": true`. VS Code's `GitHub Copilot Chat Hooks.log`
+shows "[SessionStart] Executing 8 hook(s)": three from
+`.github/hooks/hooks.json`, three from `.claude/settings.json` (with the
+`claude-code` argument), and the two probe loggers. So the double run of F2
+already happens on the Local harness here. In that Local run the hooks'
+environment had no `COPILOT_CLI=1` (only
+`COPILOT_CLI_ENABLED_FEATURE_FLAGS` and `COPILOT_OTEL_FILE_EXPORTER_PATH`),
+and every hook, camelCase-named or not, received the Local format
+(`hook_event_name`, `session_id`, `transcript_path`). The reporting reminder
+from the Claude settings ran at `UserPromptSubmit` and returned its nested
+`additionalContext`.
+
 ## Corrections to earlier statements in this session
 
 - "The guards must read a different tool-call format" was wrong. They read
