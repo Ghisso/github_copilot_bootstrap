@@ -124,3 +124,69 @@ uv run python .claude/scripts/verify.py fast --format text               : fast:
 Not run this round (as asked): the full suite, the byte-identity battery. No hook script changed bytes except a
 comment in _lib-frontmatter.sh (json_escape's comment), so the battery of phase-C-byte-identity-battery.txt still
 describes the code.
+
+
+=============================================================================
+Fix round 1, part 2 (2026-11-17): the second `tr` set is 31 spaces
+=============================================================================
+Decision: the second set has one space for each of the 31 characters, so the mapping is position for position and
+needs no padding rule. The form `printf -v spaces '%31s' ''` is a bash builtin (since 3.1), so it needs no fork and
+no hand-counted literal; the simpler bare `' '` was not used because it depends on the padding rule of each `tr`.
+Final code (shared/hooks/scripts/_lib-frontmatter.sh):
+
+json_escape() {
+  local spaces
+  printf -v spaces '%31s' ''
+  printf '%s' "$1" | tr '\001-\037' "$spaces" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+The comment above it says: one space for each of the 31 characters, position for position, no padding rule (POSIX
+leaves a shorter second set unspecified, and BusyBox `tr` does not read `[c*]`); run on GNU `tr` and BusyBox `tr`
+1.36.1; not run on macOS or BSD `tr`. The T3 row in docs/target-mapping.md says the same.
+
+== 1. BusyBox evidence ==
+(a) the new tr call on `printf 'a\tb\nc'`, and (b) json_escape and deny_pretool with `tr` resolved to BusyBox (a scratch
+folder first in PATH holds a `tr` link to /usr/bin/busybox; the first help line shows BusyBox v1.36.1). The reason
+holds a tab, a newline, a backslash, and a quote. Expect spaces and valid JSON.
+  printf 'a\tb\nc' | GNU tr '\001-\037' <31 spaces> | od -c : 0000000   a       b       c
+  printf 'a\tb\nc' | busybox tr '\001-\037' <31 spaces> | od -c : 0000000   a       b       c
+  [GNU tr] command -v tr / first help line: '/usr/bin/tr\nUsage: tr [OPTION]... STRING1 [STRING2]'
+  [GNU tr] json_escape 'tab\there\nnewline backslash\\ quote" end' -> 'tab here newline backslash\\\\ quote\\" end'
+  [GNU tr] deny_pretool as github-copilot: valid JSON, reason round-trips to 'tab here newline backslash\\ quote" end'; equals the text with each control character replaced by a space: True
+  [GNU tr] deny_pretool as claude-code: valid JSON, reason round-trips to 'tab here newline backslash\\ quote" end'; equals the text with each control character replaced by a space: True
+  [busybox tr first in PATH] command -v tr / first help line: '<scratch>/tr\nBusyBox v1.36.1 (Ubuntu 1:1.36.1-6ubuntu3.1) multi-call binary.'
+  [busybox tr first in PATH] json_escape 'tab\there\nnewline backslash\\ quote" end' -> 'tab here newline backslash\\\\ quote\\" end'
+  [busybox tr first in PATH] deny_pretool as github-copilot: valid JSON, reason round-trips to 'tab here newline backslash\\ quote" end'; equals the text with each control character replaced by a space: True
+  [busybox tr first in PATH] deny_pretool as claude-code: valid JSON, reason round-trips to 'tab here newline backslash\\ quote" end'; equals the text with each control character replaced by a space: True
+
+== 2. Byte-identity battery against 5d229e5, and the T3 harness ==
+Battery (harness: phase-C-battery-harness.py.txt; report refreshed in phase-C-byte-identity-battery.txt):
+  comparisons: 19918; differences: 0
+  github-copilot comparisons with an answer: 944; with no answer (allow, both trees): 3425
+  library functions (no control character): 400 / 0 / 395   (section: library functions, runs / differences / old printed an answer)
+  library functions (control characters; planned T3 change): 250 / 0 / 250
+  duration: 5m57.450s
+T3 harness (phase-C-t3-control-characters.txt refreshed): 24 of 24 "after == the old code on the text with each control
+character replaced by a space" lines are True for the three other clients; 0 lines are False; the 20 INVALID JSON
+lines are all "before" lines; every "after" line is valid JSON; the github-copilot top-level value equals the nested value.
+
+== 3. Tests ==
+test_every_control_character_in_a_reason_becomes_one_space: 5 passed (None and the four clients).
+six-file pytest line: 3643 passed in 216.50s (0:03:36)
+
+== 4. Commands ==
+uv run python scripts/generate_targets.py --all                          : generated multi-agent and sidecar
+uv run python scripts/install_bootstrap.py . --allow-self --local-only   : done; installed copies match shared/ (restore-root-adapters.sh differs by design: placeholder substituted)
+uv run python scripts/validate_targets.py                                : exit 0, PASS generated target is structurally valid
+uv run python scripts/check_runtime.py                                   : exit 0, PASS generated runtime wiring is present
+uv run python scripts/check_copilot_runtime.py --require                 : Result: PASS (0 of 43 checks failed), exit 0, 0m14.932s
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases : Success: no issues found in 43 source files
+uv run ruff check shared scripts tests                                   : All checks passed
+uv run ruff format --check shared scripts tests                          : 43 files already formatted
+uv run python .claude/scripts/verify.py fast --format text               : fast: PASS
+
+== 5. Full suite, timed, nothing else running ==
+uv run pytest tests/ -q --tb=short
+5756 passed, 1 skipped in 423.42s (0:07:03)
+exit=0
+wall clock (/usr/bin/time, includes uv start-up): 7:27.78
