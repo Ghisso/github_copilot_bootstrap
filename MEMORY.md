@@ -16,8 +16,9 @@
   agent workflow bootstrap from `shared/` into `dist/multi-agent/` (full; Claude
   Code, Codex, Copilot, Antigravity) and `dist/sidecar/` (personal overlay); it
   is not a Hydra/BentoML/Haystack/Gradio application and has no `src/` or
-  `pyproject.toml`. Durable project context (refreshed 2026-11-15 at
-  `2e8c7bb`): `.claude/instructions/project-context.instructions.md`.
+  `pyproject.toml`. Durable project context (refreshed 2026-11-17 at
+  `2e8c7bb`; PR #57 released `dev` to `main` on 2026-11-15):
+  `.claude/instructions/project-context.instructions.md`.
 - [LEARN:domain] Context Mode 1.x (pinned until the 2026-11-12
   `context-mode-2x-migration`) checks the npm registry at startup and every
   hour (the "outdated → v… available" notice; no setting turns it off), and

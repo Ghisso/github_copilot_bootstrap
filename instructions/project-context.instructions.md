@@ -40,10 +40,18 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   characters, except `ponytail` and `ponytail-review`, whose text is pinned
   to upstream by hash. Niche library lessons live as `references/` files
   inside `haystack` and `data-and-graph-pitfalls`. `onboard` is one of the 37.
-- `shared/agents/`: canonical agent metadata and target-neutral prompts.
-- `shared/review-profiles/`: profile checklists used by the unified reviewer.
+- `shared/agents/`: canonical agent metadata and target-neutral prompts, one
+  folder per agent. Five agents are universal (`orchestrator`, `planner`,
+  `coder`, `reviewer`, `documenter`), two are Codex-only (`luna_coder`,
+  `sol_coder`), and one is Antigravity-only (`antigravity_flash_coder`).
+- `shared/review-profiles/`: ten profile checklists used by the unified
+  reviewer.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
-  including `context-mode-dispatch.sh` (pins Context Mode `2.1.8`).
+  including `context-mode-dispatch.sh` (pins Context Mode `2.1.8`). Its
+  `git-hooks/` folder holds the real Git hooks `commit-msg`, `post-commit`,
+  and `pre-push`.
+- `shared/prompts/`: reusable prompt templates copied into a consumer's
+  `.claude/prompts/`; today it holds only a placeholder `README.prompt.md`.
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
   (Context Mode is filtered to exactly three tools: `ctx_index`,
   `ctx_search`, `ctx_stats`; Antigravity gets no Context Mode entry).
@@ -214,11 +222,19 @@ When adding new hook Python code, verify it compiles under Python 3.9 with `pyth
 ## Current status and verification
 
 Onboarding was refreshed on `dev` at `2e8c7bb` (the merge of PR #56) on
-2026-11-15. `dev` matched `origin/dev`. `uv run python
-scripts/check_runtime.py` exited 0 with 22 PASS lines and one expected WARN: the
-global `context-mode` on this host is still 1.0.169, so the dispatcher
-refuses it and uses `npx -y context-mode@2.1.8`. `uv run pytest tests/ -q`
-gave 5243 passed, 1 skipped (about 6 minutes).
+2026-11-17. No tracked file has changed since the 2026-11-15 refresh, and
+`dev` matched `origin/dev`. `uv run python scripts/check_runtime.py` exited 0
+with 22 PASS lines and one expected WARN: the global `context-mode` on this
+host is still 1.0.169, so the dispatcher refuses it and uses
+`npx -y context-mode@2.1.8`. `uv run pytest tests/ -q` gave 5243 passed,
+1 skipped (about 6 minutes) at this same commit on 2026-11-15; it was not run
+again on 2026-11-17.
+
+The tracked documents (`README.md`, `SECURITY.md`, root `CLAUDE.md` and
+`AGENTS.md`, and the undated files in `docs/`) were checked against the code
+on 2026-11-17: every source path they name exists, the pinned versions and
+the skill count match, and the README agent table, hook list, and verifier
+options match the source. Nothing needed a change.
 
 Pull requests merged into `dev` since the 2026-11-12 refresh:
 
@@ -231,9 +247,12 @@ Pull requests merged into `dev` since the 2026-11-12 refresh:
   from 55 to 37 with the 300-character cap; and the installer's link and
   wrong-kind refusals (Phases F and H).
 
-`origin/main` was last updated on 2026-10-23 by PR #50 (`dev` into `main`);
-`dev` is 28 commits ahead of it. Releasing `dev` to `main` is the user's
-call. No implementation branch is unmerged.
+PR #57 (`217b3ca`, 2026-11-15) merged `dev` into `main`, so `origin/main`
+holds everything on `dev`, and `dev` is 0 commits ahead of it. The local
+`main` branch on this computer is still at PR #50 (`d514277`, 2026-10-23),
+29 commits behind `origin/main`; it can be fast-forwarded, and doing so is
+the user's call. No implementation branch is unmerged; the remote has only
+`dev`, `main`, and `ai-state`.
 
 Open follow-ups to start from:
 
@@ -248,19 +267,34 @@ Open follow-ups to start from:
   and `.gitattributes` appends, and the `settings.local.json` restore). The
   sidecar note suggests one small plan for both.
 
-On 2026-11-15 none of the four local full consumers (`~/work/RAG`,
+All four local full consumers (`~/work/RAG`,
 `~/work/git_projects/img-classification`, `industrial-inspection`, and
-`schema-bootstrap-llm-wiki`) had been refreshed since October: each still
-had 52 to 58 skill folders under `.claude/skills/` (the pre-trim set). The
-user has other consumers on other computers, so this list is not complete.
-A refresh through `scripts/update_consumers.py` brings MCP-only Context Mode
-2.1.8 (Node.js 24.15.0 or newer on the host or in a rebuilt devcontainer),
-the 37-skill set, and the new refusals. The `safe-consumer-bootstrap-refresh`
-skill maps the 20 retired skills and explains the refusals. Consumer MEMORY
-entries that name removed skills (RAG 14, industrial-inspection 1) need an
-update at that refresh, and consumers installed at `76887a8` (2026-08-22)
-cannot refresh because of an older takeover rule. Refreshing is the user's
-call.
+`schema-bootstrap-llm-wiki`) were refreshed on 2026-11-15 at 14:29 UTC. Each
+nested `.claude` repository has a `bootstrap: update` commit from that
+minute; `img-classification` first got a `migrate: import pre-git state`
+commit. Checked on 2026-11-17: each has the Context Mode `2.1.8` pin and the
+37 shipped skills, and its `.claude/scripts/verify.py`,
+`closeout.instructions.md`, and `safe-consumer-bootstrap-refresh` skill are
+byte-identical to `dist/multi-agent/`. Two things are still open there:
+
+- The consumer MEMORY entries that name retired skills were not updated at
+  the refresh. `~/work/RAG/.claude/MEMORY.md` still has 14 such lines and
+  `industrial-inspection` has 1. The `safe-consumer-bootstrap-refresh` skill
+  maps the 20 retired skills to where their content went.
+- `RAG` and `schema-bootstrap-llm-wiki` each keep two empty folders,
+  `.claude/skills/iterative-plan-review` and `.claude/skills/retrieval-routing`
+  (dated 2026-08-09; both were bootstrap skills retired in July). The
+  obsolete-file cleanup in `install_bootstrap.py` removes a folder only after
+  it deletes a file inside it, so an already-empty folder stays. The refresh
+  ran with them present. They are harmless and can be deleted by hand.
+
+The user has other consumers on other computers, so this list is not
+complete. For a consumer not yet refreshed, a refresh through
+`scripts/update_consumers.py` brings MCP-only Context Mode 2.1.8 (Node.js
+24.15.0 or newer on the host or in a rebuilt devcontainer), the 37-skill
+set, and the new refusals; the `safe-consumer-bootstrap-refresh` skill
+explains the refusals. Consumers installed at `76887a8` (2026-08-22) cannot
+refresh because of an older takeover rule. Refreshing is the user's call.
 
 Pinned versions: Context Mode `2.1.8` (`PINNED_CONTEXT_MODE_VERSION` in
 `shared/hooks/scripts/context-mode-dispatch.sh`), OpenWiki `0.7.2` (the guard
