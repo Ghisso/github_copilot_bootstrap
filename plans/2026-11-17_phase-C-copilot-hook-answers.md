@@ -175,6 +175,13 @@ the PascalCase rule, which removes the output blocker for a later rename.
   - Step 1, after review round 1: the suite covers the `fail_closed` paths
     of every guard for the Copilot shape (42 more cases), not only
     `git-protection.sh` and the library function.
+  - Step 1, after review round 2: one test runs `json_escape` with a stub
+    `tr` that refuses a second set that is not 31 characters long, because
+    GNU `tr` pads a short set and hides that regression. The script form
+    of `tests/test_hook_gates.py`, which the CI workflow runs on Linux and
+    macOS, also calls the control-character test; the docstring of
+    `validate_hook_gate_regression_tests` in `scripts/validate_targets.py`
+    no longer states a count.
   - Step 6 also changes `tests/test_check_copilot_runtime.py` and the probe
     section of `docs/runtime-checks.md`. Three setup checks are added to
     the eight planned ones: `camel-hooks-source`, `camel-events-renamed`,

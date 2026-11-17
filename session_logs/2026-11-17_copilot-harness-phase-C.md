@@ -80,6 +80,13 @@ reason that holds a control character from producing invalid JSON.
   only. Sent to the `coder`: add that test to the script list, so macOS
   really runs it after the push, and add one test with a stub `tr` that
   fails for a second set that is not 31 characters long.
+- **00:14** - Both added. The stub test fails for `'[ *]'`, for `' '`, and
+  for a 30-space set, while the existing control-character tests pass on
+  all three (GNU `tr` pads). The script form of `tests/test_hook_gates.py`
+  exits 0 and now calls the control-character test for two clients.
+  Orchestrator checks: `verify.py fast` PASS and the script form exit 0.
+  `gh` is not signed in on this machine, so the macOS result of the CI
+  workflow cannot be read from here.
 
 ## [LEARN] Entries
 
