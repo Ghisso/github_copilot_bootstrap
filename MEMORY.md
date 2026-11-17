@@ -1464,6 +1464,18 @@
   new file under `.claude/` outside the evidence folders. A script that
   imports `.claude/scripts/verify.py` writes `.claude/scripts/__pycache__/`
   there; run it with `python -B` or delete the folder (2026-11-17).
+- [LEARN:hooks] In a hook script, give `tr` two sets of equal length.
+  `tr '\001-\037' '[ *]'` gives `]` on BusyBox `tr` (Alpine), which does
+  not read `[c*]`, and POSIX leaves a shorter second set unspecified. GNU
+  `tr` pads and hides both. `json_escape` builds 31 spaces with
+  `printf -v`; a stub-`tr` test in `tests/test_hook_gates.py` pins it. A
+  manual quote is not a run: try a second implementation (`busybox tr`)
+  when one is on the machine (2026-11-18).
+- [LEARN:testing] The CI workflow's macOS job runs only the calls listed
+  under `if __name__ == "__main__":` in `tests/test_hook_gates.py`, through
+  `scripts/validate_targets.py`. It does not run the pytest suite. Add a
+  call there when a shell behavior needs a real macOS run, and check any
+  claim about CI coverage against `.github/workflows/validate.yml`.
 - [LEARN:documentation] Before submitting an OpenWiki page, map the cited
   ranges of every file the page cites, not only the file that carries the
   flagged claim. In sidecar Phase M the first page's flagged claim was in
@@ -1643,7 +1655,9 @@
   runtime bundled in VS Code 1.146.0 (`1.0.108-0`): the PascalCase hook file
   works unchanged, but the runtime also loads `.claude/settings.json`, so
   every hook runs twice; nested `hookSpecificOutput` answers are honored
-  only under PascalCase `PreToolUse`; a timeout or non-JSON output lets the
+  only under PascalCase `PreToolUse` (under camelCase names a nested deny
+  or ask is ignored; since Phase C the guards also print the documented
+  top-level answer for `github-copilot`); a timeout or non-JSON output lets the
   tool run; `apply_patch` sends its patch text as a string `tool_input`
   (offline only the six Codex-family model ids get that tool, but the real
   VS Code also gave it to `gpt-6-luna`), which crashed `protect-files.py`

@@ -87,8 +87,70 @@ reason that holds a control character from producing invalid JSON.
   Orchestrator checks: `verify.py fast` PASS and the script form exit 0.
   `gh` is not signed in on this machine, so the macOS result of the CI
   workflow cannot be read from here.
+- **00:17** - Review round 3 on the two test additions: Gate PASS, no
+  finding, no open request.
+
+### Phase-boundary summary
+
+- **Objective and change:** for `github-copilot`, every guard prints its
+  decision at the top level (the shape Copilot documents) and nested; the
+  other three clients keep their bytes. Changed:
+  `shared/hooks/scripts/_lib-frontmatter.sh`,
+  `shared/hooks/scripts/protect-files.py`, five scripts that now name their
+  client (`enforce-pr-gate.sh`, `session-start-state.sh`,
+  `record-branch-state.sh`, `reporting-reminder.sh`, `openwiki-guard.sh`),
+  `shared/hooks/hooks.json`, `scripts/validate_targets.py`,
+  `scripts/check_copilot_runtime.py`, three test files, and two docs.
+- **Deviations:** the Scope-change record under step 8 of the small plan.
+- **Checks:** the required items below; the probe prints 43 lines and 0
+  fail on runtime `1.0.108-0`; with the earlier guards 7 of 43 fail; byte
+  identity for the other three clients (19,918 comparisons, 0
+  differences); negative controls for the session setup.
+- **Open findings:** none.
+- **Unverified limitations:** the shell escaping was run on GNU and BusyBox
+  `tr`, not on macOS or BSD `tr` (the CI workflow's macOS job runs it after
+  the push); the Local harness was not run with the new output (it reads
+  only the nested object, by the source of VS Code's Copilot extension
+  0.74.0).
+- **Decision needed:** none.
+- **Next operation:** Phase D,
+  `.claude/plans/2026-11-17_phase-D-lifecycle-hook-stand-down.md` (the
+  lifecycle hooks from the Claude settings stand down on the Copilot
+  harness).
+
+## Stale-claims surfaces checked
+
+This phase changed documented guard output for `github-copilot` and row T3.
+
+- `docs/target-mapping.md`: updated in this phase (Native Adapters, the
+  "Answer shape" paragraph, the T3 row, one recorded follow-up).
+- `docs/runtime-checks.md`: updated in this phase (the probe section:
+  three sessions, 43 lines, the new checks).
+- `README.md`, `docs/architecture.md`, `docs/smoke-tests.md`: searched for
+  `hookSpecificOutput`, `permissionDecision`, `additionalContext`, and for
+  Copilot statements about hook output or context text; no statement
+  found, so nothing to correct.
+- `docs/2026-09-19-openwiki-hook-mechanics-spike.md`: shows the nested
+  answer of the OpenWiki guard in a dated spike record. That guard has no
+  client argument and still prints the nested answer. Not changed.
+- `.claude/MEMORY.md`: the 2026-11-17 Copilot harness entry said nested
+  answers are honored only under PascalCase `PreToolUse`; extended in
+  place with the camelCase finding and this phase's top-level answer.
+- `openwiki/`: not searched; it is refreshed through OpenWiki's tools in
+  the final phase of this plan.
 
 ## [LEARN] Entries
+
+- [LEARN:hooks] Give `tr` two sets of equal length in a hook script;
+  `'[ *]'` gives `]` on BusyBox `tr`, and GNU `tr` hides it. A manual quote
+  is not a run. Recorded in `.claude/MEMORY.md`.
+- [LEARN:testing] The CI workflow's macOS job runs only the calls under
+  `__main__` in `tests/test_hook_gates.py`; check a claim about CI
+  coverage against the workflow file. Recorded in `.claude/MEMORY.md`.
+- No lesson recorded for: the restore of root adapters during the probe
+  (already in `.claude/MEMORY.md` from Phase A, and it was passed to the
+  `coder` in the brief), and the nested `ask` under camelCase event names
+  (`docs/target-mapping.md` carries it).
 
 ## Verification
 
@@ -96,4 +158,21 @@ reason that holds a control character from producing invalid JSON.
 # filled at closeout step 4
 ```
 
+- Findings: `.claude/quality_reports/findings-2026-11-17_phase-C-copilot-hook-answers.json`
+  (no surviving finding; gate PASS; six profiles; round 1 with two MINOR
+  and one open request, round 2 PASS with one MINOR, all fixed before
+  round 3, which had no finding).
+- optional 1: NOT RUN — it needs a person in a signed-in VS Code window with the Local harness and this phase's hooks installed in a test project; the source of VS Code's Copilot extension 0.74.0 shows the Local harness reads only the nested object, which is byte-identical to the earlier answer (944 comparisons), and the check is on the manual checklist of Phase F.
+
 ## Open Questions / Next Steps
+
+- Next: Phase D, the stand-down of the lifecycle hooks from the Claude
+  settings on the Copilot harness.
+- For Phase D: remove `GIT_*` and `GH_*` variables from the environment
+  the probe gives the runtime (old gap from review round 1).
+- For the user: the result of the `macos-latest` job of the `Validate`
+  workflow after the push; it is the first run of the shell escaping on
+  BSD `tr`.
+- For the user (from Phase B): one prompt in a Copilot-harness chat that
+  asks for a new plain file, to confirm the patch-tool fix in the real
+  client; and keep, narrow, or lift the deny of the two workflow tools.
