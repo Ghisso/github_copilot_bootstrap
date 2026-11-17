@@ -13,17 +13,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh pull",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh pull",
             "timeout": 60
           },
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-log.sh claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-log.sh claude-code",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-start-state.sh claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-start-state.sh claude-code",
             "timeout": 10
           }
         ]
@@ -35,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" protect-files.sh claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" protect-files.sh claude-code",
             "timeout": 10
           }
         ]
@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" pretool-bash-guard.sh claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" pretool-bash-guard.sh claude-code",
             "timeout": 10
           }
         ]
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh pre",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh pre",
             "timeout": 10
           }
         ]
@@ -67,12 +67,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" record-branch-state.sh claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" record-branch-state.sh claude-code",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh late-report claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh late-report claude-code",
             "timeout": 10
           }
         ]
@@ -82,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
             "timeout": 10
           }
         ]
@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
             "timeout": 10
           }
         ]
@@ -105,7 +105,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" claude-stop.sh",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" claude-stop.sh",
             "timeout": 180
           }
         ]
@@ -116,12 +116,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
             "timeout": 60
           },
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh prompt claude-code",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh prompt claude-code",
             "timeout": 10
           }
         ]
@@ -132,7 +132,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh checkpoint",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh checkpoint",
             "timeout": 10
           }
         ]
@@ -143,7 +143,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BOOTSTRAP_HOOK_SOURCE=claude-settings \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
             "timeout": 60
           }
         ]

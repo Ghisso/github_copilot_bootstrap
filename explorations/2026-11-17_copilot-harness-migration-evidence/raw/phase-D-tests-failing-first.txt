@@ -1,0 +1,322 @@
+Phase D, step 1: the new tests, failing first. 2026-11-18.
+Code under test: shared/hooks/scripts/run-hook.sh, scripts/generate_targets.py and scripts/validate_targets.py exactly as at HEAD 49d3460
+(steps 2 and 3 not yet made). Only tests/test_hook_gates.py and tests/test_validate_targets.py differ from HEAD (git status --short above).
+Command: uv run pytest tests/test_hook_gates.py tests/test_validate_targets.py -q --tb=line -rA -k '<names of the new tests>'
+Result: 48 failed, 2 passed. The two that pass cannot fail before the change: one checks that the plan's guard names are shipped,
+one checks that the Codex, Copilot, and Antigravity hook files carry no marker (true before and after).
+Every other new test fails for its intended reason: each pairs a control that must stand down (and runs today), or asserts the marked command.
+
+git status --short at the time of the run:
+ M tests/test_hook_gates.py
+ M tests/test_validate_targets.py
+
+---- pytest output ----
+FFFFF.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.FFFFFFFFF                       [100%]
+=================================== FAILURES ===================================
+E   AssertionError: state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: state-sync.sh
+E   AssertionError: session-log.sh
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: session-log.sh
+E   AssertionError: session-start-state.sh
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-start-state.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: session-start-state.sh
+E   AssertionError: claude-stop.sh
+    assert (0, 'RAN clau...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN claude-stop.sh \n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: claude-stop.sh
+E   AssertionError: reporting-reminder.sh
+    assert (0, 'RAN repo...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN reporting-reminder.sh prompt claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: reporting-reminder.sh
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control
+    assert (0, 'RAN sess...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN session-log.sh claude-code\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: control state-sync.sh
+    assert (0, 'RAN stat...tart"}\n', '') == (0, '', '')
+      
+      At index 1 diff: 'RAN state-sync.sh pull\n{"hook_event_name":"SessionStart"}\n' != ''
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: control state-sync.sh
+E   AssertionError: assert (0, b'RAN ses...x00\xff', b'') == (0, b'', b'')
+      
+      At index 1 diff: b'RAN session-log.sh claude-code\nnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at all\x00\xffnot json at a...
+      
+      ...Full output truncated (2 lines hidden), use '-vv' to show
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5203: AssertionError: assert (0, b'RAN ses...x00\xff', b'') == (0, b'', b'')
+E   AssertionError: closed stdin
+    assert (1, 'RAN sess...descriptor\n') == (0, '', '')
+      
+      At index 0 diff: 1 != 0
+      Use -v to get more diff
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5078: AssertionError: closed stdin
+E   AssertionError: assert not True
+     +  where True = exists()
+     +    where exists = PosixPath('/tmp/pytest-of-ghisso/pytest-93/test_the_launcher_stands_the_s0/.claude/session_logs/hooks-sessions.log').exists
+/home/ghisso/work/github_copilot_bootstrap/tests/test_hook_gates.py:5250: AssertionError: assert not True
+E   AssertionError: REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" state-sync.sh pull
+    assert False
+     +  where False = <built-in method startswith of str object at 0x78814361a9a0>('REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; BOOTSTRAP_HOOK_SOURCE=claude-settings "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" ')
+     +    where <built-in method startswith of str object at 0x78814361a9a0> = 'REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" state-sync.sh pull'.startswith
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:269: AssertionError: REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" state-sync.sh pull
+E   assert 'REPO_ROOT="$...-sync.sh pull' == 'REPO_ROOT="$...-sync.sh pull'
+      
+      Skipping 78 identical leading characters in diff, use -v to show
+      - | pwd)}"; BOOTSTRAP_HOOK_SOURCE=claude-settings "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" state-sync.sh pull
+      ?          --------------------------------------
+      + | pwd)}"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" state-sync.sh pull
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:284: assert 'REPO_ROOT="$...-sync.sh pull' == 'REPO_ROOT="$...-sync.sh pull'
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:293: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:303: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:317: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:317: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:317: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:325: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:325: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+E   AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+/home/ghisso/work/github_copilot_bootstrap/tests/test_validate_targets.py:325: AttributeError: module 'validate_targets' has no attribute 'hook_source_marker_errors'. Did you mean: 'root_source_mirror_errors'?
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_hook_gates.py::test_the_guard_scripts_the_plan_names_are_all_shipped
+PASSED tests/test_validate_targets.py::test_the_other_three_generated_hook_files_never_carry_the_marker
+FAILED tests/test_hook_gates.py::test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold[state-sync.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold[session-log.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold[session-start-state.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold[claude-stop.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_stands_a_lifecycle_script_down_when_all_seven_conditions_hold[reporting-reminder.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[_lib-frontmatter.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[codex-stop.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[context-mode-dispatch.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[enforce-branch-state.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[enforce-commit-gate.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[enforce-pr-gate.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[git-protection.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[openwiki-guard.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[pretool-bash-guard.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[protect-files.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[record-branch-state.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[record-commit-closeout.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[restore-root-adapters.sh]
+FAILED tests/test_hook_gates.py::test_the_launcher_never_stands_down_a_script_outside_the_lifecycle_five[stop-session-log-check.sh]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[no-marker]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[another-marker]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[copilot-cli-unset]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[copilot-cli-not-one]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[hook-depth-unset]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[hook-depth-empty]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[hook-dir-set]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_one_environment_condition_fails[claudecode-set]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy[missing]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy[link]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy[disable-all-hooks]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy[no-session-log-copilot]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_when_the_copilot_hook_file_is_not_trustworthy[no-state-sync-push]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_in_the_environment_of_a_real_non_copilot_session[claude-code-session]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_in_the_environment_of_a_real_non_copilot_session[claude-code-from-a-copilot-shell]
+FAILED tests/test_hook_gates.py::test_a_lifecycle_script_runs_in_the_environment_of_a_real_non_copilot_session[local-harness-claude-hooks]
+FAILED tests/test_hook_gates.py::test_the_stand_down_reads_all_of_its_input
+FAILED tests/test_hook_gates.py::test_the_stand_down_exits_zero_even_when_stdin_is_closed
+FAILED tests/test_hook_gates.py::test_the_launcher_stands_the_session_log_down_and_a_guard_still_denies
+FAILED tests/test_validate_targets.py::test_every_generated_claude_hook_command_carries_the_source_marker
+FAILED tests/test_validate_targets.py::test_the_validator_expects_the_marked_claude_command
+FAILED tests/test_validate_targets.py::test_the_marker_check_accepts_the_generated_hook_files
+FAILED tests/test_validate_targets.py::test_the_marker_check_names_a_claude_command_without_the_marker
+FAILED tests/test_validate_targets.py::test_the_marker_check_names_another_hook_file_that_carries_the_marker[Codex]
+FAILED tests/test_validate_targets.py::test_the_marker_check_names_another_hook_file_that_carries_the_marker[Copilot]
+FAILED tests/test_validate_targets.py::test_the_marker_check_names_another_hook_file_that_carries_the_marker[Antigravity]
+FAILED tests/test_validate_targets.py::test_the_marker_check_rejects_claude_hooks_with_no_commands[None]
+FAILED tests/test_validate_targets.py::test_the_marker_check_rejects_claude_hooks_with_no_commands[hooks1]
+FAILED tests/test_validate_targets.py::test_the_marker_check_rejects_claude_hooks_with_no_commands[hooks2]
+48 failed, 2 passed, 1506 deselected in 0.51s
