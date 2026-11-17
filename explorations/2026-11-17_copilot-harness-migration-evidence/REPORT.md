@@ -435,6 +435,36 @@ and every hook, camelCase-named or not, received the Local format
 from the Claude settings ran at `UserPromptSubmit` and returned its nested
 `additionalContext`.
 
+**A3. After the folder was created, the Copilot harness ran in the real
+VS Code and matched the offline runs (Run, in the real VS Code, 16:41).**
+The user created `/run/user/1000` with `sudo` and reloaded the window. The
+agent host then logged `WebSocket server listening on
+/run/user/1000/vscode-ipc-<id>.sock`, and the prompt "hi" ran as session
+`616c2a0b-9877-4944-8344-2791ac24db58` (`client_name: vscode-agent-host`,
+`copilotVersion: 1.0.108-0`). Seen in `agenthost.log`, the session's
+`events.jsonl`, and the probe hook logs:
+
+- "Granting the runtime 'session' trust for trusted working directory",
+  which confirms F15.
+- The session is in `hooks-sessions.log` as `target=github-copilot` and
+  `target=claude-code`: the double run of F2 happens in the real client.
+- Hook inputs have exactly the two formats of F8. The hook environment has
+  `COPILOT_CLI=1`, `COPILOT_PROJECT_DIR`, `COPILOT_HOOK_DIR`,
+  `COPILOT_HOOK_DEPTH=1`, `CLAUDE_PROJECT_DIR`, and also
+  `CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP=1`, `COPILOT_CLI_RUN_AS_NODE=1`, and
+  `COPILOT_EXP_COPILOT_CLI_EXECUTION_SUBAGENT=true`.
+- `sessionStart`, `userPromptSubmitted`, `userPromptTransformed`,
+  `agentStop`, and (when the chat was replaced) `sessionEnd` fired.
+- MCP servers `semble`, `context7`, and `context-mode` each connected once.
+  VS Code added `pylance mcp server` and the built-in `github-mcp-server`.
+- The model was chosen by Auto: "Copilot Fusion selected MAI-Code-1.1-Flash
+  because it was the best choice out of the models available in your plan."
+  `availableModels` held only `mai-code-1.1-flash`, a model that uses
+  `create` and `edit`, not `apply_patch`.
+
+No tool call was made in that session, so the three checks (a denied
+command, the approval question, the tool names) are still open.
+
 ## Corrections to earlier statements in this session
 
 - "The guards must read a different tool-call format" was wrong. They read
