@@ -1523,6 +1523,22 @@
   report by bare labels such as "A6": the report is in `.claude/explorations/`,
   which readers of the repository do not have. Describe what was seen,
   where, and when; a label in brackets may follow.
+- [LEARN:workflow] In a knowledge-refresh final phase, run the audit of
+  the docs, policies, and skills first and the OpenWiki refresh second:
+  the wiki cites line ranges of those files, so they must be final before
+  OpenWiki reads them. The OpenWiki skill forbids page sub-agents, so the
+  orchestrator writes the pages; a `coder` can do the audit and list each
+  page's stale statements with their source lines (Phase G of
+  `copilot-harness-migration`, 2026-11-18).
+- [LEARN:documentation] After adding a new fact to a wiki page, search the
+  same page for an older sentence that says the opposite. In Phase G the
+  sidecar page gained the 2026-11-18 discovery result while an older
+  sentence still gave the earlier finding as a present-tense reason; the
+  review caught it. A fix to a generated page after review goes through a
+  new scoped run (`openwiki_begin` with mode `update`, a plan with only
+  the affected pages). When a page's text is shortened, revise the claim
+  that asserted the removed text, and keep one claim for a rule on the
+  page that still states it.
 - [LEARN:testing] For a new script, a failing-first run only shows that
   the file was missing. Follow it with one mutation for each stated
   property. In Phase E this found three weak tests: one matched a single

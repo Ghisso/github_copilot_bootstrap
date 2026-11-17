@@ -100,10 +100,134 @@ of the live-advice surfaces for statements this plan made outdated.
   not checked: whether that script is safe to run twice there.
   `validate_targets.py` exit 0 and `verify.py fast` PASS. Review round 2
   started.
+- **08:52** - Review round 2: Gate PASS, no open request. Three MINOR, all
+  fixed: on the quickstart page the definition of the two harnesses had
+  run into a table cell that lists files; the sidecar page pointed to a
+  section by a wrong name; `SECURITY.md` used "Copilot harness" without
+  an explanation. From the reviewer's notes: the rules of
+  `subagent-context.sh` on the hooks page got a claim of their own again,
+  and the open point on `record-branch-state.sh` went into the project
+  context file. The wiki fixes went through a third scoped OpenWiki run
+  (three pages, `openwiki_finish` returned `complete`).
+- **08:56** - Review round 3: Gate PASS, no finding, no open request.
+
+### Phase-boundary summary
+
+- **Objective and change:** the generated wiki and the live-advice
+  surfaces match the state after Phases A to F. Changed in the repository:
+  eight wiki pages with their claim files, the two index pages, the page
+  manifest and `openwiki/.last-update.json` (all written through
+  OpenWiki's tools); `README.md` (one bullet in the notes on upgrading a
+  consumer), `SECURITY.md` (the trust paragraph),
+  `docs/native-client-acceptance.md`, and
+  `shared/skills/knowledge-refresh/SKILL.md`. Changed in the AI state:
+  `.claude/MEMORY.md` and the project context file. No code changed.
+- **Deviations:** the Scope-change record under step 3 of the small plan.
+- **Checks:** the required items below; three OpenWiki runs, each ended
+  with `complete`; no `openwiki/.run.json`; no managed block in root
+  `AGENTS.md` or `CLAUDE.md`.
+- **Open findings:** none.
+- **Open points for the user (none blocks the plan):** run the manual
+  checklist in `docs/smoke-tests.md`; read the `macos-latest` job of the
+  `Validate` workflow; decide on one small plan for the two old defects of
+  the guard hooks; keep, narrow, or lift the deny of the two workflow
+  tools; add an item for the Copilot harness to `openwiki/INSTRUCTIONS.md`;
+  open a pull request to `dev` when wanted.
+- **Next operation:** none in this plan. It is the last phase; the commit
+  hook sets the big plan to `status: complete`.
 
 ## Stale-claims surfaces checked
 
+The standing final-phase audit. The `coder`'s table with the search terms
+and the files read in full is `raw/phase-G-audit.md` in the evidence
+folder `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`.
+
+- Root guidance `CLAUDE.md` and `AGENTS.md`: searched for the Copilot,
+  hook, reminder, sub-agent, and time-budget statements; no stale
+  statement.
+- `README.md`: rewritten in Phase F. One gap found and closed: the notes
+  on upgrading a consumer had no word on the guard changes; a bullet lists
+  the two new denies and the three looser decisions.
+- `SECURITY.md`: the trust paragraph named only Codex and Claude. It now
+  states what the offline run on the Copilot runtime showed and that VS
+  Code's own trust prompt was not run.
+- `docs/` except dated documents: `docs/architecture.md`,
+  `docs/runtime-checks.md`, `docs/smoke-tests.md`,
+  `docs/target-mapping.md`, `docs/sidecar-provider-contract.md` (current
+  after Phase F; no stale statement). `docs/native-client-acceptance.md`
+  said Copilot stays covered by the generated-target checks; corrected to
+  say that its command does not cover Copilot, with pointers to the
+  Copilot runtime check and the manual checklist.
+- Dated records, left unchanged: root `plans/`, the files `docs/2026-*`,
+  `docs/plan-deterministic-commit-gate.md`, `docs/evidence/`, and the
+  closed session logs of Phases A to F. No entry in a closed log was found
+  that would mislead a reader, so no erratum was written.
+- Canonical policy source `shared/policies/` (12 files): no stale
+  statement; `workflow.instructions.md` states the 1020-second item
+  budget. The generated copies under `.claude/instructions/` follow from
+  it.
+- Canonical skill source `shared/skills/`: `knowledge-refresh/SKILL.md`
+  corrected (what OpenWiki's `copilot` integration writes; that the
+  Copilot hook file has no `openwiki-guard.sh` entry); no stale statement
+  in the other skills.
+- `shared/agents/`, `shared/templates/`, `shared/review-profiles/`,
+  `shared/sidecar/`: no stale statement.
+- State READMEs: the sources under `shared/plans/`,
+  `shared/session_logs/`, `shared/quality_reports/`, the four sidecar
+  state READMEs, the explorations README text in
+  `scripts/generate_targets.py`, and the two MEMORY seeds: no stale
+  statement.
+- `.github/`: `workflows/validate.yml` and the generated
+  `.github/copilot-instructions.md`: no stale statement.
+- Other shipped text: `shared/devcontainer`, `shared/mcp`,
+  `shared/vscode`, `shared/prompts`, `shared/schemas`, `shared/scripts`,
+  `targets/`, `.vscode/mcp.json`, `.codex/config.toml`: no stale
+  statement.
+- Active plans: the big plan and this phase's plan hold no statement that
+  this plan made false; the big plan's two dated corrections (the item
+  limit; row B of the options table) stand.
+- `.claude/MEMORY.md`: the Copilot harness entry was rewritten to state
+  the current behavior first; the entry on turning hooks off is limited
+  to the Local harness; the tool-names entry and the sidecar discovery
+  entry are extended; five entries are added (the shell helper tools, the
+  inherited `COPILOT_CLI`, VS Code's tool set for each model, the reason
+  against a stand-down on the Local harness, the trade-off of option B).
+  After review, four statements got their basis or a "not run" label.
+- Project context file
+  (`.claude/instructions/project-context.instructions.md`): the layout,
+  the design decisions, the status, the open follow-ups, what a refresh
+  brings to a consumer, the runtime version, and a caveat on evidence
+  labels are updated. After review, a sentence that said no
+  implementation branch is unmerged was corrected.
+- `openwiki/`: eight pages refreshed through OpenWiki's tools in three
+  runs (`architecture/hooks-and-guardrails.md`,
+  `architecture/agents-and-skills.md`,
+  `architecture/source-generated-consumer-layout.md`,
+  `operations/deterministic-verification.md`,
+  `operations/git-backed-ai-state-sync.md`,
+  `operations/install-ownership-and-runtime-checks.md`,
+  `operations/sidecar-overlay.md`, `quickstart.md`). No stale statement:
+  `operations/context-mode-dispatcher.md`,
+  `workflows/lifecycle-and-task-lanes.md`, and the index pages.
+  `openwiki/INSTRUCTIONS.md`, the user's brief, has no item for the
+  Copilot harness; reported to the user, not edited.
+- Not a live-advice surface, recorded as a follow-up: comments in
+  `run-hook.sh`, `subagent-context.sh`, and `protect-files.py`, and some
+  test docstrings, cite the private evidence report by bare labels.
+
 ## [LEARN] Entries
+
+- [LEARN:workflow] In a knowledge-refresh final phase, audit the docs,
+  policies, and skills first and refresh the wiki second; the
+  orchestrator writes the wiki pages, because the OpenWiki skill forbids
+  page sub-agents. Recorded in `.claude/MEMORY.md`.
+- [LEARN:documentation] After adding a new fact to a wiki page, search
+  the page for an older sentence that says the opposite; fix a generated
+  page after review through a new scoped run; keep a claim for each rule
+  a page states. Recorded in `.claude/MEMORY.md`.
+- No lesson recorded for: the file guard refusing a search command whose
+  pattern names an agent folder (the existing entry on commands that name
+  a protected path covers it).
 
 ## Verification
 
@@ -111,4 +235,24 @@ of the live-advice surfaces for statements this plan made outdated.
 # filled at closeout step 4
 ```
 
+- Findings: `.claude/quality_reports/findings-2026-11-17_phase-G-knowledge-refresh.json`
+  (no surviving finding; gate PASS; six profiles; round 1 FAIL with two
+  MAJOR and six MINOR, round 2 PASS with three MINOR, all fixed before
+  round 3, which had no finding).
+- optional 1: PASS — the orchestrator wrote each changed sentence from the source it read in the same page job, and the reviewer opened the source for every changed sentence on the eight pages; the two mismatches it recorded (the reason sentence on the sidecar page, and where the marker sits in a Claude settings hook command) were fixed through a second scoped run and confirmed in review rounds 2 and 3.
+
 ## Open Questions / Next Steps
+
+- The plan is complete with this phase's commit. A pull request to `dev`
+  is opened only when the user asks.
+- For the user: the manual checklist in `docs/smoke-tests.md` (section
+  "VS Code Copilot harness (manual)"), in the test folder
+  `~/copilot-harness-probe-20261117`.
+- For the user: the result of the `macos-latest` job of the `Validate`
+  workflow.
+- For the user: one small plan for the two old defects of the guard hooks
+  (inline Python without `-I`; the temp-file leak of `protect-files.sh`),
+  which can also replace the bare evidence labels in code comments and
+  check `record-branch-state.sh` on the Copilot harness.
+- For the user: keep, narrow, or lift the deny of the two workflow tools;
+  add an item for the Copilot harness to `openwiki/INSTRUCTIONS.md`.

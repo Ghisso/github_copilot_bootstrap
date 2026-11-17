@@ -542,7 +542,7 @@ Separately:
 - [x] `2026-11-17_phase-D-lifecycle-hook-stand-down` — Claude-settings lifecycle hooks stand down on the Copilot harness
 - [x] `2026-11-17_phase-E-subagent-context` — sub-agent context and session-start reminder
 - [x] `2026-11-17_phase-F-copilot-docs` — documentation, manual checklist, sidecar recorded check
-- [ ] `2026-11-17_phase-G-knowledge-refresh` — knowledge refresh and final audit
+- [x] `2026-11-17_phase-G-knowledge-refresh` — knowledge refresh and final audit
 
 ## Verification
 
