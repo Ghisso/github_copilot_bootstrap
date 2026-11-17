@@ -7,12 +7,16 @@ fi
 
 # Control characters (\001-\037, tab and newline included) are not allowed raw
 # in a JSON string, and a hook answer that is not valid JSON lets the tool run
-# on Copilot. They become spaces first. POSIX defines `[c*]` in the second set
-# as padding to the length of the first set; this form was run on GNU `tr` only
-# (BusyBox 1.36.1 `tr` prints `]` for each character instead). Stays free of
-# python3: fail_closed runs when python3 is missing.
+# on Copilot. They become spaces first. The second set has one space for each of
+# the 31 characters, so the mapping is position for position and needs no
+# padding rule (POSIX leaves a shorter second set unspecified, and BusyBox `tr`
+# does not read `[c*]`). Run on GNU `tr` and BusyBox `tr` 1.36.1; not run on
+# macOS or BSD `tr`. Stays free of python3: fail_closed runs when python3 is
+# missing.
 json_escape() {
-  printf '%s' "$1" | tr '\001-\037' '[ *]' | sed 's/\\/\\\\/g; s/"/\\"/g'
+  local spaces
+  printf -v spaces '%31s' ''
+  printf '%s' "$1" | tr '\001-\037' "$spaces" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 # Single home for the implementation-branch shape used by every lifecycle gate.
