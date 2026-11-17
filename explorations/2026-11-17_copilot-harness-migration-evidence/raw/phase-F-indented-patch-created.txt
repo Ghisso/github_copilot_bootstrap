@@ -1,0 +1,18 @@
+# Phase F: does the runtime apply a patch whose header has blanks in front?
+# (basis of the row T2 sentence in docs/target-mapping.md)
+# Date: 2026-11-18. Runtime 1.0.108-0 (VS Code 1.146.0).
+# Command: uv run python scripts/check_copilot_runtime.py --keep   (exit 0; Result: PASS (0 of 48 checks failed))
+# The probe answers every hook question with approve-once, so the guard's question for the
+# indented header was approved and the runtime then ran the patch.
+# Patch sent (scripts/check_copilot_runtime.py, PATCH_INDENTED, about line 1116):
+#   '*** Begin Patch\n  *** Add File: .github/hooks/evil-indented.json\n+{}\n*** End Patch'
+
+## files named evil* in the kept probe project
+.github/hooks/evil-indented.json  (3 bytes)
+.github/hooks/evil.json  (3 bytes)
+
+## content of .github/hooks/evil-indented.json
+{}
+
+## the probe's own line for the check
+PASS patch-indented-hook-ask: 2 question(s) of kind hook; not denied

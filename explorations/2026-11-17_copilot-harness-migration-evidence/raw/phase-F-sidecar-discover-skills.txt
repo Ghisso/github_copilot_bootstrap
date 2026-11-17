@@ -1,0 +1,107 @@
+# Phase F step 1: sidecar `skills` profile, Copilot runtime discovery
+# Date: 2026-11-18. Bootstrap HEAD 5a77d4b (clean tree), branch copilot-harness-migration_implementation.
+# Runtime: VS Code 1.146.0, Copilot SDK 1.0.30-preview.0, runtime 1.0.108-0 (printed below).
+# Method: script `sidecar_check.py` (kept in the session scratch folder, not in the repository):
+#   a new temporary Git repository (one commit with README.md and app.py, fixed Git identity,
+#   GIT_CONFIG_GLOBAL=/dev/null, cleaned environment with no GIT_*, GH_*, or AI_STATE_* variable
+#   from the host), then the installer command from README.md's sidecar section, then
+#   `check_copilot_runtime.py --discover`. Machine paths are replaced by <repo>, <team-repo>,
+#   <scratch>, and <tmp>.
+# The section "supplementary" is not the printed output of `--discover`: it reads the runtime's
+# raw discovery record (record.json) of a second run with --keep, to show each skill's and agent's
+# own path. The script that wrote it is the same one; the repository's code was not changed.
+
+## team repository commit
+exit 0
+
+## install command
+cd <repo> && uv run python scripts/install_bootstrap.py <team-repo> --mode sidecar --profile skills
+exit 0
+--- stdout ---
+sidecar-install: installed 10, updated 0, removed 0, adopted 0, unchanged 0, preserved 0, seeded 0
+--- stderr ---
+
+## git status --short (tracked and untracked changes)
+exit 0
+(empty)
+
+## git status --short --ignored
+exit 0
+!! .agents/
+!! .claude/
+!! .github/
+
+## .git/info/exclude
+# git ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+# For a project mostly in C, the following would be a good set of
+# exclude patterns (uncomment them if you want to use them):
+# *.[oa]
+# *~
+# BEGIN ai-bootstrap sidecar
+/.agents/skills/debug-investigator
+/.agents/skills/humanize
+/.agents/skills/ponytail
+/.agents/skills/ponytail-review
+/.claude/rules/ai-bootstrap-sidecar.md
+/.claude/skills/debug-investigator
+/.claude/skills/humanize
+/.claude/skills/ponytail
+/.claude/skills/ponytail-review
+/.github/instructions/ai-bootstrap-sidecar.instructions.md
+# END ai-bootstrap sidecar
+
+## installed files outside any skills folder
+.claude/rules/ai-bootstrap-sidecar.md
+.github/instructions/ai-bootstrap-sidecar.instructions.md
+README.md
+app.py
+
+## skill folders
+.agents/skills/debug-investigator
+.agents/skills/humanize
+.agents/skills/ponytail
+.agents/skills/ponytail-review
+.claude/skills/debug-investigator
+.claude/skills/humanize
+.claude/skills/ponytail
+.claude/skills/ponytail-review
+
+## discover command (exact output)
+cd <repo> && uv run python scripts/check_copilot_runtime.py --discover <team-repo>
+exit 0
+--- stdout ---
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+hooks: 0
+MCP servers: 0
+instructions: 2 (ai-bootstrap-sidecar.instructions.md, ai-bootstrap-sidecar.md)
+skills: 4
+agents: 0
+note: repository hooks and MCP servers load only for a trusted folder; this command adds no trust, so none are listed.
+--- stderr ---
+
+## supplementary: raw discovery record of a second --keep run
+second run with --keep: exit 0
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+hooks: 0
+MCP servers: 0
+instructions: 2 (ai-bootstrap-sidecar.instructions.md, ai-bootstrap-sidecar.md)
+skills: 4
+agents: 0
+note: repository hooks and MCP servers load only for a trusted folder; this command adds no trust, so none are listed.
+Kept the temporary folder: <tmp>/copilot-runtime-probe-XXXX
+-- skills.discover (raw record) --
+count: 4
+keys of first skill: commandName, description, enabled, name, path, projectPath, source, userInvocable
+{"commandName": "debug-investigator", "enabled": true, "name": "debug-investigator", "path": "<team-repo>/.agents/skills/debug-investigator/SKILL.md", "projectPath": "<team-repo>", "source": "project", "userInvocable": true}
+{"commandName": "humanize", "enabled": true, "name": "humanize", "path": "<team-repo>/.agents/skills/humanize/SKILL.md", "projectPath": "<team-repo>", "source": "project", "userInvocable": true}
+{"commandName": "ponytail-review", "enabled": true, "name": "ponytail-review", "path": "<team-repo>/.agents/skills/ponytail-review/SKILL.md", "projectPath": "<team-repo>", "source": "project", "userInvocable": true}
+{"argumentHint": "[lite|full|ultra]", "commandName": "ponytail", "enabled": true, "name": "ponytail", "path": "<team-repo>/.agents/skills/ponytail/SKILL.md", "projectPath": "<team-repo>", "source": "project", "userInvocable": true}
+-- agents.discover (raw record) --
+-- instructions.discover (raw record) --
+{"id": "vscode-instructions/.github/instructions/ai-bootstrap-sidecar.instructions.md", "label": "ai-bootstrap-sidecar.instructions.md", "location": "repository", "projectPath": "<team-repo>", "sourcePath": ".github/instructions/ai-bootstrap-sidecar.instructions.md", "type": "vscode"}
+{"id": "vscode-instructions/.claude/rules/ai-bootstrap-sidecar.md", "label": "ai-bootstrap-sidecar.md", "location": "repository", "projectPath": "<team-repo>", "sourcePath": ".claude/rules/ai-bootstrap-sidecar.md", "type": "vscode"}

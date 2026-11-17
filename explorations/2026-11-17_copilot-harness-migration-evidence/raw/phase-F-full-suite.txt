@@ -1,0 +1,40 @@
+# Phase F: one full suite run on the final documentation tree
+# Date: 2026-11-18. Bootstrap HEAD 5a77d4b plus the uncommitted Phase F documentation edits (six files).
+# Command: ( time uv run pytest tests/ -q --tb=short )   run from the repository root.
+# Result: 1 failed, 5926 passed, 1 skipped, 1 error in 433.78s (0:07:13) by pytest;
+#         the shell `time` for the whole command printed real 11m28.116s, user 3m39.934s, sys 2m35.912s
+#         (the gap between pytest's 7:13 and the shell's 11:28 was not investigated).
+# The progress dots are left out below. The failure and the error are one event:
+#   - FAILED test_protect_files_checks_original_cwd_when_cd_is_not_provable[cd /tmp | mv * /tmp/out]:
+#     protect-files.sh returned 2 ("python: ..., error: unknown"). The last line that the run added to the live
+#     `.claude/session_logs/hooks-errors.log` is "2026-11-17T21:07:24Z WARN hook fail-closed: protected-file
+#     classifier exited with status 142 ..." (142 = SIGALRM; `CLASSIFIER_SECONDS = 4` in
+#     shared/hooks/scripts/protect-files.py line 401). That is 06:07:24 local time, during the run.
+#   - ERROR at teardown of test_receipt_without_extensions_still_loads: the conftest fixture reports that the
+#     live hooks-errors.log changed during the session. It is the log line above, written by the failing test.
+# Reruns of the one test alone (twice, same tree, after the suite): both passed, "2 passed in 2.84s" each time. With
+# --durations the case `cd /tmp | mv * /tmp/out` took 2.75s, against the 4s limit (CLASSIFIER_SECONDS). At that time
+# /tmp held 142,794 entries (ls /tmp | wc -l). Whether the classifier reads /tmp for this case was not checked. The
+# second rerun took more than 120 seconds of wall time in total although pytest itself reported 2.84s, and its
+# process was in disk-wait state (D) while it ran, so the machine was slow on disk at that time.
+# No documentation file is read by this test. Not changed here; reported as a follow-up.
+
+==================================== ERRORS ====================================
+_______ ERROR at teardown of test_receipt_without_extensions_still_loads _______
+tests/conftest.py:47: in _live_error_log_must_stay_untouched
+    pytest.fail(
+E   Failed: <repo>/.claude/session_logs/hooks-errors.log changed during the test session: hook scripts must be run with REPO_ROOT under tmp_path, never the live checkout.
+=================================== FAILURES ===================================
+_ test_protect_files_checks_original_cwd_when_cd_is_not_provable[cd /tmp | mv * /tmp/out] _
+tests/test_hook_gates.py:1727: in test_protect_files_checks_original_cwd_when_cd_is_not_provable
+    assert process.returncode == 0, process.stderr
+E   AssertionError: 
+E   assert 2 == 0
+E    +  where 2 = CompletedProcess(args=['bash', '<repo>/shared/hooks/scripts/protect-files.sh', 'op...n: Python 3.13.6, path: <repo>/.venv/bin/python3, error: unknown)"}}\n', stderr='').returncode
+=========================== short test summary info ============================
+FAILED tests/test_hook_gates.py::test_protect_files_checks_original_cwd_when_cd_is_not_provable[cd /tmp | mv * /tmp/out]
+ERROR tests/test_verify.py::test_receipt_without_extensions_still_loads - Fai...
+1 failed, 5926 passed, 1 skipped, 1 error in 433.78s (0:07:13)
+real	11m28.116s
+user	3m39.934s
+sys	2m35.912s
