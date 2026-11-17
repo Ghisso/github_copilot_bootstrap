@@ -62,6 +62,21 @@ code change.
 - **06:27** - Orchestrator checks: `verify.py fast` PASS. Scope-change
   record added to the small plan. Review round 1 started with six
   profiles.
+- **06:40** - Review round 1: Gate PASS, no CRITICAL or MAJOR finding, 15
+  MINOR. The reviewer opened about 75 rows of the claims table against
+  their basis and found the counts, the real-window statements, the
+  deny-and-question wording, and the sidecar section sound. Disposition:
+  all 15 are fixed. The ones that matter most: the checklist did not say
+  that it must run in a folder with no work to keep (item 10 is a deny
+  that was never run); item 4 could pass without the patch tool; item 9
+  told the reader to look for a denial in a log that does not record
+  denials; `docs/architecture.md` said only the Local harness needs
+  `.github/copilot-instructions.md`, which the sub-agent hook also reads;
+  the February 2027 date named no source. Sent to the `coder`. For the
+  final phase the reviewer listed: `openwiki/architecture/hooks-and-guardrails.md`
+  is stale, and source comments in `subagent-context.sh`, `run-hook.sh`,
+  and some test docstrings cite the private evidence report by bare
+  labels.
 
 ## [LEARN] Entries
 
