@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-11-17T10:19:03Z",
+  "branch": "copilot-harness-migration_implementation",
+  "head_sha": "2e8c7bb1127fea881f9f4b6185b4745cadeed76e",
+  "base_ref": "dev",
+  "merge_base_sha": "2e8c7bb1127fea881f9f4b6185b4745cadeed76e",
+  "phase": "2026-11-17_phase-A-copilot-runtime-probe",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "35675943a0e24771898c0fba82d1b09d80ae1da3",
+  "changed_files": [
+    "docs/runtime-checks.md",
+    "scripts/check_copilot_runtime.py",
+    "scripts/copilot_runtime_probe.mjs",
+    "tests/test_check_copilot_runtime.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
