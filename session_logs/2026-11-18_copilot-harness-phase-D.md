@@ -47,6 +47,12 @@ Code session and the Local harness never stand down.
   it now starts from the filtered environment. The `coder` had also noted
   that `AI_STATE_REMOTE` passes through; it does not, the function sets it
   to an empty string.
+- **02:01** - Follow-up done: `prepare_project` builds on the filtered
+  environment. Two tests added; with the earlier line put back, both fail,
+  and a probe run with `GIT_DIR` aimed at a scratch folder writes a `.git`
+  there. With the fix the scratch folder stays untouched and the probe
+  passes (0 of 46 failed). Orchestrator checks: `verify.py fast` PASS and
+  the probe PASS. Review round 1 started with six profiles.
 
 ## [LEARN] Entries
 
