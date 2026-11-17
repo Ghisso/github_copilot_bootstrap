@@ -3721,12 +3721,11 @@ def main() -> int:
             # `apply_patch` is a free-form tool: its input is the patch text, not
             # JSON. Only a tool that can write takes it. A read or shell tool
             # that gets patch text fails closed, like any other text.
-            text = tool_input
-            if is_shell or read_only or not text.lstrip().startswith(PATCH_BEGIN):
+            if is_shell or read_only or not tool_input.lstrip().startswith(PATCH_BEGIN):
                 raise AmbiguousCommand(
                     "tool input is neither JSON nor patch text"
                 ) from error
-            add_patch_paths(text, paths)
+            add_patch_paths(tool_input, paths)
             emit(target_id, repo_root, paths, uncertain)
             return 0
     if not isinstance(tool_input, dict):
