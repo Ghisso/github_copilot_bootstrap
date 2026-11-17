@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-17
 **Plan:** `.claude/plans/2026-11-17_phase-C-copilot-hook-answers.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -155,8 +155,18 @@ This phase changed documented guard output for `github-copilot` and row T3.
 ## Verification
 
 ```text
-# filled at closeout step 4
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS      216.7s  uv run pytest tests/test_hook_gates.py tests/test_protect_files_copilot_harness.py tests/test_protect_files_scoping.py tests/test_protect_files_substitutions.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+PASS       15.2s  uv run python scripts/check_copilot_runtime.py --require
+PASS        0.0s  grep -q -F 'git-protection.sh github-copilot' dist/multi-agent/.github/hooks/hooks.json
+PASS       44.6s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      424.5s  uv run python .claude/scripts/verify.py phase --format text
+closeout: PASS
 ```
+
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest with 5757 passed and 1 skipped in 425.93 s, freshness, provenance, generation).
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-C-copilot-hook-answers.json`
   (no surviving finding; gate PASS; six profiles; round 1 with two MINOR
