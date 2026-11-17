@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-18
 **Plan:** `.claude/plans/2026-11-17_phase-D-lifecycle-hook-stand-down.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -157,8 +157,20 @@ settings hold.
 ## Verification
 
 ```text
-# filled at closeout step 4
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS      156.9s  uv run pytest tests/test_hook_gates.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+PASS       13.4s  uv run python scripts/check_copilot_runtime.py --require
+PASS        0.0s  grep -q -F 'BOOTSTRAP_HOOK_SOURCE=claude-settings' dist/multi-agent/.claude/settings.json
+PASS        0.0s  test "$(grep -c -F 'BOOTSTRAP_HOOK_SOURCE' dist/multi-agent/.github/hooks/hooks.json)" = "0"
+PASS        0.0s  grep -q -F 'chat.useClaudeHooks' README.md
+PASS       44.7s  uv run python scripts/validate_targets.py
+PASS        0.7s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      433.0s  uv run python .claude/scripts/verify.py phase --format text
+closeout: PASS
 ```
+
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest with 5829 passed and 1 skipped in 430.26 s, freshness, provenance, generation).
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-D-lifecycle-hook-stand-down.json`
   (no surviving finding; gate PASS; six profiles; round 1 FAIL with one
