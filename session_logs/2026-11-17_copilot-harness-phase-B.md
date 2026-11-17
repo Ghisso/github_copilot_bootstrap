@@ -58,6 +58,12 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   1 skipped, 409.74 s by pytest, 436.43 s wall time. The generated OpenWiki
   page `openwiki/operations/deterministic-verification.md` still states 480
   and 600; the final phase of this plan refreshes it.
+- **21:45** - Review round 3 on the budget addition (the same six
+  profiles): Gate PASS, no finding, no open request. The reviewer confirmed
+  from the source that both constants are used only as `timeout=` values,
+  that a timeout still ends as UNVERIFIED or TIMEOUT and never as PASS, and
+  that no hook or CI file runs `verify.py phase` or `verify.py closeout`
+  under a shorter limit.
 
 ### Phase-boundary summary
 
@@ -67,6 +73,9 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   `scripts/check_copilot_runtime.py`, `scripts/copilot_runtime_probe.mjs`,
   `tests/test_check_copilot_runtime.py`, `docs/target-mapping.md`,
   `docs/runtime-checks.md`; new: `tests/test_protect_files_copilot_harness.py`.
+  Added at closeout: the verifier's time budgets in
+  `shared/scripts/verify.py` and the item budget stated in
+  `shared/policies/workflow.instructions.md`.
 - **Deviations:** the Scope-change record before step 11 of the small plan.
 - **Checks:** the required items below; the probe printed 31 PASS lines on
   runtime `1.0.108-0`; the differential battery section below; the negative
@@ -137,6 +146,11 @@ Surfaces checked for claims it made wrong:
 - [LEARN:testing] In a differential battery, read each "unexplained" row
   before touching the guard; the classifier can be the wrong part. Recorded
   in `.claude/MEMORY.md`.
+- [LEARN:tooling] The full suite ran past the verifier's 480-second budget
+  at closeout; raise `COMMAND_TIMEOUT_SECONDS` when the suite passes about
+  two thirds of it, because a late raise costs one more review round and a
+  second closeout. The existing entry in `.claude/MEMORY.md` is updated in
+  place.
 - No lesson recorded for: the hook names of the runtime tools and the
   handling of each tool (the table in `docs/target-mapping.md` carries
   them), and a long pytest run piped into `tail` keeping the call open
@@ -150,7 +164,8 @@ Surfaces checked for claims it made wrong:
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-B-copilot-tool-inputs.json`
   (no surviving finding; gate PASS; six profiles; round 1 FAIL with one
-  MAJOR and two MINOR in the documentation, all fixed before round 2).
+  MAJOR and two MINOR in the documentation, all fixed before round 2;
+  round 3 on the time-budget addition PASS with no finding).
 - optional 1: PASS — the section "Differential battery (plan step 9)" above holds the class table (314 differences, 0 unexplained) and points to the full 314-row table in `raw/phase-B-differential.md`; every row belongs to L1, L2, L3, T1, T2, or T4.
 - optional 2: NOT RUN — it needs a person in a signed-in VS Code window with this phase's guard installed in a test project; the offline probe session `codex-patch` shows the same patch input creating a plain file on runtime `1.0.108-0`, and the user is asked to repeat the check in VS Code.
 

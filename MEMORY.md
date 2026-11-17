@@ -1451,9 +1451,13 @@
   the suite is slower than that budget, which then fails closeout's
   receipt check even though every required item passed. The budget was
   180 s while this repository's suite took 188 s (sidecar Phase L raised
-  it to 480 s). When a phase adds many real-Git tests, time `uv run
-  pytest tests/ -q` on an idle machine before closeout and compare it with
-  the constant in `shared/scripts/verify.py`.
+  it to 480 s). It happened again on 2026-11-17 with 5,560 tests at about
+  410 s; Phase B of `copilot-harness-migration` raised it to 900 s and the
+  item budget to 1020 s. When a phase adds many real-Git tests, time `uv
+  run pytest tests/ -q` on an idle machine before closeout and compare it
+  with the constant in `shared/scripts/verify.py`. Raise the budget when
+  the suite passes about two thirds of it; a late raise costs one more
+  review round and a second closeout.
 - [LEARN:documentation] Before submitting an OpenWiki page, map the cited
   ranges of every file the page cites, not only the file that carries the
   flagged claim. In sidecar Phase M the first page's flagged claim was in
