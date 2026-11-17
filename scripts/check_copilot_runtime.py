@@ -59,6 +59,9 @@ BRANCH_GUARD_REASONS = (
     "missing big-plan file for branch",
 )
 ABSENT = "no pre-tool hook event"
+CHILD_MARKER = "PROBE-CHILD-general"
+WORKFLOW_DENIAL = "Tool blocked by policy"
+SQL_REFUSAL = "Blocked SQL statement"
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,7 @@ class ToolRun:
     deny: str | None = None
     questions: list[str] = field(default_factory=list)
     success: bool | None = None
+    result: str = ""
 
 
 # --- runtime, environment, project ----------------------------------------
@@ -418,12 +422,14 @@ def tool_runs(events: Sequence[Mapping[str, Any]]) -> dict[str, ToolRun]:
             if request.get("toolCallId"):
                 run(request["toolCallId"]).questions.append(str(request.get("kind")))
         elif kind == "tool.execution_complete":
-            run(data.get("toolCallId")).success = data.get("success")
+            finished = run(data.get("toolCallId"))
+            finished.success = data.get("success")
+            finished.result = str(_dict(data.get("result")).get("content") or "")
     return runs
 
 
-def _scripted_run(record: SessionRecord, step: str) -> tuple[ToolRun | None, str]:
-    """The run of a scripted step, or None with the reason it cannot be judged.
+def _step_run(record: SessionRecord, step: str) -> tuple[ToolRun | None, str]:
+    """The run of a scripted step, or None with the reason it did not run.
 
     Only scripted steps are judged. A tool run that is not one of them (the
     runtime's own read of a finished shell, probe P3) has no pre-tool hook
@@ -434,9 +440,17 @@ def _scripted_run(record: SessionRecord, step: str) -> tuple[ToolRun | None, str
         why = _dict(record.summary.get("skippedSteps")).get(step)
         return None, f"step {step} did not run" + (f" ({why})" if why else "")
     run = tool_runs(record.events).get(str(call_id))
-    if run is None or not run.pre_hook:
-        return None, f"{ABSENT} for step {step} ({call_id}): the hooks did not run"
+    if run is None:
+        return None, f"no event for step {step} ({call_id})"
     return run, ""
+
+
+def _scripted_run(record: SessionRecord, step: str) -> tuple[ToolRun | None, str]:
+    """The run of a scripted step that the pre-tool hooks saw, or None with why not."""
+    run, problem = _step_run(record, step)
+    if run is not None and not run.pre_hook:
+        return None, f"{ABSENT} for step {step}: the hooks did not run"
+    return run, problem
 
 
 # --- checks ----------------------------------------------------------------
@@ -504,6 +518,67 @@ def allowed(name: str, *steps: str) -> Check:
             if run.success is not True:
                 return False, f"{step} did not succeed (success={run.success})"
         return True, f"{len(steps)} steps succeeded with no hook question"
+
+    return Check(name, judge)
+
+
+def not_denied(name: str, step: str) -> Check:
+    """The step must get no denial and no question of kind `hook`.
+
+    What the tool itself returns is not judged: a search for a file that does
+    not exist may fail, and that is not the guard's doing.
+    """
+
+    def judge(record: SessionRecord) -> tuple[bool, str]:
+        run, problem = _scripted_run(record, step)
+        if run is None:
+            return False, problem
+        if run.deny is not None:
+            return False, f"denied: {run.deny}"
+        if "hook" in run.questions:
+            return False, "raised a question of kind hook"
+        return True, f"the {run.tool} call got no hook denial and no hook question"
+
+    return Check(name, judge)
+
+
+def refused(name: str, text: str, *steps: str) -> Check:
+    """Each step must fail with `text` in the tool's own answer, not from a hook."""
+
+    def judge(record: SessionRecord) -> tuple[bool, str]:
+        for step in steps:
+            run, problem = _scripted_run(record, step)
+            if run is None:
+                return False, problem
+            if run.deny is not None:
+                return False, f"{step} was denied by a hook, not refused by the tool"
+            if run.success is not False or text not in run.result:
+                return False, (
+                    f"{step} was not refused with {text!r} "
+                    f"(success={run.success}, result: {run.result[:120]!r})"
+                )
+        return True, f"{len(steps)} steps refused by the tool: {text}"
+
+    return Check(name, judge)
+
+
+def helpers_not_denied(name: str, *steps: str) -> Check:
+    """No step may be denied by a pre-tool hook; a step with no hook event is not judged.
+
+    The runtime's own read of a finished shell has no pre-tool hook event (probe P3),
+    so a helper call with none is left alone. Each step must still have run.
+    """
+
+    def judge(record: SessionRecord) -> tuple[bool, str]:
+        notes = []
+        for step in steps:
+            run, problem = _step_run(record, step)
+            if run is None:
+                return False, problem
+            if run.deny is not None or DENIED_PREFIX in run.result:
+                return False, f"{step} denied: {run.deny or run.result[:160]}"
+            notes.append(f"{step}: " + ("not denied" if run.pre_hook else "not judged"))
+        return True, "; ".join(notes)
 
     return Check(name, judge)
 
@@ -590,15 +665,24 @@ def mcp_none(record: SessionRecord) -> tuple[bool, str]:
     return True, "0 MCP servers discovered or started; no .mcp.json after the session"
 
 
+def _step(label: str, tool: str, **args: object) -> dict[str, object]:
+    return {"label": label, "tool": tool, "args": args}
+
+
+def _shell(label: str, command: str, **args: object) -> dict[str, object]:
+    return _step(
+        label, "bash", command=command, description=f"probe step {label}", **args
+    )
+
+
+def _patch(label: str, patch: str) -> dict[str, object]:
+    """A free-form call: the text is the whole input, as the patch tool takes it."""
+    return {"label": label, "tool": "apply_patch", "input": patch}
+
+
 def baseline_scenario(project: Path) -> dict[str, object]:
     """The scripted tool calls of the baseline session, in the plan's table order."""
-
-    def step(label: str, tool: str, **args: str) -> dict[str, object]:
-        return {"label": label, "tool": tool, "args": args}
-
-    def shell(label: str, command: str) -> dict[str, object]:
-        return step(label, "bash", command=command, description=f"probe step {label}")
-
+    step, shell = _step, _shell
     plain = str(project / "probe-plain.txt")
     return {
         "name": "main",
@@ -637,6 +721,95 @@ def baseline_scenario(project: Path) -> dict[str, object]:
                 old_str="probe",
                 new_str="probe two",
             ),
+            # The shell helpers carry a shell id, not a command (probe P3).
+            shell("helper-start", "sleep 2; echo async-done", mode="async"),
+            step("helper-read", "read_bash", shellId="0", delay=1),
+            step("helper-list", "list_bash"),
+            step("helper-stop", "stop_bash", shellId="0"),
+            step(
+                "read-agent-file",
+                "view",
+                path=str(project / ".claude" / "agents" / "coder.md"),
+            ),
+            step("search-secret", "grep", pattern="SECRET", paths=[".env"]),
+            step("search-glob", "glob", pattern=".env*"),
+            # Tools that run code or commands outside the pre-tool hooks.
+            step("deny-workflow-run", "run_dynamic_workflow", name="probe-workflow"),
+            step("deny-workflow-manage", "dynamic_workflows_manage", operation="list"),
+            step(
+                "sql-attach",
+                "sql",
+                description="Attach a file",
+                query=f"ATTACH DATABASE '{project / 'probe-attached.db'}' AS x",
+            ),
+            step(
+                "sql-vacuum-into",
+                "sql",
+                description="Copy the database",
+                query=f"VACUUM INTO '{project / 'probe-vacuum.db'}'",
+            ),
+            step(
+                "subagent-start",
+                "task",
+                description="probe general",
+                prompt=f"{CHILD_MARKER} run the child steps",
+                agent_type="general-purpose",
+                name="probe-general",
+                mode="sync",
+            ),
+        ],
+        # What the sub-agent does: its own tool calls pass through the hooks too.
+        "childSteps": {
+            CHILD_MARKER: [
+                _shell("child-git-reset", "git reset --hard HEAD"),
+                _step(
+                    "child-store-attach",
+                    "session_store_sql",
+                    description="Attach a file",
+                    query=f"ATTACH DATABASE '{project / 'probe-store.db'}' AS x",
+                    source="local",
+                ),
+            ]
+        },
+    }
+
+
+# The patch texts of the evidence scenario `sc5_codex_patch.json`, then one with an
+# indented header.
+PATCH_PLAIN = (
+    "*** Begin Patch\n*** Add File: probe-patch.txt\n+plain file\n*** End Patch\n"
+)
+PATCH_SECRET = "*** Begin Patch\n*** Add File: .env\n+SECRET=1\n*** End Patch\n"
+PATCH_HOOK = (
+    "*** Begin Patch\n*** Add File: .github/hooks/evil.json\n+{}\n*** End Patch\n"
+)
+PATCH_SERVER = (
+    "*** Begin Patch\n*** Update File: .mcp.json\n@@\n-{\n+{ \n*** End Patch\n"
+)
+PATCH_AGENT = (
+    "*** Begin Patch\n*** Delete File: .claude/agents/coder.md\n*** End Patch\n"
+)
+PATCH_INDENTED = (
+    "*** Begin Patch\n  *** Add File: .github/hooks/evil-indented.json\n+{}\n"
+    "*** End Patch\n"
+)
+
+
+def codex_patch_scenario(project: Path) -> dict[str, object]:
+    """Patch-tool calls. Only Codex-family model ids are offered `apply_patch` offline."""
+    return {
+        "name": "codex-patch",
+        "model": "gpt-5.2-codex",
+        "marker": "PROBE-MARKER",
+        "subfolder": "docs/deeper",
+        "timeoutMs": SEND_TIMEOUT_MS,
+        "steps": [
+            _patch("patch-plain", PATCH_PLAIN),
+            _patch("patch-secret", PATCH_SECRET),
+            _patch("patch-hook", PATCH_HOOK),
+            _patch("patch-server", PATCH_SERVER),
+            _patch("patch-agent", PATCH_AGENT),
+            _patch("patch-indented-hook", PATCH_INDENTED),
         ],
     }
 
@@ -666,8 +839,40 @@ BASELINE_CHECKS = (
         "allow-plain-create",
         "allow-plain-edit",
     ),
+    helpers_not_denied("helper-tools", "helper-read", "helper-list", "helper-stop"),
+    allowed("read-agent-file", "read-agent-file"),
+    denied(
+        "search-secret-denied",
+        "search-secret",
+        "Protected file blocked by policy: .env",
+    ),
+    not_denied("search-glob-not-judged", "search-glob"),
+    denied("deny-workflow-run", "deny-workflow-run", WORKFLOW_DENIAL),
+    denied("deny-workflow-manage", "deny-workflow-manage", WORKFLOW_DENIAL),
+    refused("sql-no-file-write", SQL_REFUSAL, "sql-attach", "sql-vacuum-into"),
+    denied(
+        "subagent-deny-git-reset",
+        "child-git-reset",
+        "Blocked dangerous git operation",
+    ),
+    refused("subagent-store-sql-refused", SQL_REFUSAL, "child-store-attach"),
 )
-SESSIONS = (Session("main", baseline_scenario, BASELINE_CHECKS),)
+CODEX_PATCH_CHECKS = (
+    allowed("patch-plain-allowed", "patch-plain"),
+    denied(
+        "patch-secret-denied",
+        "patch-secret",
+        "Protected file blocked by policy: .env",
+    ),
+    asked("patch-hook-ask", "patch-hook"),
+    asked("patch-server-ask", "patch-server"),
+    asked("patch-agent-ask", "patch-agent"),
+    asked("patch-indented-hook-ask", "patch-indented-hook"),
+)
+SESSIONS = (
+    Session("main", baseline_scenario, BASELINE_CHECKS),
+    Session("codex-patch", codex_patch_scenario, CODEX_PATCH_CHECKS),
+)
 
 
 # --- output ----------------------------------------------------------------

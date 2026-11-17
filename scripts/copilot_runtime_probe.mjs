@@ -8,6 +8,9 @@
 // Usage: node copilot_runtime_probe.mjs <config.json>
 //   mode "discover": ask the runtime what it finds in a folder (no session)
 //   mode "session":  discovery before and after folder trust, then one scripted session
+// A scripted step is { label, tool, args } for an ordinary tool call, or { label, tool, input }
+// for a free-form one (apply_patch). `childSteps` maps a sub-agent marker (PROBE-CHILD-<name>,
+// put in the task prompt) to the steps that sub-agent plays.
 // Everything is written to <outDir>: record.json, and for a session events.jsonl.
 import fs from "node:fs";
 import http from "node:http";
@@ -49,7 +52,8 @@ const hooksAndMcp = async (directory) => ({
 const scenario = config.scenario ?? { steps: [] };
 const eventsFile = path.join(outDir, "events.jsonl");
 let callCounter = 0;
-let stepIndex = 0;
+const mainState = { index: 0 };
+const childState = {};
 record.stepCalls = {};
 record.skippedSteps = {};
 record.subagentFirstRequests = {};
@@ -72,20 +76,29 @@ const nextReply = (body) => {
                 user: messages.filter((m) => m.role === "user").map((m) => textOf(m).slice(0, 3000)),
             };
         }
-        return { text: "ok" };
+        // The sub-agent plays its own scripted steps, in order, one per model request.
+        const steps = (key && scenario.childSteps?.[key]) || [];
+        const state = key ? (childState[key] ??= { index: 0 }) : { index: 0 };
+        return takeStep(steps, state, toolNames) ?? { text: "ok" };
     }
-    while (stepIndex < scenario.steps.length) {
-        const step = scenario.steps[stepIndex];
-        stepIndex += 1;
+    return takeStep(scenario.steps, mainState, toolNames) ?? { text: "probe complete" };
+};
+// The next scripted step the model was offered a tool for, as a model reply. A step with `input`
+// is a free-form (custom) tool call such as apply_patch. A step whose tool was not offered is
+// recorded and skipped.
+const takeStep = (steps, state, toolNames) => {
+    while (state.index < steps.length) {
+        const step = steps[state.index];
+        state.index += 1;
         if (!toolNames.includes(step.tool)) {
             record.skippedSteps[step.label] = `tool ${step.tool} not offered`;
             continue;
         }
         const id = `call_probe_${callCounter}`;
         record.stepCalls[step.label] = id;
-        return { tool: { id, name: step.tool, args: step.args ?? {} } };
+        return { tool: { id, name: step.tool, args: step.args ?? {}, input: step.input } };
     }
-    return { text: "probe complete" };
+    return undefined;
 };
 const completion = (body, reply) => {
     const base = { id: `chatcmpl-probe-${callCounter}`, created: Math.floor(Date.now() / 1000), model: body.model };
@@ -94,7 +107,11 @@ const completion = (body, reply) => {
         ? {
               role: "assistant",
               content: null,
-              tool_calls: [{ id: reply.tool.id, type: "function", function: { name: reply.tool.name, arguments: JSON.stringify(reply.tool.args) } }],
+              tool_calls: [
+                  reply.tool.input !== undefined
+                      ? { id: reply.tool.id, type: "custom", custom: { name: reply.tool.name, input: reply.tool.input } }
+                      : { id: reply.tool.id, type: "function", function: { name: reply.tool.name, arguments: JSON.stringify(reply.tool.args) } },
+              ],
           }
         : { role: "assistant", content: reply.text };
     const finish = reply.tool ? "tool_calls" : "stop";

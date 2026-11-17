@@ -451,7 +451,12 @@ interpreters other than shells that read a script from stdin (`python3 -`, `node
 a value whose default word, or what is left without its expansions, is only a fragment of a protected name (`y=${z:-.e}; tee "${y}nv"`, `x=.e; y=${z}${x}nv; tee "$y"`); only a guess that names a protected file by itself is tracked;
 a single-quoted `$` in an assignment is read as an expansion (the quote kind is not tracked);
 functions defined on an earlier command line;
+a `command` carried by the `bash_shutdown` tool of VS Code's agent host: its name does not end in `bash`, so it is judged as a native tool, and no run has shown that it carries a command;
+an `apply_patch` header that the runtime's parser accepts and the guard's pattern does not read: the pattern allows any blanks and any letter case around `Add File`, `Update File`, `Delete File`, and `Move to`, and nothing else;
 and zsh syntax beyond the refused qualifiers, `setopt`/`unsetopt`, and `${(` flags (zsh is not modelled).
+
+The Copilot-harness search tools (`grep`, `rg`, `glob`) are read tools. Only an explicit secret-shaped entry in their `paths` list is denied. A search over a folder, a `glob` pattern or filter such as `.env*`, and a search `pattern` that names a secret file get no decision, so a secret file inside a searched folder can be read. Shell reads such as `cat .env` are allowed too, by user decision (2026-10-21). See "Copilot harness tools and guard handling" in [target-mapping.md](target-mapping.md).
+
 For
 opaque command or interpreter syntax, verify conservative high-confidence path
 coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
@@ -558,22 +563,49 @@ baseline checks are:
 - the guards deny a hard reset, a force push, a secret file removal, a secret
   file read, a branch, a commit, and a pull request (`deny-*`), ask for the
   `.vscode/settings.json` and agent-wrapper edits (`ask-*`), and allow plain
-  work (`allow-plain`).
+  work (`allow-plain`);
+- the shell helpers `read_bash`, `list_bash`, and `stop_bash` are not denied
+  (`helper-tools`; a helper call with no pre-tool hook event is not judged);
+- the read tool reads `.claude/agents/coder.md` with no guard question
+  (`read-agent-file`), a `grep` with `paths: [".env"]` is denied
+  (`search-secret-denied`), and a `glob` for `.env*` gets no hook denial
+  (`search-glob-not-judged`);
+- the workflow tools are denied by name (`deny-workflow-run`,
+  `deny-workflow-manage`);
+- the tool `sql` refuses `ATTACH` and `VACUUM INTO` itself (`sql-no-file-write`);
+- a `general-purpose` sub-agent, started with the `task` tool, has its own
+  `git reset --hard HEAD` denied by the same hooks (`subagent-deny-git-reset`)
+  and its `session_store_sql` `ATTACH` refused by the tool
+  (`subagent-store-sql-refused`).
 
-These are 14 checks. The probe also prints a fifteenth line, `session-main`: it
-is `PASS` when the session finished, and `FAIL` for a timeout, a crash, a
-runtime error, or a run limit used up before the session could start. When it
-cannot build the temporary project within the run limit, it prints
-`FAIL project` and runs no session. So the counts of failed lines in the table
-below (for example "12 of 15") are out of 15 lines.
+A second session, `codex-patch`, uses the model id `gpt-5.2-codex`, because
+offline only Codex-family ids are given the patch tool `apply_patch`. It sends
+the five patches of the evidence scenario `sc5_codex_patch.json` and one more
+with an indented header. A plain new file succeeds (`patch-plain-allowed`) and a
+`.env` file is denied (`patch-secret-denied`). A hook file, a server file, an
+agent file, and an indented hook file each raise at least one question of kind
+`hook`, and none is denied (`patch-hook-ask`, `patch-server-ask`,
+`patch-agent-ask`, `patch-indented-hook-ask`). The runtime raises two questions
+for each, because both hook sources run.
+
+The `main` session has 23 checks and `codex-patch` has 6. The probe also prints
+one line for each session, `session-main` and `session-codex-patch`: it is `PASS`
+when the session finished, and `FAIL` for a timeout, a crash, a runtime error,
+or a run limit used up before the session could start. A run prints 31 lines.
+When it cannot build the temporary project within the run limit, it prints
+`FAIL project` and runs no session. The counts of failed lines in the table
+below (for example "12 of 15") were measured with the first version of the
+probe, which had one session and printed 15 lines (14 checks and
+`session-main`).
 
 **What it does not prove.** It does not run VS Code's own layer: approval
 dialogs, "Allow all", Autopilot, or the tool set VS Code gives each model.
 VS Code can give a model a different tool set than the runtime's own list for that model.
 In the real VS Code, Auto chose `gpt-6-luna` and VS Code gave it the patch tool
 `apply_patch`, while the runtime's own list gives that model `create` and `edit`
-(evidence A4). The printed inventory is the runtime's list for the model name
-`probe-model`. The probe makes no claim about Copilot CLI, Copilot
+(evidence A4). Each printed inventory is the runtime's list for the model name of
+its session: `probe-model` for `main` and `gpt-5.2-codex` for `codex-patch`. The
+probe makes no claim about Copilot CLI, Copilot
 cloud agents, or any runtime version other than the one it prints.
 
 **Finding the runtime.** Without `--vscode-bin`, it takes the folder under
@@ -603,16 +635,16 @@ on VS Code commit `69047191fc427f2f92828279aae1d90d8eeda7ab`, SDK
 | Unknown | Result | Evidence |
 | --- | --- | --- |
 | Can the SDK start the runtime with no account and a private data folder? | Yes. `getStatus()` returned the runtime version; sessions ran. | `raw/outcomes-g-both.txt`; probe note, section 1 |
-| Can a scripted model on 127.0.0.1 drive real tool calls? | Yes. 13 scripted calls ran in 14 model replies. | `raw/outcomes-g-both.txt`; probe note, section 1 |
+| Can a scripted model on 127.0.0.1 drive real tool calls? | Yes. 13 scripted calls ran in 14 model replies (the first version of the probe). The current version also sends free-form calls (the patch tool) and scripts a sub-agent's own steps; its `main` session ran 27 scripted calls in 29 model replies, and `codex-patch` ran 6 in 7. | `raw/outcomes-g-both.txt`; probe note, section 1; run of 2026-11-17 for the Copilot tool-input change |
 | Do repository hooks load only for a trusted folder? | Yes. In a fresh install the probe counted 0 hooks before trust and 26 after trust (12 from `.github/hooks/hooks.json`, 14 from `.claude/settings.json`). The raw files show the same 12 and 14 for the two sources in an older test project, which also had two logging hook files (54 hooks in total). | Probe note, sections 1 and 6; `raw/discover-before-trust.txt`; `raw/discover-after-trust-hooks-and-mcp.txt` |
 | Do both hook files load from a subfolder two levels down? | Yes, on `1.0.108-0`. | P4; `raw/planning-probe-p4-subfolder-discovery.txt` |
 | How do a deny and a guard question appear in session events? | A deny is a `hook.end` of `preToolUse` whose output reads `Denied by preToolUse hook: <reason>`, with `tool.execution_complete` `success: false`. A question is a `permission.requested` of kind `hook`; with both hook files, a protected edit raises two. | `raw/outcomes-g-both.txt`; F3 |
-| Does every tool run have a pre-tool hook event? | No. The runtime's own read of a finished shell has none. The probe judges only its scripted steps, and a scripted step with no hook event is a `FAIL`. | P3 |
+| Does every tool run have a pre-tool hook event? | No. The runtime's own read of a finished shell has none. The probe judges only its scripted steps, and a scripted step with no hook event is a `FAIL`. The one exception is `helper-tools`, which does not judge a helper step that has no hook event. | P3 |
 | Does deleting the project's `.mcp.json` keep MCP servers from starting? | No, not alone. The SessionStart hook `state-sync.sh pull` runs `restore-root-adapters.sh`, which copies `.mcp.json` back from `.claude/bootstrap-root/` during the session. In a control run that deleted only the project file, the traced process tree showed 2 such copies inside the session and 3 MCP server launches (`uvx` for `semble`, `npx` for `context7` and for `context-mode`). The only connection attempts outside loopback in that run were 16 DNS lookups (8 to 1.1.1.1 and 8 to 8.8.8.8, port 53), all refused because the namespace had no route. The file was back after the run in 4 of 4 control runs. The first version of `mcp-none` read only discovery and session events: it printed `FAIL` in 1 of those 4 runs (the traced run, which is slower) and `PASS` in the other 3, because no MCP event reached the session before it ended. The check now also reads the project file after the session, and the same control failed in 4 of 4 runs. The probe deletes the mirror copy and the manifest line too; the traced run of the shipped probe shows 0 copies inside the session and 0 launches. A test runs the restore script on the prepared project. | Probe note, sections 2, 3, and 7 |
 | Does the run leave 127.0.0.1? | In one run, no. It ran in a network namespace with only loopback, traced with `strace -f`, counting `connect` calls: the whole process tree (Python, git, node, the runtime, the hooks) made 2 `connect` calls, both to 127.0.0.1. Only that run was traced. | Probe note, section 2 |
 | Does the run write to `~/.copilot`? | Not observed. After a run, none of its session ids was under `~/.copilot/session-state`, and no file under `~/.copilot` mentioned a probe folder. | Probe note, section 5 |
-| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. | Probe note, sections 1 and 2 |
-| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. | Probe note, section 4 |
+| How long does a run take? | With a network: 6.06 and 5.82 seconds (the session itself 4.4 seconds; the session-start hook 1.6 seconds, tool hooks 0.1 to 0.3 seconds). In the loopback-only namespace under `strace`: 90 seconds, with the session itself 63.8 seconds, the session-start hook 32.4 seconds, and tool hooks 0.5 to 3.6 seconds. The cause of the slow hooks was not traced. The current version, with two sessions and 31 lines, took 13.61 and 11.72 seconds in two runs with a network. | Probe note, sections 1 and 2; runs of 2026-11-17 for the Copilot tool-input change |
+| Do the checks fail on a wrong result? | Yes. With both hook files removed from the temporary project, the first version of the probe printed `FAIL` for 12 of 15 lines and exited 1. With only `.github/hooks/hooks.json` removed, 4 of 15 failed. With the file guard from before the Copilot tool-input change put into the temporary project, 11 of 31 lines failed and the probe exited 1: `helper-tools`, `read-agent-file`, `search-secret-denied`, `deny-workflow-run`, `deny-workflow-manage`, and the six patch checks. Checks of behavior that did not change, such as `sql-no-file-write` and `subagent-deny-git-reset`, still passed. | Probe note, section 4; run of 2026-11-17 for the Copilot tool-input change |
 
 The runtime's environment drops every variable whose name starts with `CLAUDE`
 or `ANTHROPIC`, and `GH_TOKEN`, `GITHUB_TOKEN`, and `COPILOT_GITHUB_TOKEN`.
@@ -949,7 +981,7 @@ of this changes what a gate checks, only what an operator should expect.
 | `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
 | `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh overwrites these four files, even a hand-edited one, unless the README path or its folder is a link or the wrong kind; then it skips that README with a warning | None needed — treat them as generated, not editable |
 | Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks implementation-branch creation (the big plan and its listed phases) and the next commit when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
-| `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
+| `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 1020` seconds |
 | Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
 | OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Ask the user to run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell (the guard denies an agent command that names a hook script) to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
 | More files are protected hook or server configs: `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json` | An agent edit of one asks on Claude and Copilot and is denied on Codex and Antigravity, including an ordinary `.vscode/settings.json` edit. Any command outside the guard's read-only list that merely names one of these files is denied on all four clients, including `ls`, `jq`, `test -f`, `git add <file>`, and an inline `gh pr create --body "..."` | Approve the prompt, or edit the file yourself outside the agent. Inspect with `cat` or the native read tool, stage with `git add -u` or a path that does not name the file, and pass PR text written with the native Write tool through `--body-file` |
@@ -1008,7 +1040,7 @@ Three practical notes worth knowing before a refresh:
 block itself, in order, before it binds the tree — it never accepts a
 session-log claim that a check ran instead. The run results are stored at
 `extensions.verification_items` in the closeout receipt, one entry per item,
-each bounded by a 600-second timeout. The commit gate judges only the phase
+each bounded by a 1020-second timeout. The commit gate judges only the phase
 being completed, and only under the `exact` head relation. See the canonical
 definition in `shared/policies/workflow.instructions.md`, section
 "Verification Evidence Contract", rather than restating its parsing rules

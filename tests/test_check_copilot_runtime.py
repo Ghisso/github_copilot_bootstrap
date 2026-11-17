@@ -29,6 +29,18 @@ import check_copilot_runtime as probe  # noqa: E402
 
 GITHUB_HOOKS = "file:///work/project/.github/hooks/hooks.json"
 CLAUDE_SETTINGS = "file:///work/project/.claude/settings.json"
+# The guard's reason for a workflow tool (row T4), with the tool's name in it.
+WORKFLOW_REASON = (
+    "Tool blocked by policy: {tool} runs workflow code that the pre-tool hooks "
+    "cannot see"
+)
+# What the tool itself answers (seen in a real run), not a hook.
+SQL_ATTACH = (
+    'Error: Blocked SQL statement: "ATTACH" is not allowed for security reasons.'
+)
+SQL_VACUUM = (
+    'Error: Blocked SQL statement: "VACUUM INTO" is not allowed for security reasons.'
+)
 
 # Plan step 3 table: the tool each scripted step uses, the deny reason (or the
 # permission questions) the guards must give for it on a fresh install on `dev`.
@@ -75,7 +87,67 @@ EXPECTED_STEPS: dict[str, dict[str, Any]] = {
     "allow-plain-view": {"tool": "view", "questions": ("read",)},
     "allow-plain-create": {"tool": "create", "questions": ("write",)},
     "allow-plain-edit": {"tool": "edit", "questions": ("write",)},
+    # Phase B steps (the Phase B plan, steps 6 and 7; shapes from a real run).
+    "helper-start": {"tool": "bash", "questions": ("shell",)},
+    "helper-read": {"tool": "read_bash"},
+    "helper-list": {"tool": "list_bash"},
+    "helper-stop": {"tool": "stop_bash"},
+    "read-agent-file": {"tool": "view", "questions": ("read",)},
+    "search-secret": {
+        "tool": "grep",
+        "reason": "Protected file blocked by policy: .env",
+    },
+    "search-glob": {"tool": "glob", "questions": ("read",)},
+    "deny-workflow-run": {
+        "tool": "run_dynamic_workflow",
+        "reason": WORKFLOW_REASON.format(tool="run_dynamic_workflow"),
+    },
+    "deny-workflow-manage": {
+        "tool": "dynamic_workflows_manage",
+        "reason": WORKFLOW_REASON.format(tool="dynamic_workflows_manage"),
+    },
+    "sql-attach": {"tool": "sql", "success": False, "result": SQL_ATTACH},
+    "sql-vacuum-into": {"tool": "sql", "success": False, "result": SQL_VACUUM},
+    "subagent-start": {"tool": "task"},
+    "child-git-reset": {
+        "tool": "bash",
+        "reason": "Blocked dangerous git operation: git reset --hard",
+    },
+    "child-store-attach": {
+        "tool": "session_store_sql",
+        "success": False,
+        "result": SQL_ATTACH,
+    },
 }
+# The steps the sub-agent plays; every other step is the main model's.
+CHILD_STEP_LABELS = ("child-git-reset", "child-store-attach")
+MAIN_STEP_LABELS = [label for label in EXPECTED_STEPS if label not in CHILD_STEP_LABELS]
+# Plan step 7, session `codex-patch`: the five patch calls of the evidence scenario
+# `sc5_codex_patch.json` (both hook sources ask twice), then an indented header.
+EXPECTED_PATCH_STEPS: dict[str, dict[str, Any]] = {
+    "patch-plain": {"tool": "apply_patch", "questions": ("write",)},
+    "patch-secret": {
+        "tool": "apply_patch",
+        "reason": "Protected file blocked by policy: .env",
+    },
+    "patch-hook": {"tool": "apply_patch", "questions": ("hook", "hook")},
+    # The server file is not in the temporary project, so the patch itself fails.
+    "patch-server": {
+        "tool": "apply_patch",
+        "questions": ("hook", "hook"),
+        "success": False,
+    },
+    "patch-agent": {"tool": "apply_patch", "questions": ("hook", "hook")},
+    "patch-indented-hook": {"tool": "apply_patch", "questions": ("hook", "hook")},
+}
+EXPECTED_PATCH_CHECK_NAMES = [
+    "patch-plain-allowed",
+    "patch-secret-denied",
+    "patch-hook-ask",
+    "patch-server-ask",
+    "patch-agent-ask",
+    "patch-indented-hook-ask",
+]
 EXPECTED_CHECK_NAMES = [
     "hooks-untrusted",
     "hooks-sources",
@@ -91,6 +163,15 @@ EXPECTED_CHECK_NAMES = [
     "deny-commit",
     "deny-pr",
     "allow-plain",
+    "helper-tools",
+    "read-agent-file",
+    "search-secret-denied",
+    "search-glob-not-judged",
+    "deny-workflow-run",
+    "deny-workflow-manage",
+    "sql-no-file-write",
+    "subagent-deny-git-reset",
+    "subagent-store-sql-refused",
 ]
 
 
@@ -102,6 +183,7 @@ def call_events(
     questions: Sequence[str] = (),
     success: bool | None = None,
     hooked: bool = True,
+    result: str = "",
 ) -> list[dict[str, Any]]:
     """Events of one tool call, in the order the runtime emits them."""
     denied = reason is not None
@@ -147,6 +229,7 @@ def call_events(
             "data": {
                 "toolCallId": call_id,
                 "success": (not denied) if success is None else success,
+                "result": {"content": result},
             },
         }
     )
@@ -183,6 +266,7 @@ def build_record(
     steps: dict[str, dict[str, Any]] | None = None,
     discovery: dict[str, Any] | None = None,
     extra_events: Sequence[dict[str, Any]] = (),
+    name: str = "main",
 ) -> probe.SessionRecord:
     """A record of a correct run, unless the caller passes wrong steps or discovery."""
     steps = EXPECTED_STEPS if steps is None else steps
@@ -198,6 +282,7 @@ def build_record(
             questions=step.get("questions", ()),
             success=step.get("success"),
             hooked=step.get("hooked", True),
+            result=step.get("result", ""),
         )
     events += list(extra_events)
     summary: dict[str, Any] = {
@@ -225,11 +310,32 @@ def build_record(
         "mcpFileAfterSession": False,
         "errors": [],
     }
-    return probe.SessionRecord(name="main", events=events, summary=summary)
+    return probe.SessionRecord(name=name, events=events, summary=summary)
+
+
+def build_patch_record(
+    steps: dict[str, dict[str, Any]] | None = None,
+) -> probe.SessionRecord:
+    """A record of a correct `codex-patch` run, unless the caller passes wrong steps."""
+    steps = EXPECTED_PATCH_STEPS if steps is None else steps
+    return build_record(steps, name="codex-patch")
+
+
+def record_for(scenario: dict[str, object]) -> probe.SessionRecord:
+    """The record of a correct run of the scenario a fake session was given."""
+    if scenario["name"] == "codex-patch":
+        return build_patch_record()
+    return build_record()
 
 
 def results_by_name(record: probe.SessionRecord) -> dict[str, probe.CheckResult]:
     return {r.name: r for r in probe.evaluate(record, probe.BASELINE_CHECKS)}
+
+
+def patch_results_by_name(
+    record: probe.SessionRecord,
+) -> dict[str, probe.CheckResult]:
+    return {r.name: r for r in probe.evaluate(record, probe.CODEX_PATCH_CHECKS)}
 
 
 def make_runtime(
@@ -524,12 +630,102 @@ def test_a_correct_run_passes_every_check() -> None:
 def test_the_scenario_has_one_scripted_step_per_expected_step() -> None:
     scenario = probe.baseline_scenario(Path("/work/project"))
     steps: list[dict[str, Any]] = scenario["steps"]  # type: ignore[assignment]
+    child_steps: list[dict[str, Any]] = scenario["childSteps"][  # type: ignore[index]
+        probe.CHILD_MARKER
+    ]
 
-    assert [step["label"] for step in steps] == list(EXPECTED_STEPS)
-    assert {step["label"]: step["tool"] for step in steps} == {
+    assert [step["label"] for step in steps] == MAIN_STEP_LABELS
+    assert [step["label"] for step in child_steps] == list(CHILD_STEP_LABELS)
+    assert {step["label"]: step["tool"] for step in steps + child_steps} == {
         label: expected["tool"] for label, expected in EXPECTED_STEPS.items()
     }
     assert scenario["model"] == "probe-model"
+
+
+def test_the_sub_agent_is_started_with_the_marker_that_keys_its_steps() -> None:
+    scenario = probe.baseline_scenario(Path("/work/project"))
+    steps: list[dict[str, Any]] = scenario["steps"]  # type: ignore[assignment]
+
+    task = next(step for step in steps if step["label"] == "subagent-start")
+
+    assert task["tool"] == "task"
+    assert probe.CHILD_MARKER == "PROBE-CHILD-general"
+    assert probe.CHILD_MARKER in task["args"]["prompt"]
+    assert task["args"]["agent_type"] == "general-purpose"
+
+
+def test_the_helper_steps_start_an_async_shell_and_name_its_id() -> None:
+    scenario = probe.baseline_scenario(Path("/work/project"))
+    steps: dict[str, dict[str, Any]] = {
+        step["label"]: step
+        for step in scenario["steps"]  # type: ignore[attr-defined]
+    }
+
+    assert steps["helper-start"]["args"]["mode"] == "async"
+    assert steps["helper-read"]["args"] == {"shellId": "0", "delay": 1}
+    assert steps["helper-stop"]["args"] == {"shellId": "0"}
+    assert steps["helper-list"]["args"] == {}
+
+
+def test_the_search_steps_name_the_secret_file_and_a_glob_filter() -> None:
+    scenario = probe.baseline_scenario(Path("/work/project"))
+    steps: dict[str, dict[str, Any]] = {
+        step["label"]: step
+        for step in scenario["steps"]  # type: ignore[attr-defined]
+    }
+
+    assert steps["search-secret"]["tool"] == "grep"
+    assert steps["search-secret"]["args"]["paths"] == [".env"]
+    assert steps["search-glob"]["tool"] == "glob"
+    assert steps["search-glob"]["args"]["pattern"] == ".env*"
+    assert steps["read-agent-file"]["args"]["path"] == (
+        "/work/project/.claude/agents/coder.md"
+    )
+
+
+def test_the_workflow_and_sql_steps_use_the_tool_names_the_guard_denies() -> None:
+    scenario = probe.baseline_scenario(Path("/work/project"))
+    steps: dict[str, dict[str, Any]] = {
+        step["label"]: step
+        for step in scenario["steps"]  # type: ignore[attr-defined]
+    }
+
+    assert steps["deny-workflow-run"]["tool"] == "run_dynamic_workflow"
+    assert steps["deny-workflow-manage"]["tool"] == "dynamic_workflows_manage"
+    assert "ATTACH DATABASE '/work/project/" in steps["sql-attach"]["args"]["query"]
+    assert steps["sql-vacuum-into"]["args"]["query"].startswith("VACUUM INTO '")
+
+
+# The evidence file raw/hook-inputs-patch-tool.txt holds these five payloads.
+EVIDENCE_PATCHES = {
+    "patch-plain": "*** Begin Patch\n*** Add File: probe-patch.txt\n+plain file\n*** End Patch\n",
+    "patch-secret": "*** Begin Patch\n*** Add File: .env\n+SECRET=1\n*** End Patch\n",
+    "patch-hook": "*** Begin Patch\n*** Add File: .github/hooks/evil.json\n+{}\n*** End Patch\n",
+    "patch-server": "*** Begin Patch\n*** Update File: .mcp.json\n@@\n-{\n+{ \n*** End Patch\n",
+    "patch-agent": "*** Begin Patch\n*** Delete File: .claude/agents/coder.md\n*** End Patch\n",
+}
+
+
+def test_the_patch_scenario_sends_the_five_evidence_patches_and_an_indented_one() -> (
+    None
+):
+    scenario = probe.codex_patch_scenario(Path("/work/project"))
+    steps: list[dict[str, Any]] = scenario["steps"]  # type: ignore[assignment]
+
+    assert scenario["name"] == "codex-patch"
+    assert scenario["model"] == "gpt-5.2-codex"
+    assert [step["label"] for step in steps] == list(EXPECTED_PATCH_STEPS)
+    assert {step["label"]: step["tool"] for step in steps} == dict.fromkeys(
+        EXPECTED_PATCH_STEPS, "apply_patch"
+    )
+    # A free-form call carries its text as `input`, never as `args`.
+    assert all(isinstance(step["input"], str) and "args" not in step for step in steps)
+    inputs = {step["label"]: step["input"] for step in steps}
+    assert {label: inputs[label] for label in EVIDENCE_PATCHES} == EVIDENCE_PATCHES
+    indented = inputs["patch-indented-hook"].splitlines()
+    assert indented[0] == "*** Begin Patch"
+    assert indented[1] == "  *** Add File: .github/hooks/evil-indented.json"
+    assert indented[-1] == "*** End Patch"
 
 
 @pytest.mark.parametrize(
@@ -637,6 +833,143 @@ def test_the_scenario_has_one_scripted_step_per_expected_step() -> None:
             {"tool": "edit", "questions": ("write",), "success": False},
             id="plain-edit-fails",
         ),
+        # Phase B checks. A `label` names the step when it differs from the check.
+        pytest.param(
+            "helper-tools",
+            {
+                "label": "helper-read",
+                "tool": "read_bash",
+                "reason": "hook exited with code 2",
+            },
+            id="read-helper-denied",
+        ),
+        pytest.param(
+            "helper-tools",
+            {
+                "label": "helper-list",
+                "tool": "list_bash",
+                "reason": "hook exited with code 2",
+            },
+            id="list-helper-denied",
+        ),
+        pytest.param(
+            "helper-tools",
+            {
+                "label": "helper-stop",
+                "tool": "stop_bash",
+                "reason": "hook exited with code 2",
+            },
+            id="stop-helper-denied",
+        ),
+        pytest.param(
+            "read-agent-file",
+            {"tool": "view", "questions": ("hook", "read")},
+            id="agent-file-read-asks-a-hook-question",
+        ),
+        pytest.param(
+            "read-agent-file",
+            {"tool": "view", "reason": "Protected file blocked by policy: .env"},
+            id="agent-file-read-denied",
+        ),
+        pytest.param(
+            "search-secret-denied",
+            {"label": "search-secret", "tool": "grep"},
+            id="secret-search-allowed",
+        ),
+        pytest.param(
+            "search-secret-denied",
+            {
+                "label": "search-secret",
+                "tool": "grep",
+                "reason": "Blocked dangerous git operation: force push",
+            },
+            id="secret-search-denied-for-the-wrong-reason",
+        ),
+        pytest.param(
+            "search-glob-not-judged",
+            {
+                "label": "search-glob",
+                "tool": "glob",
+                "reason": "Protected file blocked by policy: .env",
+            },
+            id="glob-filter-denied",
+        ),
+        pytest.param(
+            "search-glob-not-judged",
+            {"label": "search-glob", "tool": "glob", "questions": ("hook", "read")},
+            id="glob-filter-asks-a-hook-question",
+        ),
+        pytest.param(
+            "deny-workflow-run",
+            {"tool": "run_dynamic_workflow", "success": False},
+            id="workflow-run-reaches-the-tool",
+        ),
+        pytest.param(
+            "deny-workflow-run",
+            {
+                "tool": "run_dynamic_workflow",
+                "reason": "Protected file blocked by policy: .env",
+            },
+            id="workflow-run-denied-for-another-reason",
+        ),
+        pytest.param(
+            "deny-workflow-manage",
+            {"tool": "dynamic_workflows_manage"},
+            id="workflow-manage-allowed",
+        ),
+        pytest.param(
+            "sql-no-file-write",
+            {
+                "label": "sql-attach",
+                "tool": "sql",
+                "success": True,
+                "result": "Schema operation completed successfully.",
+            },
+            id="sql-attach-ran",
+        ),
+        pytest.param(
+            "sql-no-file-write",
+            {
+                "label": "sql-vacuum-into",
+                "tool": "sql",
+                "success": False,
+                "result": "SQL Error: Error: boom",
+            },
+            id="sql-vacuum-failed-for-another-reason",
+        ),
+        pytest.param(
+            "sql-no-file-write",
+            {
+                "label": "sql-attach",
+                "tool": "sql",
+                "reason": "Protected file blocked by policy: .env",
+            },
+            id="sql-denied-by-a-hook-not-refused-by-the-tool",
+        ),
+        pytest.param(
+            "subagent-deny-git-reset",
+            {"label": "child-git-reset", "tool": "bash"},
+            id="sub-agent-reset-runs",
+        ),
+        pytest.param(
+            "subagent-deny-git-reset",
+            {
+                "label": "child-git-reset",
+                "tool": "bash",
+                "reason": "Protected file blocked by policy: .env",
+            },
+            id="sub-agent-reset-denied-for-the-wrong-reason",
+        ),
+        pytest.param(
+            "subagent-store-sql-refused",
+            {
+                "label": "child-store-attach",
+                "tool": "session_store_sql",
+                "success": True,
+                "result": "1 row(s) returned",
+            },
+            id="sub-agent-store-attach-ran",
+        ),
     ],
 )
 def test_each_tool_check_fails_on_a_wrong_result_and_only_that_check(
@@ -718,6 +1051,133 @@ def test_events_in_another_order_are_judged_the_same() -> None:
     results = probe.evaluate(record, probe.BASELINE_CHECKS)
 
     assert [r.status for r in results] == [probe.PASS] * len(EXPECTED_CHECK_NAMES)
+
+
+def test_a_helper_step_with_no_pre_tool_hook_event_is_not_judged() -> None:
+    steps = dict(EXPECTED_STEPS)
+    steps["helper-read"] = {"tool": "read_bash", "hooked": False}
+
+    result = results_by_name(build_record(steps))["helper-tools"]
+
+    assert result.status == probe.PASS
+    assert "helper-read: not judged" in result.detail
+    assert "helper-list: not denied" in result.detail
+
+
+def test_a_helper_step_that_never_ran_fails_its_check() -> None:
+    steps = {k: v for k, v in EXPECTED_STEPS.items() if k != "helper-list"}
+
+    result = results_by_name(build_record(steps))["helper-tools"]
+
+    assert result.status == probe.FAIL
+    assert "helper-list did not run" in result.detail
+
+
+def test_a_helper_result_that_names_a_denial_fails_even_with_no_hook_event() -> None:
+    steps = dict(EXPECTED_STEPS)
+    steps["helper-stop"] = {
+        "tool": "stop_bash",
+        "hooked": False,
+        "success": False,
+        "result": "Denied by preToolUse hook: hook exited with code 2",
+    }
+
+    result = results_by_name(build_record(steps))["helper-tools"]
+
+    assert result.status == probe.FAIL
+    assert "helper-stop denied" in result.detail
+
+
+def test_a_skipped_step_says_why_it_did_not_run() -> None:
+    record = build_record()
+    del record.summary["stepCalls"]["child-store-attach"]
+    record.summary["skippedSteps"] = {
+        "child-store-attach": "tool session_store_sql not offered"
+    }
+
+    result = results_by_name(record)["subagent-store-sql-refused"]
+
+    assert result.status == probe.FAIL
+    assert "tool session_store_sql not offered" in result.detail
+
+
+# --- the codex-patch session -------------------------------------------------
+
+PATCH_CHECK_STEPS = {
+    "patch-plain-allowed": "patch-plain",
+    "patch-secret-denied": "patch-secret",
+    "patch-hook-ask": "patch-hook",
+    "patch-server-ask": "patch-server",
+    "patch-agent-ask": "patch-agent",
+    "patch-indented-hook-ask": "patch-indented-hook",
+}
+# F6: the file guard crashed on the patch text, so every patch was denied this way.
+PATCH_CRASH = {"tool": "apply_patch", "reason": "hook exited with code 2"}
+PATCH_ASKED = {"tool": "apply_patch", "questions": ("hook", "hook")}
+PATCH_ALLOWED = {"tool": "apply_patch", "questions": ("write",)}
+WRONG_PATCH_RESULTS = {
+    "patch-plain-allowed": {"crashed": PATCH_CRASH, "asked": PATCH_ASKED},
+    "patch-secret-denied": {
+        "crashed": PATCH_CRASH,
+        "allowed": PATCH_ALLOWED,
+        "asked": PATCH_ASKED,
+    },
+    **{
+        check: {"crashed": PATCH_CRASH, "allowed": PATCH_ALLOWED}
+        for check in PATCH_CHECK_STEPS
+        if check.endswith("-ask")
+    },
+}
+
+
+def test_the_patch_session_has_the_planned_checks_in_order() -> None:
+    assert [c.name for c in probe.CODEX_PATCH_CHECKS] == EXPECTED_PATCH_CHECK_NAMES
+    assert [session.name for session in probe.SESSIONS] == ["main", "codex-patch"]
+    assert probe.SESSIONS[1].checks == probe.CODEX_PATCH_CHECKS
+
+
+def test_a_correct_patch_run_passes_every_check() -> None:
+    results = probe.evaluate(build_patch_record(), probe.CODEX_PATCH_CHECKS)
+
+    assert [r.name for r in results] == EXPECTED_PATCH_CHECK_NAMES
+    assert [r.status for r in results] == [probe.PASS] * len(EXPECTED_PATCH_CHECK_NAMES)
+
+
+@pytest.mark.parametrize(
+    ("check", "wrong_step"),
+    [
+        pytest.param(check, wrong, id=f"{check}-{kind}")
+        for check, variants in WRONG_PATCH_RESULTS.items()
+        for kind, wrong in variants.items()
+    ],
+)
+def test_each_patch_check_fails_on_a_wrong_result_and_only_that_check(
+    check: str, wrong_step: dict[str, Any]
+) -> None:
+    steps = dict(EXPECTED_PATCH_STEPS)
+    steps[PATCH_CHECK_STEPS[check]] = wrong_step
+
+    results = patch_results_by_name(build_patch_record(steps))
+
+    assert results[check].status == probe.FAIL
+    assert results[check].detail
+    assert [n for n, r in results.items() if r.status == probe.FAIL] == [check]
+
+
+def test_a_patch_step_that_never_ran_fails_its_check() -> None:
+    steps = {k: v for k, v in EXPECTED_PATCH_STEPS.items() if k != "patch-agent"}
+
+    results = patch_results_by_name(build_patch_record(steps))
+
+    assert results["patch-agent-ask"].status == probe.FAIL
+    assert "did not run" in results["patch-agent-ask"].detail
+
+
+def test_the_hook_asks_report_how_many_questions_the_runtime_raised() -> None:
+    result = patch_results_by_name(build_patch_record())["patch-indented-hook-ask"]
+
+    assert result.status == probe.PASS
+    assert "2 question(s) of kind hook" in result.detail
 
 
 # --- evaluate: discovery checks ----------------------------------------------
@@ -1013,7 +1473,7 @@ class TestMainOrchestration:
             timeout: float = probe.SESSION_LIMIT_SECONDS,
         ) -> probe.SessionRecord:
             calls.append((project, home, runtime.node))
-            return build_record()
+            return record_for(scenario)
 
         monkeypatch.setattr(probe, "run_session", fake_session)
 
@@ -1021,15 +1481,21 @@ class TestMainOrchestration:
 
         out = capsys.readouterr().out
         assert code == 0
-        assert len(calls) == 1
+        assert len(calls) == 2  # main, then codex-patch; one project and one home
+        assert len({(project, home) for project, home, _ in calls}) == 1
         assert "VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab" in out
         assert "SDK version: 1.0.30-preview.0" in out
         assert "runtime version: 1.0.108-0" in out
-        assert len(re.findall(r"^PASS ", out, re.MULTILINE)) >= len(
-            EXPECTED_CHECK_NAMES
+        assert len(re.findall(r"^PASS ", out, re.MULTILINE)) == (
+            2 + len(EXPECTED_CHECK_NAMES) + len(EXPECTED_PATCH_CHECK_NAMES)
         )
         assert "FAIL" not in out
+        assert "PASS session-main:" in out
+        assert "PASS session-codex-patch:" in out
+        assert "Tool inventory, session main" in out
+        assert "Tool inventory, session codex-patch" in out
         assert "bash: command, description" in out
+        assert "Result: PASS (0 of " in out
 
     def test_a_wrong_result_exits_1(
         self,
@@ -1040,13 +1506,49 @@ class TestMainOrchestration:
         steps = dict(EXPECTED_STEPS)
         steps["deny-git-reset"] = {"tool": "bash"}
         monkeypatch.setattr(
-            probe, "run_session", lambda *args, **kwargs: build_record(steps)
+            probe,
+            "run_session",
+            lambda runtime, project, scenario, home, timeout=0: (
+                build_record(steps)
+                if scenario["name"] == "main"
+                else record_for(scenario)
+            ),
         )
 
         code = probe.main([])
 
+        out = capsys.readouterr().out
         assert code == 1
-        assert re.search(r"^FAIL deny-git-reset", capsys.readouterr().out, re.MULTILINE)
+        assert re.search(r"^FAIL deny-git-reset", out, re.MULTILINE)
+        assert len(re.findall(r"^FAIL ", out, re.MULTILINE)) == 1
+
+    def test_a_wrong_patch_result_exits_1_and_names_the_check(
+        self,
+        fake_runtime: probe.RuntimeInfo,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        crashed = dict(EXPECTED_PATCH_STEPS)
+        crashed["patch-plain"] = {
+            "tool": "apply_patch",
+            "reason": PATCH_CRASH["reason"],
+        }
+        monkeypatch.setattr(
+            probe,
+            "run_session",
+            lambda runtime, project, scenario, home, timeout=0: (
+                build_patch_record(crashed)
+                if scenario["name"] == "codex-patch"
+                else record_for(scenario)
+            ),
+        )
+
+        code = probe.main([])
+
+        out = capsys.readouterr().out
+        assert code == 1
+        assert re.search(r"^FAIL patch-plain-allowed", out, re.MULTILINE)
+        assert len(re.findall(r"^FAIL ", out, re.MULTILINE)) == 1
 
     def test_a_session_failure_such_as_a_timeout_is_a_fail_line(
         self,
@@ -1096,15 +1598,15 @@ class TestMainOrchestration:
 
         def fake_session(*args: Any, **kwargs: Any) -> probe.SessionRecord:
             timeouts.append(kwargs["timeout"])
-            return build_record()
+            return record_for(args[2])
 
         monkeypatch.setattr(probe, "run_session", fake_session)
 
         probe.main([])
 
-        assert len(timeouts) == 1
-        assert 0 < timeouts[0] <= probe.SESSION_LIMIT_SECONDS == 150
-        assert probe.RUN_LIMIT_SECONDS == 480
+        assert len(timeouts) == 2
+        assert all(0 < t <= probe.SESSION_LIMIT_SECONDS == 150 for t in timeouts)
+        assert sum(timeouts) <= probe.RUN_LIMIT_SECONDS == 480
 
     @pytest.mark.parametrize(("keep", "expect_left"), [(False, 0), (True, 1)])
     def test_temporary_folder_is_removed_unless_keep(
@@ -1169,7 +1671,10 @@ class TestRunSession:
         assert config["project"] == str(tmp_path / "project")
         assert config["outDir"] == str(out)
         assert config["scenario"]["model"] == "probe-model"
-        assert [s["label"] for s in config["scenario"]["steps"]] == list(EXPECTED_STEPS)
+        assert [s["label"] for s in config["scenario"]["steps"]] == MAIN_STEP_LABELS
+        assert [
+            s["label"] for s in config["scenario"]["childSteps"][probe.CHILD_MARKER]
+        ] == list(CHILD_STEP_LABELS)
 
     def test_errors_in_the_record_are_the_failure(self, tmp_path: Path) -> None:
         runtime = make_fake_node(tmp_path / "vscode", ERRORS_NODE)

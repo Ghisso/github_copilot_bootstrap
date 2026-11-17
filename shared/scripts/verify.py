@@ -65,15 +65,17 @@ CHECK_IDS = (
     "VFY-RECEIPT-001",
 )
 # Budget for one lint, type, generation, or pytest command. This
-# repository's own suite takes about 190 seconds (2,225 tests, many real-Git,
-# after sidecar Phase L), so the earlier 180-second budget made `verify.py
-# phase` UNVERIFIED on an idle machine. Keep it below
-# VERIFICATION_ITEM_TIMEOUT_SECONDS by at least the lint and type time.
-COMMAND_TIMEOUT_SECONDS = 480
+# repository's own suite has 5,560 tests (many real-Git) and takes about 410
+# seconds on an idle machine after Phase B of `copilot-harness-migration`; one
+# run timed out at the earlier 480-second budget on 2026-11-17. Before that,
+# 2,225 tests took about 190 seconds and the 180-second budget made `verify.py
+# phase` UNVERIFIED. Keep it below VERIFICATION_ITEM_TIMEOUT_SECONDS by at
+# least the lint and type time.
+COMMAND_TIMEOUT_SECONDS = 900
 # Separate from COMMAND_TIMEOUT_SECONDS because a required item may itself be
 # `verify.py phase`, which already spends up to COMMAND_TIMEOUT_SECONDS on
 # one pytest run.
-VERIFICATION_ITEM_TIMEOUT_SECONDS = 600
+VERIFICATION_ITEM_TIMEOUT_SECONDS = 1020
 PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase-{phase}.json")
 CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout-{phase}.json")
 # Closeout receipts exist only since commit b3c6bec (2026-08-29).
