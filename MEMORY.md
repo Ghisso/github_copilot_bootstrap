@@ -1899,3 +1899,27 @@
   link followed). A subprocess helper that copies `os.environ` also passes
   variables the code reads as input (`AI_STATE_REMOTE` acts like
   `--state-remote`); drop them in the helper and set them per test.
+- [LEARN:tooling] Deleting a root adapter from an installed project does not
+  last one session: the `SessionStart` hook runs `state-sync.sh pull`, which
+  runs `restore-root-adapters.sh` and copies back every path listed as
+  `BOOTSTRAP_ROOT_PATH=` in `.claude/bootstrap-ownership.env` from
+  `.claude/bootstrap-root/`. A manifest line with no mirror copy makes that
+  script exit 1. To keep a project without one adapter (the Copilot runtime
+  probe needs no `.mcp.json`), remove the file, its mirror copy, and its
+  manifest line. Found with `strace -f -e trace=connect,execve` in a
+  loopback-only namespace (`unshare -rn`).
+- [LEARN:testing] A check that reads events can pass in a wrong setup when
+  the run ends before the event arrives: the probe's first "no MCP server"
+  check failed in only 1 of 4 control runs although the file was back in 4
+  of 4. Run a negative control several times, and prefer a condition on
+  state that outlasts the run (the file exists afterwards) to one on timing.
+- [LEARN:testing] A test for "works with no Git identity" passes by accident
+  on a host where Git guesses a name from the user and host. Set
+  `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=user.useConfigOnly`,
+  `GIT_CONFIG_VALUE_0=true` in the test so a missing identity fails on every
+  host. Any helper that runs the installer must pass `GIT_AUTHOR_*` and
+  `GIT_COMMITTER_*`, because `state-sync.sh setup` makes a plain commit.
+- [LEARN:workflow] In Claude Code a resumed subagent delivers only one
+  hand-back per result; a second report after a follow-up message can be
+  refused. Ask a resumed coder to write its report to a scratch file as
+  well, and read the file.
