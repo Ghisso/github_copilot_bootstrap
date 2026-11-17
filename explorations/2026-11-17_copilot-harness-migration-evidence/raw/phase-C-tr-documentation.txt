@@ -74,8 +74,9 @@ not run):
 - It reads `[ *]` as four plain characters: control characters become `[`,
   a space, `*`, or `]`. The answer is valid JSON with a wrong visible
   character in the reason; the decision is unchanged.
-- It fails: the reason is empty. The answer is valid JSON and the decision
-  is unchanged.
-In the first two cases a text without a control character is unchanged. In
-the third case every reason would be empty, also one without a control
-character.
+- It fails: the guards run under `set -euo pipefail`, so the guard exits
+  with a non-zero code and prints no answer. That still denies:
+  `pretool-bash-guard.sh` turns a non-zero child into `fail_closed`, and
+  the Copilot runtime denies on a non-zero exit (F5). (Corrected after
+  review round 2; the first wording said the reason would be empty.)
+In the first two cases a text without a control character is unchanged.

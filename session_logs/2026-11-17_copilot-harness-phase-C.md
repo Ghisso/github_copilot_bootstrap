@@ -71,6 +71,15 @@ reason that holds a control character from producing invalid JSON.
   comparisons, 0 differences. Full suite: 5,756 passed, 1 skipped, 423 s.
   Orchestrator checks: `verify.py fast` PASS, and one combined answer with
   a tab, a newline, a backslash, and a quote parsed as expected.
+- **00:01 (2026-11-18)** - Review round 2: Gate PASS, no open request, one
+  MINOR (the Scope-change record still said T3 turns control characters
+  into spaces for every guard; narrowed to the shell guards). The reviewer
+  also wrote that the macOS leg of `.github/workflows/validate.yml` runs
+  the control-character test. That was not so: the workflow runs
+  `tests/test_hook_gates.py` as a script, which calls five smoke tests
+  only. Sent to the `coder`: add that test to the script list, so macOS
+  really runs it after the push, and add one test with a stub `tr` that
+  fails for a second set that is not 31 characters long.
 
 ## [LEARN] Entries
 

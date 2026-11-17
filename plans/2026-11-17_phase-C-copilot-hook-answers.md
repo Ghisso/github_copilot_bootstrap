@@ -163,9 +163,11 @@ the PascalCase rule, which removes the output blocker for a later rename.
     for each character of `\001-\037`, so the mapping depends on no padding
     rule. The first form, `[ *]`, gave `]` on BusyBox `tr`. Run on GNU and
     BusyBox `tr`; a run on macOS or BSD `tr` is an unverified limitation.
-  - Row T3 holds for every client, as the big plan's table says: each
-    character 1 to 31 in a reason or context text becomes one space. A text
-    that ends in a newline now ends in a space. Kept: no caller passes such
+  - Row T3 holds for every client in the shell guards, as the big plan's
+    table says: each character 1 to 31 in a reason or context text becomes
+    one space. The file guard `protect-files.py` is not changed by T3: it
+    always escaped such a character and still keeps it. A text that ends
+    in a newline now ends in a space. Kept: no caller passes such
     a text (the byte-identity battery shows no difference), and removing it
     would add code for no caller.
   - Step 4: tests for the new validator check go into
