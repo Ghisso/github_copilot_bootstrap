@@ -98,6 +98,13 @@ code change.
   more than the record; "reads the nested copy only" says more than the
   source reading) and one in the small plan's Scope-change record, which
   the orchestrator extended. Sent to the `coder`.
+- **07:11** - Fix round 2 done. The paragraph follows the table's last
+  row; the table check now also fails for a table cut in two (it reported
+  the orphan row before the fix, and 26 tables with 0 problems after).
+  The checklist has three marks and five result words, defined once. The
+  pass rule of the deny items is "the command does not run and the chat
+  shows the guard's reason". Orchestrator checks: `verify.py fast` PASS,
+  and the two table rows read. Review round 3 started.
 
 ## [LEARN] Entries
 
