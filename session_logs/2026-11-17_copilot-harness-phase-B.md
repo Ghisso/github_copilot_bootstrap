@@ -64,6 +64,14 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   that a timeout still ends as UNVERIFIED or TIMEOUT and never as PASS, and
   that no hook or CI file runs `verify.py phase` or `verify.py closeout`
   under a shorter limit.
+- **22:25** - Second closeout run: steps 3 and 4 passed (the full suite in
+  410 s). The first receipt run of step 6 failed with `VFY-FRESH-002:
+  governing control-plane provenance is stale`. Cause: an orchestrator
+  mistake. After step 4, the orchestrator corrected one sentence in the big
+  plan (the risk row that names the 600-second item limit), and the phase
+  receipt binds the big plan's bytes. The edit was reverted to the exact
+  earlier bytes and checkpointed, and step 6 was run again. The sentence is
+  corrected after this phase's commit, before Phase C's receipts.
 
 ### Phase-boundary summary
 
@@ -151,6 +159,11 @@ Surfaces checked for claims it made wrong:
   two thirds of it, because a late raise costs one more review round and a
   second closeout. The existing entry in `.claude/MEMORY.md` is updated in
   place.
+- [LEARN:workflow] The phase receipt of closeout step 4 binds the big
+  plan and every listed small plan, not only the receipt of step 6. After
+  step 4, edit only the session log; a plan edit there costs a failed
+  receipt run. No new `.claude/MEMORY.md` entry: the closeout instructions
+  already state which files the receipts bind.
 - No lesson recorded for: the hook names of the runtime tools and the
   handling of each tool (the table in `docs/target-mapping.md` carries
   them), and a long pytest run piped into `tail` keeping the call open
