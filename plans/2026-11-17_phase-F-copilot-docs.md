@@ -103,6 +103,33 @@ stands alone.
   - claim Copilot CLI or cloud-agent support;
   - edit dated records.
 
+  Scope-change record (approved by the orchestrator on 2026-11-18; each
+  item serves this phase's stated intent, and no code changes):
+  - The manual checklist has 11 items, not 9. It takes in the checks that
+    Phases B to E left for a signed-in window: the patch tool, the
+    Local-harness deny with the new answer, one session-log entry for each
+    chat, the sub-agent guidance, and the session-start reminder.
+  - The checklist item on the approval questions follows the Phase D
+    correction: the runtime raises two hook questions for one protected
+    edit, and in the one real VS Code run VS Code answered the second one
+    itself. The item asks how many dialogs appear.
+  - Step 1: the heading `### Copilot harness discovery check (2026-11-18)`
+    sits under a new parent heading `## Copilot harness check, 2026-11-18`,
+    so that it does not fall under a dated section of 2026-10-02.
+  - In the six files, bare labels of the evidence report (such as "A6" or
+    "F13") get a plain description of what was seen, where, and when. Each
+    document says once where the report is.
+  - Stale or unsupported sentences corrected inside the six files, beyond
+    the plan's list: that Copilot gets no sidecar agents (the discovery
+    check lists the five sidecar agent files); that
+    `check_native_clients.py` covers Copilot; that no earlier decision was
+    loosened (the rows L1 to L3 did loosen decisions); row L1's "every
+    sub-agent read asked"; row T2's one-off run, which had no saved
+    record and now cites a saved probe run.
+  - Not added to the docs: the follow-up on inline Python without `-I`
+    and on the temp-file leak of `protect-files.sh`. The user decides how
+    to handle both.
+
 - [ ] **3. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,

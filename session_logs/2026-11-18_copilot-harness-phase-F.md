@@ -34,6 +34,34 @@ code change.
   - Not added to the public docs in this phase: the follow-up on inline
     Python without `-I` in the older hooks. The user was told on
     2026-11-18 and decides how to handle it.
+- **05:41** - Phase F delegated to a fresh `coder` in the documenter role.
+- **06:22** - `coder` finished steps 1 and 2. Six files changed, docs
+  only. Sidecar check on runtime `1.0.108-0`: the `skills` profile shows 2
+  instruction sources, 4 skills, 0 agents; the `workflow` profile shows 4
+  instruction sources, 22 skills, and the five sidecar agent files as
+  Copilot agents. The docs had said Copilot gets no sidecar agents;
+  corrected to what the discovery showed. A claims table with 238 rows
+  gives the basis of each Copilot claim. The plan's Verification lines
+  pass. The full suite had 1 failure and 1 error.
+- **06:25** - Cause of that failure found by the orchestrator, and it is
+  an old defect, not this phase. `protect-files.sh` makes a file with
+  `mktemp` on every call and removes it only when the classifier fails, so
+  each guard call leaves one empty `/tmp/tmp.XXXXXXXXXX` file
+  (`openwiki-guard.sh` removes its file on both paths). `/tmp` held
+  142,664 of them, all empty and all from 2026-11-17 and 2026-11-18. The
+  classifier expands a glob with `glob.glob`, so the test
+  `test_protect_files_checks_original_cwd_when_cd_is_not_provable[cd /tmp
+  | mv * /tmp/out]` ran past the 4-second limit (exit 142). The error in
+  `tests/test_verify.py` came from the same run: the fail-closed line went
+  into the live `hooks-errors.log`, which a test guard reports. Cleanup:
+  140,397 empty files of that name pattern, owned by the user and older
+  than 30 minutes, were deleted; `/tmp` has 2,416 entries. The same test
+  then passed in 0.20 s (2.75 s before). The fix of the leak is not part
+  of this docs-only phase; it is recorded as an open follow-up with the
+  `-I` item, and the user is told.
+- **06:27** - Orchestrator checks: `verify.py fast` PASS. Scope-change
+  record added to the small plan. Review round 1 started with six
+  profiles.
 
 ## [LEARN] Entries
 

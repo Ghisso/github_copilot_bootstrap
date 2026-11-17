@@ -1489,6 +1489,17 @@
   `session-log.sh` do not yet (open follow-up, told to the user on
   2026-11-18; check with `rg -n 'python3 -c|python3 - |run_python -c'
   shared/hooks/scripts` before proposing it again).
+- [LEARN:hooks] `protect-files.sh` leaks one empty `/tmp/tmp.XXXXXXXXXX`
+  file per call: it removes its `mktemp` file only when the classifier
+  fails (`openwiki-guard.sh` removes it on both paths). On 2026-11-18,
+  after a day of suite runs, `/tmp` held 142,664 of them; the classifier's
+  `glob.glob` on `/tmp/*` then ran past its 4-second limit, and
+  `test_protect_files_checks_original_cwd_when_cd_is_not_provable` failed
+  with exit 142 in a full suite run. When that test fails or the suite's
+  wall time grows, count `ls -f /tmp | wc -l` and remove the old empty
+  ones: `find /tmp -maxdepth 1 -type f -user "$(id -u)" -name
+  'tmp.??????????' -size 0 -mmin +30 -delete`. The fix (remove the file on
+  the success path) is an open follow-up, told to the user.
 - [LEARN:testing] For a new script, a failing-first run only shows that
   the file was missing. Follow it with one mutation for each stated
   property. In Phase E this found three weak tests: one matched a single
