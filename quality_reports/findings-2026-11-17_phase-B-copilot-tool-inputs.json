@@ -16,7 +16,7 @@
     "tests"
   ],
   "findings": [],
-  "generated_at": "2026-11-17T11:55:38Z",
+  "generated_at": "2026-11-17T12:24:56Z",
   "branch": "copilot-harness-migration_implementation",
   "head_sha": "d34779a2a1804c5127983d0faf470280b19d3cf3",
   "base_ref": "dev",
@@ -24,13 +24,15 @@
   "phase": "2026-11-17_phase-B-copilot-tool-inputs",
   "target": ".",
   "dirty": false,
-  "content_hash": "7ee3d7ce5d2b1139589b82b4813b9e16a8ee3a2c",
+  "content_hash": "81f484a5eb922c4534502af71dd6fb3048299bc2",
   "changed_files": [
     "docs/runtime-checks.md",
     "docs/target-mapping.md",
     "scripts/check_copilot_runtime.py",
     "scripts/copilot_runtime_probe.mjs",
     "shared/hooks/scripts/protect-files.py",
+    "shared/policies/workflow.instructions.md",
+    "shared/scripts/verify.py",
     "tests/test_check_copilot_runtime.py",
     "tests/test_protect_files_copilot_harness.py"
   ],
