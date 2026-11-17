@@ -1,0 +1,126 @@
+Phase C, review fix round 1, 2026-11-17.
+
+== 1. docs/target-mapping.md, row T3 ==
+The row said "Invalid JSON on every client" and "each such character is a space". That holds for the shell
+guards only (`json_escape` in _lib-frontmatter.sh). protect-files.py prints through json.dumps, which always
+escaped control characters: its answer was never invalid JSON, and it keeps the character (written as \t, \n,
+or \u0001). The row is now limited to the shell guards and says so. The "Answer shape" paragraph in
+docs/target-mapping.md and docs/runtime-checks.md were checked: neither mentions control characters or invalid JSON
+(`rg -i "invalid JSON|valid JSON|control char"` finds only the T3 row), so only the T3 row changed.
+
+== 3. The `tr` form: what is known ==
+POSIX defines `[c*]` in the second set as padding to the length of the first set. The form was run on GNU tr
+only. No macOS or BSD machine here. A second tr implementation exists on this machine (/usr/bin/busybox, BusyBox
+v1.36.1, no install needed). Command: printf 'a\tb\nc' | <tr> '\001-\037' '[ *]' | od -c
+  GNU tr 9.4              : 0000000   a       b       c
+  busybox tr (1.36.1)     : 0000000   a   ]   b   ]   c
+For comparison, other forms of the same mapping:
+  bare ' ' on GNU tr      : 0000000   a       b       c
+  bare ' ' on busybox tr  : 0000000   a       b       c
+  31 literal spaces, GNU  : 0000000   a       b       c
+  31 literal spaces, busybox: 0000000   a       b       c
+FINDING: BusyBox tr does not read `[c*]` in the second set. It pads with the set's last character, so each control
+character becomes `]` instead of a space. The result is still valid JSON, but it is not a space, and the claim
+"on GNU and BSD tr alike" that was in the code comment was wrong. The code is unchanged in this round, as asked. The
+comment in _lib-frontmatter.sh now says: POSIX defines `[c*]` as padding; run on GNU tr only; BusyBox 1.36.1 prints
+`]` for each character. The T3 row says the same. The bare form `' '` and a 31-space second set both give spaces on
+GNU and BusyBox; whether BSD tr pads the bare form was not run. A decision for the coordinator: keep `[ *]`, or go back
+to the bare `' '`, or use the 31-space set (portable by construction, no padding rule).
+
+== 2. fail_closed paths: new cases ==
+New cases: 42 (3 new test functions and 5 new rows of the PRETOOL_GATES table), pytest ids:
+ - rows (each runs in three table-driven tests: Copilot combined shape, other clients' literal bytes, exported
+   TARGET_ID): fail-closed-branch-state, fail-closed-commit-gate, fail-closed-pr-gate, fail-closed-protect-files,
+   fail-closed-bash-wrapper. The existing row `fail-closed` (git-protection.sh) was renamed
+   `fail-closed-git-protection`; it counted before and is not in the 42.
+   5 rows x (1 + 3 + 2) = 30 cases.
+ - test_protect_files_prints_the_client_shape_when_the_classifier_fails (4 clients): a Bash payload with no command
+   makes the classifier exit 2; protect-files.sh's `fail_closed` (reason has python version and path, so the check
+   is structural: one line, top-level equals nested for github-copilot, no top-level hookEventName, only
+   hookSpecificOutput for the others, exit 2).
+ - test_protect_files_prints_the_client_shape_when_python3_is_missing (4 clients): PATH holds only awk, sed, tr,
+   cat, dirname, date, mkdir; literal bytes, exit 2.
+ - test_the_bash_wrapper_prints_the_client_shape_for_malformed_child_output (4 clients): fixture child guards print
+   non-JSON and exit 0, so the wrapper's second `fail_closed` runs; structural check as above.
+Reached: the early unreadable-payload `fail_closed` of git-protection, enforce-branch-state, enforce-commit-gate,
+enforce-pr-gate, protect-files; protect-files' two later `fail_closed` calls (python3 missing, classifier exit);
+pretool-bash-guard's two `fail_closed` calls (a child exits non-zero, a child prints non-JSON).
+Not reached from a test: none of the listed guards. openwiki-guard.sh is covered by the existing exported-TARGET_ID
+test (unreadable payload) and its unknown-mode path was not added (it has no client argument; its bytes are the
+nested-only line for every client).
+Exit code and shape: Copilot cases assert the combined line byte for byte, or (structural cases) top-level equals
+nested, no top-level hookEventName, exit 2; the other three clients assert today's literal nested-only bytes.
+
+== can the new cases fail? One mutation per guard, in a scratch copy, then the new cases for that guard ==
+Mutation "client named only after the early fail_closed": the line TARGET_ID="${1:-unknown-target}" moved below the
+`fail_closed "unparseable tool payload"` block (git-protection, enforce-branch-state, enforce-commit-gate,
+enforce-pr-gate). Mutation "every fail_closed call runs without the client": each `fail_closed` call prefixed with
+TARGET_ID=unknown-target (protect-files.sh, pretool-bash-guard.sh). The working copy was not edited; the mutants
+live in a scratch folder (script fix_round1_mutants.py in the scratch area).
+
+=== mutant: git-protection.sh (client named only after the early fail_closed)
+    new cases run: -k "fail-closed-git-protection"
+    result: 3 failed, 3 passed, 1088 deselected in 0.74s
+    FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed-git-protection]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-git-protection-claude-code]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-git-protection-openai-codex]
+    sample: E   assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+
+=== mutant: enforce-branch-state.sh (client named only after the early fail_closed)
+    new cases run: -k "fail-closed-branch-state"
+    result: 3 failed, 3 passed, 1088 deselected in 0.66s
+    FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed-branch-state]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-branch-state-claude-code]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-branch-state-openai-codex]
+    sample: E   assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+
+=== mutant: enforce-commit-gate.sh (client named only after the early fail_closed)
+    new cases run: -k "fail-closed-commit-gate"
+    result: 3 failed, 3 passed, 1088 deselected in 0.67s
+    FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed-commit-gate]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-commit-gate-claude-code]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-commit-gate-openai-codex]
+    sample: E   assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+
+=== mutant: enforce-pr-gate.sh (client named only after the early fail_closed)
+    new cases run: -k "fail-closed-pr-gate"
+    result: 3 failed, 3 passed, 1088 deselected in 0.68s
+    FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed-pr-gate]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-pr-gate-claude-code]
+    FAILED tests/test_hook_gates.py::test_an_exported_target_id_never_changes_another_clients_output[fail-closed-pr-gate-openai-codex]
+    sample: E   assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+
+=== mutant: protect-files.sh (every fail_closed call runs without the client)
+    new cases run: -k "fail-closed-protect-files or classifier_fails or python3_is_missing"
+    result: 3 failed, 11 passed, 1080 deselected in 1.12s
+    FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed-protect-files]
+    FAILED tests/test_hook_gates.py::test_protect_files_prints_the_client_shape_when_the_classifier_fails[github-copilot]
+    FAILED tests/test_hook_gates.py::test_protect_files_prints_the_client_shape_when_python3_is_missing[github-copilot]
+    sample: E   assert '{"hookSpecif... payload"}}\n' == '{"permission... payload"}}\n'
+
+=== mutant: pretool-bash-guard.sh (every fail_closed call runs without the client)
+    new cases run: -k "fail-closed-bash-wrapper or malformed_child"
+    result: 2 failed, 8 passed, 1084 deselected in 1.07s
+    FAILED tests/test_hook_gates.py::test_copilot_guards_print_the_decision_at_the_top_level_and_nested[fail-closed-bash-wrapper]
+    FAILED tests/test_hook_gates.py::test_the_bash_wrapper_prints_the_client_shape_for_malformed_child_output[github-copilot]
+    sample: E   assert '{"hookSpecif...status 2"}}\n' == '{"permission...status 2"}}\n'
+
+
+The sample assertion shows the Copilot answer missing its top-level fields (left: nested only; right: combined).
+The exported-TARGET_ID failures for the first four mutants show the inherited github-copilot value leaking into a
+claude-code or openai-codex answer.
+
+== commands, after the fixes ==
+uv run python scripts/generate_targets.py --all                          : generated multi-agent and sidecar
+uv run python scripts/install_bootstrap.py . --allow-self --local-only   : done
+uv run python scripts/validate_targets.py                                : exit 0, PASS generated target is structurally valid
+uv run python scripts/check_runtime.py                                   : exit 0, PASS generated runtime wiring is present
+six-file pytest line of the plan's Verification block                    :    (was 3601; +42 new cases)
+uv run python scripts/check_copilot_runtime.py --require                 : Result: PASS (0 of 43 checks failed), exit 0, 0m17.128s
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases : Success: no issues found in 43 source files
+uv run ruff check shared scripts tests                                   : All checks passed
+uv run ruff format --check shared scripts tests                          : 43 files already formatted
+uv run python .claude/scripts/verify.py fast --format text               : fast: PASS
+Not run this round (as asked): the full suite, the byte-identity battery. No hook script changed bytes except a
+comment in _lib-frontmatter.sh (json_escape's comment), so the battery of phase-C-byte-identity-battery.txt still
+describes the code.
