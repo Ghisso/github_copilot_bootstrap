@@ -77,6 +77,15 @@ code change.
   is stale, and source comments in `subagent-context.sh`, `run-hook.sh`,
   and some test docstrings cite the private evidence report by bare
   labels.
+- **07:01** - Fix round 1 done: all 15 points. The checklist opens with a
+  safety paragraph, every item starts with one of two marks ("Never run
+  anywhere" or "Seen before, not since the changes") and names its
+  Session Target and the dialog answer. The long passage in
+  `docs/target-mapping.md` that repeated the README is one short paragraph
+  with links; its facts moved to the README. Full suite on the final tree
+  with a clean `/tmp`: 5,927 passed, 1 skipped, 424 s. Link check: 133
+  relative links, 0 broken. Orchestrator checks: `verify.py fast` PASS,
+  and the start of the checklist read. Review round 2 started.
 
 ## [LEARN] Entries
 
