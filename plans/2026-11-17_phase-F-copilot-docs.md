@@ -129,6 +129,33 @@ stands alone.
   - Not added to the docs: the follow-up on inline Python without `-I`
     and on the temp-file leak of `protect-files.sh`. The user decides how
     to handle both.
+  - After review rounds 1 and 2 (23 MINOR findings and one MAJOR, all
+    fixed):
+    - The checklist opens with a safety paragraph: run it only in a test
+      folder with no work to keep. Each item starts with a mark that says
+      whether it was ever run, names its Session Target, and gives the
+      answer for a dialog. Result words are defined once, with one for an
+      item that only records what is seen.
+    - This plan's text calls the folder `/run/user/<uid>` a precondition.
+      The checklist says it is needed only when a chat freezes and
+      `agenthost.log` shows the `listen EACCES` lines, because one check
+      on 2026-11-17 showed sessions whose agent host used a socket under
+      `/tmp`.
+    - The hook and sub-agent detail of `docs/target-mapping.md` moved to
+      the two README sections; that document keeps one short paragraph
+      with links. The Local-harness source reading is stated once, in the
+      README.
+    - One paragraph below the hook-config table of
+      `docs/target-mapping.md` names the files the Copilot harness loads
+      and cites one direct run of the guard on 2026-11-18.
+    - A recorded follow-up and `docs/architecture.md` say that
+      `.github/copilot-instructions.md` is also read by the sub-agent
+      hook, so it must stay when the Local harness is removed.
+    - The February 2027 date names its sources at its first mention in
+      each document.
+    - The sidecar note says GitHub Copilot chat has two harnesses and
+      names the dated "Agent Host, Claude harness" row as a third,
+      unverified session type.
 
 - [ ] **3. Review.**
   Owner: reviewer.

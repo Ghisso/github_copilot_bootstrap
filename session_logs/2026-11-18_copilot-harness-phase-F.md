@@ -86,6 +86,18 @@ code change.
   with a clean `/tmp`: 5,927 passed, 1 skipped, 424 s. Link check: 133
   relative links, 0 broken. Orchestrator checks: `verify.py fast` PASS,
   and the start of the checklist read. Review round 2 started.
+- **07:06** - Review round 2: 14 of the 15 fixes hold. Gate FAIL on one
+  MAJOR that a fix introduced: the new paragraph in
+  `docs/target-mapping.md` was inserted inside the Gate-Repair table, so
+  the table's last row no longer renders as a row. The `coder`'s table
+  check counted cells only. Eight MINOR, seven in the checklist and the
+  wording (item 3 missing from the safety paragraph; two items marked
+  "Never run anywhere" although something was seen; no result word for an
+  item that only records an observation; "any dialog means FAIL" has no
+  basis on the Local harness; "the recovery needed a window reload" says
+  more than the record; "reads the nested copy only" says more than the
+  source reading) and one in the small plan's Scope-change record, which
+  the orchestrator extended. Sent to the `coder`.
 
 ## [LEARN] Entries
 
