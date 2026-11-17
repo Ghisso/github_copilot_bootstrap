@@ -14,7 +14,7 @@ phases:
   - 2026-11-17_phase-E-subagent-context
   - 2026-11-17_phase-F-copilot-docs
   - 2026-11-17_phase-G-knowledge-refresh
-current_phase: 2026-11-17_phase-A-copilot-runtime-probe
+current_phase: 2026-11-17_phase-B-copilot-tool-inputs
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
