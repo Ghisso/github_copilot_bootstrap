@@ -14,15 +14,15 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
 
 ## Work Log
 
-- **19:50** - Phase A committed as `d34779a` and pushed; the commit hook
+- **19:42** - Phase A committed as `d34779a` and pushed; the commit hook
   activated Phase B. No re-planning needed: Phase A changed nothing that
   later phases rely on, except that the probe's temporary project removes
   the MCP server file, its mirror copy, and its manifest line (Phase A
   Scope-change record).
-- **19:55** - Phase B delegated to a fresh `coder` with the evidence packet
+- **19:43** - Phase B delegated to a fresh `coder` with the evidence packet
   (the small plan, the big plan's decision-change table, the evidence
   folder's raw files, and the Phase A probe structure).
-- **20:35** - `coder` finished steps 1 to 10. The patch-text crash is fixed
+- **20:37** - `coder` finished steps 1 to 10. The patch-text crash is fixed
   on the real runtime (`1.0.108-0`): a plain `apply_patch` file succeeds, a
   `.env` patch is denied, and hook, server, agent, and indented-header
   patches raise the hook questions. Step 6 found two tools for row T4:
@@ -35,7 +35,7 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   `print_decision` with the two patch constants, and the updated probe
   counts in the docs). Evidence saved under
   `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/raw/phase-B-*`.
-- **20:50** - Review round 1 (`code`, `architecture`, `security`, `tests`,
+- **20:49** - Review round 1 (`code`, `architecture`, `security`, `tests`,
   `ponytail`, `documentation`): no finding on the guard, the probe, or the
   batteries. Gate FAIL on documentation: one MAJOR (row L3 in
   `docs/target-mapping.md` claimed that patch text gets the same decision as
@@ -44,10 +44,10 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   pinned; the `sql` row made a universal claim from five tried statements).
   Two open requests: the step 9 table in this log, and the two run times
   saved as evidence.
-- **21:05** - All three fixed; one test added
+- **20:53** - All three fixed; one test added
   (`test_a_hunk_context_line_that_spells_a_header_is_judged_as_that_target`).
   Review round 2: Gate PASS, no finding, no open request.
-- **21:25** - First closeout run stopped at step 4: `verify.py phase
+- **21:04** - First closeout run stopped at step 4: `verify.py phase
   --persist` gave `VFY-PYTEST-001: UNVERIFIED`, because the full suite
   (5,560 tests) ran past the verifier's 480-second budget for one command.
   No test failed. Approved as a scope change: the `coder` set
@@ -58,13 +58,13 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   1 skipped, 409.74 s by pytest, 436.43 s wall time. The generated OpenWiki
   page `openwiki/operations/deterministic-verification.md` still states 480
   and 600; the final phase of this plan refreshes it.
-- **21:45** - Review round 3 on the budget addition (the same six
+- **21:24** - Review round 3 on the budget addition (the same six
   profiles): Gate PASS, no finding, no open request. The reviewer confirmed
   from the source that both constants are used only as `timeout=` values,
   that a timeout still ends as UNVERIFIED or TIMEOUT and never as PASS, and
   that no hook or CI file runs `verify.py phase` or `verify.py closeout`
   under a shorter limit.
-- **22:25** - Second closeout run: steps 3 and 4 passed (the full suite in
+- **21:54** - Second closeout run: steps 3 and 4 passed (the full suite in
   410 s). The first receipt run of step 6 failed with `VFY-FRESH-002:
   governing control-plane provenance is stale`. Cause: an orchestrator
   mistake. After step 4, the orchestrator corrected one sentence in the big
@@ -72,6 +72,11 @@ the search tools' `paths` list. Give every runtime tool a recorded handling.
   receipt binds the big plan's bytes. The edit was reverted to the exact
   earlier bytes and checkpointed, and step 6 was run again. The sentence is
   corrected after this phase's commit, before Phase C's receipts.
+- **21:56** - A check script that imported `.claude/scripts/verify.py`
+  left a `__pycache__` folder in `.claude/scripts/`. That folder also
+  changes the bound runtime state, so it was removed before the second
+  receipt run. A comparison of the phase receipt with the current state
+  then showed every bound field equal.
 
 ### Phase-boundary summary
 
@@ -162,8 +167,12 @@ Surfaces checked for claims it made wrong:
 - [LEARN:workflow] The phase receipt of closeout step 4 binds the big
   plan and every listed small plan, not only the receipt of step 6. After
   step 4, edit only the session log; a plan edit there costs a failed
-  receipt run. No new `.claude/MEMORY.md` entry: the closeout instructions
-  already state which files the receipts bind.
+  receipt run. Recorded in `.claude/MEMORY.md`, in one entry with the next
+  lesson.
+- [LEARN:tooling] A script that imports `.claude/scripts/verify.py` writes
+  `.claude/scripts/__pycache__/`, and the receipts count that folder as
+  runtime state (`VFY-FRESH-002` goes stale). Run such a script with
+  `python -B`. Recorded in `.claude/MEMORY.md`.
 - No lesson recorded for: the hook names of the runtime tools and the
   handling of each tool (the table in `docs/target-mapping.md` carries
   them), and a long pytest run piped into `tail` keeping the call open

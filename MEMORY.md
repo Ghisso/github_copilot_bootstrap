@@ -1458,6 +1458,12 @@
   with the constant in `shared/scripts/verify.py`. Raise the budget when
   the suite passes about two thirds of it; a late raise costs one more
   review round and a second closeout.
+- [LEARN:tooling] Between closeout step 4 and the commit, two things make
+  `VFY-FRESH-002` stale besides a nested checkpoint: any edit to the big
+  plan or a listed small plan (the phase receipt binds their bytes), and a
+  new file under `.claude/` outside the evidence folders. A script that
+  imports `.claude/scripts/verify.py` writes `.claude/scripts/__pycache__/`
+  there; run it with `python -B` or delete the folder (2026-11-17).
 - [LEARN:documentation] Before submitting an OpenWiki page, map the cited
   ranges of every file the page cites, not only the file that carries the
   flagged claim. In sidecar Phase M the first page's flagged claim was in
