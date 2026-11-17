@@ -53,6 +53,20 @@ Code session and the Local harness never stand down.
   there. With the fix the scratch folder stays untouched and the probe
   passes (0 of 46 failed). Orchestrator checks: `verify.py fast` PASS and
   the probe PASS. Review round 1 started with six profiles.
+- **02:12** - Review round 1 (`code`, `architecture`, `security`, `tests`,
+  `ponytail`, `documentation`): no finding on the stand-down rules (no
+  guard can stand down; a real Claude Code or Local-harness session cannot
+  stand down; the stand-down path cannot deny or fail). Gate FAIL on one
+  MAJOR in the documentation: `README.md` and `docs/target-mapping.md`
+  said a deny shows twice and a protected edit asks twice. The recorded
+  runs show one deny reason per denied call, and in the one real VS Code
+  run the second question was answered by VS Code itself, so the user saw
+  one (A6). The wording came from the plan's own text. Two MINOR: `grep`
+  errors on an unreadable Copilot hook file reach stderr; one new test and
+  the `state-sync-once` check depend on ambient `AI_STATE_*` variables.
+  One open request: a full suite run on the final tree. Sent to the
+  `coder` with two small accuracy fixes (`docs/architecture.md`, one test
+  comment).
 
 ## [LEARN] Entries
 

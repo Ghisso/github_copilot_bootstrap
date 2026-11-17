@@ -197,6 +197,16 @@ VS Code, A3). This phase implements **option B** of the big plan (REQ-004).
     can fail. The launcher, marker, and validator tests were written first.
   - Step 1: four calls are added to the script form of
     `tests/test_hook_gates.py`, which the CI workflow runs on macOS.
+  - Step 5, after review round 1: the docs do not repeat this plan's
+    wording that a deny "happens twice" and a protected edit "asks twice".
+    The recorded runs show one deny reason per denied call. For a
+    protected edit the runtime raises two hook questions, and in the one
+    real VS Code run VS Code answered the second one itself, so one
+    question was seen (A6). The docs say that.
+  - After review round 1: `stands_down()` silences `grep` errors for an
+    unreadable Copilot hook file; the probe also removes `AI_STATE_*`
+    variables from the runtime environment; `docs/architecture.md` gets one
+    sentence on the stand-down rule.
 
 - [ ] **7. Review.**
   Owner: reviewer.
