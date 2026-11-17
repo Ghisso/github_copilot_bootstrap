@@ -1,0 +1,131 @@
+Step 6 evidence: one-off scripted sessions of the real runtime (VS Code 1.146.0, runtime 1.0.108-0), 2026-11-17.
+Each call shows: whether a pre-tool hook event fired, any hook denial, permission questions, and the tool's own answer.
+
+== Hook names and input keys (PascalCase hook name, joined by tool call id)
+bash                               -> Bash                               inputs: command,description
+dynamic_workflows_manage           -> dynamic_workflows_manage           inputs: meta,operation,run | operation
+fetch_copilot_cli_documentation    -> fetch_copilot_cli_documentation    inputs: query
+list_agents                        -> list_agents                        inputs: 
+list_bash                          -> list_bash                          inputs: 
+read_agent                         -> read_agent                         inputs: agent_id
+run_dynamic_workflow               -> run_dynamic_workflow               inputs: args,name
+semantic_code_search               -> semantic_code_search               inputs: query,repo
+session_store_sql                  -> session_store_sql                  inputs: description,query,source
+skill                              -> skill                              inputs: skill
+sql                                -> sql                                inputs: description,query
+task                               -> Agent                              inputs: agent_type,description,mode,name,prompt
+update_todo                        -> TodoWrite                          inputs: todos
+view                               -> Read                               inputs: path
+web_fetch                          -> WebFetch                           inputs: url
+write_agent                        -> write_agent                        inputs: agent_id,message
+
+== session e1 (scenario <scratchpad>/phaseB/harness/e1.json)
+### call_probe_1 dynamic_workflows_manage {"operation": "guide"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Failed to locate workflow documentation: extensions are not configured for this session
+### call_probe_2 dynamic_workflows_manage {"operation": "list"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True No workflows registered.
+### call_probe_3 sql {"description": "list tables", "query": "SELECT name FROM sqlite_master"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True 4 row(s) returned:  | name | | --- | | todos | | sqlite_autoindex_todos_1 | | todo_deps | | sqlite_autoindex_todo_deps_1 |
+### call_probe_4 sql {"description": "attach file", "query": "ATTACH DATABASE '<scratchpad>/phaseB/harness/runs/e1/p/project/sql-attached.db' AS x"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Error: Blocked SQL statement: "ATTACH" is not allowed for security reasons.
+### call_probe_5 sql {"description": "create attached", "query": "CREATE TABLE x.t(a)"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False SQL Error: Error: unknown database x
+### call_probe_6 web_fetch {"url": "file://<scratchpad>/phaseB/harness/runs/e1/p/project/README.md"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False The file:// protocol is not supported by web_fetch. Use the view tool to read local files instead.
+### call_probe_7 skill {"skill": "caveman"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True Skill "caveman" loaded successfully. Follow the instructions in the skill context.
+### call_probe_8 semantic_code_search {"query": "main", "repo": "octocat/hello-world"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False GitHub Code Search server error: 401 {   "message": "Requires authentication",   "documentation_url": "https://docs.github.com/rest",   "status": "401" }
+### call_probe_9 write_agent {"agent_id": "none", "message": "x"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False No agent found with agent_id: none. The agent may have been cleared or never existed. Use list_agents to see the agents you can message, or start a new agent with the task tool.
+### call_probe_10 read_agent {"agent_id": "none"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False No agent found with agent_id: none. The agent may have been cleared or never existed.
+### call_probe_11 list_agents {}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True <no background agents>
+### call_probe_12 list_bash {}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True <no active shell sessions>
+
+== session e2 (scenario <scratchpad>/phaseB/harness/e2.json)
+### call_probe_1 dynamic_workflows_manage {"operation": "author", "meta": {"name": "probe-wf", "description": "writes a file and runs a command", "phases": [{"title": "p"}]}, "run": "async ({ args, log }) => { const fs = await import('node:fs'); fs.writeFileSync('/tmp/claude-1000/-home-<user>-work-git
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Failed to author workflow: extensions are not configured for session 85b9e030-3f02-4968-9717-189f265b0e7d
+### call_probe_2 dynamic_workflows_manage {"operation": "list"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True No workflows registered.
+### call_probe_3 run_dynamic_workflow {"name": "probe-wf", "args": null}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Failed to run workflow "probe-wf": No workflow registered with name "probe-wf" Error code: workflow_not_found. Available workflows: (none).
+### call_probe_4 dynamic_workflows_manage {"operation": "runs"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True No workflow runs found.
+### call_probe_5 sql {"description": "vacuum out", "query": "VACUUM INTO '<scratchpad>/phaseB/harness/runs/e2/p/project/sql-vacuum.db'"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Error: Blocked SQL statement: "VACUUM INTO" is not allowed for security reasons.
+### call_probe_6 sql {"description": "load ext", "query": "SELECT load_extension('nothing')"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Error: Blocked SQL statement: "load_extension" is not allowed for security reasons.
+### call_probe_7 sql {"description": "write file fn", "query": "SELECT writefile('<scratchpad>/phaseB/harness/runs/e2/p/project/sql-writefile.txt', 'x')"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False SQL Error: Error: no such function: writefile
+### call_probe_8 sql {"description": "pragma", "query": "PRAGMA database_list"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Error: Blocked SQL statement: "PRAGMA database_list" is not allowed for security reasons.
+### call_probe_9 sql {"description": "create table", "query": "CREATE TABLE notes (a TEXT)"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True Schema operation completed successfully.
+### call_probe_10 sql {"description": "insert", "query": "INSERT INTO notes VALUES ('x')"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True 1 row(s) inserted. Last inserted row ID: 1.
+### call_probe_11 sql {"description": "select it", "query": "SELECT * FROM notes"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True 1 row(s) returned:  | a | | --- | | x |
+
+== session e5 (scenario <scratchpad>/phaseB/harness/e5.json)
+### call_probe_1 task {"description": "probe general", "prompt": "PROBE-CHILD-general run the child steps", "agent_type": "general-purpose", "name": "probe-general", "mode": "sync"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True child PROBE-CHILD-general complete
+### call_probe_2 session_store_sql {"description": "select one", "query": "SELECT 1 AS one", "source": "local"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True 1 row(s) returned:  | one | | --- | | 1 |
+### call_probe_3 session_store_sql {"description": "create table", "query": "CREATE TABLE zz(a)", "source": "local"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False SQL Error: Error: not authorized
+### call_probe_4 session_store_sql {"description": "attach", "query": "ATTACH DATABASE '<scratchpad>/phaseB/harness/runs/e5/p/project/store-attached.db' AS x", "source": "local"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=False Error: Blocked SQL statement: "ATTACH" is not allowed for security reasons.
+### call_probe_5 fetch_copilot_cli_documentation {"query": "hooks"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True Copilot CLI. Matches for "hooks" (8 of 18; pass ids for detail):  Frontend commands, flags and guides are not available in this client.  ## setting:disableAllHooks  [from this build] Disable all hooks, both user-level and repo-level. Also called: turn off hooks Type: boolean. Change: set "disableAllHooks": true in <scratchpad>/phaseB/harness/runs/e5<user-home>.json.  ## setting:disabledHooks  [from this build] Hooks discovered but not executed (content-hash keys). Policy hooks cannot be suppressed
+### call_probe_6 bash {"command": "echo child-one", "description": "child echo"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True child-one <shellId: 0 completed with exit code 0>
+### call_probe_7 bash {"command": "git reset --hard HEAD", "description": "child destructive git: expect deny"}
+   pre-hook event: True | deny: Denied by preToolUse hook: Blocked dangerous git operation: git reset --hard | permission: []
+   result: success=False None
+### call_probe_8 view {"path": "<scratchpad>/phaseB/harness/runs/e5/p/project/.env"}
+   pre-hook event: True | deny: Denied by preToolUse hook: Protected file blocked by policy: .env | permission: []
+   result: success=False None
+### call_probe_10 task {"description": "probe coder", "prompt": "PROBE-CHILD-coder run the child steps", "agent_type": "coder", "name": "probe-coder", "mode": "sync"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True child PROBE-CHILD-coder complete
+### call_probe_11 update_todo {"todos": "- [ ] one"}
+   pre-hook event: True | deny: None | permission: []
+   result: success=True TODO list updated
+
+== attempt to enable extensions (workflow tools), scratch copy of the runner with requestExtensions
+-- with requestExtensions only:
+session.create failed: Failed to initialize standalone session extensions: extensionSdkPath is required when standalone extensions are requested
+-- with requestExtensions and extensionSdkPath:
+session.create failed: Failed to initialize standalone session extensions: No extension launch provider is registered for standalone extensions

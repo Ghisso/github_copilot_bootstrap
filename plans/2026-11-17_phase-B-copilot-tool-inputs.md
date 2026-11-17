@@ -215,6 +215,29 @@ and the T1 text in step 8 before branch creation.
   - `uv run python scripts/validate_targets.py`;
   - `uv run python scripts/check_runtime.py`.
 
+  Scope-change record (approved by the orchestrator on 2026-11-17; each
+  item serves this phase's stated intent and changes no other decision):
+  - Step 1, header shapes inside a shell `apply_patch` heredoc: the
+    expected value is deny on all four clients, not the hook-file decision.
+    That is today's behavior and it does not change: a shell command that
+    starts an unknown program and names a protected file is an uncertain
+    hit (`docs/target-mapping.md`), and `add_patch_paths` is not called for
+    shell commands.
+  - Step 6 found two tools for row T4: `run_dynamic_workflow` and
+    `dynamic_workflows_manage`. Both are denied by name on `github-copilot`
+    only. Offline the workflow tools answer "extensions are not configured",
+    so no run could show their code passing through a hook. The user is
+    told and can lift or narrow the deny.
+  - Step 7 gains the probe steps that step 6 calls for:
+    `deny-workflow-run`, `deny-workflow-manage`, `sql-no-file-write`,
+    `subagent-deny-git-reset`, `subagent-store-sql-refused`, and the
+    runner's scripted sub-agent steps.
+  - `protect-files.py` gets one output function, `print_decision`, shared by
+    `emit` and the T4 deny, and the constants `PATCH_BEGIN` and `PATCH_END`.
+    No output byte changes.
+  - The probe section of `docs/runtime-checks.md` is updated for the new
+    counts (31 result lines, two sessions).
+
 - [ ] **11. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,

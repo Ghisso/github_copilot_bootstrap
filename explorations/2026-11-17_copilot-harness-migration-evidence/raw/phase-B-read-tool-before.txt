@@ -1,0 +1,5 @@
+E   AssertionError: (found, expected) per client: {'github-copilot': (('ask', 0), ('allow', 0)), 'claude-code': (('ask', 0), ('allow', 0)), 'openai-codex': (('deny', 0), ('allow', 0)), 'google-antigravity': (('deny', 0), ('allow', 0))}
+<user-home>/work/github_copilot_bootstrap/tests/test_protect_files_copilot_harness.py:114: AssertionError: (found, expected) per client: {'github-copilot': (('ask', 0), ('allow', 0)), 'claude-code': (('ask', 0), ('allow', 0)), 'openai-codex': (('deny', 0), ('allow', 0)), 'google-antigravity': (('deny', 0), ('allow', 0))}
+E   AssertionError: (found, expected) per client: {'github-copilot': (('ask', 0), ('allow', 0)), 'claude-code': (('ask', 0), ('allow', 0)), 'openai-codex': (('deny', 0), ('allow', 0)), 'google-antigravity': (('deny', 0), ('allow', 0))}
+<user-home>/work/github_copilot_bootstrap/tests/test_protect_files_copilot_harness.py:114: AssertionError: (found, expected) per client: {'github-copilot': (('ask', 0), ('allow', 0)), 'claude-code': (('ask', 0), ('allow', 0)), 'openai-codex': (('deny', 0), ('allow', 0)), 'google-antigravity': (('deny', 0), ('allow', 0))}
+2 failed, 161 deselected in 0.43s

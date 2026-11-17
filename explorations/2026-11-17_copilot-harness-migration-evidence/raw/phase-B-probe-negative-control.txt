@@ -1,0 +1,74 @@
+VS Code commit: 69047191fc427f2f92828279aae1d90d8eeda7ab
+Copilot SDK version: 1.0.30-preview.0
+Copilot runtime version: 1.0.108-0
+PASS session-main: finished after 29 scripted model replies
+PASS hooks-untrusted: 0 hooks before trust
+PASS hooks-sources: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS hooks-subfolder: 26 hooks (.github/hooks/hooks.json: 12, .claude/settings.json: 14)
+PASS mcp-none: 0 MCP servers discovered or started; no .mcp.json after the session
+PASS deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS deny-force-push: Blocked dangerous git operation: force push
+PASS deny-secret-rm: Protected file blocked by policy: .env
+PASS deny-secret-view: Protected file blocked by policy: .env
+PASS ask-vscode-settings: 2 question(s) of kind hook; not denied
+PASS ask-agent-wrapper: 2 question(s) of kind hook; not denied
+PASS deny-branch: implementation branches must be created from dev; current branch is HEAD
+PASS deny-commit: commit gate failed for github-copilot: commits must happen on a <plan_name>_implementation branch, not HEAD; missing big-plan file: .claude/plans/HEAD.md; missing small-plan file: .claude/plans/unknown.md; {"errors":["closeout receipt gate needs branch, phase, and head"]}
+PASS deny-pr: PR/push gate only allows implementation branches; current branch is HEAD
+PASS allow-plain: 4 steps succeeded with no hook question
+FAIL helper-tools: helper-read denied: Denied by preToolUse hook: hook exited with code 2
+FAIL read-agent-file: read-agent-file raised a question of kind hook
+FAIL search-secret-denied: not denied: the grep call ran (success=False)
+PASS search-glob-not-judged: the glob call got no hook denial and no hook question
+FAIL deny-workflow-run: not denied: the run_dynamic_workflow call ran (success=False)
+FAIL deny-workflow-manage: not denied: the dynamic_workflows_manage call ran (success=True)
+PASS sql-no-file-write: 2 steps refused by the tool: Blocked SQL statement
+PASS subagent-deny-git-reset: Blocked dangerous git operation: git reset --hard
+PASS subagent-store-sql-refused: 1 steps refused by the tool: Blocked SQL statement
+PASS session-codex-patch: finished after 7 scripted model replies
+FAIL patch-plain-allowed: patch-plain denied: Denied by preToolUse hook: hook exited with code 2
+FAIL patch-secret-denied: denied for another reason: Denied by preToolUse hook: hook exited with code 2
+FAIL patch-hook-ask: denied instead of asked: Denied by preToolUse hook: hook exited with code 2
+FAIL patch-server-ask: denied instead of asked: Denied by preToolUse hook: hook exited with code 2
+FAIL patch-agent-ask: denied instead of asked: Denied by preToolUse hook: hook exited with code 2
+FAIL patch-indented-hook-ask: denied instead of asked: Denied by preToolUse hook: hook exited with code 2
+Tool inventory, session main (19 tools):
+  bash: command, description, shellId, mode, detach, initial_wait
+  read_bash: shellId, delay
+  stop_bash: shellId
+  list_bash: (no input)
+  view: path, view_range, forceReadLargeFiles
+  create: path, file_text
+  edit: path, old_str, new_str
+  web_fetch: url, max_length, start_index, raw
+  semantic_code_search: query, repo
+  skill: skill
+  run_dynamic_workflow: name, args, limits, resumeFromRunId
+  dynamic_workflows_manage: operation, name, runId, beforeSeq, meta, run
+  sql: description, query
+  read_agent: agent_id, wait, timeout, since_turn
+  list_agents: include_completed, scope
+  write_agent: agent_id, agent_ids, scope, message
+  grep: pattern, paths, output_mode, glob, type, -i, -A, -B, -C, -n, head_limit, multiline
+  glob: pattern, paths
+  task: description, prompt, agent_type, name, model, reasoning_effort, context_tier, mode
+Tool inventory, session codex-patch (18 tools):
+  bash: command, description, shellId, mode, detach, initial_wait
+  read_bash: shellId, delay
+  stop_bash: shellId
+  list_bash: (no input)
+  apply_patch: (free-form text)
+  view: path, view_range, forceReadLargeFiles
+  web_fetch: url, max_length, start_index, raw
+  semantic_code_search: query, repo
+  skill: skill
+  run_dynamic_workflow: name, args, limits, resumeFromRunId
+  dynamic_workflows_manage: operation, name, runId, beforeSeq, meta, run
+  sql: description, query
+  read_agent: agent_id, wait, timeout, since_turn
+  list_agents: include_completed, scope
+  write_agent: agent_id, agent_ids, scope, message
+  rg: pattern, paths, output_mode, glob, type, -i, -A, -B, -C, -n, head_limit, multiline
+  glob: pattern, paths
+  task: description, prompt, agent_type, name, model, reasoning_effort, context_tier, mode
+Result: FAIL (11 of 31 checks failed)

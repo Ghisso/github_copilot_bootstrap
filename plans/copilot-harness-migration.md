@@ -429,6 +429,11 @@ nothing, exits 0) only when all of these hold:
 Option B changes no guard decision. Option A or C adds the row named in the
 options table.
 
+Phase B outcome for row T4 (2026-11-17): step 6 found two tools,
+`run_dynamic_workflow` and `dynamic_workflows_manage`. Both are denied by
+name on `github-copilot` only, because no offline run could show a
+workflow's own code passing through a hook.
+
 ### Decisive assumptions
 
 | Id | Assumption | Evidence | Remaining limit |
