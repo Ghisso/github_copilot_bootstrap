@@ -132,6 +132,12 @@ the patch tool, which the runtime's own list does not (A4).
     timed out, crashed, or logged a runtime error.
   - `--discover DIR` adds no folder trust, so it lists 0 hooks and 0 MCP
     servers and says so. Instructions, skills, and agents are listed.
+  - `mcp-none` also fails for a temporary project that holds `.mcp.json`
+    after the last session. Reason: with only the project file deleted, the
+    file was back in 4 of 4 control runs, yet the event-based conditions
+    reported FAIL in only 1 of 4.
+  - `prepare_project` gives git and the installer a fixed author identity,
+    no standard input, and the time left of the 480-second limit.
 
 - [ ] **3. Add the baseline checks.**
   Owner: coder. Files: `scripts/check_copilot_runtime.py`.
