@@ -17,7 +17,9 @@
   Code, Codex, Copilot, Antigravity) and `dist/sidecar/` (personal overlay); it
   is not a Hydra/BentoML/Haystack/Gradio application and has no `src/` or
   `pyproject.toml`. Durable project context (refreshed 2026-11-17 at
-  `2e8c7bb`; PR #57 released `dev` to `main` on 2026-11-15):
+  `2e8c7bb` and extended on 2026-11-18 for the plan
+  `copilot-harness-migration`, which is on its own branch and not merged;
+  PR #57 released `dev` to `main` on 2026-11-15):
   `.claude/instructions/project-context.instructions.md`.
 - [LEARN:domain] Context Mode 1.x (pinned until the 2026-11-12
   `context-mode-2x-migration`) checks the npm registry at startup and every
@@ -1332,6 +1334,11 @@
   any read folder. The Local agent loads both `.github/instructions/` and
   `.claude/rules/`; an Agent Host session in the Copilot format loads only
   `.github/instructions/`, and `applyTo: "**"` loads with no attached file.
+  On 2026-11-18 the Copilot harness runtime `1.0.108-0` listed both
+  `.github/instructions/` and `.claude/rules/` as instruction sources, and
+  the five `.claude/agents/` files of the `workflow` profile as agents
+  (discovery only: no session and no VS Code run; section "Copilot harness
+  check, 2026-11-18" of the same document).
 - [LEARN:architecture] `scripts/runtime_ownership.py` is copied
   byte-for-byte to `dist/multi-agent/.claude/scripts/runtime_ownership.py`,
   so every constant added there ships to every full consumer, and a
@@ -1692,35 +1699,103 @@
   (microsoft/vscode `chatHookService.ts`, 2026-10-17). Shell guards keyed on
   `bash`/`shell` names had silently skipped every Copilot terminal command.
   Confirm a client's real hook tool names from source before claiming a
-  gate covers that client.
+  gate covers that client. On the Copilot harness the hook names are
+  PascalCase for built-ins (`Bash`, `Read` for `view`, `Glob`, `Edit` for
+  `apply_patch`, `Write` for `create`), and the runtime's own names under
+  camelCase events; see the table "Copilot harness tools and guard
+  handling" in `docs/target-mapping.md`.
 - [LEARN:security] An exemption implemented as an early return skips every
   check after it. The Copilot read-tool exemption first dropped the
   secret-file deny along with the hook-config prompt; exempt only the
   specific hit class and test the checks that must still apply.
-- [LEARN:tooling] Copilot hooks can be turned off from the repository:
-  `.vscode/settings.json` (`chat.useHooks`, `chat.hookFilesLocations`,
-  `chat.useClaudeHooks`) and `.github/copilot/settings*.json`
-  (`disableAllHooks`). Protect them like other hook configs.
+- [LEARN:tooling] On the Local harness, hooks can be turned off from the
+  repository: `.vscode/settings.json` (`chat.useHooks`,
+  `chat.hookFilesLocations`, `chat.useClaudeHooks`). Those Local settings
+  do not stop the Copilot harness from loading a hook file (VS Code docs,
+  read 2026-11-17). For the Copilot runtime, `disableAllHooks` at the top
+  of a hook file skips that file's hooks; a top-level `disableAllHooks` in
+  a repository `settings.json` under `.github/copilot/` is documented for
+  Copilot CLI only, and its effect on the Copilot harness in VS Code was
+  not run. Protect all of these files like other hook configs; the
+  launcher's stand-down refuses to act when the Copilot hook file carries
+  `disableAllHooks`.
 - [LEARN:tooling] VS Code removes Copilot's Local harness in February 2027;
-  the Copilot harness is the default since 1.143. Spike 2026-11-17 on the
-  runtime bundled in VS Code 1.146.0 (`1.0.108-0`): the PascalCase hook file
-  works unchanged, but the runtime also loads `.claude/settings.json`, so
-  every hook runs twice (since Phase D the launcher `run-hook.sh` makes the
-  five lifecycle hooks from the Claude settings stand down there; guards
-  still run from both files); nested `hookSpecificOutput` answers are honored
-  only under PascalCase `PreToolUse` (under camelCase names a nested deny
-  or ask is ignored; since Phase C the guards also print the documented
-  top-level answer for `github-copilot`); a timeout or non-JSON output lets the
-  tool run; `apply_patch` sends its patch text as a string `tool_input`
-  (offline only the six Codex-family model ids get that tool, but the real
-  VS Code also gave it to `gpt-6-luna`), which crashed `protect-files.py`
-  until Phase B of the plan `copilot-harness-migration` made the guard read
-  it; sub-agents get no repository instructions (since Phase E a
-  `SubagentStart` hook, `subagent-context.sh`, gives them the text of
-  `.github/copilot-instructions.md`, at most 2,048 bytes). Read
+  the Copilot harness is the default since 1.143. The bootstrap supports
+  the Copilot harness inside VS Code, not Copilot CLI or cloud agents.
+  Behavior on the runtime in VS Code 1.146.0 (`1.0.108-0`; spike
+  2026-11-17, then the plan `copilot-harness-migration`): the PascalCase
+  hook file works unchanged, and the runtime also loads
+  `.claude/settings.json`. The five lifecycle hooks reached through the
+  Claude settings (`state-sync.sh`, `session-log.sh`,
+  `session-start-state.sh`, `claude-stop.sh`, `reporting-reminder.sh`)
+  stand down there, so they run once (Phase D: `run-hook.sh`, marker
+  `BOOTSTRAP_HOOK_SOURCE=claude-settings`); the guards run from both files
+  and never stand down. With `chat.useClaudeHooks` on, the Local harness
+  still runs every hook twice. For `github-copilot` the guards print the
+  decision at the top level and nested (Phase C): the runtime reads the
+  top level under both event spellings; a nested-only answer works only
+  under PascalCase `PreToolUse`; the Local harness takes the decision from
+  the nested copy and drops a result whose top-level `hookEventName` names
+  another event; a timeout or non-JSON output lets the tool run.
+  `apply_patch` sends its patch text as a string `tool_input` (offline
+  only Codex-family models get that tool; the real VS Code also gave it to
+  `gpt-6-luna`); Phase B made `protect-files.py` read it, where it had
+  crashed. A sub-agent gets only its agent file, plus, since Phase E, the
+  text of `.github/copilot-instructions.md` (at most 2,048 bytes) and one
+  fixed line from the `SubagentStart` hook `subagent-context.sh`. Read
   `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/REPORT.md`
-  before any Copilot change; its `scripts/` run the real runtime offline
-  with a scripted local model, no account needed.
+  before any Copilot change (its items are cited below as F, A, and P
+  numbers); `scripts/check_copilot_runtime.py --require` runs the real
+  runtime offline with a scripted model (no account) and prints 48 lines.
+- [LEARN:hooks] The Copilot runtime's shell helper tools `read_bash`,
+  `list_bash`, and `stop_bash` carry `shellId` and `delay`, no `command`.
+  A guard that treats every tool whose name ends in `bash` as a shell
+  command stops each of them ("Bash payload has no command"), so a
+  background shell starts but is never read or stopped. `protect-files.py`
+  judges them like a native tool unless a `command` is present
+  (`SHELL_HELPER_TOOLS`). The runtime's own read of a finished shell runs
+  with no pre-tool hook, so a check must not demand a hook event for every
+  tool run (probe check `helper-tools`; planning probe P3, 2026-11-17).
+- [LEARN:tooling] The Copilot runtime's shell tool gives every command
+  `COPILOT_CLI=1` and `COPILOT_AGENT_SESSION_ID`, but not
+  `COPILOT_HOOK_DEPTH` or `COPILOT_PROJECT_DIR`, which only hook processes
+  get (planning probe P1). A Claude Code session started from such a shell
+  therefore inherits `COPILOT_CLI=1` (inferred from P1; not run), and a
+  stand-down keyed on that variable alone would remove its hooks. The
+  launcher also needs a non-empty `COPILOT_HOOK_DEPTH`, an empty
+  `COPILOT_HOOK_DIR` and `CLAUDECODE`, and the marker. A `CLAUDE_CODE_*`
+  variable in a Copilot hook is not proof of Claude Code: real Copilot
+  hooks carry `CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP=1` (A3).
+- [LEARN:tooling] VS Code can give a model a different tool set than the
+  Copilot runtime's own list for that model. On 2026-11-17 in the real VS
+  Code, Auto chose `gpt-6-luna` and VS Code gave it `apply_patch`; the
+  runtime's own list gives that model `create` and `edit` (A4). Offline,
+  only Codex-family ids such as `gpt-5.2-codex` get `apply_patch`. So a
+  guard maps tools by hook name and input, never by model, and the offline
+  probe cannot show what VS Code offers; that stays on the manual
+  checklist in `docs/smoke-tests.md`.
+- [LEARN:tooling] The double run on the Local harness (setting
+  `chat.useClaudeHooks` on) is left out of the stand-down on purpose. Its
+  Claude-settings hooks have the environment of a real Claude Code session
+  (no `COPILOT_CLI=1`; A2), so no environment test separates the two.
+  Whether the other hook source also runs depends on user settings
+  (`chat.useHooks`, `chat.hookFilesLocations`, `chat.useClaudeHooks`) that
+  a hook cannot read, so a stand-down there could remove the only copy.
+  The docs say to turn the setting off.
+- [LEARN:architecture] On the Copilot harness only the five lifecycle
+  hooks reached through `.claude/settings.json` stand down (option B of
+  the plan `copilot-harness-migration`); the guards run from both files.
+  Cost: one protected edit raises two hook questions in the probe (the
+  real VS Code answered the second itself once, so the user saw one; A6),
+  and a deny comes from either file. Gain: a wrong stand-down loses only
+  session-log entries, session-start context, AI-state pull and push, and
+  the reminder, never a guard (condition matrix: 247 rows, no guard row
+  stands down). Lost on purpose: the Claude-settings state push at
+  `UserPromptSubmit` and `SessionEnd` and the checkpoint at `StopFailure`;
+  the Copilot file still pushes at every `Stop`. Rejected: stand down
+  every Claude-settings hook (a failed `.github/hooks` copy would leave no
+  guard), and drop the Claude-settings asks (an ask would become an
+  allow).
 - [LEARN:workflow] After a self-install, new protect-files rules apply to the
   orchestrator's own Bash commands. A command that names a protected config
   or loops over an installed hook script is refused; probe with

@@ -76,6 +76,33 @@ matching, `SubagentStart`), `openwiki/architecture/agents-and-skills.md`
   - Record every surface and its outcome under
     `## Stale-claims surfaces checked`.
 
+  Scope-change record (approved by the orchestrator on 2026-11-18; each
+  item serves this phase's stated intent, and no code changes):
+  - Order: the audit of the surfaces outside `openwiki/` ran first, the
+    wiki refresh second, the inspection of the pages third. The wiki cites
+    line ranges of the docs and the skills, so those files had to be final
+    before OpenWiki read them.
+  - Step 1: the orchestrator wrote the wiki pages itself. The OpenWiki
+    skill forbids page sub-agents, so the `coder` did not write pages; it
+    did the audit of step 3 and listed the stale statements of each wiki
+    page.
+  - Step 3: the audit swept the canonical sources under `shared/` in
+    place of the generated copies under `.claude/instructions/`. The
+    `coder` corrected four tracked files (`README.md`, `SECURITY.md`,
+    `docs/native-client-acceptance.md`,
+    `shared/skills/knowledge-refresh/SKILL.md`). The orchestrator, which
+    owns the AI state, made the edits to `.claude/MEMORY.md` and to the
+    project context file from the `coder`'s proposals.
+  - Step 1 covers eight pages, more than the three this plan names: the
+    audit found stale statements also on the pages for the generated
+    layout, verification (the time budgets), AI-state sync, the sidecar
+    overlay, and the quickstart.
+  - Not done here: `openwiki/INSTRUCTIONS.md`, the human-written brief,
+    has no item for the Copilot harness. It is reported to the user, who
+    owns that file. The bare evidence labels in comments of three hook
+    scripts and some test docstrings are code and are recorded as a
+    follow-up.
+
 - [ ] **4. Review.**
   Owner: reviewer.
   Review Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`,

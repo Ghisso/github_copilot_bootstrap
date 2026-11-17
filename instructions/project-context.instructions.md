@@ -49,7 +49,10 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
   including `context-mode-dispatch.sh` (pins Context Mode `2.1.8`). Its
   `git-hooks/` folder holds the real Git hooks `commit-msg`, `post-commit`,
-  and `pre-push`.
+  and `pre-push`. `hooks.json` is the GitHub Copilot hook file (five events,
+  including `SubagentStart`, which runs `subagent-context.sh`). The launcher
+  `run-hook.sh` makes the five lifecycle hooks reached through the Claude
+  settings stand down on the Copilot harness; guards never stand down.
 - `shared/prompts/`: reusable prompt templates copied into a consumer's
   `.claude/prompts/`; today it holds only a placeholder `README.prompt.md`.
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
@@ -104,8 +107,15 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `scripts/check_runtime.py`: runtime-file drift and optional-helper checker.
 - `scripts/check_native_clients.py`: optional native-client probes and
   evidence (Claude Code and Codex only).
+- `scripts/check_copilot_runtime.py` with `scripts/copilot_runtime_probe.mjs`:
+  an opt-in, offline probe of the real Copilot runtime that ships inside VS
+  Code (three sessions, 48 result lines on runtime `1.0.108-0`). It is run
+  by hand and as a required item of a plan phase, never by tests or hooks.
 - `tests/`: pytest suite for hooks, gates, verifier, installer, sidecar,
-  state sync, and the Context Mode dispatcher and MCP filter.
+  state sync, the Context Mode dispatcher and MCP filter, and the Copilot
+  harness (`test_protect_files_copilot_harness.py`,
+  `test_check_copilot_runtime.py`, and the stand-down and sub-agent hook
+  cases in `test_hook_gates.py`).
 - `.github/workflows/validate.yml`: CI for generation and target validation
   on Ubuntu and macOS plus Python 3.9 hook compatibility. It runs the
   validator as `uv run --with pytest`, because the validator's hook-gate
@@ -152,6 +162,12 @@ consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
   depend on a per-user plugin or network availability.
 - Guardrails are shared shell scripts, while commit/push invariants also run as
   real Git hooks; this closes tool-layer and human/IDE bypasses where possible.
+- On VS Code's Copilot harness (the runtime shared with Copilot CLI), the
+  guards print each decision at the top level and nested, the lifecycle hooks
+  reached through the Claude settings stand down, and the guards run from both
+  hook files and never stand down (option B of the plan
+  `copilot-harness-migration`, chosen by the user on 2026-11-17). The Local
+  harness stays supported until VS Code removes it in February 2027.
 - The commit gate trusts only what it checks: the findings report records the
   reviewer's `gate_result` and open requests (schema version 2), and the gate
   requires the review profiles the branch's changed paths call for. The
@@ -234,7 +250,21 @@ The tracked documents (`README.md`, `SECURITY.md`, root `CLAUDE.md` and
 `AGENTS.md`, and the undated files in `docs/`) were checked against the code
 on 2026-11-17: every source path they name exists, the pinned versions and
 the skill count match, and the README agent table, hook list, and verifier
-options match the source. Nothing needed a change.
+options match the source. Nothing needed a change on that day.
+
+Since then (2026-11-17 to 2026-11-18): the plan `copilot-harness-migration`
+on the branch `copilot-harness-migration_implementation`, seven phases (A to
+G), each committed and pushed; not merged, and no pull request opened (the
+user's call). It moved the GitHub Copilot support to VS Code's Copilot
+harness. Phase F rewrote the Copilot statements in `README.md` and five
+documents; the final audit in Phase G corrected `README.md`, `SECURITY.md`,
+`docs/native-client-acceptance.md`, and
+`shared/skills/knowledge-refresh/SKILL.md`, and the wiki was refreshed. On
+that branch `uv run pytest tests/ -q` gave 5,927 passed, 1 skipped (about 7
+minutes) on 2026-11-18. The verifier's budgets are 900 seconds for one
+command and 1,020 seconds for one required item (`shared/scripts/verify.py`).
+Evidence report:
+`.claude/explorations/2026-11-17_copilot-harness-migration-evidence/REPORT.md`.
 
 Pull requests merged into `dev` since the 2026-11-12 refresh:
 
@@ -255,6 +285,28 @@ the user's call. No implementation branch is unmerged; the remote has only
 `dev`, `main`, and `ai-state`.
 
 Open follow-ups to start from:
+
+- From `copilot-harness-migration`, open on 2026-11-18:
+  - The user has not yet run the manual checklist in `docs/smoke-tests.md`
+    (section "VS Code Copilot harness (manual)", 11 items, test folder
+    `~/copilot-harness-probe-20261117`). No item has a run in a signed-in
+    window since the changes.
+  - The result of the `macos-latest` job of the `Validate` workflow has not
+    been read (`gh` was not signed in on this computer). It is the first run
+    of the shell escaping and the launcher on macOS tools.
+  - Two old defects in the guard hooks, told to the user, who decides: inline
+    Python without `-I` (a `json.py` in the repository root runs inside the
+    guards), and `protect-files.sh` leaving one empty `/tmp/tmp.*` file for
+    each call. Recommended as one small plan. Not in the public docs. The
+    same plan can replace the bare evidence labels in comments of
+    `run-hook.sh`, `subagent-context.sh`, and `protect-files.py`.
+  - The user can keep, narrow, or lift the deny of `run_dynamic_workflow` and
+    `dynamic_workflows_manage` on `github-copilot`.
+  - At the Local harness removal (February 2027): rename the hook events to
+    camelCase (recheck the input side first), drop the Local-only fields of
+    the agent wrappers, decide on `.vscode/mcp.json`, and keep
+    `.github/copilot-instructions.md` (the sub-agent hook reads it). The list
+    is in `docs/target-mapping.md`, "Recorded follow-ups".
 
 - Low severity, open: the `workflow` sidecar profile seeds a missing state
   `README.md` through a linked `.ai-bootstrap/` subfolder, which can create
@@ -293,13 +345,20 @@ complete. For a consumer not yet refreshed, a refresh through
 `scripts/update_consumers.py` brings MCP-only Context Mode 2.1.8 (Node.js
 24.15.0 or newer on the host or in a rebuilt devcontainer), the 37-skill
 set, and the new refusals; the `safe-consumer-bootstrap-refresh` skill
-explains the refusals. Consumers installed at `76887a8` (2026-08-22) cannot
+explains the refusals. Once `copilot-harness-migration` is merged, a refresh
+also brings the marker `BOOTSTRAP_HOOK_SOURCE=claude-settings` in the Claude
+settings hook commands, a `SubagentStart` entry and a session-start reminder
+entry in the Copilot hook file, and the guard changes listed in `README.md`
+under "Upgrading a consumer with active work". Consumers installed at `76887a8` (2026-08-22) cannot
 refresh because of an older takeover rule. Refreshing is the user's call.
 
 Pinned versions: Context Mode `2.1.8` (`PINNED_CONTEXT_MODE_VERSION` in
 `shared/hooks/scripts/context-mode-dispatch.sh`), OpenWiki `0.7.2` (the guard
 allows only `mode: "update"`), and Ponytail partially merged from upstream
-`v5.3.2` (`ponytail-review` stays complexity-only). Context Mode 2.x needs
+`v5.3.2` (`ponytail-review` stays complexity-only). The Copilot runtime is
+not pinned: `1.0.108-0` (Copilot SDK `1.0.30-preview.0`, VS Code 1.146.0) is
+the version the offline probe last passed on, 2026-11-18; the probe prints
+the version on every run and says nothing about another. Context Mode 2.x needs
 Node.js 24.15.0 or newer (the dispatcher enforces it in server mode and
 `--self-check`), always reports server version `"dev"`, needs `--agent` (the
 kit uses `codex` for every client, started from the outer repository root),
@@ -356,6 +415,10 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   `receipt metadata control-plane provenance is invalid`. Run
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after editing either file.
+- `README.md`, `docs/`, and the wiki cite the private evidence report of the
+  Copilot migration by bracket labels such as `[A6]` after a plain
+  description. The report is in `.claude/explorations/` and is not tracked,
+  so never cite it by a bare label in a tracked file.
 - A one-phase plan gets no knowledge-refresh phase, so the wiki drifts until
   the next refresh. Refresh pages only through the `knowledge-refresh` skill,
   never by hand. PR #56 ended with a knowledge-refresh phase (Phase I).
