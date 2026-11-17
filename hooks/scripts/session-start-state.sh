@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=_lib-frontmatter.sh
 . "$SCRIPT_DIR/_lib-frontmatter.sh"
 
+# Names the client for the answer shape in _lib-frontmatter.sh; never inherited.
+TARGET_ID="${1:-unknown-target}"
 REPO_ROOT="$(repo_root_from_script)"
 INPUT="$(cat >/dev/null || true)"
 
