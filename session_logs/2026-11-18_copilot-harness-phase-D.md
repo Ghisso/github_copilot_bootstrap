@@ -67,6 +67,17 @@ Code session and the Local harness never stand down.
   One open request: a full suite run on the final tree. Sent to the
   `coder` with two small accuracy fixes (`docs/architecture.md`, one test
   comment).
+- **02:36** - Fix round 1 done. The docs now state what was seen: a deny
+  from either file blocks the call; the runtime raises two hook questions
+  for one protected edit, and VS Code answered the second itself in the
+  real run. `stands_down()` silences `grep` errors (81 more comparisons
+  for an unreadable hook file, 0 differences). The probe drops `AI_STATE_*`
+  variables; with the earlier filter and `AI_STATE_REPO_ROOT` aimed at a
+  scratch folder, the installer wrote a `.claude` folder there. Condition
+  matrix: 247 rows, no guard row stands down. Differential: 1,362
+  comparisons, 0 differences. Full suite on the final tree: 5,829 passed,
+  1 skipped, 434 s. Orchestrator checks: `verify.py fast` PASS, the probe
+  PASS (0 of 46 failed). Review round 2 started.
 
 ## [LEARN] Entries
 
