@@ -1,0 +1,49 @@
+Phase E verification results, 2026-11-18 (coder run; the orchestrator owns verify phase and closeout).
+Tree: HEAD 3402601 plus the uncommitted Phase E changes. Runtime 1.0.108-0 (VS Code commit 69047191fc427f2f92828279aae1d90d8eeda7ab).
+
+=== Plan Verification block, every line except `verify.py phase`, on the final tree
+$ uv run python scripts/generate_targets.py --all            -> exit 0
+$ uv run pytest tests/test_hook_gates.py tests/test_validate_targets.py tests/test_check_copilot_runtime.py -q --tb=short
+    1855 passed in 158.50s (run before the last two edits: a README sentence and one pinned contract in tests/test_lifecycle_hooks.py;
+    the full suite below ran after them)
+$ uv run python scripts/check_copilot_runtime.py --require   -> Result: PASS (0 of 48 checks failed); runtime 1.0.108-0; exit 0
+$ grep -q -F 'subagent-context.sh github-copilot' dist/multi-agent/.github/hooks/hooks.json            -> exit 0
+$ grep -q -F 'reporting-reminder.sh session github-copilot' dist/multi-agent/.github/hooks/hooks.json  -> exit 0
+$ uv run python scripts/validate_targets.py                  -> PASS generated target is structurally valid; exit 0
+$ uv run python scripts/check_runtime.py                     -> PASS hook scripts guard empty-array expansions for Bash 3.2; PASS generated runtime wiring is present; exit 0
+$ uv run python scripts/validate_plan_frontmatter.py         -> no output; exit 0
+
+=== Step 7 commands
+$ uv run python scripts/generate_targets.py --all
+$ uv run python scripts/install_bootstrap.py . --allow-self --local-only
+    Each run ended with "install-bootstrap: done". The installer also made a checkpoint commit in the nested .claude repository
+    each time it found changed content (7375fcf, 889e20b, 0655c2c; the last one carried the Phase E evidence files).
+
+=== Other commands asked for
+$ uv run python tests/test_hook_gates.py                     -> exit 0 (the script form the CI macOS job runs; 3 calls added for Phase E)
+$ uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases   -> Success: no issues found in 43 source files
+$ uv run ruff check shared scripts tests                     -> All checks passed!
+$ uv run ruff format --check shared scripts tests            -> 43 files already formatted
+$ uv run python .claude/scripts/verify.py fast --format text -> fast: PASS (VFY-RUFF-001: PASS)
+
+=== Full suite, final tree, nothing else running
+$ uv run pytest tests/ -q --tb=short
+    5923 passed, 1 skipped, 0 failed in 432.52s (0:07:12); wall time 7m43.763s (uv start-up and collection included)
+    The one skipped test was not identified (the run used no -rs); the first full run also had exactly one skip.
+    The budget in shared/scripts/verify.py is 900 s for the suite, so the suite uses 48 percent of it.
+
+=== The first full-suite run found one failure (tree before the fix)
+    5922 passed, 1 skipped, 1 failed in 430.61s: tests/test_lifecycle_hooks.py::test_shared_copilot_hooks_run_no_context_mode_handler
+    It pinned the old Copilot hook file (exactly four events, three SessionStart entries). The approved plan adds the SubagentStart event and a
+    fourth SessionStart entry, so the pin was updated to the new contract and now also checks the two new commands. Its input is the shared hook
+    file itself; no test input was changed to hide a refusal. The test passes in the final run above (47 of 47 in the file).
+
+=== Python 3.9 (the CI job python_39_hooks runs hooks under 3.9)
+    The new hook's embedded program ran under Python 3.9.0 as `python3`: 55 hook tests passed, and the hard-input table is identical to the one
+    under 3.13.6 (phase-E-context-hook-hard-inputs.txt).
+
+=== Not run
+    macOS (the CI macOS leg) and bash 3.2: no such host here. The new script uses only builtins, `dirname`, and `python3`, no array and no
+    bash 4 feature; `read -r -d ''` with a quoted here-document and `trap ... ERR` are bash 3.2 features. The repository's own check
+    (check_runtime.py, "hook scripts guard empty-array expansions for Bash 3.2") passes. BusyBox tools were not used for this script.
+    The Local harness, and the real VS Code window, were not run.
