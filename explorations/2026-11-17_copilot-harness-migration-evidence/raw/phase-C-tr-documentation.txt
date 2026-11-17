@@ -52,6 +52,17 @@ Conclusion from the two documents: `\001-\037` names the coded values 1 to
 of those bytes maps to one space. The bare form `' '` would rely on padding
 that POSIX leaves unspecified; the `[ *]` form does not.
 
+Addition, 2026-11-17 23:40. The documents were not the whole answer: the
+coder ran the `[ *]` form with BusyBox `tr` 1.36.1 (the `tr` of Alpine
+containers) and got `a]b]c` for `printf 'a\tb\nc'`. BusyBox does not read
+`[c*]`; it pads with the last character of the set. The result is valid
+JSON with a wrong visible character. Decision by the orchestrator: the
+second set becomes exactly 31 spaces, one for each character of the first
+set, so the mapping is position for position and depends on no padding rule
+of any `tr`. The runs for that form are in `phase-C-fix-round-1.txt`,
+"Fix round 1, part 2". The quotes above still matter for one point: an octal
+range names coded values on POSIX and FreeBSD `tr`.
+
 What stays unverified: a run on macOS or BSD `tr`, and `tr`/`sed` behavior
 there on invalid UTF-8 in a reason (the earlier `sed`-only code had the same
 kind of risk).
