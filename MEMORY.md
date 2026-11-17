@@ -1471,6 +1471,17 @@
   `printf -v`; a stub-`tr` test in `tests/test_hook_gates.py` pins it. A
   manual quote is not a run: try a second implementation (`busybox tr`)
   when one is on the machine (2026-11-18).
+- [LEARN:tooling] A script that builds a temporary project and runs `git`,
+  the installer, or `state-sync.sh` in it must drop `GIT_*`, `GH_*`, and
+  `AI_STATE_*` from the environment first. With `GIT_DIR` set, `git init`
+  wrote a `.git` into another folder; with `AI_STATE_REPO_ROOT` set, the
+  installer wrote a `.claude` there (`scripts/check_copilot_runtime.py`,
+  `runtime_environment`, 2026-11-18).
+- [LEARN:documentation] Plan text is not evidence. Phase D's docs copied
+  the plan's "a deny happens twice" and "asks twice"; the recorded runs
+  showed one deny reason, and one question seen by the user. Before a
+  behavior claim goes from a plan into the docs, name the run that shows
+  it, or write "not seen in a recorded run".
 - [LEARN:testing] The CI workflow's macOS job runs only the calls listed
   under `if __name__ == "__main__":` in `tests/test_hook_gates.py`, through
   `scripts/validate_targets.py`. It does not run the pytest suite. Add a
@@ -1654,7 +1665,9 @@
   the Copilot harness is the default since 1.143. Spike 2026-11-17 on the
   runtime bundled in VS Code 1.146.0 (`1.0.108-0`): the PascalCase hook file
   works unchanged, but the runtime also loads `.claude/settings.json`, so
-  every hook runs twice; nested `hookSpecificOutput` answers are honored
+  every hook runs twice (since Phase D the launcher `run-hook.sh` makes the
+  five lifecycle hooks from the Claude settings stand down there; guards
+  still run from both files); nested `hookSpecificOutput` answers are honored
   only under PascalCase `PreToolUse` (under camelCase names a nested deny
   or ask is ignored; since Phase C the guards also print the documented
   top-level answer for `github-copilot`); a timeout or non-JSON output lets the

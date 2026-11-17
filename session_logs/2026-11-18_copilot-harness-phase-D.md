@@ -78,8 +78,81 @@ Code session and the Local harness never stand down.
   comparisons, 0 differences. Full suite on the final tree: 5,829 passed,
   1 skipped, 434 s. Orchestrator checks: `verify.py fast` PASS, the probe
   PASS (0 of 46 failed). Review round 2 started.
+- **02:39** - Review round 2: Gate PASS, no finding, no open request. From
+  its notes: the big plan's options table (row B) still said "A deny also
+  happens twice"; a dated correction is added below that table. Left as
+  is: one docstring summary line and one test comment say "one question
+  per hook source", which evidence A6 and the one-source control support.
+
+### Phase-boundary summary
+
+- **Objective and change:** on the Copilot harness the five lifecycle
+  hooks reached through the Claude settings stand down; the guards run
+  from both files. Changed: `shared/hooks/scripts/run-hook.sh` (the rule),
+  `scripts/generate_targets.py` (the marker in the Claude settings
+  commands), `scripts/validate_targets.py` (the marker check),
+  `scripts/check_copilot_runtime.py` (three checks in session `main`, the
+  environment filter), three test files, `README.md`,
+  `docs/target-mapping.md`, `docs/runtime-checks.md`,
+  `docs/architecture.md`.
+- **Deviations:** the Scope-change record under step 6 of the small plan.
+- **Checks:** the required items below; the probe prints 46 lines and 0
+  fail on runtime `1.0.108-0`; before the change two of them fail; the
+  condition matrix (247 rows, no guard row stands down); the differential
+  against `49d3460` (1,362 comparisons, 0 differences); the mixed-install
+  runs.
+- **Open findings:** none.
+- **Unverified limitations:** the stand-down was not seen in a real VS
+  Code Copilot-harness chat (Phase F's manual checklist); bash and tools
+  on macOS (the CI workflow's macOS job runs four launcher calls after
+  the push).
+- **Lost on purpose on the Copilot harness:** the state push from the
+  Claude settings at `UserPromptSubmit` and `SessionEnd`; the Copilot hook
+  file still pushes at every `Stop`.
+- **Decision needed:** none.
+- **Next operation:** Phase E,
+  `.claude/plans/2026-11-17_phase-E-subagent-context.md` (sub-agent
+  context and the session-start reminder).
+
+## Stale-claims surfaces checked
+
+This phase changed what the launcher does and what the generated Claude
+settings hold.
+
+- `README.md`: updated in this phase (the section "Hooks on the Copilot
+  harness").
+- `docs/target-mapping.md`, `docs/runtime-checks.md`: updated in this
+  phase (Native Adapters; the probe section and its environment text).
+- `docs/architecture.md`: its launcher paragraph said only that
+  `run-hook.sh` resolves the root and dispatches; one sentence on the
+  stand-down rule added in this phase.
+- `docs/smoke-tests.md:225`: says the generated `run-hook.sh` is
+  executable because Claude and Codex hook commands call it directly.
+  Still true; the Claude command now has a variable assignment in front of
+  the same call. Not changed.
+- `docs/sidecar-provider-contract.md:1218`: names `run-hook.sh` as one of
+  the scripts that identify an install. Not affected.
+- `.claude/MEMORY.md`: the 2026-11-17 Copilot harness entry said every
+  hook runs twice; extended in place with this phase's stand-down.
+- `.claude/plans/copilot-harness-migration.md`: the options table said a
+  deny happens twice; a dated correction is added below the table.
+- `openwiki/`: not searched. `openwiki/architecture/hooks-and-guardrails.md`
+  describes the earlier launcher; the final phase of this plan refreshes
+  it through OpenWiki's tools.
 
 ## [LEARN] Entries
+
+- [LEARN:tooling] A script that builds a temporary project must drop
+  `GIT_*`, `GH_*`, and `AI_STATE_*` from the environment before it runs
+  `git`, the installer, or `state-sync.sh`; with `GIT_DIR` or
+  `AI_STATE_REPO_ROOT` set, they wrote into another folder. Recorded in
+  `.claude/MEMORY.md`.
+- [LEARN:documentation] Plan text is not evidence: name the run that shows
+  a behavior before the claim goes into the docs. Recorded in
+  `.claude/MEMORY.md`.
+- No lesson recorded for: `grep -q` not silencing error messages (general
+  shell knowledge), and the closed standard input on the stand-down path
+  (the launcher's comment and its test carry it).
 
 ## Verification
 
@@ -87,4 +160,17 @@ Code session and the Local harness never stand down.
 # filled at closeout step 4
 ```
 
+- Findings: `.claude/quality_reports/findings-2026-11-17_phase-D-lifecycle-hook-stand-down.json`
+  (no surviving finding; gate PASS; six profiles; round 1 FAIL with one
+  MAJOR in the documentation and two MINOR, all fixed before round 2,
+  which had no finding).
+- optional 1: NOT RUN — it needs a person in a signed-in VS Code window with this phase's hooks installed in a test project; the offline probe on runtime `1.0.108-0` shows the same two facts for session `main` (`single-session-log`: no `target=claude-code` line for the session; `deny-git-reset`: still denied), and the check is on the manual checklist of Phase F.
+
 ## Open Questions / Next Steps
+
+- Next: Phase E, sub-agent context and the session-start reminder.
+- For the user: the result of the `macos-latest` job of the `Validate`
+  workflow after the pushes of Phases C and D.
+- For the user (from Phase B): one prompt in a Copilot-harness chat that
+  asks for a new plain file, to confirm the patch-tool fix in the real
+  client; and keep, narrow, or lift the deny of the two workflow tools.

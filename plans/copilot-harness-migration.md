@@ -315,6 +315,14 @@ flowchart TD
 | **B (planned)** | Lifecycle hooks only: `state-sync.sh`, `session-log.sh`, `session-start-state.sh`, `claude-stop.sh`, `reporting-reminder.sh` | two. A deny also happens twice, which is harmless because a deny wins. | Lost for that session: session-log entries, session-start context, AI-state pull and push, the reminder. The guards keep running. | As written in Phase D |
 | **C** | Lifecycle hooks; the Claude-settings guards run, but the launcher drops their `ask` answers | one | Protected-config edits proceed with no question: an ask becomes an allow | Phase D: `run-hook.sh` captures the output of `protect-files.sh` and `pretool-bash-guard.sh` (no `exec`) under the same conditions. It drops output whose decision is `ask` (exit 0) and passes a deny and any non-zero exit unchanged. New tests for both paths; the probe expects one question; the decision-change table gains the row "Claude-settings guard asks dropped on the Copilot harness", a loosening in the failure case. |
 
+**Correction for row B (Phase D review, 2026-11-18).** The column
+"Questions per protected edit" counts the hook questions the runtime raises,
+which the probe pins at two. In the one real VS Code run, VS Code answered
+the second question itself, so the user saw one (A6). The sentence "A deny
+also happens twice" has no supporting run: the recorded runs show one deny
+reason per denied call, and a deny from either file blocks the call. The
+docs written in Phase D state it this way.
+
 **Option B conditions.** A lifecycle hook reached through
 `.claude/settings.json` stands down (reads and discards its input, prints
 nothing, exits 0) only when all of these hold:
@@ -531,7 +539,7 @@ Separately:
 - [x] `2026-11-17_phase-A-copilot-runtime-probe` — offline check of the real runtime; baseline checks
 - [x] `2026-11-17_phase-B-copilot-tool-inputs` — patch text, shell helpers, read alias, search paths, unmapped tools
 - [x] `2026-11-17_phase-C-copilot-hook-answers` — documented answer format for the Copilot client
-- [ ] `2026-11-17_phase-D-lifecycle-hook-stand-down` — Claude-settings lifecycle hooks stand down on the Copilot harness
+- [x] `2026-11-17_phase-D-lifecycle-hook-stand-down` — Claude-settings lifecycle hooks stand down on the Copilot harness
 - [ ] `2026-11-17_phase-E-subagent-context` — sub-agent context and session-start reminder
 - [ ] `2026-11-17_phase-F-copilot-docs` — documentation, manual checklist, sidecar recorded check
 - [ ] `2026-11-17_phase-G-knowledge-refresh` — knowledge refresh and final audit
