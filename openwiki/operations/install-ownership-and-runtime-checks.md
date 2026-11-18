@@ -1,7 +1,7 @@
 ---
 type: operations
 title: Installing the bootstrap, file ownership, and runtime drift checks
-description: How install_bootstrap.py chooses between a full install and a sidecar install and refuses unsafe targets, which sidecar profile and source it picks, how a full install installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater that finishes every target and reports failures, and what check_runtime.py reports.
+description: How install_bootstrap.py chooses between a full install and a sidecar install and refuses unsafe targets, which sidecar profile and source it picks, how a full install installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater that finishes every target and reports failures, what check_runtime.py reports, and the opt-in check of the Copilot runtime in check_copilot_runtime.py.
 tags: [install, refresh, ownership, runtime-ownership, check-runtime, drift, bootstrap-root, consumers]
 sources:
   - id: openwiki-source-37cd5f3d3aa49832caf1a222
@@ -10,6 +10,8 @@ sources:
     resource: repo://docs/target-mapping.md
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
+  - id: openwiki-source-5165b1a916543ec51eb74ded
+    resource: repo://scripts/check_copilot_runtime.py
   - id: openwiki-source-42e51bf2d8e7ed2f137178e1
     resource: repo://scripts/check_runtime.py
   - id: openwiki-source-7c162969a98fb2f3fa853ffc
@@ -32,10 +34,10 @@ sources:
     resource: repo://tests/test_sidecar_update.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-11-15T05:13:09.357Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:45:26.446Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-15T05:13:09.357Z
+    at: 2026-11-17T23:45:26.446Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
@@ -239,8 +241,27 @@ On success it prints `PASS` lines for optional binaries found, the Semble launch
 
 The nested `.gitignore` and `.gitattributes` became consumer state because `state-sync.sh` writes both and a consumer may extend them. Before that, every refresh deleted both as obsolete owned files, so a consumer's own ignore lines were lost right before the installer's `git add -A` and `bootstrap: update` commit. `state-sync.sh` now keeps both files current by appending only missing lines (see the AI-state sync page).
 
+## The opt-in Copilot runtime check
+
+`scripts/check_copilot_runtime.py` runs the installed hooks on the real Copilot runtime. That runtime is the program that runs the agent, calls the tools, and runs the hooks for a Copilot chat in VS Code, and Copilot CLI uses it too. VS Code calls this way of running a chat the Copilot harness. The word is not related to the "agent harness" that a full install owns, described earlier on this page. Nothing in the test suite, a hook, or `verify.py` calls the check. Run it by hand:
+
+```bash
+uv run python scripts/check_copilot_runtime.py --require
+```
+
+- It starts the runtime that ships inside VS Code through the runtime's own SDK, with VS Code's `node`, a private data folder, and no login.
+- A small server on `127.0.0.1` plays the model and returns scripted tool calls, so the check makes no model call and needs no account.
+- The runtime works in a fresh full install of this bootstrap in a temporary folder. The check removes `.mcp.json` there, so no MCP server starts.
+- It runs three sessions: `main`, `codex-patch`, and `camel-rename`. The third runs in a copy of the folder whose hook events have the camelCase names and whose Claude settings are switched off.
+- It prints the runtime version, one line for each check, and a last line such as `Result: PASS (0 of 48 checks failed)`. It exits 1 when any check fails.
+- `--require` exits 1 when no runtime is found. `--vscode-bin DIR` names the folder that holds `node` and the Copilot SDK; the default is the newest `~/.vscode-server/bin/*`. `--keep` keeps the temporary folder. `--discover DIR` prints what the runtime discovers in a folder, with no session.
+- One session may take at most 150 seconds, and the whole run at most 480 seconds.
+
+The check does not exercise VS Code's own layer: approval dialogs, "Allow all", or the tool set VS Code gives each model. The section "Copilot runtime probe" in `docs/runtime-checks.md` lists every check, and `docs/smoke-tests.md` holds the manual list for a signed-in VS Code window. The [hooks page](../architecture/hooks-and-guardrails.md) explains what the hooks do on that harness.
+
 ## Representative tests
 
+- `tests/test_check_copilot_runtime.py` covers the Copilot runtime check without the real runtime: how it finds the runtime, builds the temporary project with a cleaned environment, judges each check, and reports a missing runtime.
 - `tests/test_install_bootstrap.py` covers mode detection and every refusal (including a team `.claude` submodule, a dubious-ownership Git error, a non-UTF-8 or non-regular `info/exclude`, a dangling manifest symlink, a sidecar tree passed to full mode, and the `--uninstall` hint in the `--mode full` refusal), the full-install default for a repository that tracks only code and `.gitignore`, the tracked-path warning on a Git failure, the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption. Tests named `project_skill` cover every project-skill refusal (each one checks a non-zero exit, the folder named in the message, an unchanged target tree, and an unchanged outside sentinel), the mirror and its skip cases (including an unreadable subfolder, Python caches, and `.git`), an edit or deleted file reaching the mirror on refresh, and real installer runs that keep a project skill, refuse a stray, a name clash, a newly shipped name the record lacks, or an unmarked shipped name with no record, delete a retired skill, and refuse a skill whose marker went missing. They also check the wording for a linked or dangling record, and two over-refusal guards: a project with no skill folders, or with only a marked one, installs with no record. Tests named `destination_link` cover the preflight with real installer runs, each refused before any write with an outside sentinel unchanged: linked paths (a shipped `SKILL.md`, a hook script, a generated folder, `.claude/bootstrap-root`, `.gitignore`, a preserved `CLAUDE.md`, and `.claude` itself) and wrong kinds (a folder in place of `.devcontainer/Dockerfile`, a tracked or untracked `CLAUDE.md`, or `.claude/bootstrap-root/CLAUDE.md`; a regular file at `.devcontainer` or `.claude/templates`; a regular file above a written path; a FIFO). They also cover a refusal with both sections, a dry run, the devcontainer check with `--state-remote`, an exported `AI_STATE_REMOTE`, or neither, the README and chmod skips, the copy-time guard at each copy site called directly, and the recheck after a legacy migration. Tests named `stale_agents` cover the explanation for stale live `.agents/skills/` folders, including the advice to move them aside, and the generic message for every other conflict shape.
 - `tests/test_sidecar_update.py` covers batch updates that mix full and sidecar consumers and continue past a refused target.
 - `tests/test_check_runtime.py` covers the plan-frontmatter delegation and every shape of the Bash 3.2 array-expansion rule.

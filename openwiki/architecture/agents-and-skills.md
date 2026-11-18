@@ -5,7 +5,7 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-14T16:56:38.985Z
+    at: 2026-11-17T23:45:26.446Z
 sources:
   - id: openwiki-source-5939cd6c98209174dac35ee6
     resource: repo://docs/2026-10-06-behavioral-pilot-evidence.md
@@ -57,8 +57,12 @@ sources:
     resource: repo://shared/agents/reviewer/workflow-prompt.md
   - id: openwiki-source-fa7286655feb8d4301c96b64
     resource: repo://shared/agents/sol_coder/agent.yaml
+  - id: openwiki-source-69261d4f76fb1ff7d74bbf5f
+    resource: repo://shared/hooks/hooks.json
   - id: openwiki-source-f11e4ce184d9addc83c16d26
     resource: repo://shared/hooks/scripts/_lib-frontmatter.sh
+  - id: openwiki-source-427465a2f2e2144bb2c57bf4
+    resource: repo://shared/hooks/scripts/subagent-context.sh
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-66b9be26404846b939fba828
@@ -89,7 +93,7 @@ sources:
     resource: repo://shared/third_party/ponytail/UPSTREAM.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:45:26.446Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -167,7 +171,7 @@ Composition is one level deep, and `validate_prompt_composition` enforces it. Th
 
 - **Claude Code.** `render_claude_agents` writes `.claude/agents/<name>.md` with the frontmatter that `claude_agent_frontmatter` builds. It holds `name`, `description`, and a `tools` list derived from `capabilities`. It adds an optional `model` and `effort` from `model_intent["claude-code"]` and an `agents:` list from `delegates`. Hidden agents get `user-invocable: false`, and the orchestrator gets `disable-model-invocation: true`. The body is the canonical prompt with target path rewrites. The `search` capability maps to `Grep`, `Glob`, and the server-level grants `mcp__semble`, `mcp__context-mode`, and `mcp__context7`, so every agent that can search also gets read-only documentation lookup through Context7.
 - **Sidecar workflow profile.** `render_sidecar_workflow_units` writes the same `.claude/agents/<id>.md` for the five canonical agents into `dist/sidecar/workflow/`. Each file wraps the agent's `workflow-prompt.md` in `sidecar_agent_frontmatter`. That is the Claude Code frontmatter with every `mcp__*` tool grant removed, because the sidecar ships no MCP configuration. No `.github/agents` or `.codex/agents` file ships in that profile. The workflow orchestrator delegates a step only to an agent the session can start. Otherwise it does that step itself and labels a self-review as one. The planner and reviewer return their plan or report as reply text, and the agent that asked saves it under `.ai-bootstrap/`. They cannot save it themselves, because their tools come from the shared `capabilities` and include no `Write` or `Edit`. These relaxed prompts carry short advisory versions of the checks described under "Requirement authority and evidence" below. The planner names each decisive assumption. The coder maps every place a change must reach and reruns the original reproduction after a bug fix. The reviewer compares the diff against the approved requirements, reads the code the change touches, and lists anything it still needs at the end of its report. The [sidecar overlay page](../operations/sidecar-overlay.md) covers how those files reach a team-owned repository.
-- **GitHub Copilot.** `render_github_agent_adapter` writes a thin pointer: frontmatter with `name`, `description`, tools, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body tells Copilot to read the canonical `.claude/agents/<name>.md`. An agent not eligible for Claude Code gets a self-contained body instead.
+- **GitHub Copilot.** `render_github_agent_adapter` writes a thin pointer: frontmatter with `name`, `description`, tools, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body tells Copilot to read the canonical `.claude/agents/<name>.md`. An agent not eligible for Claude Code gets a self-contained body instead. On VS Code's Copilot harness (the agent runtime that VS Code shares with Copilot CLI), a sub-agent gets only this wrapper from the agent definition. The `SubagentStart` hook `subagent-context.sh`, wired in the Copilot hook file, adds the text of `.github/copilot-instructions.md` and one fixed line that names `.claude/agents/<id>.md` and `.claude/skills/<name>/SKILL.md`. The [hooks page](hooks-and-guardrails.md) states the hook's rules.
 - **OpenAI Codex.** `render_codex_agent_adapter` emits TOML with `name`, `description`, optional `model` and `model_reasoning_effort`, and the composed prompt as `developer_instructions`. Codex custom agents inherit the parent session's MCP servers, sandbox, and approval policy, and a custom agent file cannot override them. The adapter therefore no longer writes `sandbox_mode`, and `validate_targets.py` rejects it as a per-agent override, the same way it rejects `skills` and `mcp_servers`. Read-only Codex roles are read-only by their instructions only, which `docs/target-mapping.md` records as a remaining gap.
 - **Google Antigravity.** `render_antigravity_agent_adapter` writes `.agents/agents/<id>/agent.md` with `mainAgent: false`, `subagent: true` for every agent except the orchestrator, the provider model, and `inheritMcp: true` for subagents. `inheritMcp` is not a documented Antigravity field (the documented subagent field is `mcpServers`), so whether Antigravity subagents reach the workspace MCP servers is unverified, and the Antigravity hook bridge denies MCP tool calls in any case.
 

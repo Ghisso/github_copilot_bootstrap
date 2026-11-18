@@ -8,8 +8,12 @@ sources:
     resource: repo://.gitignore
   - id: openwiki-source-115b2dad781e2a2c5b5a980d
     resource: repo://docs/architecture.md
+  - id: openwiki-source-0538e0ce41cc304631959580
+    resource: repo://docs/native-client-acceptance.md
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
+  - id: openwiki-source-5165b1a916543ec51eb74ded
+    resource: repo://scripts/check_copilot_runtime.py
   - id: openwiki-source-42e51bf2d8e7ed2f137178e1
     resource: repo://scripts/check_runtime.py
   - id: openwiki-source-aedfa38e00652688559a19c4
@@ -32,10 +36,10 @@ sources:
     resource: repo://shared/sidecar/workflow/skills/onboard/SKILL.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:45:26.446Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-14T16:56:38.985Z
+    at: 2026-11-17T23:45:26.446Z
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -97,7 +101,7 @@ Two facts about this repository do not carry over to consumers:
 2. `render_shared_basis` writes the `.claude/` basis: `MEMORY.md`, templates, `verify.py`, `record_findings.py`, and every policy under `.claude/instructions/`, plus Claude path-scoped rules for conditional policies. It copies `runtime_ownership.py` and `validate_plan_frontmatter.py` verbatim, because provider path rewriting would corrupt those target-neutral authorities, and writes `bootstrap-ownership.env`, the manifest of installer-owned root adapters.
 3. Root `AGENTS.md` comes from `render_root_guidance("multi-agent")`.
 4. `render_github` writes `.github/copilot-instructions.md`, one instruction adapter per policy, the copied `hooks.json`, `.vscode/mcp.json`, `.vscode/tasks.json`, and one `.github/agents/<id>.agent.md` per eligible agent.
-5. `render_claude` writes `CLAUDE.md`, `.mcp.json`, and `.claude/settings.json` with the hook wiring.
+5. `render_claude` writes `CLAUDE.md`, `.mcp.json`, and `.claude/settings.json` with the hook wiring. Every hook command in those settings first assigns `REPO_ROOT` and then calls the launcher `run-hook.sh` with the marker `BOOTSTRAP_HOOK_SOURCE=claude-settings` as an environment prefix. The launcher uses the marker on VS Code's Copilot harness, the agent runtime that VS Code's Copilot chat shares with Copilot CLI and that loads the Claude settings as well as the Copilot hook file. `hook_source_marker_errors` in `scripts/validate_targets.py` requires the marker in every Claude settings hook command and refuses it in the other three hook files.
 6. `render_codex` writes `.codex/config.toml` (MCP servers plus one `[[skills.config]]` entry per skill), `.codex/hooks.json`, and one `.codex/agents/<id>.toml` per eligible agent. Codex itself lists repository skills from `.agents/skills/`; the config's own comment records that a codex-cli 0.147.0 probe found the `[[skills.config]]` entries add no skill of their own.
 7. `render_antigravity` writes a copy of the skill tree under `.agents/skills/`, `.agents/mcp_config.json`, `.agents/hooks.json`, and one `.agents/agents/<id>/agent.md` per eligible agent. In a consumer, the installer later adds a mirror of each project-owned skill to `.agents/skills/` (see [install ownership](../operations/install-ownership-and-runtime-checks.md)).
 
@@ -143,11 +147,13 @@ Policies are authored once and discovered natively per host:
 - Codex reads hierarchical `AGENTS.md` files with a combined size cap, so a conditional policy becomes a nested `AGENTS.md` only when it owns a stable directory, and otherwise maps to an existing skill.
 - GitHub Copilot's instruction adapters derive `applyTo` from the same patterns, and generation checks their scope parity with Claude's `paths`.
 
-Runtime loading by a real client is probed separately by `scripts/check_native_clients.py`; the structural validator does not claim it.
+The validator also pins the Copilot hook file. It requires the five events `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`, and `SubagentStart`, the client name on every guard entry, and the two context hooks (`copilot_context_hook_errors`). It fails when the generated `.github/copilot-instructions.md` is larger than 2,048 bytes, because the sub-agent hook reads at most that much.
+
+Runtime loading by a real client is probed separately, and the structural validator does not claim it. `scripts/check_native_clients.py` covers Claude Code and Codex only. The Copilot harness has its own opt-in, offline check, `scripts/check_copilot_runtime.py`, which the [install and runtime checks page](../operations/install-ownership-and-runtime-checks.md) describes.
 
 ## Representative tests
 
-`tests/test_validate_targets.py` exercises the generator and validator together: agent target scoping and rendering, the Antigravity static adapter, Codex specialist metadata, skill-contract checks, and the README agent contract. The validator's own end-to-end cases run under `uv run python scripts/validate_targets.py`.
+`tests/test_validate_targets.py` exercises the generator and validator together: agent target scoping and rendering, the Antigravity static adapter, Codex specialist metadata, skill-contract checks, and the README agent contract. It also covers the marker check, the Copilot event set, and the 2,048-byte check. The validator's own end-to-end cases run under `uv run python scripts/validate_targets.py`.
 
 ## Related pages
 

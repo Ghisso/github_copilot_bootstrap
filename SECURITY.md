@@ -17,6 +17,14 @@ project-hook trust to `.codex/hooks.json` content/hash; the installer reports
 possible review/reapproval but never approves it. Claude hooks run with the
 user's permissions. Review official [Codex hooks](https://learn.chatgpt.com/docs/hooks)
 and [Claude hook security guidance](https://code.claude.com/docs/en/hooks).
+For the Copilot harness (the agent runtime of VS Code's Copilot chat; see
+[GitHub Copilot in VS Code: two harnesses](README.md#quick-install)), the
+runtime that ships inside VS Code was run offline with a scripted model
+(runtime `1.0.108-0`). It found no repository hook before
+the folder was trusted. After trust it found the hooks of both
+`.github/hooks/hooks.json` and `.claude/settings.json` (see [Runtime
+Checks](docs/runtime-checks.md#copilot-runtime-probe)). VS Code's own trust
+prompt was not run.
 
 ## Hostile Inputs
 

@@ -20,14 +20,16 @@ sources:
     resource: repo://shared/hooks/hooks.json
   - id: openwiki-source-b5b439338ba5fba465bf930c
     resource: repo://shared/hooks/scripts/restore-root-adapters.sh
+  - id: openwiki-source-80751922e4fcb1a91255462c
+    resource: repo://shared/hooks/scripts/run-hook.sh
   - id: openwiki-source-92c74e76955d0f817db531c4
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-c3f54dc63823dfff60ef659d
     resource: repo://tests/test_state_sync.py
-generated: { by: "claude-code", at: "2026-10-23T07:02:22.284Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:45:26.446Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-12T09:54:42.940Z
+    at: 2026-11-17T23:45:26.446Z
 ---
 
 # Git-backed AI-state sync
@@ -141,6 +143,7 @@ Both files belong to the consumer. `write_nested_gitignore` and `write_nested_gi
 - **Stop**: `claude-stop.sh` and `codex-stop.sh` run `checkpoint` then `publish`, and GitHub Copilot runs `state-sync.sh push`. Stop paths are best-effort; closing an editor tab does not guarantee the event.
 - **UserPromptSubmit** on Claude Code and Codex: `state-sync.sh push`.
 - **Session end**: Codex runs a local `checkpoint` on `SessionEnd`. Claude Code runs `push` on `SessionEnd` and a local `checkpoint` on `StopFailure`.
+- **VS Code's Copilot harness** (the agent runtime VS Code shares with Copilot CLI): sync runs once, from the Copilot hook file, with a pull at `SessionStart` and a push at `Stop`. The Claude-settings copies of `state-sync.sh` stand down there, so the push on `UserPromptSubmit` and `SessionEnd` and the checkpoint on `StopFailure` do not run. The [hooks page](../architecture/hooks-and-guardrails.md) lists the conditions.
 - **Outer `post-commit` Git hook**: the closeout recorder, then `state-sync.sh push` with stdin from `/dev/null`. Git ignores the hook's exit status, so this is the durable publication boundary the Stop hooks cannot promise.
 - **VS Code tasks**: an automatic `AI state: pull` on folder open, which runs `setup` then `pull`, and a manual `AI state: push`.
 - **Devcontainer**: `post-start.sh` runs `setup` then `pull`. Before the container starts, the generated `devcontainer.json` runs a list-form `initializeCommand` (`mkdir -p`, no shell) on the host that creates `~/.openwiki` and `~/.cache/huggingface`, because Docker's `--mount` refuses a missing bind source. `scripts/validate_targets.py` requires that exact command.

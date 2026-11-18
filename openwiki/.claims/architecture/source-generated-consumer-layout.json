@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:73909b7aad0128e246c3dbd25a37f0004f1f76bf4d3f8162f743384b72b5ba11",
+  "pageVersion": "sha256:a2ffad927c0d7ab3fcdc909f2c2025b0f2605e68018983bdd1336a92c164c15b",
   "claims": [
     {
       "id": "claim_8c95339bcd2a421fb59848cad3c15947",
@@ -11,7 +11,7 @@
           "version": "repo-lines-v1:sha256:4f5f60c8d0b58e7be373629e9b11bc00f9d7da568340991e6786c65f8a4aec24:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzJkNzg2OGQ4MDZiNzljYTZjNzA5OWJiODdhNmI5NzllMDQxMjJiN2EwOTdmZjViODdiZDg4ZDZhN2Y0NDEwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjODk1NTg2OTNiZDM3NGVkYWJlYjhmYWIzNWFjYTRjMjgwNjM0YzU5YjY0OWQ1MWEzMDRmZjVmYTlkNGI1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODExNTQ3NTI3NzJiNDljMGRlM2EwODBkMWFiZWJmY2I5MzZmYWEzMTFmNDJiOGJiZjUzN2ZhYjNmMjRlNjlmMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzcwOThkMWRkZjBmNWZhYzc5YWQwNmM0NTg5MDAxOTdkODBhZmQ3ZGEzMmNiOGYxMTA2NWExYTRmODIxOGY3NyJ9"
         },
         {
-          "resource": "repo://docs/architecture.md#L57-L72",
+          "resource": "repo://docs/architecture.md#L63-L78",
           "version": "repo-lines-v1:sha256:434db84ae62482740971301145cdbc0a666687e958f17430e86ba132562fe544:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEzMWVkYWNmNDQ4YWMyNTY3M2Q0MjMwNzc1YzQxNGNiM2JjMmE0Yzg2ZGU5ZDQyMjY5ODhlMGI2OGIxMTM3Y2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAyYWQ3YTY1OWZmNWQyYmU4ZTU2M2M0NjEzNzA0NzNhNmIyZmIxNTM2OTBlYjQ0ZTBmMzlkMDMyMDkxOTUyNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgwNGIxNWE0Mjg1ZDc4NTQ3MmE5MzBlNmE2ODg1N2VjZmI1ZjdlNTVhNDA1YmE3OTI4NjFlYjYwYjBlOTRhY2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhYTkzNjc5NmMzNDM0YzNhNmE5NTk1Zjk1MTZkZDIwMTgwNTNkODgzNDQyZDEyN2MwMTRhYzQ3MTdkYmQ5N2IifQ"
         }
       ]
@@ -31,7 +31,7 @@
       "statement": "generate_targets.py has two targets, multi-agent and sidecar; generate resets each target's output directory, calls render_multi_agent for the first and render_sidecar once per profile in SIDECAR_PROFILES for the second (dist/sidecar/skills/ and dist/sidecar/workflow/), raises ValueError for any other target name, and strips quarantined content; the CLI accepts --all, --target, and --output.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1946-L1974",
+          "resource": "repo://scripts/generate_targets.py#L1948-L1976",
           "version": "repo-lines-v1:sha256:6f46a0164657a90ffcf38db5a69c2483df74c7551179674723893e8bbaf820d6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzZGY0YTg1Mzc3M2RkZTMyNjY1NTg0NTdiMzM5MmM0ZTA2MWRlMTI5MDcyMzQxZTBmZTM3NjA4YmFkMzhkNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUxMGEwZTlmZmQ1MzVjMzAzMjI3ZmRiZmJkZTA4YmVlOWE3MmY3NjY5NTllZWFlZTRiZjMyZmE2NGM0Y2MwMTcifQ"
         },
         {
@@ -49,7 +49,7 @@
       "statement": "render_multi_agent renders in a fixed order: devcontainer, the shared .claude basis, root AGENTS.md, the GitHub Copilot surface, the Claude Code surface, the Codex surface, and the Antigravity surface.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1773-L1781",
+          "resource": "repo://scripts/generate_targets.py#L1775-L1783",
           "version": "repo-lines-v1:sha256:4398969eb7af046fe53e04e9c968c91e98e7a39bfc42da02822b6a325c4c4429:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmJjMDNhMzgyZTE5Y2QzZGEwZDc5YWU0NjZmY2M4MDdjNGM4MjBjNjQ2MzJiMjkyODFjMGRkYmMyYzRmZTlkZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdhNzk1OTVkNzFjN2Y0ODJiOTFmMzlmZmY4OTVmYTI0NGVkMmZiNzI4N2YwNDY4NzY3NWZmNzk5NjAzNGE2NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjYyNzJiYTQzYjM1ZjYxMDgyYzQ0MjJmMGMzMDMyMjg3M2I3ZmRjMzRhZjY3ZTA2NjkyNmFhOTA1OTA2ZDJiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzA4MWYyNmJjYTZkY2RjMTg3OTA0MzIzMzA0MDZhM2NkMmMwM2E0YmUwMmEwZjZjOTRhMTM4ZGMzMDI1NmVjNCJ9"
         }
       ]
@@ -69,7 +69,7 @@
       "statement": "render_github writes .github/copilot-instructions.md, one instruction adapter per policy, the copied hooks.json, .vscode/mcp.json and tasks.json, and one .github/agents/<id>.agent.md per eligible agent.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1721-L1747",
+          "resource": "repo://scripts/generate_targets.py#L1723-L1749",
           "version": "repo-lines-v1:sha256:e28f8e4382173e66301cc26cf9d514aea12e42dbd0ff68a6eef4ee278280765a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYjZiZmNmM2M1OWZkZTEwMTkzMDI1MzEyYmM0OWI3NTA1NmYzMjZjMWE2ODhjMTRhZDVkMDc2YjU0ODlhZWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk0ZDEzZWM3NDJjYThhZDI0ZGE4NTI3MWNiMjUwNzFhZjg2OWM1NTQ4OTBhNWM5NzAxMmJlZTc5MGNiMzM0NzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU3NjFhMjYxNDQ1OWFkOGIwNjllMzA0ODg4MzkzYjg5YmJkOWZmNjVkMTJlMzVjOGU4ZTdlZGQwMDlkOWNkMTUifQ"
         }
       ]
@@ -107,7 +107,7 @@
       "statement": "validate_targets.py runs a fixed sequence of structural gates over generated targets, starting with the task-lane contract, the workflow policy byte budget, and the closeout procedure pin, and including both sidecar profiles and their adversarial cases, determinism, and mandatory hook-gate regression tests; it prints failures and exits 1 when any gate fails.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L12633-L12680",
+          "resource": "repo://scripts/validate_targets.py#L12769-L12816",
           "version": "repo-lines-v1:sha256:25f8ef895d365ee70c3c79be70c018146dcc2b66a1f83422fe1e957234c9dc1f:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0MzM2ODIxZTI3MDE4MGY5MTc0MTFiNzdmZTU0MWFlNDNlNjBhOTY3MDYzNGI3Yzk2NTViYzlhMDdjZTY1MzEifQ"
         }
       ]
@@ -117,11 +117,11 @@
       "statement": "validate_determinism regenerates the target into a temporary directory with generate_targets.py --all and requires it to match the current dist/ byte for byte, so any hand edit to generated output fails validation.",
       "evidence": [
         {
-          "resource": "repo://docs/architecture.md#L142-L146",
+          "resource": "repo://docs/architecture.md#L164-L168",
           "version": "repo-lines-v1:sha256:603dc1703e07fe50aba0f588ff8c81fd134dd47fe2aa4643e6de9a058258f933:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTc0YTk5MTI1YTBmNGNmZTMyYzAzYmQ1ZDRhODk2Y2M5NjBlNzEzOTk5ZDFlMjk0ZTI1OWQ1NjBlNTQ0ZTE1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGRhZWMzOGU3YTdlZTcyNjg4ODc5OGY1MDZjZTllN2U2YWFkNWIwNTY5NDQ3NjI2ZTZkYTY4MmI0ZTQzYjc3YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmZjZTJlNTU3NTdlNTIwYWMyNWI0OGYxMTJmYTExN2Y1ODY1MmIzMmYwMjBhMjAxMTc3MGI1NGJmNDFjZmZlMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYThjZTUzOWFkMDBmOTEzNmY5NTg0Njg4MGRmNzNmNzg4NjI2MGY3NWYyZjQ1MDc4ODU0OWFjM2ExYjM5N2VhYSJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L11591-L11615",
+          "resource": "repo://scripts/validate_targets.py#L11723-L11747",
           "version": "repo-lines-v1:sha256:72c408f5a9b69d50b2768bc24dba0c1093e878a82c637692235447c6bb0f0fad:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhMGI1NWIxN2U3NGRjMjE1NjA3Mjg4MjI0ZjRjOGJkY2E5ZmZhYzJkNzc4NGUxYmRhNDVjMDBmNTU5NzVhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1N2ExNTYwZGI2MzQ3OWJmMmI4N2JlNDA3MzAwNzQ2OTMzNjE2NGJmYTk0YWVmMDFhMWFiMGE2NmJhZWRjY2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0ZTJiZjJkM2ZmZDZmNmEzMjdkYzQxMTVkYmVlNWVlMWQyZjVjYzQyYWU5ZWE1MzI2NDA5ODRmODc1Mzg5NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc1ZDE0YmYzZWM3NTU3YzMwMDJlNWZkY2NlYmM3ZWMyYWI5ZDQwYjQ0ZGQ5NmExODA5OWZkYTRhMmFhMmZhMjQifQ"
         }
       ]
@@ -131,8 +131,8 @@
       "statement": "Policies are authored once with target-neutral applicability frontmatter and discovered natively per host: Claude Code loads conditional policies as path-scoped rules under .claude/rules/, Codex gets a nested AGENTS.md only for a policy owning a stable directory (otherwise a skill), and Copilot adapters derive applyTo from the same patterns with scope parity validated against Claude's paths.",
       "evidence": [
         {
-          "resource": "repo://docs/architecture.md#L32-L48",
-          "version": "repo-lines-v1:sha256:200b3695aa6d0efa96e60f05309d4327840dad5e4493486066d3f881388dc555:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkMTJmOTYxYTI5ZDhjZTJmNjZiY2UzOTFlZWU4NWMyZGRjNzIyN2U3ZWEyMGMzNmQ1MzkyZWYwZWQ2MTNkODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyNzA2MjYxMTZmODA1ZTY2MDk1MWRlN2ViMzFiNjI4NDAwOTJlZWEwODg1ZWY1NGY5NzEzZDQwOTY1MjNlMTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlNTdkYzk5NDc2OWE3MjIxMTY4YjcxYzkzZTA4MjIwMWMyNTBlZjg1ZDllMjYyNTFiMzhjNWE4MjE3M2FhZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmNTgxODJiM2YzYWRhZjlmNjU1M2MwOWMwMWFkMjgyODM3YjcyMTY3Y2VjMDU3NjFhOTQxNWEyMTBkYTQxNzIifQ"
+          "resource": "repo://docs/architecture.md#L33-L56",
+          "version": "repo-lines-v1:sha256:6d5f48e77d04b1ecd3553c9fde313c77560e2eea3bede38b774bd276b6c738db:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkMTJmOTYxYTI5ZDhjZTJmNjZiY2UzOTFlZWU4NWMyZGRjNzIyN2U3ZWEyMGMzNmQ1MzkyZWYwZWQ2MTNkODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3M2ZhZTk1ZDJjNWYxZjNjMDY0M2ExMGM1MGU0ZGQ1YThkMjVjYmNmZDdhNmEwOWFlYjFhNjJlNGRhZWQwY2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjNjhiMDQ4ODhmODc0OGUxNjAyNjI3OWViNDM3ODNiNjAyYTdiNDk0Mjg0YmFlYjRhZTRjODY1ZGNkMzdmNmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5Nzk5ZWRjYTZkNjE0NGE2ZWY1MjQ2YjMxNTE2ZmZhZjRjZjc4ODNkNWI1NzVmZDE3NTgwNWFmNTY4ZmFkZTEifQ"
         }
       ]
     },
@@ -141,7 +141,7 @@
       "statement": "This repository self-installs its generated output with scripts/install_bootstrap.py --allow-self to exercise the lifecycle end to end, keeping tracked authoring adapters byte-stable; a normal consumer only receives the generated copy and never shared/.",
       "evidence": [
         {
-          "resource": "repo://README.md#L181-L201",
+          "resource": "repo://README.md#L240-L260",
           "version": "repo-lines-v1:sha256:b30a62028c79d09a82b9fa462bf245e36b5289bcfe6dfb136794465e84375ef6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwYTI1ZDExMmIxM2U4MDkzNjI3MjIzMDVlY2E1OTljMDQ1ZjJiYzY5ZjkxZmZiNWIxY2I0NTVhNmQ2OTEyN2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVjYmY3ZTE1NGQ0ZWYzNDA3ZjZkY2Q4ZDNhNzExYjk3MDg0MzExMDliZjBmZTM1ZWFiODQ3YjhkNzRjZDQzYzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkYTc5MjZlZWIxNzkxNzIzOTNkYWQwNDNiN2M1ODU5OGIyMzdmZDcwNTYyNTE0ODg2ZmE4OTlhNGE4YWMzYzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFmMWI0OGMwOGUzMjQxMmY1ZDI2NmMzYjI5ZmM5MzdiMDdlZWY5NzAyOTc1ZTdiMTFhYTZhZWQzZDI0MjIwN2QifQ"
         },
         {
@@ -155,7 +155,7 @@
       "statement": "render_sidecar copies each profile's skills into both sidecar skill roots, but selects a separate source for workflow onboard; it then renders profile-specific bridges or workflow units and private state seeds.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1895-L1945",
+          "resource": "repo://scripts/generate_targets.py#L1897-L1947",
           "version": "repo-lines-v1:sha256:eee921d4a9e9b82918950345e317ec23ca6eee214258f42fdf4d59d7a74706b2:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiMDU1ODQzZDQ1MmQ0M2M2Yjg5OGQ0OTQ3NTQ4ZjUzYTRlOTk5OThkYTY5MzIzNTNlMDAwNTI3Mjg4YzY3ZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3ZWU5ZjNlYzM3MDNiZDhkOWYwNmQ2ODc5ZDIzMjAzMzI1ZDNjOGJhYjJhNDcwNmRlZmM2MTZkYThiOGJlZmUifQ"
         },
         {
@@ -169,7 +169,7 @@
       "statement": "The sidecar target validator checks the exact profile file set, profile forbidden text, generated frontmatter and licenses, and adds a workflow-only check that both onboard copies carry private output and destination-safety instructions without full-install memory or nested Git references.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L9247-L9533",
+          "resource": "repo://scripts/validate_targets.py#L9379-L9665",
           "version": "repo-lines-v1:sha256:f3171847d5a01a13d3ce4f18214c0651a3c9da57f6bbd6ab31249de751bdf18c:eyJzZWxlY3RlZExpbmVDb3VudCI6Mjg3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI3MWI4MTcwZjc0MTk0MWYxZGRjZmNkZWE0ZmRjN2VmYWZlOWE1OGNhMmUzNDE3NzZlZWZjZjM1YTBiYzQ3OTAyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3NmFmN2MyYWMyMjc5NjBmY2Q1YzNjYzg4MGQ1YjA4Y2ZiMzk3MTEyZGE4MTBiZjc1YzNmNGViYWEzYTM3ZTVkIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI3Njk1NzQ4YmM4YmZhMTEyYWViMjQxZjkxYjEwYzRhMzFmOWU5YzU4MGRlOWM5MTRjYzkwNTEwYTY4NjMyNjIxIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJjMTE3ODc4Y2ExOGM5MzM0MjVhYTJjNmNlZTYyMWI0OTZhODgwYjFmMzUyZTAzZDE4ZWViMzdiMWIxMDU0ZjU5In0"
         },
         {
@@ -191,7 +191,7 @@
           "version": "repo-lines-v1:sha256:cc224685d580792122aa2def863c42042300c1116b013ede456c5ba33516ecea:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3YTNmOWI4MGNjMTIwNjljMWNlYzlmOWZhNmNkZWY3Yjg3NjE5ZWQ2MWRmZTVhNjM0OTc5MjdjMTVhNzIyZWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExNjUyZjRlZTRjOWFkZjUyZDBjMDgyN2Q4MDU5YjBkMGM3OGMwNGMwOWEzMTlkZGEwOTFjNjA0ZGU0YzE5ZGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc3ZjRmMzNjMjc4YWEwNmQzNzEwNDRlOGUwNWJjNTZkNDBhOWFmNWQ5ZjNkZmQ3OTM4MWY4NjIzN2VlMGVmOTAifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L9513-L9532",
+          "resource": "repo://scripts/validate_targets.py#L9645-L9664",
           "version": "repo-lines-v1:sha256:64b58fa3d55b91eae03648675f0c6a2c2beeca2b08caefa58a3c35ed242a56c8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNDAwYjEwMWJmYTNiOGZkMTBhNzQ5OWRhMjkyOGUxZTdkOTE0M2Y2NDhjZjk4ZThkOWFiOGJiOTFiY2ZlMzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRiNzZkMDViOTcwNDZjZjkyZWQ2NjhlYTYyZjJjMzliY2E4MjAyYTVkMDQ2YTZhMzZjMmY4Yjk4ZWQ0MWNmZTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRiNWU5ODJiOWZlNWZjYmQ1MzRjNTFlNDZjZDQ3ZGM3NmI5YjVmNDc3YzY3NmNmMzhiYTg1MjYxNGJkNjQwNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MifQ"
         }
       ]
@@ -201,7 +201,7 @@
       "statement": "render_sidecar_workflow_units writes the workflow profile's rules as .claude/rules/ai-bootstrap-<name>.md, the Copilot file .github/instructions/ai-bootstrap-workflow.instructions.md with applyTo: \"**\", the five agents from their workflow-prompt.md with sidecar_agent_frontmatter, the review profiles and all four templates from shared/sidecar/workflow/templates/ with the state-path rewrite, and the state seed files under .ai-bootstrap/ at the repository root, outside .claude/.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1829-L1893",
+          "resource": "repo://scripts/generate_targets.py#L1831-L1895",
           "version": "repo-lines-v1:sha256:efacbfca2d4d899b4674d2a7f32835e8023cc0ac6ff8d1c1320d1e80c45d9cc8:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4YWY5MWQwNzc2MWVkY2FmZWVjYmUyYTQ2YTg5ZTBkNmYzMTIwYTEyZjgwYzM5YWE4ZGY3Mzc2NzM2NTI3NDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyYjUyN2NkZTI1NTQ1ZWU5YTc3ODEwMDYzOWQ4ZWY2ZjI2NWNhZWQxYWYyYTMzNGUyY2IyMTIyMzI0M2VkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgzNjJlNmFhNjFkZTcxMDU4MzRhNGNlODVmYzA1NDc3OGE0NWRmYmRjNjg1ZjViZDliZTkxNzdkZDM0MjhhMjIifQ"
         },
         {
@@ -215,7 +215,7 @@
       "statement": "A SHA-256 snapshot test pins the exact bytes of the skills profile output under dist/sidecar/skills/, and a deliberate edit to one of its four shipped skills or to the vendored Ponytail LICENSE re-captures that hash.",
       "evidence": [
         {
-          "resource": "repo://tests/test_validate_targets.py#L4860-L4886",
+          "resource": "repo://tests/test_validate_targets.py#L5218-L5244",
           "version": "repo-lines-v1:sha256:a707456e69734ea0ed3d43452fdf6dc296b6d3ee4e65b628d33a1055269f4eb3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZiNDY5NjYxNWU0ZmM3ZjY3NmFiYmU2NTdmODM1YTA3MDhmMGJkZjJhYjBiMmQ1YTVjMmQwYWJkYWQyOTg4NDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM1ZDFjMTM1MzYzYmRlZDZhYmI1M2ViNWM1ZTE0MDBkYzA5YWI3ZTgzOWViMjcxN2VmYjNkYjUxYThkNzQ4YTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkNzQ1N2E3MzZkODE5ODc3ZjA0ODAxOThlZWQ2MGNiMTkzYjljYWI2YmJkYTBhNzAzM2QxNGEzOWZkZjQ5N2EifQ"
         }
       ]
@@ -225,7 +225,7 @@
       "statement": "This repository's tracked root MCP adapters (.mcp.json, .vscode/mcp.json, .codex/config.toml) start Context Mode only through the guarded dispatcher route from shared/mcp/servers.json, and root_mcp_adapter_errors reads each file with its own key and fails when its context-mode entry differs from that route.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L3239-L3261",
+          "resource": "repo://scripts/validate_targets.py#L3359-L3381",
           "version": "repo-lines-v1:sha256:e2666bd18f0a2f86c248e4b22d5b1353659df758590f52e6f9359639096b8e94:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzYjFmOGY2OTY2ZGZhZjk0ZGI3ZjhmYjJmM2UxMmU5MmRhZDhmMjE4MjM4NTIwNzVjYzZiYTliYTA3MTk3NWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0ZmI3OTY4YTg0ODYwNDg5NDAyNGU2ODlmYTRiZTkxOTkyNjE3MmVmYWQyYmRiYTY3OWI4NWI4YWQwYmJiNDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU0NGNhYzYzZGRjZjEzYTFlM2JhOWEzMmVhMjAxOTRjNjRjZmFlYjBiMjBiOTM1ODZlYTNmNmI2YzdiOGQwNzYifQ"
         },
         {
@@ -277,14 +277,60 @@
       "statement": "POLICY_BYTE_BUDGETS caps six shared policies: workflow and closeout at 16 KiB, plan-lifecycle at 11 KiB, workspace at 7,680 bytes, and quality-and-testing and tool-routing at 3 KiB.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L407-L414",
+          "resource": "repo://scripts/validate_targets.py#L408-L415",
           "version": "repo-lines-v1:sha256:490aa0e36027a4480183314f7cfdb90c77da31456bc9413d8bc8f8e59981eec4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2QxOGRmNzlmMTRjNzMxMGUxZTNjNTA5ZmZmODk3MjdhYTEzNTNhZmEwMWFiYjcxNmZhNjhmNTgxMTg2NmY1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2EzMjVhZGQ1ODFhN2YzMzgyY2EzMGEwM2U4MzM0Yzk4Y2JkNGRkMWVmYTdmNWIxN2RiNDNmNmQ3MjYyN2IyZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGM5YmQwMDQ1NTIxZTc1MTAwZWQyYzc3Mjk4ZjU0ZjkxMDM4YzBiMjJiOTljNTFiYTliOGZkYzE4NGQwOTBiMyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_668e3067a0ef4784a06cb41bc8d875eb",
+      "statement": "Every hook command in the generated Claude settings first assigns REPO_ROOT and then calls run-hook.sh with the marker BOOTSTRAP_HOOK_SOURCE=claude-settings as an environment prefix, and hook_source_marker_errors in validate_targets.py requires it there and refuses it in the Codex, Copilot, and Antigravity hook files.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1089-L1101",
+          "version": "repo-lines-v1:sha256:a982f31e711f9431c91d0934e5403777de8d5cae2c09b57bf5f42ade2989da73:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyNTVjZWMzYzlkYWVlYmRmOGYyMmNjYWQ0ZDdkYWNjZjM3NTFhMTRhZTJjZmM1ZmZlYTRkNmU1ZWJkNTY2OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2ZWM1YThmMmNkMjc2OTMyZWJkN2YyOTI5MGRhNjcyZTQyMDliMjczZDc0OGQ3ODdlMmQ5OGY2N2U1ZThhNjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxNzFkODk5MDcyMGEwYzQyMzNlYWY2MjIzMGEzMTA1ZGRiZmU4Yjg2ZWVhMzVkMTQwZWY3ZDU5Y2ViYzM2MWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUxM2EwNTNmOTM3MjdkNjdlYzY0NzBmMWJmZmNmNDIyMGZhYjM2ODcxYWVlM2MwN2ZlMjM2YTc1NDM5MjI5OTcifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L1607-L1642",
+          "version": "repo-lines-v1:sha256:f28d2fe5cf55a3ddb996c7893193bbb451b9e21757053b1f1d0d77c588a84f0d:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkMjdlMGM0OGFmMjNiNTYwMTJmMWM2Y2NjNzUyNzBhZWRjNjAyZWFkM2Y1N2IzOTA2MmI3ZWEwYzE0YjEzMmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0NGRmODE0ODg2ZTJiYzljOTY5ZTAyMzA3ODIxMTNiNzI1MTk0ZmJmZmI1MTVkZGMyNTM5OGQ0ZDc3ZDYwODQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYxMmRmNTA0ZWE5ZTBlMjYwMDY5MmNkNDZmNmRhMjE3Mjk1NTBhZWU2MzIzZWY5MzczNmU1ZWZmYjcwNDk2YjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwYjRkYzEyZWRkZDJlZjU1ZDQyY2UwZDRiNWE4OTQxMTk4ZjUxOGZhMGUyMGQyODEwMTg3MWEyMmU1MmNjMDYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b73ea08b69c74974857e37ab19b08e86",
+      "statement": "validate_targets.py pins the Copilot hook file to the five events SessionStart, PreToolUse, PostToolUse, Stop, and SubagentStart, requires the two context hooks subagent-context.sh and reporting-reminder.sh session with exactly one handler each, and fails when the generated .github/copilot-instructions.md exceeds 2,048 bytes.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L1675-L1681",
+          "version": "repo-lines-v1:sha256:ad067bd13d5cdac3466e0dd99b66801e129aa2c7cbd38996957dac46b852165c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTcyZDczZjFmMzllMzg5NDk1YTdkZTI0NTNmZWE2NjE3MjdiYTEzOWJmN2Y0MzBkN2Q5ZTQ0ODk3ZDJlOTVkMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDQ5OTkzMzZlYmMwNmVkMDNmOTQ1NGZhOTM1MGVmOWI4N2JiMWFjM2Q0OTY3MjAzMzAzZGZiN2RkNWRkMGZhYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDM0NzZhYTg0NzNkODgwNDI0YjZhMGY3ZmZmOTRmOWVmMDE1ZGYzYWM2YmVkNGRmOWExZTk2MjNhODI2NDAwMCJ9"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L1894-L1912",
+          "version": "repo-lines-v1:sha256:371c45324015c70e98d26d9260702c890d81f1877333d1a6b25d3e8f8eda17e6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzNjNmZDAwMWRlNzg5Y2RmMDBmODFiZDMyZTQxMzg1ZmYxYWM3ZTczNWNlMDY5MzQ0NjVjYWUyOGNhZjc5N2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NjEwMjgyMmVkYmE3NzBmOTBmMTg1ZWMxZTQ3MDg2M2UyNGY2NDJhYzdiMjFhOTllZWJjNmIxNTk2MGM2NjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1YjJiYWQ1MDNkMDI3MWI3MDkzODljNmY2MTUxYzc1MGI3NjIxNjkxYzgyMjQyMjdlODkxM2Y3Y2E5NGIzODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhjMWE3MTMwNGU5NmU2NzljNmQxYjQ3ZDlmN2U2YzhiOGQ0MjljM2JmYTZkZDFjMWIyNGVkMWE3NjVhMGRiOTcifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L759-L772",
+          "version": "repo-lines-v1:sha256:39cc27f22e915f2d32788ec6442954a54641c18772ad17c2c367e3d8296c73dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0ZDEyYzUzMmVlZjAzY2RhM2IxY2ZjMDRjMDYwYjE2YjdjZTgwOTJhNDEyYzQ4NTNhYmEwYjMyOWMwZGNhZTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzMWEyMGQ4Nzc3Yjk4MzFhNmIyMDVkODI3ZDRhMTMxYzJhYjA2YjVkNTFiMTk1MzJmZmU2MzM4ODhjMzBkMjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBjMGYyMDE1MDgwZTU3Zjg1NTMyYzJmYWVmZTgwZmNiYzFjZmUyYmVmNjhjMzFkNzNlZDQ0NDc3MmQ3OWM4ZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImViZWJkZjZlYmRhNDE3MDIxNzMzMzQyMzA0MWVlZThmZmJjODk5NDFlYTEwZWVjMmMxOWJlY2EwMTBiNGY5OWYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3829350007614df88886a5bcb3449889",
+      "statement": "check_native_clients.py does not cover GitHub Copilot; the Copilot harness has its own opt-in, offline check, scripts/check_copilot_runtime.py, which no test, hook, or verify.py run calls.",
+      "evidence": [
+        {
+          "resource": "repo://docs/native-client-acceptance.md#L3-L12",
+          "version": "repo-lines-v1:sha256:6bf4438d91f7db61678528f43dfa9b72339a1fdf579827fd4fa3b4a63350d2e5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4ZGE3Y2ZiNjdjNGQ2MTA5MDY1YTM5OTdiM2MzYmE4MGY5Yzc0ZWE1NzM2N2UzZTRlOWUzMGQxN2MxYzRkOWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY5MGMwZWYyN2Y5MmQzNjQ1YmY3ZjQ5ZTg1YzgzMzIzNDU5NjE3Yjc5OGNiZDc4Mzc5NzcxNDJmMDIzZGYzYjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjoyLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFkZTllNWRkYjUyZjgxZDllNGFkNGM5ZjYyZjc1NzE2ZjljMzgyNGFjMDQyY2IzYWZjZWRlMzk3ZWE3YWJkYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhhZDZkYjJmZTYwODZkMjQ4NjhkODcwN2Y0Y2I5YmVkYmQwOTE5NjhiZTVlMjEyODdjNzY3Yzk0MTJiOGZiNmUifQ"
+        },
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L1-L17",
+          "version": "repo-lines-v1:sha256:c74edac80a1b68526263dac6c97cea3c75d763c43ad50157e6ae2f34817e5bee:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzMDNlY2RkNGE0ZDEwZjE5YzczZmQ0MmZkMTI0MzdmZDMzNTRhODI2ODE2MDVkYTUyNTVhOTdhMzkwNjhkYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YjZlODcwNmI0MzA0N2YyYTZkYjY3ZjEzMjYzODU5NTYwNGU2N2YzNjk2Njg3NmNlMDE1OGYwMDUzZTZiZDEifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-14T16:56:38.985Z"
+    "at": "2026-11-17T23:45:26.446Z"
   }
 }

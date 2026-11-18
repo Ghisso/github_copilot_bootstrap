@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:ed775aff4657322c89889ac91d107ce15cc4022d020aec48fafaf106c9efed11",
+  "pageVersion": "sha256:33541ee71eb79dc55df07fadd811f76b051fe45d351cd3dc11fbcdcbf5319e31",
   "claims": [
     {
       "id": "claim_577abfccd7214b578dafc049c57d3ba8",
-      "statement": "run-hook.sh is the shared dispatcher for Copilot, Claude Code, and Codex hooks: it resolves the repository root from its own location, then GITHUB_WORKSPACE, WORKSPACE_FOLDER, VSCODE_CWD, or PWD, then git rev-parse, exits 2 on a missing script name, and only warns and exits 0 when the named script file is missing.",
+      "statement": "run-hook.sh is the shared dispatcher for Copilot, Claude Code, and Codex hooks: it resolves the repository root from its own location, then GITHUB_WORKSPACE, WORKSPACE_FOLDER, VSCODE_CWD, or PWD, then git rev-parse, exits 2 on a missing script name, only warns and exits 0 when the named script file is missing, and otherwise runs the script unless stands_down holds: for the five lifecycle scripts only, with BOOTSTRAP_HOOK_SOURCE=claude-settings, COPILOT_CLI=1, a non-empty COPILOT_HOOK_DEPTH, an empty COPILOT_HOOK_DIR and CLAUDECODE, and a regular Copilot hook file without disableAllHooks that contains 'session-log.sh github-copilot' and 'state-sync.sh push', it drains its input and exits 0 without starting the script.",
       "evidence": [
         {
           "resource": "repo://shared/hooks/scripts/run-hook.sh",
-          "version": "repo-file-v1:sha256:fbf6d4ed20fa552013a4a7a85fc9a2cb2446eb512436ea297599968a65e435bc"
+          "version": "repo-file-v1:sha256:d3b31d170dac64399ff304fdcb96a38a63c93ceae0e99febdfa6ad4024c9d69f"
         }
       ]
     },
@@ -17,7 +17,7 @@
       "statement": "Google Antigravity's generated .agents/hooks.json wires a single '*' PreToolUse matcher to antigravity-pretool.py, a Python bridge that normalizes the payload and invokes the canonical guards, with no lifecycle hooks.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1264-L1296",
+          "resource": "repo://scripts/generate_targets.py#L1287-L1319",
           "version": "repo-lines-v1:sha256:f79e739ba534e6de73d0f011f17f32447a3dba6ece5cfd1c0283a193cf2ce893:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MjJjNDJjZDE5YzZkMDNkODA4YzQ1MjcyMDU1MjgyNWI3ZWExYzViNDkxYjIxODUxMWNhYzc0MTVjZjlkOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4ZjU5MjA0YzFjM2RmMzlkNGY5ZDVlN2E5N2Q5N2E4NTU1MDExYzM0YTg2MzIxMjQ3YTE3MWQyMzhkOTFmNDIifQ"
         },
         {
@@ -31,15 +31,15 @@
       "statement": "Claude Code and Codex PreToolUse routing is split by matcher into exactly three groups: Edit|Write runs protect-files.sh, Bash runs pretool-bash-guard.sh, and mcp__openwiki__openwiki_begin runs openwiki-guard.sh pre; PostToolUse on Bash runs record-branch-state.sh and reporting-reminder.sh late-report, and pretool_routing_errors requires exactly the three PreToolUse groups.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1106-L1142",
+          "resource": "repo://scripts/generate_targets.py#L1129-L1165",
           "version": "repo-lines-v1:sha256:c749683fb68d41102f8866fe313cd1e378a307840e84c883a090b54df6206cbf:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGRkMmNjNTdmYjM4ZDI2Mzc0ZjYyZDU0OTRkNjE1ZDdjOWZlMGRkMmE4YWYzZjZhOTY2ZWNlM2Q0OWI5MmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxY2E3YWJiNzg3Mzc2NTY1ODQxNzRlNjcyMGIwYjk1MGU3NmU0ZDlkNjJlMjdhODJiYWNkY2I4NGViNTZkYTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmNlZGNjZDA4MTkxNTgzNzY1NzhlOWRlMGI5MDE1MzJmODQwYWRhOWYyYWRiOTEwYzg1NzUyZDlhOTg5YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU2ZDcxMjFjNGIyYWU3YjczNWJkM2RkZWFiMjRjZWQ4M2EyNDcxNGQ2ZThkNjdhMWU5MTNhNDgwZGNlN2ZmYTkifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1206-L1235",
+          "resource": "repo://scripts/generate_targets.py#L1229-L1258",
           "version": "repo-lines-v1:sha256:fb7dd0b356bb20f714731cea772bdb0a0affa5c7dd3b213095b73a80b05aacce:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhNzA1Zjc4YzgxNmNjM2Y5MmY0ZTU4YzQ3ZmIzNGY4ZGU2M2MwNjc2YzcxZjU0YTExNGRjYWE5NWFlYTQ2ODYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0YWU4NDhmYTA4NjYzY2I3ZTdlNzBhYWI4YmIzM2I2YTFhMDA0MGNiYWQ0NGRiMjE3ZDlmMWFiMGY0YWEzZGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxYzQ4OTNmN2U4ZTQxN2EzM2M5NmYxNTcyNDYwM2FlYjYxOWQxYmNhNzBlYzFhZjVjZDcwMTlmNjAxZThiNGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEyOTQ1Y2NkMDk5OWZkZWFmNTc1OTRhMjQ3NDA0MzZmMmE3YjlkMDFmMTJjNWVkOGUzZmU2OGFlY2YxMzNkMGEifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L1501-L1553",
+          "resource": "repo://scripts/validate_targets.py#L1811-L1863",
           "version": "repo-lines-v1:sha256:d4e55ddf26e53b081f47c164689333de398086ffe595052c7dc6841258818f8c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiZjY1NTRkNGUwMjViMzUxMGI3YzYwOWJlZDBjZTM2NWIxZDI1YTQ5MmJiZDlmNGI4NGM4MDlhZjFmODkzNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2ZjE0OTBlODU4MGY5YjU1OWQwZDNmMTExNmIyZDY0Mzc0MzFiZDU0MmMxY2M4YmE1Njc5YTIwZDk4Yzc5ZTcifQ"
         }
       ]
@@ -49,22 +49,22 @@
       "statement": "Claude Code wires openwiki-guard.sh post to PostToolUseFailure as well as PostToolUse, while Codex fires nothing on an MCP error and instead runs a payload-free openwiki-guard.sh post at Stop; both hosts run state-sync.sh push and reporting-reminder.sh prompt on UserPromptSubmit, and at session end Codex runs a local state-sync.sh checkpoint on SessionEnd while Claude Code runs state-sync.sh push on SessionEnd and state-sync.sh checkpoint on StopFailure.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1144-L1171",
+          "resource": "repo://scripts/generate_targets.py#L1167-L1194",
           "version": "repo-lines-v1:sha256:303c8664c44ff51dd2b59ec86920f3cc214e353221b8d212d9426f05693eff39:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjNWE3ZDQ3MjllYzk2ZDE4ODljOTY1YjBjOTA4ZDI5NWZlMGIwZmM0NjczZGRjOWM5ZTc1ODMwMmIwNmNlNTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkYzM1YjRkY2ZjMTVkZTRmM2Y0N2Y3ZjNkMmZmMzFjYTA1Y2QyNWNjZDA5NzJjMTIwM2E4ZGRiZjFjZDAxZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1240-L1260",
+          "resource": "repo://scripts/generate_targets.py#L1263-L1283",
           "version": "repo-lines-v1:sha256:be65230b886fa1b2486643a9f92626186309a7981a2cc6940da316fc3fe6414f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhYTcxYjViMWRkZDQxNDI4MDkwZDQ5YTA4MTUwZDZhYzBiNTYyYjZmMGYwY2U2MzZkZjcxNWVmMzJlNDZjZmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVlZDM1ODI4Yzg3YjI2YTRhYzdmMjZjM2U3NmZlYzFmNDg2MTQ4OTM2N2UzYmM5MDM4YmI2MWM2ZmE4NjA0OWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
         }
       ]
     },
     {
       "id": "claim_772a4fb0d28f46228762876e9942510d",
-      "statement": "GitHub Copilot's hooks.json has no matchers and lists protect-files.sh, git-protection.sh, enforce-branch-state.sh, enforce-commit-gate.sh, and enforce-pr-gate.sh individually under PreToolUse, with state-sync.sh pull, session-log.sh, and session-start-state.sh on SessionStart, record-branch-state.sh on PostToolUse, and session-log.sh, stop-session-log-check.sh, and state-sync.sh push on Stop.",
+      "statement": "GitHub Copilot's hooks.json has no matchers and five events: state-sync.sh pull, session-log.sh, session-start-state.sh, and reporting-reminder.sh session on SessionStart; protect-files.sh, git-protection.sh, enforce-branch-state.sh, enforce-commit-gate.sh, and enforce-pr-gate.sh listed individually under PreToolUse; record-branch-state.sh on PostToolUse; session-log.sh, stop-session-log-check.sh, and state-sync.sh push on Stop; and subagent-context.sh on SubagentStart.",
       "evidence": [
         {
           "resource": "repo://shared/hooks/hooks.json",
-          "version": "repo-file-v1:sha256:131ef48bb0e94861dce1503c529dad24407fc06e476a3dfe97d31507532a0717"
+          "version": "repo-file-v1:sha256:744f6549552922265664b36238ec6dd840f09feda043fd69a05027567a2e82fd"
         }
       ]
     },
@@ -83,8 +83,12 @@
       "statement": "fail_closed appends a timestamped line to .claude/session_logs/hooks-errors.log, emits a deny decision whose reason begins 'hook could not evaluate the request safely, denying:', and exits 2; an empty payload is allowed while an unparseable one fails closed.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L36-L87",
-          "version": "repo-lines-v1:sha256:af02cd81305148f845695a2b33e5264f01d17a2fcd08479cb71ff2b897a1a00f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiMjI0NWQwMjg0ZDE1NDk3YjAwNzhmMzE3NmJmNTNhMWI2NmZhMWI3ODU1ZjZjNDg1N2FjOTYxMjE5Mzk4ODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkwOTMwYzM5ODlkMjMwMGNkN2RjNTk0OWQyYzVlYTg3M2YwMzBmZDlhYzljNjgzNDFiY2QwZmFjYjBmZTAzNjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjZWFhNTI0YzBlYmY1MDlhYmZhMGNmOGM0ZWRmYzhlZmUwNjRmMzk1NmNmYzlmOTEzNjU4ZDQzOGUzNmE5YjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgyOTdmMDM0N2FjZmZlMTdkYWJhZjkxYTE3MGYyNzA3ZDU2MDY0MGM5YWI4ZjBiMTViYzdiOTNjZTIwZDY5OTUifQ"
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L62-L104",
+          "version": "repo-lines-v1:sha256:aea5bae9c53081839f445f01cee54b8f4eac2df6291baf77e5192a3337fd1b3d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiMjI0NWQwMjg0ZDE1NDk3YjAwNzhmMzE3NmJmNTNhMWI2NmZhMWI3ODU1ZjZjNDg1N2FjOTYxMjE5Mzk4ODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhhNWRmYjhmMzFhN2IxN2M1OGFkN2M2ZGRkMjUxMTAxYWFjNjVmYzMxNmJhNDJjNjYyMWQ4MmVhZGI4ZjRmMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIwMTkyMTk0OTczZjc2MzYwZWVjZDRiZjUyNTA3NjQwZjY2Y2I3NzQ4YTdhYTM4NzRiMTc4ZjQyM2RlNzI0ZTgifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.sh#L12-L19",
+          "version": "repo-lines-v1:sha256:4670a8482715cd1d04c67a64a6512b8b656742ea290665ca8a1368fda1db5367:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGQ0NzE0NTQyM2FhZWQ2ZmU5NDRlMjljNDk2OWE1OTg0NjIyNmViODRkNWM0YjM5N2Y5MmQzYjlmMWZkZWQwOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzc2OWQyMzdjZDQyMGI5ZDM4Yjk4MWEwYTRmNjc3MDE5MGE0YTgzZGNhMWZlNTZjNGY1YmExZTJjYmMwZWY3NiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjViZmQ0NTZhMWUwODQwYjYyZjZkOWI4MTlhODk0MWM3Yjg3MzA1YmMwMTMxZjUxOGJiNWYxOTc1ZDYxNjYwMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTYwMGVmOWZiYzNlN2RkMDFhMjZjY2M1ZDhhZTRjOTRlYmUwN2I5NTUyNjg2OGIyM2M4NGYwZTFiYTRmNTc3OSJ9"
         }
       ]
     },
@@ -94,14 +98,14 @@
       "evidence": [
         {
           "resource": "repo://shared/hooks/scripts/protect-files.py#L18-L57",
-          "version": "repo-lines-v1:sha256:f7965ea13b51e1d3fc61c1cd47a56b9fba6ee154752daac2dff0422d212f801d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzN2YxZTA3ZTdlZTYyZjg1NzI0NjNjNjA2NjY3MDMzNTBiMmMxMzg2YmU0YzM3NDVjY2U3ZDkyZmQ0ZDY3ZjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0NzlkNGUxZDg1ZGYxNmYxNTYxMGQ4YTkwOTViZWI3ZWU3NzFiNjY0ZGQ4NTg4ZGQwZjAyZWRlYmU3NjczM2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzMzQzODM2NTYwY2M1NjY1NzkyZDIzZjQ3YmVkZTlhMWFjMzc3NzcwZTg0N2QwNTU5NGNjYTY2ZDljYTYxYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ2ZThlNDg4NWMwZDAxZWIzYzgxNDFhMWNkNTdhZTAyMGY5NWU5MmMyNzMwYWRkMDMyZGVkY2E0MjY3ZjYzMmYifQ"
+          "version": "repo-lines-v1:sha256:f7965ea13b51e1d3fc61c1cd47a56b9fba6ee154752daac2dff0422d212f801d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzN2YxZTA3ZTdlZTYyZjg1NzI0NjNjNjA2NjY3MDMzNTBiMmMxMzg2YmU0YzM3NDVjY2U3ZDkyZmQ0ZDY3ZjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0NzlkNGUxZDg1ZGYxNmYxNTYxMGQ4YTkwOTViZWI3ZWU3NzFiNjY0ZGQ4NTg4ZGQwZjAyZWRlYmU3NjczM2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzMzQzODM2NTYwY2M1NjY1NzkyZDIzZjQ3YmVkZTlhMWFjMzc3NzcwZTg0N2QwNTU5NGNjYTY2ZDljYTYxYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjZjZiM2EyNTUwOWEzY2RiODk5ODY1NDhhMDcxYTc3Mjk5YmY3YjY4OGIxMzU5YjU1MzQ1MDcxZWUzNjNlMjcifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L3608-L3661",
-          "version": "repo-lines-v1:sha256:65072745aa4302ebcafff136b14887b7f40bba72a36574f4b65b50afb8800a1f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNTRhMGYyZmYzMjcxOGEyZjY4ZTQzMTdiNDc5ZDQwYmU0OWVhODMwNmZjOTkxMjFlNzk2Y2JiMTc0OGMxMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc5NGZhZWQ4NjJmYjBiYWRjNDkzNTM2MGFjZDNkNzJiNTg2NDAxNmMyMTA1YzcxYzhmMTczNWNlNDJlODdmYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhNTRlYzU0Y2Q5MjEwNTRkYjkzMGY2MTVlYjY1YTY2NTIyNjQyZGZjYzEyZDRhOThjZWFjMDFkMmNiODg5ZTYifQ"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3660-L3701",
+          "version": "repo-lines-v1:sha256:e372f809fc62a695f2a51f8177ea830e9380e075f75911fe82c8df37a086b12a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNTRhMGYyZmYzMjcxOGEyZjY4ZTQzMTdiNDc5ZDQwYmU0OWVhODMwNmZjOTkxMjFlNzk2Y2JiMTc0OGMxMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4ZDVkYTBiODk1NTY1NWM1ODA1Mjc5YjBmYjkzMmNkODJlYjNiNTdjZDkzMTcwMmFjY2Y1MDcwNjgzMDNjZGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZhOGFlZWRkMWMwNWNkMDFhNmUzZjM1ZWEyNDFjOTllZmM0MjBhYTY4YWU3MzViMGNmYTM4ZTcyMGMyZTg5ODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU0OGQ3NDgzZDA2MGYxNzIyZTI0NTM2ODg4MzM0MjU2YjU0OTBlOGJiZTg2OTgyMDY3NmNhOWVhZjM1MDljYzkifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L732-L790",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L753-L811",
           "version": "repo-lines-v1:sha256:3a9b1bc72de6fafdf5de7fd240954763afe5069fdf44837aa340899f90db2d21:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkMzQ0YzNjNWM3ZTg5ZTVjYjc5NjQ3MTJmZmMzNWVhOTk5N2NmOTBiYjlhMjdlZDc4M2Q3YzA0NWFhZjUxZjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhNjZiMjZhNWQwYjJmNTE2NGVkNzMzNDgwYTllZTM1YjFlYWQ0NTUxZTgwZGMwNzlmMWJhMmMxNWZkNDdhYTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM3MDY1MmQ2YzQyNTg2MzVmNzdlNDFiMzAwNDJmNmViMGJmYjJkODZkZGM5NTIwMjhmY2NlZmUzMjM3ZGU1M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3ZjdhNTQ2MWFjYzhlNmFhNDg2OTZhNTgzNDQwNmM5ZWI1YzdhZTkzMGViZWFmY2M2ODBiNTdiNThiZmQ2YjYifQ"
         },
         {
@@ -145,7 +149,7 @@
       "statement": "enforce-pr-gate.sh lets a push aimed at the nested or another repository stand down but never a pull request, requires an implementation branch, requires --base dev for gh pr create, runs assert_closeout_invariants for pull requests and assert_push_invariants for pushes, and refuses a chained commit-and-push with an explanation.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/enforce-pr-gate.sh#L21-L99",
+          "resource": "repo://shared/hooks/scripts/enforce-pr-gate.sh#L23-L101",
           "version": "repo-lines-v1:sha256:d967e452782b0115a0696eac4870ce83eb0e05bda006fc98ac4a2f92c8f682ec:eyJzZWxlY3RlZExpbmVDb3VudCI6NzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5YzdmODllZWY3MTFiOGZlZDU5YTE5NmJkODY0ZTAxNWVkNDJmOWZjMWVkZGE4YjBiY2FmYmZjYmVlYmY2OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkxMWMzMzJmMTE3MThjMjMxY2U3ODMyZjk1ODk4YWZhOWZiYWI5ZWM3ZTcwNjk0MTBkNmJhZDU3ZjI0Y2E5MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         }
       ]
@@ -183,7 +187,7 @@
       "statement": "record-branch-state.sh writes originating_branch, implementation_branch, started_at, and current_phase into the big plan after a branch creation and activates the first planned phase, reporting rather than writing an unsafe value or unexpected status; record-commit-closeout.sh advances current_phase from the post-commit hook and never infers a transition from a merge.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/record-branch-state.sh#L39-L52",
+          "resource": "repo://shared/hooks/scripts/record-branch-state.sh#L41-L54",
           "version": "repo-lines-v1:sha256:1277b644aaa162c38b3630c8938e20ab3835ea592221ea81e8ab3849a778640f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiOTk1M2UyY2QxNmEwYzc2MTU4ZmRmMjZkYWVlYjU2MzkxYjljZTIxODlhZTlhMGNlMjMwOTVlYjM1ZmU4ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NmE4NGE1NDViMmI4Zjk0ZTM3MzQyNjNlZjVlY2UyNjViNDQzZWUyYmIwOWE0MzdiNjAzYjZlM2Q2Y2I0N2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhZTkzZWIwYTc2OWJmZDE4MDQ1ZjEyNzJhZDU3NTZjNGM5MDk3YmE5N2M1ZjE1YWU2Yzg4NTU4Mjk5MDZhNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkZWQxNzkwMDJkZDU5ZWFhODFhODk4NTYzY2M3NTkxYTQwN2NlZTZiZjcxODQ3MjNkODY2NzAwYjdjNDcyZTgifQ"
         },
         {
@@ -215,7 +219,7 @@
       "statement": "hooks-errors.log is local-only diagnostics that state-sync.sh gitignores and untracks in the nested repository, while hooks-bypass.log stays tracked and blocks publication until bypasses are acknowledged in the big plan.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L1559-L1588",
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L1586-L1615",
           "version": "repo-lines-v1:sha256:2e107162c03c9c97f4ca2ad7c7c41fef10428b722d780f151c9db41db3a35904:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyY2RiODAyOThmNTFhM2E2OWQxZWJlZDM5MmQ4NzA3YWNkNDIxZGY4N2Q0YTU0NDY4NDZlYzg5MGNlNjk4ODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjYTcyYzViNDM2MTVkYTU4YWQyNzBjOWFhNWRkNTY3NzA0NWM3OTc0NmM1M2I5YzZiOWYyNzMzYzg1MzI5MjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyZjQwOTVhODViNjYwODY3NTZiN2M1Y2UzNzgyNzBkMjIyZDU5NTk0YjY2MTdhOGQ2Njk3ZTM4N2RlZjYwODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhMzlkYWE4MmViZjRjY2RhZWUxYzNmN2E3YjExNzg5N2ZiYWE3ZjlmNGQyYjVjNmExYjI4MmYxYjIyYjE0MGYifQ"
         },
         {
@@ -236,37 +240,37 @@
     },
     {
       "id": "claim_2089bfda47d34728bd027582974b2a75",
-      "statement": "Guards treat a payload as a terminal command when its tool name is empty, contains bash or shell, equals execute, or is VS Code's Local-harness run_in_terminal or send_to_terminal, so Copilot terminal commands go through the branch, commit, and PR gates and the protected-file shell analysis.",
+      "statement": "Guards treat a payload as a terminal command when its tool name is empty, contains bash or shell, equals execute, or is VS Code's Local-harness run_in_terminal or send_to_terminal, so Copilot terminal commands go through the branch, commit, and PR gates and the protected-file shell analysis; protect-files.py judges the Copilot harness's helper tools read_bash, list_bash, and stop_bash like a native tool when they carry no command.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L234-L243",
-          "version": "repo-lines-v1:sha256:9d1e288389e464c4a32f280361fecbeedba058a30f4396d4acb43b6bdc210388:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkMTczYTZkMzk2MDVjYTI3YzJhYzM5MGRiZTliMjQxYTRhMjJmNDQ1NDU5MmVmOGUyMTc3NDBkMjEzM2Y3NDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmYzJhZGJiNzg2NWZjY2VjMGU1ZjRkNDQ5ZmQ5ZDZjMzRhZmRhNzNjNDcyOTFmMGZhNGZjODk2OTYwZWM0MTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3ZTM2NjhlMGVhMDYwMjhlYzAzZDIwM2NhMmFlNDAyMWIxMGRmNjkyOTk3M2M1ZmFlYWUwYzcxZWYwY2U2OGIifQ"
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L264-L270",
+          "version": "repo-lines-v1:sha256:e4ec90258ee96c78ae5a3efd4f99dfa2588c1f49f19806507e0f58c946c3ac58:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDYxYzc2NjBjZDlmOTZlYjBjOTQ5OGNlNjM2YTYyZjM3YmFhOTE2ZDAyNWVjZTQyOTk1MzAxYTI5NGQwNDRlNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWI2ODNlNDg4MTkxN2E2NWY5OWM5NzQ0YzZiZTc3NGJkNGI4YWIyOTFiZGQwODBkMTcyZDYxNDFhYmYxNWQ2ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTdlMzY2OGUwZWEwNjAyOGVjMDNkMjAzY2EyYWU0MDIxYjEwZGY2OTI5OTczYzVmYWVhZTBjNzFlZjBjZTY4YiJ9"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L3663-L3684",
-          "version": "repo-lines-v1:sha256:3ba08b90516abe7e73845810b94e07b74ddcbfa639159a18a8aca75b11abd40e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3704-L3750",
+          "version": "repo-lines-v1:sha256:324777f9ae4b63bd7556ff007b82a39786bdaad03e94420153fa91691177af8f:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyY2I0ZDllOTE1YWY0Y2YyMjFhZmRiMTIyY2I0ZTMzZTJmOTI1ZjA5MzA3MTE2OGZlMWE3ZDU2MTA5YzZiMTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L56-L58",
-          "version": "repo-lines-v1:sha256:fcdbd1b0676b6614a4f6c6e9ad1b085341f2d379d14d7a07a471369892f2dc43:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjE0MTNiMjgxYzU1YTQ1YTJmNmY5YjRiZDMzMTU2Y2Y3ODE5ZGM5NDk3ZTdhZmRmMzFiNjZiYTRlYzQ0NjI4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2RhNGIxNzMxNjEwZDU5M2EyYjJiN2U5YjZlZTM2NWMyY2VmZTkyODQ4MzhjMTVmOTliNzFjYmExOWE0YWM4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGFhYTBiMzMyMjFmNzY4M2IzODlmMmYyMzU4ZjJlMTYxYzA3ODE0MWI4NDkwMzcyZWQ2ZWYxYWEzM2JjYWJhOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWVkNzdiMmE0MmY1NWU5YzIxZjU0Zjc2ZDE1ZGFhNDZjZWJiNjgyZWFmZGIxYTFiZGZiODQ2NTU1ZTlhOTIzZCJ9"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L56-L64",
+          "version": "repo-lines-v1:sha256:79b629bdb9f523b67d5e6a26fcaf0f80ad20ef4c0f010c693df7dfbf82c71373:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjE0MTNiMjgxYzU1YTQ1YTJmNmY5YjRiZDMzMTU2Y2Y3ODE5ZGM5NDk3ZTdhZmRmMzFiNjZiYTRlYzQ0NjI4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGJkMTk3Mzg3YTY1NTg1YzczYjM3MjBjMDlkOTViMDI1Njc3YmQxODI3NWFhMGI4NjYxZGMyMjM4ODg4OWIyNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTE5ZDRhMTA0MzAxZDU5MDY4NzQ2OWQ0MDllZTVhNGRjYjNhY2I3NTc3MjAzMzhjNWI0YWIyNGJmZThmMGE0NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjNkMWJiMmVhYjJiZTNhZGNiNDY0NDZjNGY0M2ZjOTM5YjY3MDNhOWZlNzNiMjg1OTA3Y2Q2OGU5N2EwOWQzNSJ9"
         }
       ]
     },
     {
       "id": "claim_b5686a991b86400d9e3f4bb7d15b4c83",
-      "statement": "Native read-only tools (read_file, view_image, list_dir, file_search, grep_search, semantic_search, view, grep, rg, glob) get no decision for hook-config paths, keep the secret-file deny, and are not scanned for patch text.",
+      "statement": "Native read-only tools (read_file, view_image, list_dir, file_search, grep_search, semantic_search, view, read, grep, rg, glob) get no decision for hook-config paths, keep the secret-file deny, and are not scanned for patch text; read is the Copilot harness's hook name for view.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L3586-L3616",
-          "version": "repo-lines-v1:sha256:8d1fbd6c9c9b753a849db43f099822bad9725af0472ec31005ce4fdb39a74a5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExYTJhNTJmMzk2YjM0YzU3NmZlMmUxODk1NGU3OWY4ODUwNTc4OGYxZWMxOWU2ZTIzM2ExMDlhYzA2ZWEzZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0ODAwMzFhZTczNjA4Njc5Yzg2Y2ZkOTEyMTRkNWQzNWI1ZWJlN2RiNTBmZGY2NzlkZGNmZjdhYWI1YzE1YmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkNGY3MTM4MjZlMjkyZWI4Y2NiNmM3ODAxYjIyYTQyZDg1NmM2NGRjNjc3M2FlMmU0N2RhMWMxZjk3MDkzNzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlMTg2MTk0MzA1MDRhZmMzODQ1NWI2OTlkNWY1MDQ3OGEwYmNjMDc3Njk2YzZkMWE4ZmQ3MmE3YjRkMGZkZGQifQ"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3617-L3637",
+          "version": "repo-lines-v1:sha256:fc75175ca6cbda859951e681f2521899eaec3b965dc8db1712d2acc7d0702d7b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExYTJhNTJmMzk2YjM0YzU3NmZlMmUxODk1NGU3OWY4ODUwNTc4OGYxZWMxOWU2ZTIzM2ExMDlhYzA2ZWEzZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkNGY3MTM4MjZlMjkyZWI4Y2NiNmM3ODAxYjIyYTQyZDg1NmM2NGRjNjc3M2FlMmU0N2RhMWMxZjk3MDkzNzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjllOThmZWE2MmI2ZmQ4NTdlOGFjYzU1ZjM2YmFjOTMxMzVmY2IzM2MwOGU5ZDUyM2VkNzBiZDg1MzgzM2RiMmEifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L3663-L3684",
-          "version": "repo-lines-v1:sha256:3ba08b90516abe7e73845810b94e07b74ddcbfa639159a18a8aca75b11abd40e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3660-L3670",
+          "version": "repo-lines-v1:sha256:c8ecda77d44495ac2cb6496a1f9651f3bd0207953fd4668336f8446aef0d422b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNTRhMGYyZmYzMjcxOGEyZjY4ZTQzMTdiNDc5ZDQwYmU0OWVhODMwNmZjOTkxMjFlNzk2Y2JiMTc0OGMxMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNhOWRjOTJkMzVmZDU3NTQwN2ZlZTYxMjdlODg1ODgxZjEzMGIzMTRkOWQyYmQxN2E5YzkwZjhiOTgyZjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZhOGFlZWRkMWMwNWNkMDFhNmUzZjM1ZWEyNDFjOTllZmM0MjBhYTY4YWU3MzViMGNmYTM4ZTcyMGMyZTg5ODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4NjdjMDJjNzMwMmY2ZTM0ODk2MDQ2M2YwZDFiZDU2ZDFkZTZiOTJmMzViZmMxOTY4YmVmZmM1MGE4YjBhNzMifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L59-L74",
-          "version": "repo-lines-v1:sha256:db9eee77083f98043736249758bc089607a1beebd41154e2f98a18db01ca58d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlODY0N2E3YmYzYzhhZDg3MTRmY2FjNWFhOWQ1NTk1YWFlYjQ2NGRjYjc4YTkxMmI0NWViODBjZjMyNWQ2ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZGJkMWIwNjc2YjY2MTRhNGY2YzZlOWFkMWIwODUzNDFmMmQzNzlkMTRkN2EwN2E0NzEzNjk4OTJmMmRjNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5MmQ5ZTY4M2JjZjBjODJiY2UzOTJmODE3ZjljYWIwNDRjMjY0YTJlZDBkMTE3NDU3NTk2NWNiN2U1MmQ4ZDUifQ"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L72-L89",
+          "version": "repo-lines-v1:sha256:9d8e9cb2f3b56a0cce4a7f77f9c10421dcbc1214f417b552c3ae549ddba111ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlODY0N2E3YmYzYzhhZDg3MTRmY2FjNWFhOWQ1NTk1YWFlYjQ2NGRjYjc4YTkxMmI0NWViODBjZjMyNWQ2ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1OTlmMTU0ZTk4Y2I2NTIzYmUxOTc2Y2ZlMmY1ZmU0MTM1ODFhNTBkNDFhNmVmYTNkZTI2ZTdmNWE0ODJjZjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5ZTc0NmVkNzkyMDE4M2JhYjYyMzZmMThkNmZkMWVhYzY4ZjcyN2E2ZDJkNTY1ZDIwMjIyMjBjMjg4YzUxNTcifQ"
         }
       ]
     },
@@ -275,11 +279,11 @@
       "statement": "A secret-shaped name is tested before the control-plane name test, in both the written and the symlink-resolved path form, so a secret-shaped file inside a protected folder or behind a symlink in one is still denied on every host.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L774-L783",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L795-L804",
           "version": "repo-lines-v1:sha256:c91080692d662c59033c6991a2310dca18ed438e64c5fb6ef5953976dd8e092b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlZGY1NDMyYjgxYTAyOWM4NTI5ZmNlYWIxNjcyOWZmODVjMGM0MDhjZjMyYzczMGJkNDgzZjdlNGYzMWI5MmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVkYjk2MjMwNzBiNGY5YmViNTIxZjc5ZTJhMzRjN2Q1NDY0MGYxY2ZiYjA5ZmE3MmVkZTEzMTlkMzQ3ZmEwNzkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVmZDZiM2Q2MzU1ZGYzZGNkOTdlM2JmNzAyM2FkZTg5NjQ1YzFmODM5NDlkZGE2NjA1OTVkYzdmMmRhN2RiN2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5ZTdmMDQ5MWMwMWJkNWFlOWFhOTA2OGM5NmJhMWYwOWRiYzFlNzc0N2U2MDQ1YjEwYWRhOGJlMjNlNmQ3MjIifQ"
         },
         {
-          "resource": "repo://tests/test_hook_gates.py#L3711-L3742",
+          "resource": "repo://tests/test_hook_gates.py#L3716-L3747",
           "version": "repo-lines-v1:sha256:aa262e6a5954b8440deb99ad6385c320baaec9608ce87cc41ead846cf92533de:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA1NWRlMDljNzA5ZTFlYjI2Y2JkMWE1OWIwYjBlNTdhZTFhYWUzN2JlNjgxODdhZWZiN2EyZmY5YTEyNDVjZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiZDc0YmI3YTk0OTgxZDAyMjgxOGM3MzQ1NDczOTA1NmY4ZDE5NTY1ZWFkNjlmZGIxOTJkYjgwNDQ0NmEwYTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhMjA4MDNhOWZmNmI4YjA0N2VkNTRlZTU1ZTMwYjEzZDU2MzQwNDk4NWY1NGFlZTQ1YTE3NWI5NzI5YmFjNDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YTRjZjAwNjE3N2ZjMmQ1MTc3ZTE5OThjOTRhOTEyZDhmYTVhZDc4NTI0NmEwMjc4NmE3YmRlMzA0ZDlmMzIifQ"
         }
       ]
@@ -289,7 +293,7 @@
       "statement": "The protected folders are matched as whole folders as well as by path prefix, so removing, moving, or symlinking a whole hook or agent folder gets the same decision as editing a file inside it, while parent folders such as .claude stay unprotected.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L784-L797",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L805-L818",
           "version": "repo-lines-v1:sha256:34d90540863df41da3e0d49e98582f56619ac5b892afc46ba45fd2ae0acff993:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyMTdlNjMxY2I2NTQxODQ3YjI0MDI3ZjdhNDE5NDk0ZTc5NmUyOTQ3OTk0MzIxYzM1NTdjNGZhZGJjNWJmODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVjM2E5N2VjZGY2ZDE3NmE0ODczNjFhMDg3YzZlMjEzNDM5MTE1ODc2NThjMzkwYjFlOGVjOGYyOTRkOTZiY2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEzOGNkYzQ4Y2UwYzYwNWFmN2U1NTJjMzQ3ZWM1ZTUzOGMzZWUwZDM4MGFmYzNlNGFhNGFhZTY3YTMyYjAyNDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcyZmYzYTZlYmY3MmEwZDg5MWQwOTlmZjliNDg5YWI1YTY4YjY3OWEyNmUwOTdjNjZiMWE4YTMyNjMyZGZhODIifQ"
         },
         {
@@ -297,7 +301,7 @@
           "version": "repo-lines-v1:sha256:acfaf5141105d39233eef58209a1e028b85c09c68a8bde6902a7ef870df31413:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjMTZjYzQ5ZGUwZmM5ODFhNzQwYWJkODI1OWYxMTUyYTNhYzVlMTk5MmU1Y2QzYjQyNDRhN2Y3Y2VhMDYzZmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIwNmFkMzJlYTVmMjA3MTRhYjNkYTE5NDYzNjJlZmZiMTM2ODM2OTQ1OGUwMGQ0OTAzNzUxYzlmZWE0ZDRkNzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjZGJkMWIwNjc2YjY2MTRhNGY2YzZlOWFkMWIwODUzNDFmMmQzNzlkMTRkN2EwN2E0NzEzNjk4OTJmMmRjNDMifQ"
         },
         {
-          "resource": "repo://tests/test_hook_gates.py#L3605-L3639",
+          "resource": "repo://tests/test_hook_gates.py#L3610-L3644",
           "version": "repo-lines-v1:sha256:25f1722a0ba508e3fe797b98236ca24798102bc409d4c03b0cd04c05ae6dbffb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4NjFlM2NlMzg2YjE1YTVkZGNiMmUxN2E2MzYxODRhYzU2MjdhODZlZmRlOTUyMTZkM2U0Y2JmOWJjYTk4NGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3NDFlOTBkY2I5NWRhMzEzOTI3YjJlNTJlZjZhYWU2NTVjYTU0ZDI4NDAzY2VkN2M5ZDRiZTA2NTJiMGRkOTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMwZWRjMWM5ZDk5NmJhNWM2ODJmNjUyMjBlNjBiZGUyMjlmOGE1N2ExYmUxOWI5MWRlNWE1MWRkNTdmYjllNmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIwZjlmYjNjYTRkZDE3YTMxNDQ0YWYzYTBiN2Q4ODY5NWY0NWRhY2Y3ZDgxZGQzYTM1MTQzZjZiMDQyMTg4MDMifQ"
         }
       ]
@@ -307,7 +311,7 @@
       "statement": "Unmodelled Git commands have their path tokens resolved against the -C or cd directory as well as the repository root, and a token protected as written from the repository root keeps the stricter uncertain deny.",
       "evidence": [
         {
-          "resource": "repo://tests/test_hook_gates.py#L3640-L3666",
+          "resource": "repo://tests/test_hook_gates.py#L3645-L3671",
           "version": "repo-lines-v1:sha256:5d23b31f8a956a9c3c93ca855a9255f55d278ef0f1bd5cf70f12966f156a70ec:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxYWE4MTMzNzVhZTk3MDI4OGI5NGI1MGIzZTYxYWZkODRlZjk5YmRjMDM0YjExZjAyM2JjM2UzMmNjMzE2NWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3NDFlOTBkY2I5NWRhMzEzOTI3YjJlNTJlZjZhYWU2NTVjYTU0ZDI4NDAzY2VkN2M5ZDRiZTA2NTJiMGRkOTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgxZWEwODMyMDQxMDYzYWM5MTAxY2ZhYjBlNTU5YWZmZWQxMGEzZGYyMTU1M2Y3MzEyY2NjNjQyM2Q1NWRhYWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0YWJiNzhkMGRiY2YyOWQ0ZDNjN2FjZTJlNGRjZmMwZmQ4ZTkyYzc0M2ZlYWU4ODE3OTQ3OTg2ZTA2ZWU2ODAifQ"
         }
       ]
@@ -327,11 +331,11 @@
       "statement": "protect-files.py reads Bash command text with its own scanner instead of shlex, following Bash's rules for quotes, escapes, comments, and unquoted line breaks, and splitting runs of operator characters into Bash operators by longest match.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L1072-L1110",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1103-L1141",
           "version": "repo-lines-v1:sha256:2a93622f355876e804956f81f7a5161469143f5d93b9fdb2ae9ecb73d312cf47:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5YTVhZjdmMWQyZmMxYmU2ZTEzMzdhOGVhZTQ3NjQ2M2U3OGMzZTYzODc4OGM4OTc0MmY3ZjExMTY2YmE4YTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3MjYzMDM1NTMzZTRkNTcwMjFkZjY4MWEzYTg3NzUwNGU4Yjc4ZWQ5MmRkZjk2NDA4YjdmOTIxNDEyYjg0MjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlY2Q3MWY3M2M0OWNlOTMwZDdkYzlmZTVjYmFmMjJiYTdhNWE0ZGYzMmM2NTkwYmI2NDFmYzdjY2E2YmI4NWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBjZGFlM2ExY2Y3MTU2OGRkMGI3MGM1NzI2YWRiYWExY2Y0MWQ4ZjliYWRkNzA3MjNiOGExNTU1M2NmN2NjZDQifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L1739-L1781",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1770-L1812",
           "version": "repo-lines-v1:sha256:968b0c58a7253064bce9d9ec7f70b99b0783bc498a623368a6036d0c32e5e414:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjM2Q3NDUzNWU1MTE0YTFiZWMzMmFiMmY2NDQwNjhmYmYzZDQzZDZkYzBiODg2OGZkZGMxMDI0Nzg2YWMyNzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJjN2U1NDQ0Zjc1NDllNGViNmEzZjZjZTg5MTdiMzI2NGY0NGMzZjM3YTlmNmM4YWI1NWYwODMzZGYzY2ExYTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYzM2FhNjc1ZWM3YjZiMzc1MDE4MzZlNTU0Y2NhOTQyNTFhOGJlZjY5MTU2YWU4Y2QwZTA5ODQ0YzFkODkzMDYifQ"
         }
       ]
@@ -341,11 +345,11 @@
       "statement": "When protect-files.py runs as a script it resets SIGALRM to its default action and arms a CLASSIFIER_SECONDS (4 second) alarm, so a slow classification ends the process and the wrapper treats the failed exit as a denial instead of the hook timeout letting the command through.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L3686-L3702",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3752-L3768",
           "version": "repo-lines-v1:sha256:27acd2bf6ccf2264354e8c163c4586c6544dd82e0d00a70505e5048c209fa58e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZhNWQyOWU5MDk0YThiMmJhM2FkNDU1Y2MwNmMxNDQyNzFiNTlkYzljY2FmMDZlYzdhNWEwZWZjYTM1OTEyNWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1OGUxMmY4Y2I0OWQzMzgyZjEyM2YwMDIxOTBkZDg3Mzk5OTM1M2FmM2YyZmMwODA2MDBlZTkwMmM2YmViMTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L378-L380",
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L399-L401",
           "version": "repo-lines-v1:sha256:a3ef88c5c862ae87fedc9c9122a3f7a72f573b1f98abbc41aa1e3674fca944c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTZiODc3ZmRkM2JjZDc5OGY5YjY1NTE1ZGMxNTQwZTAzNGZhMWQwN2ViOTQ4NGUzYjZlMWQ4YWZjZjYyNjFlZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGUwODhjNTllMDA4OTI2NzM0ZTA1YWI2ZDNlYjY5YjE2YjIzNzVmYzY1MjhlOTU0NTgxMzVlZmYxMjI3N2U4OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGNkNzVhMWQyZmNmNzdiYjExYmMzNTMyNWQzMWE1ZDMxYzhmYWQxYzFiZmM3Mzk2ZDI4NDI4MDJmNjFiZGE2NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDIyYjU4ODc2NmEzMGZiMmY5NjU4MzgwMWUzMjM5MTU3NTE3Y2ZmZTkyOTVlZjhkMzgwNmIyNzk4NDg0MmE3NSJ9"
         }
       ]
@@ -377,23 +381,23 @@
       "statement": "No host wires a Context Mode hook: context_mode_hook_errors fails validation when any handler of any event runs context-mode-dispatch.sh, and validate_targets.py applies it to the Antigravity, Codex, Copilot, and Claude Code hook configurations.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L2959-L2967",
+          "resource": "repo://scripts/validate_targets.py#L3346-L3354",
           "version": "repo-lines-v1:sha256:98890cdd368b2e0dfb5ae6fef9353790541fdb05388a5a0d1bb42d4b5ce54819:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ1ZDk1NWU2ZTM2YmE0Yzk2MGRlMmE2Y2VkNGQzMzAwZTIzM2ZmNmU3MGM1NWEyOTcyMmVkNmEyYzUwMzNlNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGEwMTc0ZDg0MzVmYzA1MWNjMWJiYjNlOTlkYzczNDA3MTg2ZDYwODk1ODZiZjYyY2M5NzNkNDY1ZGVmMjdiZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYmE2Y2NkOWJiOWJmMzE5MmQ2M2JjMzQ0NDJhZjU1MjQ2Y2FjZTAyMTNmZGU5NmE1NDg0MjM2ZTZlMGU5MGIzYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWMwMzI1Y2IwNmU1YzNjNjlhYjI0MTA1ZDY3YTE1NjNhZDQwM2UwYWMwNWMxNGRhODEyMDA3Nzc1MzY2YzRjOCJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L3055-L3055",
+          "resource": "repo://scripts/validate_targets.py#L3442-L3442",
           "version": "repo-lines-v1:sha256:6eedb31cc61cc08fb72c803768c4677bbe7f9cc003abaa693b58bed361b93e38:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmVlZGIzMWNjNjFjYzA4ZmI3MmM4MDM3NjhjNDY3N2JiZTdmOWNjMDAzYWJhYTY5M2I1OGJlZDM2MWI5M2UzOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNmVlZGIzMWNjNjFjYzA4ZmI3MmM4MDM3NjhjNDY3N2JiZTdmOWNjMDAzYWJhYTY5M2I1OGJlZDM2MWI5M2UzOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWU0MzRkNTc5YWU5OWQxMmRiMGUzMjQ2NmQyZWUxNDA3M2YyNjdlNjhhMzE0ZTE1MjU5NTU0NDkyMzM2NGU1OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTFiNTE3MzkwN2NjMjNjNTc0MTQ5YTA0MGQ1MjM2NTg1MzZlMzAyNDNjMDYxNzE4MzQ5MmU2NmRkZDFiZDhkYSJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L3170-L3170",
+          "resource": "repo://scripts/validate_targets.py#L3557-L3557",
           "version": "repo-lines-v1:sha256:e81763bff446f586a22fc04a4660c4d4cc9efb97c04728f41535a397764bd539:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTgxNzYzYmZmNDQ2ZjU4NmEyMmZjMDRhNDY2MGM0ZDRjYzllZmI5N2MwNDcyOGY0MTUzNWEzOTc3NjRiZDUzOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTgxNzYzYmZmNDQ2ZjU4NmEyMmZjMDRhNDY2MGM0ZDRjYzllZmI5N2MwNDcyOGY0MTUzNWEzOTc3NjRiZDUzOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmIzN2ZhNDMzMzcyMjFlMjNhN2UzYzEzNDI1ZjQ0Yzc2ZjIxMzE3ZjdmM2VlNmE5MGNjZTk2ZjU5NmM4NGY1NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDU0YWQwZWUwYjQxMzM1ZWMwOGZmMzllNTI5YmFjNTliMGMyM2U3NmIzZDllNGU3YTUzOTliODc0NTlhMjRmYSJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L3406-L3406",
+          "resource": "repo://scripts/validate_targets.py#L3793-L3793",
           "version": "repo-lines-v1:sha256:b15862cc3d9ce9315a6fdce7ccc2f26f4b95dfcdad449b1f4a5b6fa0393633c1:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE1ODYyY2MzZDljZTkzMTVhNmZkY2U3Y2NjMmYyNmY0Yjk1ZGZjZGFkNDQ5YjFmNGE1YjZmYTAzOTM2MzNjMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE1ODYyY2MzZDljZTkzMTVhNmZkY2U3Y2NjMmYyNmY0Yjk1ZGZjZGFkNDQ5YjFmNGE1YjZmYTAzOTM2MzNjMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWViOGRhMzg2MmMxMWU2ZDg3YmEwMmYwZGE4NjBkMjA3MjRhZWM5ZmI5MmRiYzY4ZjE2MDQxYmYzOTBmNzk1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWRiMjYzODFmMmJlMmY0ZTI1ZjY2ODFkZTU2NjZlYjU1NjFkMmRiNTA1YzdmMjU1NjgwOGIzZGExNGUzYjc0MCJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L3495-L3495",
+          "resource": "repo://scripts/validate_targets.py#L3884-L3884",
           "version": "repo-lines-v1:sha256:05bf84e198352bd2d4f0f0a2de6a70b0d59f2fc9630270fc2928bc86d5e1eb91:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDViZjg0ZTE5ODM1MmJkMmQ0ZjBmMGEyZGU2YTcwYjBkNTlmMmZjOTYzMDI3MGZjMjkyOGJjODZkNWUxZWI5MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDViZjg0ZTE5ODM1MmJkMmQ0ZjBmMGEyZGU2YTcwYjBkNTlmMmZjOTYzMDI3MGZjMjkyOGJjODZkNWUxZWI5MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjkxMTZlMTg1M2YwYzhmMjY2NmY4N2JhNDNmN2IzZTNkMTA1ZWE2YzI4ZWZlMDI0ZjE1OWRmNzIwOTYyMTc2YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODk1MjNkMDYzYWZjZmY2ODdjZTlkNTI5OGY1MDgyNGU5NTkxZGQzZGVkN2QwNzI5NWMwNzY0NWQzODI5MjE4YSJ9"
         }
       ]
@@ -413,14 +417,126 @@
       "statement": "Codex limits its SessionStart hooks to the sources startup, resume, and clear.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1196-L1199",
+          "resource": "repo://scripts/generate_targets.py#L1219-L1222",
           "version": "repo-lines-v1:sha256:7b47edacf5e8fe808fac130029ef3d9c0a6b9752c41ec8c712516e0704b61afa:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE4YzJiOTY5ZmE5NzkyMmE1N2FiMzFkODAxMzBkN2U5NTFiYzIwYTE2ZDFlZTc5MWIyMDlkYmY5MzRiOTJiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWYxOTdhMjE3ZjA4YTgxODRmOTA0YjA3OGFjYmE3Y2JjMDhkN2I0MGIzMzU3NDBkYmE3MmEwYTdkMDJiYjZhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzAyYWJhM2Y0MGRmNTg0MTc3OTdmYjRjNjVjZDMwYzc3ZmQ5NjQzOWRhNDA4YjA4OTY1YWRiNDVjZDhhNjNmOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ea67db5daa6e41ee9ac210917bfe55d2",
+      "statement": "For the client github-copilot, pretool_decision and additional_context in _lib-frontmatter.sh and print_decision in protect-files.py also print the decision and its reason, or the context text, at the top level of the answer, with no top-level hookEventName; every other client gets the nested hookSpecificOutput object only, and json_escape turns control characters 1 to 31 into spaces.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L125-L133",
+          "version": "repo-lines-v1:sha256:2604776fda3b493bf67b453de62d32aa2b10b4bac98119469fc234d35c51445a:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTM1MzcxZWJlZDI2N2IzYjRhZDZlYTliN2Q3MzM5ODNjODM4M2ZjYzk2NDUzNTE3NGFiNzcxMjhjZGUxYjUxNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTgyMTRhZGU3MDhhZGNlMzllMDNjYzc5NzNlODdkODE3MTllOGQ2ODdjMWM2NTcxYWJiNTg1MjM0YzMwZDE4MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjYwYTU0ZGZkNDUwMWUyNGE4M2I4MjJhNWYxMTlmOTIzZDA3ZjIxOGQyYzAwNWFlOGZkODU5OWFjN2I2OTg1ZSJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L16-L20",
+          "version": "repo-lines-v1:sha256:b922949a7da97500d8e361b6e67b469fe6f51ccf754a412f41625e2c1457c84b:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzRlN2QwODE0ZGI2ZmFkMzhkMTg3ZmQ1NTAyNzUwYTljMzdiNWU0YWNiZjlhOTM4NjM5ZTMxZjlkNDE0ZGM1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTZhYjU0ZDY1MjI0YTdkNTMwMDk2YmE4YjAxYTQ5M2EzZWQ2ZjBjNDIzNzdjNjM5YmFjOGNhNmU2MDMwYTRiZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzZlZWI3YTc1YTg5MjZhNGE1NGQ2ZDM5YjNjMTYyNDEzMzY4NDhhZTljNTQzNzRjM2M5ZTA4NzZlMmJjZmI4OSJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L53-L60",
+          "version": "repo-lines-v1:sha256:e622deb1117a5404ecabc18269522154d8ff32f41f4e7c27ceccaff9c817d6d5:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzIwMjQ3ZmE2NWUzOWIxMDNlYzMwZTBiYTkyYzlkMDg0Zjc2ODQzMGIwNTNiYzM0NmY0YjM0NzU2MTk5OTJkNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODA2Y2IwN2YzYmU0OWMwNmI3ZDhmZTUzNjkyNmE5NGI3NjUyMjA3ZWQzZGNhN2Q2YWU1YTQxODhiZDM2MDY5NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWM4MGZlOTM4YjZjYzNkNTk4MzdkNWI3ZDdlYWNiZmQwMjhkMTI1NDczNjkzYTBkOWE3ZDM2YWMxYmY0MjlhYyJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3639-L3657",
+          "version": "repo-lines-v1:sha256:2ddad646a80160306a7b2821e896bc87c4facc99a31cf85b621de6d787fe0906:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0OGUzODMyNWYwM2M5MmIyOTAwYWQ3YWRmNmMwYjNiZDA4NGJkMTU2MmQ3ZWY0NzVmNWVkN2Q4ODEzMWU5ZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2ZDU1OGRkMGJjODgxMjQ1ZGU5ZTdhMzA2MzllZDBhZjdhOWE4MTE4NmJkMmViMDA5YjFjYzFjNDFlZjZlODgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc5NGZhZWQ4NjJmYjBiYWRjNDkzNTM2MGFjZDNkNzJiNTg2NDAxNmMyMTA1YzcxYzhmMTczNWNlNDJlODdmYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMwYzdhZGY2ZjI3OGRhMDRhYTgxNmM2ZGM3OGJhOWFkODMxYWQzMzg5MDA3MWFhMTM1NDBmN2I0OGVkZjFhM2IifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_35a2962c83fd4ef08dd54080f407d39e",
+      "statement": "On github-copilot only, protect-files.py denies the tools run_dynamic_workflow and dynamic_workflows_manage by name before any other check.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3704-L3715",
+          "version": "repo-lines-v1:sha256:3c2fe14177d34c4da4660949846c856349c806cd3f736bedc56557e1b5d4c2f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhMTY4MDljMDc1ZGIzMDllMDliYmM5YWI3ZWZlZTY5ZWZiNWY0MTliZDRkODkzMGQwMzgwNjYwMmRkMDJmZDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyY2I0ZDllOTE1YWY0Y2YyMjFhZmRiMTIyY2I0ZTMzZTJmOTI1ZjA5MzA3MTE2OGZlMWE3ZDU2MTA5YzZiMTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYwMmQzNjkxZDUxNDVlYzljYmU5ZGRhOGU3ZTFjMDBiZGY1ZjU4ZTMyMDQyOGJjMDI0MTRhMzgyMzYyZjM4ODEifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L65-L71",
+          "version": "repo-lines-v1:sha256:9e91f05b4fb6e01f93fba49a0976cef27dd48fd0f6e1d8d266ba6fc32cfad3df:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDc4YjI5NmIyYzhkOTA3YjI5MTRjMWUyNzAwZTgyZjkzYWNkZDdhZWJjMDFmNjNjOTBiOWFlMWRjZWM2OTBlMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2RkODc2OWFkZjRkN2Y2MDBjN2E4NzBiZmVjNDNlZjNlYjA5Yjg5Y2E0YWYzZDhkZmVlOGFhNzFmZDIxZjE0MiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTdkZjk4ZTQ0NGMxOWExMmZkODIxOWFlOWVkNWQxYzZiZDYwYTM2YWE0NzhkZGUxZjg5MTJhNDcyODZhMDZjZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWVkNzdiMmE0MmY1NWU5YzIxZjU0Zjc2ZDE1ZGFhNDZjZWJiNjgyZWFmZGIxYTFiZGZiODQ2NTU1ZTlhOTIzZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ad988730265b40b58f807114d86ebd1a",
+      "statement": "protect-files.py reads apply_patch text sent as a string tool_input for a tool that can write: each header line (add, update, or delete file, or move to, in any letter case and with extra blanks) adds a target, and an unterminated patch, an empty target, text that is neither JSON nor patch text, or patch text sent to a shell or read tool raises AmbiguousCommand.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L103-L112",
+          "version": "repo-lines-v1:sha256:aef642db501c2ec29dc2dc259fc7aaee96dfbc851a1663457106cf9de45f114a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyZjE5MTZjZDczYzQ1YWJhM2ZhMzA0MTExY2IxNTY5MzExOTc5Y2UzZGRiNTZjNjk0MWVjYTRiZDQ1MTg4MzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyYWIzNDhiNDlkZjkzMzU4NDYwNDI1MDlhOGRmNDcyNzQzMTMyNTE5YzNiZjk4MzRiNDFkNWY1YzA5ZGYzZWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwM2I5MWU2MGJjZWYwM2RiNDQyOWVlMzQ1MGZmNTJkMGFhZjdhYjIzYTk3MDMyMzYxNWRkYjllYmIyZGFiM2QifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L3722-L3735",
+          "version": "repo-lines-v1:sha256:341995c3bf9ef7e1cb645b94113a16a5d5ed26c83adf3ff5435f3f70f39ffbfe:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjYzdhNDc5NTlmZTY4NTc1MTNlZjNhYWJmZWEyZWE2NTA3ZjEwOGJhYjA2MzYxZTJkODNkZmUwNWJjOTFhMTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1NjZlZDZmZWMwZmJiYTRmYTk1MDVhNTFkNGQzMGMwOTlhZTViMjQ3NWZiYzM1ZmZlYzM2Y2U3OGExMDU3YmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk2NmI3NTQzOWFiODliOGQ3MTczMTYxNzExZmIzNjM5MjM5NmY3Yzg3YjA5ZTJkMDg3MTQyY2ExZDU0ZWUzYmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2YzFiM2IzODhjYmZkNzdmN2JjODI3NThjNDE5ZjU0ODE0ZTUyYWI2ZTY5ZGFjODlmMTU3ZGFlMmRmOGI4OGYifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L927-L950",
+          "version": "repo-lines-v1:sha256:e0a0cefb5dc15fdf04b25914fae34ed75c1bcbf6efcbaee716770e3515cce375:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMyMDcyNTU3OTEyYjZhYjMxZTZlZjZmZWQ0OGNjY2Q1OTVkY2IwMWM3MGJjY2NiZjRlNjQzZDBhYjVmYTEwMWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk5MWY3ZjQzY2IyNjE0M2RlZWE3MWRmYzgxMzAzMGM5ZWEwZTM5OTQ0NjgyODFkNGUyODI4N2I1YTE0NzUzNDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_138f778430fa4a8894eb699ee5a8efba",
+      "statement": "PATH_KEYS in protect-files.py includes the search tools' paths list, so a secret-shaped entry in the paths argument of grep, rg, or glob is judged like any other path argument.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L90-L102",
+          "version": "repo-lines-v1:sha256:635cda2339e5bf11e470cdd01ca2f14a658994176c2f50b02e6dc2864820d620:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzNjhiYWViZDA1ZTI3ZWRiZTcwZmFlMWMxNzQzNTAwZDE1NWI1NTQ4MzA0MzQ5Y2VmYzdiYmUzZmNmYWQ0ZjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk0M2JlNTAyNDQyMmY5OTZmMzc4M2UzNDg3Yzk1ZTIyOGM0ZDc3MTRmYmZjNjJhODFkOWExMGJjZjRjMjAxMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgwZjRhZmM2NTY3MDA1OWMwZTU3MjQ1NDU2MDA2ZWIxOWQ4ZmU2ZTFmNGQwZjU3NmMwMDc2MmIwMzIxOTY5YTQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d2fef393e1b3436990621601baa207c8",
+      "statement": "reporting-reminder.sh accepts the modes prompt and late-report for claude-code and openai-codex and the mode session for github-copilot only; session prints the reminder as SessionStart context.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/reporting-reminder.sh#L27-L54",
+          "version": "repo-lines-v1:sha256:c03a4ea78ae9a512945335c971c440248d5835e160809146c0de3b32d8d6380a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwNDk4Zjk0MWJhMWM5OGJkNTE2MGI5NmVjOWM0MmExZDNiNjVjNzllNmUwNDdmOWI2YjFlODAxOTFjYzE1OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNlZGViZGZhZDM5OTFjNGU3Y2YyY2YxYWFmY2QzNzkyYjlhY2UwN2ZmZmFiNmRiODFiMTU0ZDgyZjQzNjg2N2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFhYWZiZjU5NTE2YzFkODM3ODllMDZiZTA0NjYwOWU4Zjc5ZmI1NDI0OTRhM2YwMjIzOWVkYTRmZTZkOGE4MGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1c9e1c55a6ce49abb78bb74ad1641bdc",
+      "statement": "Each hook command in the generated Claude settings first assigns REPO_ROOT and then calls the launcher with BOOTSTRAP_HOOK_SOURCE=claude-settings as an environment prefix, and validate_targets.py requires the marker in every Claude settings hook command and refuses it in the other hook files.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1089-L1101",
+          "version": "repo-lines-v1:sha256:a982f31e711f9431c91d0934e5403777de8d5cae2c09b57bf5f42ade2989da73:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyNTVjZWMzYzlkYWVlYmRmOGYyMmNjYWQ0ZDdkYWNjZjM3NTFhMTRhZTJjZmM1ZmZlYTRkNmU1ZWJkNTY2OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2ZWM1YThmMmNkMjc2OTMyZWJkN2YyOTI5MGRhNjcyZTQyMDliMjczZDc0OGQ3ODdlMmQ5OGY2N2U1ZThhNjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxNzFkODk5MDcyMGEwYzQyMzNlYWY2MjIzMGEzMTA1ZGRiZmU4Yjg2ZWVhMzVkMTQwZWY3ZDU5Y2ViYzM2MWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUxM2EwNTNmOTM3MjdkNjdlYzY0NzBmMWJmZmNmNDIyMGZhYjM2ODcxYWVlM2MwN2ZlMjM2YTc1NDM5MjI5OTcifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L1607-L1642",
+          "version": "repo-lines-v1:sha256:f28d2fe5cf55a3ddb996c7893193bbb451b9e21757053b1f1d0d77c588a84f0d:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkMjdlMGM0OGFmMjNiNTYwMTJmMWM2Y2NjNzUyNzBhZWRjNjAyZWFkM2Y1N2IzOTA2MmI3ZWEwYzE0YjEzMmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0NGRmODE0ODg2ZTJiYzljOTY5ZTAyMzA3ODIxMTNiNzI1MTk0ZmJmZmI1MTVkZGMyNTM5OGQ0ZDc3ZDYwODQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYxMmRmNTA0ZWE5ZTBlMjYwMDY5MmNkNDZmNmRhMjE3Mjk1NTBhZWU2MzIzZWY5MzczNmU1ZWZmYjcwNDk2YjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwYjRkYzEyZWRkZDJlZjU1ZDQyY2UwZDRiNWE4OTQxMTk4ZjUxOGZhMGUyMGQyODEwMTg3MWEyMmU1MmNjMDYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6cdd2f94d5174450882656d036dc2fa8",
+      "statement": "session-log.sh writes target=<TARGET_ID>, taken from its client argument, into each line of hooks-sessions.log.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/session-log.sh#L14-L44",
+          "version": "repo-lines-v1:sha256:a3f77090243f3120363c84b3516be6a41e03a8e32f129c0ef49f82532bf52ef7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4NjBjODcyY2IxNGU0MmZjMzg3Mzc3ZDI3MGUzYzNiZTFlMDg1YWE4OWFjZTUxM2YyOTllNmI3MmEzYWNhNjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiNmNhMzExZmQ2ZmJjMjY0NWJiMTJmNTdhYmNhODJiMDNiODNlZmVkMjg0YTBlMjIyZWUxY2RhODg4YzAxNjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyMmYyMjEyZmFhZDBiMjExZDY2YjVlMTNlM2QwZjJlOTY5YTJlZGUwNmQzZjBhZDk1ZTc2NDM2MDE2YTJmODIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVjOTNlNWU0ZjkyYzlkZmNiYjY4MzlhMWQxYzlhODdkNTYzNzEzODhiNmRjZjEyMmI5MDkyY2Y3MjI4MTM5ZDkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_039021b6550944aeba04eeb43d28587b",
+      "statement": "subagent-context.sh is a context hook, not a guard: it reads .github/copilot-instructions.md only when the file's real path equals the expected path under the repository root, the file is regular, and it holds at most 2,048 bytes, adds one fixed line on where agent files and skills live, builds its answer with python3 -I and json.dumps, prints no decision, and exits 0 on every error; validate_targets.py fails when the generated .github/copilot-instructions.md exceeds 2,048 bytes.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L759-L772",
+          "version": "repo-lines-v1:sha256:39cc27f22e915f2d32788ec6442954a54641c18772ad17c2c367e3d8296c73dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA0ZDEyYzUzMmVlZjAzY2RhM2IxY2ZjMDRjMDYwYjE2YjdjZTgwOTJhNDEyYzQ4NTNhYmEwYjMyOWMwZGNhZTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzMWEyMGQ4Nzc3Yjk4MzFhNmIyMDVkODI3ZDRhMTMxYzJhYjA2YjVkNTFiMTk1MzJmZmU2MzM4ODhjMzBkMjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBjMGYyMDE1MDgwZTU3Zjg1NTMyYzJmYWVmZTgwZmNiYzFjZmUyYmVmNjhjMzFkNzNlZDQ0NDc3MmQ3OWM4ZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImViZWJkZjZlYmRhNDE3MDIxNzMzMzQyMzA0MWVlZThmZmJjODk5NDFlYTEwZWVjMmMxOWJlY2EwMTBiNGY5OWYifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/subagent-context.sh",
+          "version": "repo-file-v1:sha256:79da1fe382a066c2bd8002f59af4e331d529de32a9afb86121307f735f199df4"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-12T13:25:12.863Z"
+    "at": "2026-11-17T23:52:59.759Z"
   }
 }

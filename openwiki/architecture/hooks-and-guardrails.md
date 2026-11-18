@@ -1,7 +1,7 @@
 ---
 type: architecture
 title: Hook dispatcher and guardrail scripts
-description: How each host's hook configuration dispatches into the shared guardrail scripts, what runs on each event, the ordered Bash safety lane, what every guard denies or records and how to recover, the Git hook layer, and where hook errors are logged.
+description: How each host's hook configuration dispatches into the shared guardrail scripts, what runs on each event, how the launcher and the answer format behave on VS Code's Copilot harness, the ordered Bash safety lane, what every guard denies or records and how to recover, the Git hook layer, and where hook errors are logged.
 tags: [hooks, guardrails, safety, git, dispatcher, pretooluse, lifecycle]
 sources:
   - id: openwiki-source-aedfa38e00652688559a19c4
@@ -50,18 +50,22 @@ sources:
     resource: repo://shared/hooks/scripts/reporting-reminder.sh
   - id: openwiki-source-80751922e4fcb1a91255462c
     resource: repo://shared/hooks/scripts/run-hook.sh
+  - id: openwiki-source-67ac8997817b8b8f498eafba
+    resource: repo://shared/hooks/scripts/session-log.sh
   - id: openwiki-source-92c74e76955d0f817db531c4
     resource: repo://shared/hooks/scripts/state-sync.sh
+  - id: openwiki-source-427465a2f2e2144bb2c57bf4
+    resource: repo://shared/hooks/scripts/subagent-context.sh
   - id: openwiki-source-8b19687f44543c0a82585f7d
     resource: repo://tests/test_hook_gates.py
   - id: openwiki-source-9815a0c3b2461f2bccdb2429
     resource: repo://tests/test_openwiki_cli_smoke.py
   - id: openwiki-source-ac71b7b5ed0ae12dcdfb1f63
     resource: repo://tests/test_openwiki_guard.py
-generated: { by: "claude-code", at: "2026-11-12T09:39:07.876Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:45:26.446Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-12T13:25:12.863Z
+    at: 2026-11-17T23:52:59.759Z
 ---
 
 # Hook dispatcher and guardrail scripts
@@ -79,10 +83,26 @@ All guardrail logic lives in `shared/hooks/scripts/` and is installed into a con
 | OpenAI Codex | `.codex/hooks.json` | `run-hook.sh <script> [args]` |
 | Google Antigravity | `.agents/hooks.json` | `antigravity-pretool.py`, a Python bridge that normalizes the payload and calls the same guards |
 
-`run-hook.sh` is the dispatcher. It finds the repository root in this order: its own location, then `GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`, or `PWD`, then `git rev-parse --show-toplevel`. It then runs `.claude/hooks/scripts/<name>` under `/bin/bash`.
+`run-hook.sh` is the dispatcher. It finds the repository root in this order: its own location, then `GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`, or `PWD`, then `git rev-parse --show-toplevel`. It then runs `.claude/hooks/scripts/<name>` under `/bin/bash`, with one exception that the next section describes.
 
 - A missing script name exits 2, which denies the tool call on hosts that key blocking on exit status.
 - A missing script file only warns and exits 0, so a partial install degrades instead of blocking every call.
+
+## The Copilot harness loads two hook files
+
+VS Code runs a Copilot chat in one of two harnesses. A harness is the part of the client that runs the agent, calls the tools, and runs the hooks. The Local harness is VS Code's older built-in agent. The Copilot harness is the agent runtime that VS Code shares with Copilot CLI.
+
+The Copilot harness loads both `.github/hooks/hooks.json` and `.claude/settings.json`. Without a rule, every hook would run twice there. `run-hook.sh` holds that rule in `stands_down`. When all seven conditions hold, the launcher reads and discards its input, prints nothing, exits 0, and does not start the script:
+
+1. The script is one of the five lifecycle hooks: `state-sync.sh`, `session-log.sh`, `session-start-state.sh`, `claude-stop.sh`, or `reporting-reminder.sh`.
+2. `BOOTSTRAP_HOOK_SOURCE` is `claude-settings`. Only the generated Claude settings set this marker. Each of their hook commands first assigns `REPO_ROOT` and then calls the launcher with `BOOTSTRAP_HOOK_SOURCE=claude-settings` as an environment prefix. `hook_source_marker_errors` in `scripts/validate_targets.py` fails validation when a Claude settings hook command lacks the marker or another hook file carries it.
+3. `COPILOT_CLI` is `1`.
+4. `COPILOT_HOOK_DEPTH` is not empty.
+5. `COPILOT_HOOK_DIR` is empty.
+6. `CLAUDECODE` is empty.
+7. `.github/hooks/hooks.json` is a regular file and not a link, has no `disableAllHooks`, and contains `session-log.sh github-copilot` and `state-sync.sh push`.
+
+No guard is in that list, so every guard runs from both files and never stands down. The launcher stands down no other script either, so any other Claude-settings hook that the runtime starts there, such as `record-branch-state.sh`, still runs. A hook that fails any condition runs as before, which covers Claude Code and the Local harness. The section "Hooks on the Copilot harness" in `README.md` says what each condition rests on and what a wrong stand-down costs.
 
 ## What runs on each event
 
@@ -101,9 +121,21 @@ Both hosts also run `state-sync.sh push` and `reporting-reminder.sh prompt` on `
 
 No host wires a Context Mode hook, and no host has a `PreCompact` event. Context Mode runs only as a filtered MCP server, and `context_mode_hook_errors` in `scripts/validate_targets.py` fails validation when any hook handler of any target runs `context-mode-dispatch.sh`. A stale hook entry left in an adapter that a consumer commits still calls the dispatcher, which reads its input, prints nothing, and exits 0.
 
-GitHub Copilot's configuration has no matchers, so it lists the five Bash guards individually under `PreToolUse`, and each guard runs on every Copilot tool call. Antigravity wires only a `*` PreToolUse bridge and, on purpose, no lifecycle hooks.
+GitHub Copilot's hook file has no matchers and five events. Every entry except the two `state-sync.sh` calls passes the client name `github-copilot`:
+
+- **SessionStart**: `state-sync.sh pull`, `session-log.sh`, `session-start-state.sh`, and `reporting-reminder.sh session`, which adds the reporting reminder.
+- **PreToolUse**: the five guards `protect-files.sh`, `git-protection.sh`, `enforce-branch-state.sh`, `enforce-commit-gate.sh`, and `enforce-pr-gate.sh`, each listed alone, so each guard runs on every Copilot tool call. `copilot_guard_target_errors` in `scripts/validate_targets.py` requires the client name on each of them.
+- **PostToolUse**: `record-branch-state.sh`.
+- **Stop**: `session-log.sh`, `stop-session-log-check.sh`, and `state-sync.sh push`.
+- **SubagentStart**: `subagent-context.sh`, which gives a sub-agent the repository guidance.
+
+On the Copilot harness the Claude-settings copies of the lifecycle hooks stand down, so the entries above run them once. The Claude-settings state push on `UserPromptSubmit` and `SessionEnd` and the checkpoint on `StopFailure` do not run there. The Copilot hook file still pushes at every `Stop`.
+
+Antigravity wires only a `*` PreToolUse bridge and, on purpose, no lifecycle hooks.
 
 A guard decides whether a payload is a terminal command from its tool name. `is_bash_tool_payload` in `_lib-frontmatter.sh` accepts an empty name, any name containing `bash` or `shell`, `execute`, and VS Code's Local-harness terminal tools `run_in_terminal` and `send_to_terminal`, whose command is `tool_input.command`. `protect-files.py` uses the same names in `TERMINAL_TOOLS`. Before VS Code's names were added, Copilot terminal commands skipped the branch, commit, and PR gates and the protected-file shell analysis; `git-protection.sh` already read any `command`.
+
+The Copilot harness names its shell tool `bash`. Its helper tools `read_bash`, `list_bash`, and `stop_bash` also end in `bash` but carry no command. `protect-files.py` lists them in `SHELL_HELPER_TOOLS` and judges them like a native tool when no `command` is present.
 
 ## The ordered Bash safety lane
 
@@ -122,6 +154,8 @@ flowchart LR
 - Each guard receives the same payload. The first one that prints a `deny` or `ask` decision wins and the wrapper exits.
 - A guard that exits non-zero, or prints anything other than a well-formed decision, makes the wrapper fail closed.
 - Decisions are JSON `hookSpecificOutput` objects with `permissionDecision` set to `deny` or `ask` plus a reason.
+- For the client `github-copilot`, the same decision and reason are also printed at the top level of the object, the shape Copilot documents. The Copilot harness honors the nested object only under PascalCase event names. The answer carries no top-level `hookEventName`. `pretool_decision` in `_lib-frontmatter.sh` and `print_decision` in `protect-files.py` write this shape, and every other client keeps the nested-only line.
+- `json_escape` turns each control character in a reason into a space, so a shell guard's answer stays valid JSON.
 - `fail_closed` in `_lib-frontmatter.sh` is the shared error path. It appends a line to `.claude/session_logs/hooks-errors.log`, emits a deny whose reason starts with `hook could not evaluate the request safely, denying:`, and exits 2.
 - An empty payload is allowed, because some events send nothing. A present but unparseable payload fails closed.
 
@@ -137,6 +171,8 @@ flowchart LR
   Parent folders such as `.claude` stay unprotected, so `git -C .claude add -A` keeps working. The Bash literal matcher is built from the same names.
 
   The classifier understands edit payloads, patch blocks, shell redirects, and mutators such as `rm`, `mv`, `ln -s`, and `tee`. Unmodelled Git commands are resolved against their `-C` or `cd` folder.
+
+  The Copilot harness's `apply_patch` tool sends its patch as plain text, not JSON. The classifier reads that text for a tool that can write and judges each file a patch header names. It matches the four header forms in any letter case and with extra blanks. A patch with no end marker, text that is neither JSON nor a patch, and patch text sent to a shell or read tool all fail closed.
 
   The decision rule fails closed:
 
@@ -154,7 +190,11 @@ flowchart LR
 
   Any command outside the read-only list (`cat`, `rg`, `grep`, `head`, `tail`, `sed`, `wc`, `stat`, read-only Git) that names a protected config is denied on every host. Examples are `ls .mcp.json`, `git add <file>`, and an inline PR body. Git message text is the exception: `git commit -m "..."` and the `-m "$(cat <<'EOF' ... EOF)"` form may name a protected file.
 
-  Native read-only tools (such as `read_file`, `grep_search`, and the Copilot SDK harness's `view`) read hook and agent configs without a decision, but still get the secret-file deny. The wrapper runs the classifier with plain `python3`, not `uv run`, so protection works before a project environment exists.
+  Native read-only tools read hook and agent configs without a decision, but still get the secret-file deny. Examples are `read_file`, `grep_search`, and the Copilot harness's `view`, which a hook sees under the name `Read`. A path key such as `path` or the search tools' `paths` list is judged, so `grep`, `rg`, or `glob` with a secret-shaped file in `paths` is denied.
+
+  On `github-copilot` only, the tools `run_dynamic_workflow` and `dynamic_workflows_manage` are denied by name (`UNVERIFIED_CODE_TOOLS`), because no run showed that the code they start passes through the pre-tool hooks. The table "Copilot harness tools and guard handling" in `docs/target-mapping.md` lists every tool of that harness with its handling.
+
+  The wrapper runs the classifier with plain `python3`, not `uv run`, so protection works before a project environment exists.
 
   Recovery: inspect protected configs with `cat` or a native read tool, and stage with `git add -u`. Write findings JSON and PR bodies that name a protected path with the native Write tool, and pass them as `--findings-json <file>` or `--body-file <file>`. Change agents in `shared/agents/` and regenerate. Rewrite a command the guard refuses, for example by putting the work in a script file.
 - **`git-protection.sh`** (PreToolUse on Bash). Denies destructive Git forms anywhere in the command. They are `git reset --hard`, force pushes (`-f`, `--force`, `--force-with-lease`), and `git push --mirror`. They also include `git checkout --`, `git restore --source`, `git clean` with both `f` and `d`, and deleting `main` or `master`. It tokenizes each `git` clause up to the next unquoted shell operator and lowercases tokens. Recovery: use `git restore -- <path>` where you would reach for `git checkout -- <path>`.
@@ -162,13 +202,14 @@ flowchart LR
 - **`enforce-commit-gate.sh`** (PreToolUse on Bash). Gates `git commit`. It stands down for commits aimed at the nested `.claude` repository or at another repository; a compound command that mixes those with an outer commit is still gated. It requires an implementation branch. For an ordinary commit it also requires `assert_commit_invariants`: a passing closeout receipt, LEARN evidence, the closeout session log, and a findings report that carries every review profile the changed paths require. At phase completion the findings report must also record the reviewer's gate result `PASS` with no open request. Bypass subjects (`fixup!`, `squash!`, and `chore(typo):` or `docs(typo):` over eligible documentation paths) skip the ceremony but not the branch check and are ledgered. Recovery: the reason names the missing artifact; produce it and retry the commit alone.
 - **`enforce-pr-gate.sh`** (PreToolUse on Bash). Gates `git push` and `gh pr create`. A push aimed at the nested or another repository stands down; a pull request never does, because `gh -R` names an owner and repository, not a path. Pushes need an implementation branch and `assert_push_invariants`; pull requests also need `--base dev` and `assert_closeout_invariants`. A chained commit-and-push is refused with an explanation, because the gate evaluates the HEAD that exists before the command runs.
 - **`openwiki-guard.sh` and `openwiki-guard.py`** (PreToolUse and PostToolUse on `openwiki_begin`). `pre` denies every `mode` other than `"update"`, including `init` and a missing mode. It also denies a root outside this repository and a repository without `openwiki/INSTRUCTIONS.md`. Otherwise it snapshots root `AGENTS.md`, `CLAUDE.md`, and the OpenWiki workflow path under `.claude/.cache/openwiki-guard/`. `post` restores them byte for byte, removes an adapter that did not exist before, refuses a symlinked path, and exits 2 without touching a file that changed concurrently. A real-binary test in `tests/test_openwiki_cli_smoke.py` runs `openwiki_begin` between `pre` and `post` and checks both adapters come back byte for byte. Recovery: the user runs `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell, because `protect-files` denies an agent command that names the installed hook script. The `pre` deny reason for a run left unresolved and the `post` error both say so, naming that exact command.
-- **`reporting-reminder.sh`** (PostToolUse on Bash; Codex prompt submit). Advisory only. It fails open on any internal error and adds reminder context about user-facing reporting.
+- **`reporting-reminder.sh`** (three modes). `late-report` runs after Bash and `prompt` runs on prompt submit, both for Claude Code and Codex only. `session` runs at `SessionStart` for GitHub Copilot only. Advisory only. It fails open on any internal error and adds reminder context about user-facing reporting.
+- **`subagent-context.sh`** (`SubagentStart` in the Copilot hook file). A context hook, not a guard. It gives each sub-agent the text of `.github/copilot-instructions.md` and one fixed line that says where agent files and skills live. It reads that file only when it is a regular file of at most 2,048 bytes that no link leads to. It builds its answer with `python3 -I`, never denies, and exits 0 on every error. `validate_targets.py` fails when the generated `.github/copilot-instructions.md` is larger than 2,048 bytes.
 
 ## Recording hooks
 
 - `record-branch-state.sh` runs after every Bash call (including Copilot's `run_in_terminal` and `send_to_terminal`). When a branch was just created it writes `originating_branch`, `implementation_branch`, `started_at`, and `current_phase` into the big plan and flips the first `planned` phase to `in-progress`. An unsafe value or unexpected status is reported, not written.
 - `record-commit-closeout.sh` runs from the Git `post-commit` hook. It advances `current_phase` after a completed-phase commit and ledgers bypass commits in `.claude/session_logs/hooks-bypass.log`. A merge never infers a phase transition.
-- `session-log.sh` appends session events to `.claude/session_logs/hooks-sessions.log`, translating between Claude Code's snake_case and Codex's camelCase payload keys.
+- `session-log.sh` appends session events to `.claude/session_logs/hooks-sessions.log`, translating between Claude Code's snake_case and Codex's camelCase payload keys. Each line carries `target=<client>` from the hook's argument, so a Copilot harness session is logged as `target=github-copilot`, once.
 
 ## Git hooks as the second layer
 
@@ -191,6 +232,10 @@ flowchart LR
 - `tests/test_protect_files_scoping.py` covers the classifier's scoping rules and how the scanner reads quotes, comments, line breaks, and `${ }`.
 - `tests/test_protect_files_substitutions.py` covers substitutions, grouped redirects, `sed` writes, folder changes, shells fed by heredocs, and the recorded gaps.
 - `tests/test_hook_gates.py` also covers whole-folder and agent-folder protection on all four hosts, the `git -C` and `cd` forms, secret names inside protected folders, and mixed commands where an uncertain hit must still deny.
+- `tests/test_hook_gates.py` also covers the answer shape for each client, the stand-down conditions of the launcher, and the sub-agent hook.
+- `tests/test_protect_files_copilot_harness.py` covers the file guard on Copilot harness inputs: patch text, the shell helper tools, the name `Read`, the search tools' `paths` list, and the two workflow tools.
+
+`scripts/check_copilot_runtime.py` is an opt-in check that runs these hooks on the real Copilot runtime. The [install and runtime checks page](../operations/install-ownership-and-runtime-checks.md) describes it.
 
 ## Related pages
 
@@ -198,3 +243,5 @@ flowchart LR
 - [Deterministic verification: verify.py modes, receipts, and findings](../operations/deterministic-verification.md)
 - [Git-backed AI-state sync](../operations/git-backed-ai-state-sync.md)
 - [Context Mode dispatcher: version pin, tool filter, and cache security](../operations/context-mode-dispatcher.md)
+- [Agent roster, prompts, and the skill library](agents-and-skills.md)
+- [Install, ownership, and runtime checks](../operations/install-ownership-and-runtime-checks.md)

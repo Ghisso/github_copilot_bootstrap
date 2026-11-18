@@ -468,6 +468,16 @@ surprise an operator, plus practical notes worth knowing before you refresh:
   with no approval prompt: rewrite such a command (for example, put the work
   in a script file) or run it in your own shell. `docs/runtime-checks.md` lists every rule, the commands it blocks
   by mistake, and the forms it still does not check.
+- **Copilot harness: two new denies, three looser decisions.** The file guard now
+  denies a search tool (`grep`, `rg`, or `glob`) whose `paths` list names a
+  secret-shaped file such as `.env`, and, for the client `github-copilot` only,
+  the tools `run_dynamic_workflow` and `dynamic_workflows_manage`. It no longer
+  asks when the read tool reads a hook, server, or agent file, it no longer
+  stops the shell helper tools `read_bash`, `list_bash`, and `stop_bash`, and it
+  reads patch text from `apply_patch` instead of stopping it. The table [What
+  changed in the guard for the Copilot
+  harness](docs/target-mapping.md#what-changed-in-the-guard-for-the-copilot-harness)
+  lists each change with its basis.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
 - **Root-owned tracked files.** A tracked file owned by `root` is a container

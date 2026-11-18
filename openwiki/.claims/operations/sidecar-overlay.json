@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:65df04e7b0730380f238077509ff88b0b40b9f86737eb9907f3a840ae5c13a98",
+  "pageVersion": "sha256:994945ab41a6636d0ec1491003160e40be408b359bf2e1ca873f288a9bc1a810",
   "claims": [
     {
       "id": "claim_b0158374af164219ad80eee5f9baed11",
@@ -185,7 +185,7 @@
       "statement": "Native runs on 2026-09-25 verified Claude Code (.claude/skills and the rules bridge), Codex (.agents/skills, no bridge), and Copilot in VS Code in Local agent and Agent Host sessions; Antigravity was unavailable and is unverified for sidecar v1, and Copilot's Local agent let a sidecar .agents/skills copy hide a team skill of the same name in .github/skills.",
       "evidence": [
         {
-          "resource": "repo://docs/sidecar-provider-contract.md#L484-L600",
+          "resource": "repo://docs/sidecar-provider-contract.md#L496-L612",
           "version": "repo-lines-v1:sha256:b5d4ec488db14eff4b4f945983ff441b1315404fd46d4e39548fcdfc3cc1fb62:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIzZWZhMzljZDhjMzViZjgzODFkN2Q1YjAxMzVhNGNhZTIzNTZiYTFmZDlhYzI1YmE0Mzc0NDk2YTMyZWEzZjQ3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwNzZkZGY0OTM2YWI0ODRkOGVhZTI3NWYwMzM0NGQ4OTg1NGVkNjAzZDI0ZTM5NTY3ZjZlZTZlZDkxN2RlMDQ0IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIyOWMwOWU4Nzk1NDVjY2ZkYmViYzBkNTk5OWNmNWE0NTk0ZmM1YzhlZWU5NWY2NGZhOWJiZjNjNzgxMzUwMzYxIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
         }
       ]
@@ -221,7 +221,7 @@
       "statement": "Sidecar mode supports only the main worktree; the main worktree's info/exclude lines also hide sidecar paths in linked worktrees, background-session worktrees get no sidecar files unless listed in git.worktreeIncludeFiles or .worktreeinclude, and info/exclude is not a security boundary.",
       "evidence": [
         {
-          "resource": "repo://README.md#L916-L935",
+          "resource": "repo://README.md#L1003-L1022",
           "version": "repo-lines-v1:sha256:2af2563d11b0b73179335027f1092cdb4ee1253c6bc82d96c86a48f8044d367e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzNzFmMTYxYjcwNDIzNmYyZTUyOGJiYWRkYjBjMzQzMWYyNDg0OGE4NDNlOTg5ZmM3ZWMxNzI4OTQ4M2YzMjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyMzA2ZjRlYzFjYWJjZGFhZWE0OWRjNWFlZjBlYmZkZWY4MjRhYTNlNGUwNWIzZTJkODY4ZWEzY2UzYWY5NmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhkYjA4ODhkZTA1ZjY0ZjI5MjZhODA4OTljNzZmYmE3YTMyYTcyM2Q0YzljMzU1NTUyZThhZTE0MDg2NTA0ZjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4M2NmMzM4ZDQwODAxMmE1NDczNWI5MTFkNThiMDI2ODU0YmU3YTgwMzM3NTk4NDkyNzlkYTBiOTM3YjU2Y2MifQ"
         },
         {
@@ -665,7 +665,7 @@
       "statement": "Switching profiles is an ordinary update: --profile skills on a workflow install removes the workflow-only units through the remove-and-preserve rules and keeps the state folder hidden in place, --profile workflow on a skills install adds the missing units and seeds the state folder (migrating a retained, owned legacy .claude/ai-bootstrap first), a rerun without --profile keeps the manifest's profile, and the end-of-install empty-folder cleanup leaves no empty .claude/templates or similar root behind.",
       "evidence": [
         {
-          "resource": "repo://README.md#L683-L708",
+          "resource": "repo://README.md#L766-L791",
           "version": "repo-lines-v1:sha256:fa9e65457651843b1d10b804f49bab5e21c7399e0f9871eeda101d83150ee161:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NDZlOWQyMDQ4OTM4OTZkN2YwODZlM2QzZGM3MmFmOWMyYmY1M2U5NDRkZWQ0ZTRmYjU3NjkyNzg4YTcwZDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY3YWE2YjRiMDFiMTIwODNiYjJjNzU0NWU4MWFlMDZhYTNlYWQyMzFjMWNmYmYxZDBiNjgwN2UyZjc4NWM5MTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhNjQ5YmFhMmU2Y2QyMDMwYmI0MDcwOGI5NmM2ZjlmOTY5MWQ0ZWZhYzg5MThlZmRmZTVmNjFjODAyM2VkYmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliZGM0YTc3NTBiZjI3MmY2MWY3MzI4NGU4MDViMGZhZTc0MTBhMDZiMzUyN2YwM2FkZjMzYzE5NDNmMmY4NTMifQ"
         },
         {
@@ -701,7 +701,7 @@
       "statement": "The workflow-only onboard skill checks private destinations before writing project context and a memory pointer; its team conventions distinguish explicit rules from patterns inferred from repeated repository examples.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1908-L1921",
+          "resource": "repo://scripts/generate_targets.py#L1910-L1923",
           "version": "repo-lines-v1:sha256:b91e918bb2643539a2466d5f1f909a4bb90d53403ea566c8a468bfd3cf73a9a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzMWNmZmFiZTBhNzBjZTdkYmNiNmM4ZmQ2M2EyODdkYjI3ZDdjZTU2MzBjN2FmY2JhNTRkYjNlMmE1MGI5ZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhOTk1MmZlZDlkOTJiNDFmYWMyMTZmNjZhNTg0ZjdjNmQwMjJhZTYyMTRkNWM5MjUzNzJiNDUzNGZmNmYzMjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRkZTUzNzlhNzEzYjAyOWVmYzVlNjA0YzM2ZDc3NWFmNzljZDlhNTViOTExZGI0MWQwODU1NDkzMDVmODg3NzkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdhNDA1YWIzMTg1MWE1OTIzZjIxOTk2OGVmYmE5ZTZjMDY5NjEyNzI2OGU0ZWMxMGZkNzllNjFlODllMTE3ZmEifQ"
         },
         {
@@ -733,7 +733,7 @@
           "version": "repo-lines-v1:sha256:84b56b4bf8190361b3c15d2bcb62c2a953d18e7f9d8f369339c6bfce17ff62b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5YmViODNlMTUzY2QyMmMxN2RlYTk1NmM5NTYzNTUzZDJkOGYyYWY0NWZjODA3NWM2ODQ1MjhhYjJmZjNkNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFmNTdmNzdlNTQxNmZkZDNjOTcwNDlhNDc0NGJkYzg2ZGVmMGRlOTZlYjdhM2YxN2VjY2UyNmU3NGE2NTc5ZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjOGVlZWE0NzFiM2I0ZTRhOWUzNGFhYjBiOGNiM2FiMjBiNDgzNjM4NWVhYmI4M2M0MjFmYjMzMDBjMDhkOWQifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L9273-L9277",
+          "resource": "repo://scripts/validate_targets.py#L9405-L9409",
           "version": "repo-lines-v1:sha256:bf7ae14a8bbbf94af0dad4b35c5ef6493496a14e30e963a06fa79b05733caf66:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWMyZTA2NjU0OGE5OGQyOTI0NmY5MDliZjViZTI2ZjlkZjI1ODY4ZjI0YWRkNGRlNzU4MTI3M2VhYTIwM2Q0MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTRjNDFmNDBmM2E4Y2RhMDVmMjc5Y2JiY2IwMDNkMWUxNWM3ZTc3ZGQ3ZWVlMzNjMGYyYmJjOGYxNTM1NGY5YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGNjNGE3ZDFjYzc5NmFiYTNlNDY3MjMzMjdmNTE3ZTlmODExOTgyZDI1MGYwNzAyOTg2ZTRiNTc2NGFkOTU4OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjMxODZjZWZiOTNlYzA4MTA1ZmJjOTMwZTdiY2JmYzQ3OWI4Y2Y1NWRkNGI4YzljM2E1OGExODBkOWI1YTJjMSJ9"
         }
       ]
@@ -747,10 +747,30 @@
           "version": "repo-lines-v1:sha256:84b56b4bf8190361b3c15d2bcb62c2a953d18e7f9d8f369339c6bfce17ff62b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5YmViODNlMTUzY2QyMmMxN2RlYTk1NmM5NTYzNTUzZDJkOGYyYWY0NWZjODA3NWM2ODQ1MjhhYjJmZjNkNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFmNTdmNzdlNTQxNmZkZDNjOTcwNDlhNDc0NGJkYzg2ZGVmMGRlOTZlYjdhM2YxN2VjY2UyNmU3NGE2NTc5ZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjOGVlZWE0NzFiM2I0ZTRhOWUzNGFhYjBiOGNiM2FiMjBiNDgzNjM4NWVhYmI4M2M0MjFmYjMzMDBjMDhkOWQifQ"
         }
       ]
+    },
+    {
+      "id": "claim_7e2db4300f64430ba681caed700b2173",
+      "statement": "A discovery check recorded on 2026-11-18 on the Copilot harness runtime 1.0.108-0 (check_copilot_runtime.py --discover, no session and no VS Code run) listed 2 instruction sources, 4 skills, and no agent for the sidecar skills profile, and 4 instruction sources, 22 skills, and 5 agents for the workflow profile; the instruction sources were the files in both .github/instructions/ and .claude/rules/, and the 5 agents were the workflow profile's .claude/agents/<id>.md files; the record claims discovery only.",
+      "evidence": [
+        {
+          "resource": "repo://docs/sidecar-provider-contract.md#L1284-L1347",
+          "version": "repo-lines-v1:sha256:5604b96a0420ee9d16b9c83834f6569e85d7d73d0a236b8a6381a01463449673:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxMTExMzcyNDQ3MDllMjEwN2Y2YTNhNmM3MDlmYzZjMGQwNGZlM2NkOTVmZDBlODRiN2FmNGNmNDRhYTBhNTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMxMzYwMDE1ZGQyNWZlY2ZlMDFjOGE1YTFlNzcyYWRiMzEyZWI3N2E2NTM5ZDFmZmM5MTQ5YWQ2ZTA4NTUzNDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlM2NhM2U4ZjZmOTJhMjAwNjQ1NjdjY2MzMGNhOTg4MTllNDQ4YjMxZDZlYTI3NTc0MmEwNTNjYjE2MzdkY2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgzOTRjMzU2YzRiZmI5NTlhM2I5ODEzNjk0MjhmNjgzMmZjZDhjNjBjN2JhNzM2MjQzNzgyNjY5N2JhMWZhOGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_045ac8b8a33b438ea20094e789a216fa",
+      "statement": "No .github/agents or .codex/agents file ships in either sidecar profile: the 2026-09 native runs did not show a config-free way for Copilot or Codex to find a custom agent in an ignored file, and one later check differs for Copilot, where offline discovery on the Copilot harness runtime on 2026-11-18 listed the workflow profile's five .claude/agents files as agents without any claim that they work there.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L653-L661",
+          "version": "repo-lines-v1:sha256:370efe569fc66d73ac8b8c4fd63be1b66e07e0b6a9e072ce2580bfba299b3070:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDIwNzAxNTVjNzMyZTAxZTMzOWIwODUyMzg3Yjc3NjY3MWY5OTYxNTYyYTJlODJiYmRhMGJkZmNmMWQwNjQyYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTA4NTJiNWMzZDQ5MTNhYTc1ZTQ2ZjJiNWMzZjYwYzNjMDc4OGY4MDM0MWQxNGFkNDg3MTExNzBiOWZkOTk0NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODViNTJhMjE5NDEzYzdiZWNjMTA3NjYzZjE2NjhiMThkZTdiM2NiMDBmOTcwY2E0NWFjMTE4Mjc4NDNiY2RkZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMmFhNDAwOGYwNTAwMTc3NjlmNmJlM2JmZjdjMjIwZjNkZTMxYWNjOGFlNTYwYzNjZmI1NGZhMzNhNWE1NWFiYiJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-14T17:16:32.491Z"
+    "at": "2026-11-17T23:52:59.759Z"
   }
 }

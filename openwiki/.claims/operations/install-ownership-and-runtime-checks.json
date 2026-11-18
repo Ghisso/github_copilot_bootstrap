@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:8b3dbe979757df60eb0a3b487bd1ff550ccfc63a50be359e65853da8a1b1d1b3",
+  "pageVersion": "sha256:a3389458bfdadfb3dc1fecbc462c25b2893786d14214ec952b8922dd5e6da0a0",
   "claims": [
     {
       "id": "claim_b1af9741cfc242439d4d2f5655e2f681",
@@ -401,7 +401,7 @@
           "version": "repo-lines-v1:sha256:17227c2fe633c72599bf6d12daabce6292462997fdad0302f75082b261c0aba0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2OTE1YmVjZDFmZWU1YzI1OGRmNzYyOWJmOTZmZWQwYjcwMDBmM2FmMWMwOGEzNDNiOWQzNTY5Mzk5MzQzMjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0NmQ4N2ZiZWU1ZTg4MmVmZTVhNzQ3NGZkODc5ZDZhNjFkYThjMmU4NDRjNzJjYmYzOWI5MzkwMDcyMzQ5NDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlNDdmY2U0ZGM3Y2QxMjlkOTE5ODcxZGY4OTE5Yzk3M2I5YTM1NjAwNzE4NjVhYTcwYmYwMmMwODI5Y2U2NGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0Yzk0YTdhZWM0N2Y1MDI0ZTRkNjFkM2NiZWU0MzM5YjdjOTQ1ZWE3MmU5YTY4YTA1NmViMGJkMmU5ZTgwMTIifQ"
         },
         {
-          "resource": "repo://shared/scripts/verify.py#L917-L967",
+          "resource": "repo://shared/scripts/verify.py#L919-L969",
           "version": "repo-lines-v1:sha256:b8ee5b28615340a055bf7ca8bd9f0bd6eae319fb18838bf4a93cf5f84c6f0c8b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NWY2NTFjOGFjMzZiMzE5ODViMTA1Y2IwZTc3OGI3YjgyYzc3YWJmZjE2NmE3NDIzMzI2ZmQwZWVlZmQyMmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVhMTNkODlkODIyNjU5OTdiMTZkMTYxNWUyOGFmZGFiNjQzMzg4MWU5NDQ1OTY4ZmRkYTEzOGE4MWI2NjliMWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZjFlNDI4MjIyNTVlMmNjY2M4YmY5OWRlOGNkYWFkMmMzZDg2Njc5OTQwMjdkYjE1NWQxMTk2ZDYxM2IyNjcifQ"
         }
       ]
@@ -531,7 +531,7 @@
       "statement": "A state-folder README whose path or folder is unsafe is skipped with a warning instead of refused, chmod_runtime_scripts skips links, and the unsafe-destination check does not cover state-sync.sh's own writes to .claude/.gitignore, .claude/.gitattributes, or settings.local.json, Git's own writes, hard links, or whether the macOS quarantine strip follows links; docs/target-mapping.md records the state-sync gap as the priority follow-up.",
       "evidence": [
         {
-          "resource": "repo://docs/target-mapping.md#L121-L121",
+          "resource": "repo://docs/target-mapping.md#L157-L157",
           "version": "repo-lines-v1:sha256:445effafd5d07824b3775ed6fa7e3f77aa105151dc8380c4e5e9fff0f9637585:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQ1ZWZmYWZkNWQwNzgyNGIzNzc1ZWQ2ZmE3ZTNmNzdhYTEwNTE1MWRjODM4MGM0ZTVlOWZmZjBmOTYzNzU4NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDQ1ZWZmYWZkNWQwNzgyNGIzNzc1ZWQ2ZmE3ZTNmNzdhYTEwNTE1MWRjODM4MGM0ZTVlOWZmZjBmOTYzNzU4NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDk1NjM2OWJlMWY1NGM1NjZlYzE1NjgyN2U2ODA5NTQwNGJkYmMxYzI4YzUxOGZlMGJhODAxM2ZlOWEyY2FkYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWYxNDM2ZDU4NWQzN2M1YWIwYzI2MzJjY2I5YWNiMTcxYjVmYjkzM2IzZWZiMDc4ZTJhNDY2MjJiNmVmMTYwYiJ9"
         },
         {
@@ -625,7 +625,7 @@
       "statement": "The unsafe-destination check does not cover reads through links: populate_bootstrap_root copies a preserved, tracked root adapter that is a link into the AI state, which can then be pushed, and the installer does not guarantee that it never writes outside the project.",
       "evidence": [
         {
-          "resource": "repo://README.md#L1029-L1038",
+          "resource": "repo://README.md#L1108-L1117",
           "version": "repo-lines-v1:sha256:e14a045f0365567faea46baeb928b9212265d618d579898a9a78c661a9074c1b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzNjZhZDk3ZDM4Nzg2MGE3MGI1ZDBiNmE0MmI5Y2Q5MDZmOTk2NGViN2NlYmI5MTJkOWMwYWFiY2IxZWM3Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIzNmVlZWM0YzhjMzg5ZDViZWQzMTdlNjJkYmFjMDA2ZjE2ZDY0MzkzMzg0ZDQzNzJkNDlmNTlkZWFjMGExZGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMxY2EzZGFkNmRmNDllY2QxZWQ4MjViNTA4MjAyZTgwY2E5MjkwNWQ1MjVkZTJjOWYwNmNlNDRhYjYyMzVhN2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiMGM3MmQ5NDk1MmRhMTA5MDhkYWIxYzc0ZTM3MzQwNjc1OThjMzU5N2VjYzk3ZmE2OTg4NjlmNzgyZWEwMDUifQ"
         },
         {
@@ -657,7 +657,7 @@
       "statement": "The removal of inactive adapters in populate_bootstrap_root and the plain write_text calls for the project-name and Python-version files, .gitignore, the devcontainer file, and .claude/bootstrap-ownership.env have the unsafe-destination preflight only, with no copy-time second line.",
       "evidence": [
         {
-          "resource": "repo://docs/target-mapping.md#L127-L127",
+          "resource": "repo://docs/target-mapping.md#L163-L163",
           "version": "repo-lines-v1:sha256:29346af1a343fbc110d8873f21c458bbcd270dbbf52684ec602745de5261d2d2:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkzNDZhZjFhMzQzZmJjMTEwZDg4NzNmMjFjNDU4YmJjZDI3MGRiYmY1MjY4NGVjNjAyNzQ1ZGU1MjYxZDJkMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkzNDZhZjFhMzQzZmJjMTEwZDg4NzNmMjFjNDU4YmJjZDI3MGRiYmY1MjY4NGVjNjAyNzQ1ZGU1MjYxZDJkMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGE5YjcwNDFhYWVhMmM2MmVhYzcxYjJiZjhiMTFmZTkzNGIyNTA4MDEzZTgxMmRhYTg0NTg0NDQxMTgwNzRlYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjQyMWVlOTVmZjdmMjJkODM1ZmFiNzQzMzdkM2E2ZjAyNTlhN2QxMDZiNDlhMzU4NGJkOTNlYjdlNmUxYWEyYyJ9"
         },
         {
@@ -671,7 +671,7 @@
       "statement": "The project-skill checks ignore an unmarked folder without a SKILL.md, so an unmarked folder with a shipped name and no SKILL.md is not refused: the copy overwrites its shipped files and the obsolete-file cleanup deletes its other files.",
       "evidence": [
         {
-          "resource": "repo://docs/target-mapping.md#L128-L128",
+          "resource": "repo://docs/target-mapping.md#L164-L164",
           "version": "repo-lines-v1:sha256:c8ec9b1d4300bbe5b1b1a700eeed572f7b805bce6648fc8df9012cdc75383b49:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzhlYzliMWQ0MzAwYmJlNWIxYjFhNzAwZWVlZDU3MmY3YjgwNWJjZTY2NDhmYzhkZjkwMTJjZGM3NTM4M2I0OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYzhlYzliMWQ0MzAwYmJlNWIxYjFhNzAwZWVlZDU3MmY3YjgwNWJjZTY2NDhmYzhkZjkwMTJjZGM3NTM4M2I0OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDdiMDgwYTNhOTdkOWNmNDEyOGUyMWRiNTUxZDRhZWUyZTVlMGJiMzQyM2ZmZDY2ZDVjNzgzYjcwMmZlZTAxZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjAyOTNhZWY5YmQyMmQzZWIyZmMzYjkxNmY5ZTg4MGRhOTMyY2Q2M2YxMTg3OWRlNjFmNjMzZTExZTM3YjhkMiJ9"
         },
         {
@@ -679,10 +679,52 @@
           "version": "repo-lines-v1:sha256:88c158ed37992bd3140e51a0263c7786441bbac1d47319a4eab9ce88be9dc8a3:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGRkY2U0ZjFjZmRjMDJhNTZmYjUxZGVmYzA3NTQ4NDg1N2Q3MWI1YWVhMTJiNjUxNzdkMTdjMDM4ZWJhMzcwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTBmMTBmNzk0MjI3MTY3MmY3ZjM5YmY4ZmE4Njk3NWZmMWIzZjNjMjRhNGYxNjFlMTdjNjYxNGFiYWU3NzY1ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGE4YWJiOGMzMWExNWQ0ODI4N2ZjNWQ4Y2MzYzI4MzU4MjlhMTQ3MjdlZmJhNGU4ZGUyZTg5YmRlNGQ1OWU1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDNmY2JkNGVjOGYxZDcyNzU0OGNhNmQxZGFjZTg5Y2YxNTIxZmM1NjZmYmJjYzIyNzIxNTQ0MWI5ZDk1YWFmZCJ9"
         }
       ]
+    },
+    {
+      "id": "claim_7ea400e054334d0ea378c3cbb2ee588b",
+      "statement": "scripts/check_copilot_runtime.py is an opt-in, offline check that starts the Copilot runtime shipped inside VS Code through its SDK with VS Code's node, a private data folder, and no login, lets a local server on 127.0.0.1 play the model with scripted tool calls, and works in a fresh full install in a temporary folder whose .mcp.json is removed; it does not exercise VS Code's approval dialogs, \"Allow all\", or per-model tool sets, and no test, hook, or verify.py run calls it.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L1-L17",
+          "version": "repo-lines-v1:sha256:c74edac80a1b68526263dac6c97cea3c75d763c43ad50157e6ae2f34817e5bee:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzMDNlY2RkNGE0ZDEwZjE5YzczZmQ0MmZkMTI0MzdmZDMzNTRhODI2ODE2MDVkYTUyNTVhOTdhMzkwNjhkYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YjZlODcwNmI0MzA0N2YyYTZkYjY3ZjEzMjYzODU5NTYwNGU2N2YzNjk2Njg3NmNlMDE1OGYwMDUzZTZiZDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_0ffc69008d5041c69468a341fa3d2712",
+      "statement": "The Copilot runtime check runs the three sessions main, codex-patch, and camel-rename, limits one session to 150 seconds and the whole run to 480 seconds, prints the runtime version and a final 'Result:' line with the number of failed checks, and returns 1 when any check fails.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L1270-L1274",
+          "version": "repo-lines-v1:sha256:2a98af8da56657831b9c54a2916a9792695986287fb54faef687b1d760c5adb3:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYzkxYTZhNzc0ZmY3ODg3NjQxYTM3NzRlMjIyNDQwOTkwMTQ1ZWVmNmZlYjdmZDIxZmYyNzgwMWY1MGFhMDQ0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmFmYmEwNTI3YzM5NTNjNGI2ZTBlNWI1NzM5YmE4MzYxMmY4MDUzYmNkYzk0NjY3MzAxOTNjZDFkNTkwYjQwOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjhjYmQyNTE4OWI4ODgxM2VjYzRiNjYxOTY1Y2ZiZGViZTU4YjkwY2NjNDczOGFlMTBkOGQ5YTcyMmVmMTQ1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjAyOGQ3NDYyNzI1NDU3YWNlNmE2ZGRlZDRmOWYwNDc2Mzc5ZTg0MmQ1OTU3MDFhZDIyYzg4YWIxNWQ0OTE3NSJ9"
+        },
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L1339-L1342",
+          "version": "repo-lines-v1:sha256:b52f338555d1a3170bb24edfc01e4a40e8e1827f145798c437b57170248f32f7:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2Y0MGEwMTczODE5YzdkOWUwNWQ1MWQyZDE2NzVkMzY1NWM4YTQzZDQ4ZjBjMjVhZDY4OGJiZWRmMjkxMWUwNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2Q4ZTllNTA3NjViNmE5ZDllZTAyOWYwZWExZjQ1MmM2NGMzNjMzMDBlZjRhNDQ2MTkyNGVlMTgyMzlmOTAxYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjI2OWZmZWVjYjliNjNkMGZlZWVlOGFlYmVjMDFiYTg2NDBlODA3NDQ0MGQ3YWU3MTRmYmM3OTVjOWRmODk1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzVlZmMzYmYyYzZlOWFjYjI1M2UyNWVkNGRmYTkyMmJiNzY3ZTQ0YjQyZTE4YTdlMjk3ZGQwYmNiNjExNmVjNiJ9"
+        },
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L1400-L1405",
+          "version": "repo-lines-v1:sha256:1aa4fa0e37c83e2b6db89311ea23db55c1678433db1e6ae12bfd1e29891e20fe:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDY0Y2E2NzRhN2ZkZjU1MzE3NzlmYTI2MWIyMGMzMGI3NmIxOTgxMDU3MTZjZmYyZGE4ZDBlZjJiNzM3NzgxMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODhmZWMwYTcyZmI4ZTQzYmY5NzU3ZjBmNGI1ZWUwMjBjZDA0MDQwNzVkNWFkMjdiYTNmZDZjYWM2NDZhODllNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWZlMDQ5YjU3MDNjOWY4ODgxOTY1NjEyYWFkMmYyZTVhOTZmMjEyYzgxYTY4YjFiZmI0NjFmODM3NDhlY2I1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTUwY2JiMDAyMjAzMDkxN2U3MDVkM2Y3NDM3MmFjY2I4NTZiZGMxMmY5Yzk1YWY5YmM1NzYwNWRhMDUyODliNyJ9"
+        },
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L41-L42",
+          "version": "repo-lines-v1:sha256:880b39d0649928edeeb7a68f939c3203bff15f0ea91110c1cd611d515431e198:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTg5YzgwNmU3NzkzNTUxNzgxMTYwNjYzZjM1YzZiNTJhN2NmZDI2NGY3MjBkYjg4MjliNGZhNWE2MjYwOWRiNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk2OWZjMGZhZjViNWU4NzUwYWM1NDQ2ODllYzJhNGFlMDlmZjUyNGQ0ZDhkMzE1MGQwZmQ1MmRlYzJkNGNkNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWNlYTJmNDUyNThlMGNiMGZmNjI4NzlmMTIxOTkzNDE5Njk1YjI1ZGYwMzMzZTA2NzQ1MzkzMWI4YzYwYjgzZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGNkN2JjNDljOWI1NjJjZjhlYWU1MmYwMjhiYWI2Njg4ZGNiN2Q4ZDg0ODkwZGFlMTk5ZmE3NDk3MDdkNTQ0YiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_04291550767948c4b38321b45e41e604",
+      "statement": "The Copilot runtime check takes --require (exit 1 when no runtime is found), --vscode-bin DIR (the folder that holds node and the Copilot SDK, by default the newest ~/.vscode-server/bin/*), --keep (keep the temporary folder), and --discover DIR (print what the runtime discovers in DIR with no session).",
+      "evidence": [
+        {
+          "resource": "repo://scripts/check_copilot_runtime.py#L1428-L1451",
+          "version": "repo-lines-v1:sha256:d5c83a32f4b724e19b1618aa4c74c5e62cd2f1e57ebff1b18963f7f6aa73639d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUwODUyMzNiZDA1OTNiNmE3OTNlMWNhMjY3ODM0YTA0YTRjYjUxNzJhZmM4N2E0MTZhMTdlYWQ3M2MwNTI0YjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhMDY1MWZhODM2MTdmYTdhODQ4ODU2MDJlYzRlODAxNGViNGQzYmEzOTZlNzg1MjE1OThiYzg5MzAyNzY0YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3ZGJmOGE0M2ZlMTViMWIxMjFkOTM0NDRlZTZmZTU5ZjllYWQ4N2UxNmY5ZTMyNmVkMGJlYmMyOWFkNzEwMTkifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-15T05:13:09.357Z"
+    "at": "2026-11-17T23:45:26.446Z"
   }
 }

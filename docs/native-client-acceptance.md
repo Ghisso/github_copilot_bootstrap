@@ -2,8 +2,14 @@
 
 `scripts/check_native_clients.py` is an opt-in release probe for behavior that
 offline structural validation cannot observe. It prioritizes Codex; Claude is
-the second supported native client. GitHub Copilot remains covered by the
-deterministic generated-target checks, not this native-client command.
+the second supported native client. This command does not cover GitHub Copilot.
+The generated Copilot files are covered by the deterministic generated-target
+checks. The Copilot harness (the agent runtime of VS Code's Copilot chat; see
+[GitHub Copilot in VS Code: two harnesses](../README.md#quick-install)) has its
+own opt-in offline check, `scripts/check_copilot_runtime.py` (see [Copilot
+runtime probe](runtime-checks.md#copilot-runtime-probe)). The checks that need a
+signed-in VS Code window are in [VS Code Copilot harness
+(manual)](smoke-tests.md#vs-code-copilot-harness-manual).
 
 The [2026-10-06 behavioral pilot evidence](2026-10-06-behavioral-pilot-evidence.md)
 stopped after one role-loading output and four unavailable case runs. It is

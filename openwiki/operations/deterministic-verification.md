@@ -24,10 +24,10 @@ sources:
     resource: repo://tests/test_validate_targets.py
   - id: openwiki-source-7c9c9eb3a89efa00dd8df426
     resource: repo://tests/test_verify.py
-generated: { by: "claude-code", at: "2026-11-14T16:56:38.985Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:23:04.930Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-14T16:56:38.985Z
+    at: 2026-11-17T23:23:04.930Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -76,7 +76,7 @@ Every receipt carries the same seven checks, each `PASS`, `FAIL`, `UNVERIFIED`, 
 - **`phase`** runs the full measurement group and persists reusable evidence. In this authoring repository it lints and type-checks `shared`, `scripts`, and `tests` and runs `tests/`. In a consumer it lints the repository excluding `.claude`, type-checks the configured mypy scope (or reports `UNVERIFIED` with the fix: add `src/` or set `[tool.mypy]` files, packages, or modules), and runs pytest.
 - **`closeout`** does not re-measure. It loads the persisted phase receipt for `VFY-RECEIPT-001` and proves freshness. `VFY-FRESH-001` passes only when `base_ref`, `branch`, `head_sha`, `merge_base_sha`, and `content_hash` equal the phase receipt's values. `VFY-FRESH-002` passes only when control-plane provenance still matches. The failure messages are `relevant code evidence is stale` and `governing control-plane provenance is stale`.
 
-Each lint, type, generation, or pytest command in `phase` mode runs under `COMMAND_TIMEOUT_SECONDS = 480`. A command that exceeds it is reported as `UNVERIFIED`, for example `VFY-PYTEST-001: UNVERIFIED - pytest did not run: Command ... timed out after 480 seconds`, and the phase receipt then cannot satisfy closeout's `VFY-RECEIPT-001`. The budget stays below the 600-second per-item budget described below, because a required closeout item may itself be `verify.py phase`; this repository's own suite takes about 190 seconds.
+Each lint, type, generation, or pytest command in `phase` mode runs under `COMMAND_TIMEOUT_SECONDS = 900`. A command that exceeds it is reported as `UNVERIFIED`, for example `VFY-PYTEST-001: UNVERIFIED - pytest did not run: Command ... timed out after 900 seconds`, and the phase receipt then cannot satisfy closeout's `VFY-RECEIPT-001`. The budget stays below the 1,020-second per-item budget described below, because a required closeout item may itself be `verify.py phase`. The comment above the constant records that this repository's own suite took about 410 seconds when the budget was last raised, after one run timed out at the earlier 480 seconds.
 
 `phase` and `closeout` refuse to run when `.claude` is not its own Git repository, because nested provenance is then unavailable. The message tells you to checkpoint with `git -C .claude add -A && git -C .claude commit`.
 
@@ -100,7 +100,7 @@ Receipts live under `.claude/quality_reports/` at fixed per-phase paths, the clo
 A small plan's `## Verification` section holds fenced `bash` or `sh` blocks. Every non-comment line is a required item, and `closeout` runs them itself:
 
 - In order, from the repository root, before any metadata is collected, so files an item rewrites are part of what the receipt binds.
-- Each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600`.
+- Each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 1020`.
 - The run stops at the first non-`PASS` item and exits 2 without a receipt.
 - Results are stored at `extensions.verification_items` in the closeout receipt with item text, status, exit code, duration, and the last 20 lines of output. In text format one summary line prints per item, for example `PASS       47.5s  uv run python scripts/validate_targets.py`.
 

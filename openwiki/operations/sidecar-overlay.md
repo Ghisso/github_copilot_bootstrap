@@ -26,10 +26,10 @@ sources:
     resource: repo://tests/test_sidecar_update.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-11-14T17:16:32.491Z" }
+generated: { by: "claude-code", at: "2026-11-17T23:52:59.759Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-11-14T17:16:32.491Z
+    at: 2026-11-17T23:52:59.759Z
 ---
 
 
@@ -65,7 +65,7 @@ A unit is one skill directory at one write root, one single-file unit (a bridge,
 | Templates | `workflow` | `.claude/templates/plan-big.md`, `plan-small.md`, `session-log.md`, `quality-report.md`, relaxed variants that name no verifier or receipt |
 | State folder | `workflow` | `.ai-bootstrap/` at the repository root with `MEMORY.md` and the `plans/`, `session_logs/`, `explorations/`, `quality_reports/` READMEs as seeds; hidden by the one line `/.ai-bootstrap` |
 
-Both bridges carry the same short body from `shared/sidecar/bridge.md`: tracked repository guidance wins over the sidecar, and `ponytail` applies to coding tasks in `full` mode. The workflow rules describe a relaxed loop (read memory, plan when a task spans several files, implement, run the project's own checks, review a non-trivial diff, log the session) that nothing enforces. No `.github/agents` or `.codex/agents` file ships in either profile, because neither Copilot nor Codex has a config-free way to discover a custom agent from an ignored file; `docs/sidecar-provider-contract.md` records the native runs behind that.
+Both bridges carry the same short body from `shared/sidecar/bridge.md`: tracked repository guidance wins over the sidecar, and `ponytail` applies to coding tasks in `full` mode. The workflow rules describe a relaxed loop (read memory, plan when a task spans several files, implement, run the project's own checks, review a non-trivial diff, log the session) that nothing enforces. No `.github/agents` or `.codex/agents` file ships in either profile. The 2026-09 native runs, which `docs/sidecar-provider-contract.md` records, did not show a config-free way for Copilot or Codex to find a custom agent in an ignored file. One later check differs for Copilot. On VS Code's Copilot harness (the agent runtime that VS Code's Copilot chat shares with Copilot CLI), offline discovery on 2026-11-18 listed the five `.claude/agents/` files of the `workflow` profile as agents. The section "Client support" below gives the details, and the sidecar makes no claim that these agents work there.
 
 The workflow-only `onboard` skill comes from `shared/sidecar/workflow/skills/onboard/`, rather than the full-install skill. It reads tracked team guidance, representative code and tests, and a bounded set of commit subjects. After checking that the private state paths are ignored, untracked, and free of symlinks, it writes `.ai-bootstrap/project-context.instructions.md` and one pointer in `.ai-bootstrap/MEMORY.md`. Its `## Team conventions` section distinguishes written rules from patterns inferred from repeated examples, cites paths or commits, and calls out thin evidence. The resulting context is derived advice beneath tracked team guidance. The `skills` profile has no `onboard` or state folder.
 
@@ -95,6 +95,15 @@ Support is claimed only where a real client run observed it. `docs/sidecar-provi
 | Google Antigravity | `.agents/skills/` (documented) | none shipped | unverified for sidecar v1 |
 
 Every verified client loaded skills and bridges that only `info/exclude` hides. Copilot CLI and cloud agents are out of scope.
+
+The rows above come from native runs of 2026-09-25. A later check, on 2026-11-18, asked the Copilot harness runtime `1.0.108-0` what it discovers in a sidecar install (`scripts/check_copilot_runtime.py --discover`). It shows listing only: it starts no session, so it does not show what reaches the model, and VS Code itself was not run.
+
+- With the `skills` profile the runtime listed 2 instruction sources, 4 skills, and no agent.
+- With the `workflow` profile it listed 4 instruction sources, 22 skills, and 5 agents.
+- The instruction sources were the files in both `.github/instructions/` and `.claude/rules/`. The 2026-09-25 row for the Agent Host says only the `.github/instructions/` bridge loaded. The two results differ in VS Code version and in kind, a chat session and a discovery listing.
+- The 5 agents were the `.claude/agents/<id>.md` files of the `workflow` profile, although Git ignores them. No `.github/agents` file ships, which is still true, and no support for sidecar agents on Copilot is claimed. Whether VS Code shows them in its agent list was not checked.
+
+The section "Copilot harness discovery check (2026-11-18)" in `docs/sidecar-provider-contract.md` holds the record.
 
 ## Preflight
 

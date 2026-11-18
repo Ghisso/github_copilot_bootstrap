@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:dd53cc15ddc9df901298faa1ef01fb9a2410eae2039a21a2d0bc0719cb603aa0",
+  "pageVersion": "sha256:61baa2a8a16a8296035f247b5a9299c562f6066c403e727aa2cb0fd31f86c722",
   "claims": [
     {
       "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
@@ -167,7 +167,7 @@
       "statement": "Bootstrap refreshes land as bootstrap:-prefixed nested commits made by the installer's sync step, distinct from the session: commits session hooks make, so the nested log separates the two sources of change.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1091-L1183",
+          "resource": "repo://scripts/install_bootstrap.py#L1642-L1734",
           "version": "repo-lines-v1:sha256:6b59e5d9dd9c5647be4e00f9814ff8a276932e059c52e2acce9456a086f2e21e:eyJzZWxlY3RlZExpbmVDb3VudCI6OTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMTBkYzNmMGJhMTFhMjBhMmRjNTc2NjBhZjNhYjg4ZWIwNDkzM2VlODlkYzExMzFhNTA2MjU3YWE3ODFlMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQwYmM3YWUzY2ZkMGVlMWVkYWFmNzcxZGJkOTVhYzZjNTYzMjlkMmM0M2JiYmE2ZWQwODAzNGNjN2VjNDQ2NjQifQ"
         },
         {
@@ -181,7 +181,7 @@
       "statement": "The installer dispatches --backup-state to _run_backup_state (and so to backup_sidecar_state), --uninstall to _run_uninstall (and so to uninstall_sidecar), and a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install, uninstall, or state backup creates or touches no nested .claude repository, ai-state branch, or state sync; a missing git executable ends the install and uninstall paths with 'git not found on PATH' instead of a traceback.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1749-L1815",
+          "resource": "repo://scripts/install_bootstrap.py#L2300-L2366",
           "version": "repo-lines-v1:sha256:ac28a779ac7ba094908fa78459e9dc9fb21c43444c109f3b6fb9e299ed402a2d:eyJzZWxlY3RlZExpbmVDb3VudCI6NjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3NjIwMDQ4YjBiNDNhZDNhNGQxNTA0MWQ1MzRkOTBlOWEzY2JjODNkN2NiZTY4MzJmNmEyNmZlMTc3NGQyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyNWU3YjgyYTM4NTk5ZTU2MjQxODQ0OThhOThiN2YzMDM1MjQ2MjUzNDk4ODJhMmQ0MDIxMzg5NmRkOTg5ZjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MjMwYTUyNDI2YjYxMDZlMzZhNzcxZmZlYzU0MzI4OTU4ZWQ3NmQwMDdhNDJlZWUxNTg2MjQzNzEzYWE3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjViZTc1OGFjZDE0ZWU0YzkwYzI2YzNhZjc4MzUyYjczODA3YjMwYzdlODFlZTVlOWNlYzBjNzRiMmZhNDdlZDMifQ"
         }
       ]
@@ -383,7 +383,7 @@
       "statement": "The generated devcontainer.json runs a list-form initializeCommand that creates ${localEnv:HOME}/.openwiki and ${localEnv:HOME}/.cache/huggingface on the host before its bind mounts are created, and validate_targets.py requires that exact command.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L9561-L9571",
+          "resource": "repo://scripts/validate_targets.py#L10070-L10080",
           "version": "repo-lines-v1:sha256:e1980fea8131de2605d84168ae35683eb07728931331af38fe56ef94cab173ae:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhMGI1NWIxN2U3NGRjMjE1NjA3Mjg4MjI0ZjRjOGJkY2E5ZmZhYzJkNzc4NGUxYmRhNDVjMDBmNTU5NzVhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiYTNiMzgxNWMwNTRlY2M2Yjg4MTc1NDQ3Njc5YWY0OTU5MDQ3ZmRmYTI5NDYwZTg0YWNjNDAwZjJmMjBhZGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE4OTFiZGM2NWYyYzI3YjBmNDUxMDQ5M2NjNjliZWE4NTM4ZWE4MzM2ODM2ZDY5MzM2NTU2NWRlODhiNmM2YjAifQ"
         },
         {
@@ -397,7 +397,7 @@
       "statement": "validate_targets.py requires the generated state-sync.sh to invoke git rebase --quit exactly once, for the orphaned autostash auto-clear, and never to silence a failed rebase or merge abort with || true.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L1442-L1486",
+          "resource": "repo://scripts/validate_targets.py#L1752-L1796",
           "version": "repo-lines-v1:sha256:dd29434d4adc1ed426c9eba4b35f47590a4b3cbb8a384a289579af3021c297eb:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkYTgyMjQ3YzFiYjIzNDJkZjQwNmY3N2ExNmZjYWIxNGM0NTFmNTljNDkzNTQxZGQ2NmNjMDU4MmU4MWNhZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmYjcwNWI4NjMxOTYxYjhkNTAyOWY3NWYzNTRmYjMwODI2MzQ1OWMxNjMyODk1MjcxM2U4ODg5OTllYjljNDUifQ"
         }
       ]
@@ -407,11 +407,11 @@
       "statement": "Both Claude Code and Codex run state-sync.sh push on UserPromptSubmit; Codex runs a local state-sync.sh checkpoint on SessionEnd, while Claude Code runs state-sync.sh push on SessionEnd and state-sync.sh checkpoint on StopFailure.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1161-L1171",
+          "resource": "repo://scripts/generate_targets.py#L1184-L1194",
           "version": "repo-lines-v1:sha256:ad2480a50dfc46e5e47fea11d66479a05d218737d12bb3e6591d381f143efe6c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiMzBkZjY0ZjA4NzA2NWEyYTJkYWM2ODg2MjhlYjRmYWU2NTYzMmFkZjk0MGUxNDEwZmJkYWZmZTk4M2I2YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjMjU3NzQ3N2MwNWZjZjNjNWI4YTkxZDMwOTc2Y2VmZTFiNDU3Y2U2ZmE3MGI0NDFiNDY3ZTk1MzYwOTVkM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMjEzMDFiZTk5NzA3NzE0Y2U4ZWZhMDc5ZGYyZmM4MzMzMmVmOTdhNmFiNmUwY2VjMjg3YzMwZTFjYWIyMzgifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1251-L1260",
+          "resource": "repo://scripts/generate_targets.py#L1274-L1283",
           "version": "repo-lines-v1:sha256:8738489f8197a90b8eab0408afbd38ef128e1561b66b3d46ee7fb085c51d4be6:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiMzBkZjY0ZjA4NzA2NWEyYTJkYWM2ODg2MjhlYjRmYWU2NTYzMmFkZjk0MGUxNDEwZmJkYWZmZTk4M2I2YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjMjU3NzQ3N2MwNWZjZjNjNWI4YTkxZDMwOTc2Y2VmZTFiNDU3Y2U2ZmE3MGI0NDFiNDY3ZTk1MzYwOTVkM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
         }
       ]
@@ -421,30 +421,48 @@
       "statement": "Claude Code, Codex, and GitHub Copilot run state-sync.sh pull at SessionStart, while Antigravity wires only a PreToolUse bridge and no lifecycle hooks; GitHub Copilot's Stop runs state-sync.sh push instead of a Stop wrapper.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1106-L1114",
-          "version": "repo-lines-v1:sha256:b91f81bae2431ee6ab95192fcdc880b6bfac433088c0ceaf7f48fdac18f84077:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzRlZGVjNTAzZDQ0ZjEzZGY2MDZjZjhhNjQ3YmZmMDZjZThjYzFmNDE1MWUxN2Y3ZjUyNzlkOWNlMTBjYjkzNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmNmY2VkY2NkMDgxOTE1ODM3NjU3OGU5ZGUwYjkwMTUzMmY4NDBhZGE5ZjJhZGI5MTBjODU3NTJkOWE5ODlhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzY2M2NkYWQ3M2E2MTEwNWQ4OTM0NTg3YThiYThkNTNmMDk0YTFiZjMzNjJmNjBjMGViNzcxYjE5NjM4ZWQ0NCJ9"
+          "resource": "repo://scripts/generate_targets.py#L1129-L1134",
+          "version": "repo-lines-v1:sha256:053421ac1b6a46ec3073799e468eb856ed0dbdcca9a853e3ab03d5807684948c:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTkxYTdhYzNmNDY3M2Y2MjMwMGNlNDk5MTA2OGQ4NDk3NzVmOGJkZTE2N2Q0MjQ0MTJiMWM0OWZhODkxZDExNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmNmY2VkY2NkMDgxOTE1ODM3NjU3OGU5ZGUwYjkwMTUzMmY4NDBhZGE5ZjJhZGI5MTBjODU3NTJkOWE5ODlhMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2MyNTc3NDc3YzA1ZmNmM2M1YjhhOTFkMzA5NzZjZWZlMWI0NTdjZTZmYTcwYjQ0MWI0NjdlOTUzNjA5NWQzZCJ9"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1196-L1204",
-          "version": "repo-lines-v1:sha256:3e49797a0db047ff53f1300d14dc0bd0b13ac888e80f76d371c894d40f35c761:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGM2NDc5Y2MyMzA0NDBmZDQxZTgyMjQyMTg2Nzk2OTg1NTlkMjg5M2JkNjdiNDM4MGFmYWI4MTFiMzhhNTVhYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWYxOTdhMjE3ZjA4YTgxODRmOTA0YjA3OGFjYmE3Y2JjMDhkN2I0MGIzMzU3NDBkYmE3MmEwYTdkMDJiYjZhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWE0OWI5NWI4YmZlMGFlMjk3YjU0ZTUxNTQyNzgwMTNmMTNiOGJlY2E1N2JjZGU1NzZhZjcxM2FlYTcxZGYyMCJ9"
+          "resource": "repo://scripts/generate_targets.py#L1219-L1225",
+          "version": "repo-lines-v1:sha256:56808fe4f3e35e2668b9fcec49584988ad4f9919ead559b5c2d9528077ece3d4:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTM4ZGQyY2M1N2ZiMzhkMjYzNzRmNjJkNTQ5NGQ2MTVkN2M5ZmUwZGQyYThhZjNmNmE5NjZlY2UzZDQ5YjkyZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjQ0YWM0ZWU4YTVmYWI5ZWUwYWIyM2FjYTE5ZmJkNDM4MTFmZGEyNzA0MWFlYTgyNDVhZWE2YWNmNGFjNDlhOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWYxOTdhMjE3ZjA4YTgxODRmOTA0YjA3OGFjYmE3Y2JjMDhkN2I0MGIzMzU3NDBkYmE3MmEwYTdkMDJiYjZhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzFjNDg5M2Y3ZThlNDE3YTMzYzk2ZjE1NzI0NjAzYWViNjE5ZDFiY2E3MGVjMWFmNWNkNzAxOWY2MDFlOGI0YSJ9"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1274-L1296",
-          "version": "repo-lines-v1:sha256:ab16aa77ca21c7f8dc6403f42ff1c88ca07d54b62b7a9b70d1167680c9886ee0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2YTdhOWJlYjg4OGFiNDI1N2I0MGVhNjBhMjQ2N2Y4MzI5Y2VkOTg2MzkyZDlkNDZjMDYzZWIzNmVhMTY1ZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MjJjNDJjZDE5YzZkMDNkODA4YzQ1MjcyMDU1MjgyNWI3ZWExYzViNDkxYjIxODUxMWNhYzc0MTVjZjlkOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4ZjU5MjA0YzFjM2RmMzlkNGY5ZDVlN2E5N2Q5N2E4NTU1MDExYzM0YTg2MzIxMjQ3YTE3MWQyMzhkOTFmNDIifQ"
+          "resource": "repo://scripts/generate_targets.py#L1297-L1320",
+          "version": "repo-lines-v1:sha256:840d1a375ca129b3ae7e5396b22ed4dfbec7e386c0d7ffd198b0c956aa6e059f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2YTdhOWJlYjg4OGFiNDI1N2I0MGVhNjBhMjQ2N2Y4MzI5Y2VkOTg2MzkyZDlkNDZjMDYzZWIzNmVhMTY1ZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/hooks.json#L100-L128",
+          "version": "repo-lines-v1:sha256:6c62c3b634b2e6d6fa59ddcd1afe178f0c9e2df903726e705d7f5dee9f6a620f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViMjQ3ZmI4Yjg3YWM0OWM2ODllMDRmODRmOTExMWU2N2Y2ZWUwZjg0NTY5MDc0NzY2OTdjYzNhYTNkM2NhNzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2M2Q1MzVjZTM4MDYzZDZiNGM1MWQ4YzM4NmE3ZjliM2U1ODBhMTRhMTBjMDdiMTk4ZGZhZjE5YzkzYTNiZmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlYTkwN2EzMjcwMGMzMjk1YzA0NGJlN2UyZGYzZDBkOTU2YjkwNDEyMmY4ZTRkZWIxNzg1YTBiZDlmOTI0YWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljODI0MTBkOWZkYzJiNzJjN2YwYTIwOTM3MGQyZGIwYjJhYzBlZTc1OWFmMmMzZWFkZTU3NWU1YzBiOTIxYjUifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/hooks.json#L4-L12",
+          "version": "repo-lines-v1:sha256:7949229f4b2fd0509e2ecf21bf340ebed842ff1f1637b3a15c25760fe2bc807d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJhOTM4ZTA4OWFlNGE3ZjNjMDIyYTc3MWYwZjg4YTkwMzhmNTg1ZWJjZmFhZDhkZTM2NTViN2VhNTdlNzU3YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTY3MDc1MzM0MTAxOGE3M2JiN2RhM2Y3MmMwZWIwMWIwMGQ1MjFhZGUzNmRlMmZhMDQxZTkxMGY2MGE1YzBlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjVlNTk2ZWQwZGE4NGZmOGFhMzM5YzcyNTFkNjEwM2Y2MDc0OWY1YmQxYTFhNDlmOWFmNTVlMDkzMjE1OWVmZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI5ZmVhM2FkNWY4ZDRlZGQwODY1NjM0OTFlYWZkMThlMzEzZjQzMDZlMTA2ZTUyODAyNjRjMjk5ZmZiYzdkNiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_fcb6b93b5d934c1f8dcfbcbb0d95d8bf",
+      "statement": "On VS Code's Copilot harness the launcher run-hook.sh stands down a state-sync.sh call that carries the Claude-settings marker, so the pull at SessionStart and the push at Stop run once, from the Copilot hook file, and the Claude-settings push on UserPromptSubmit and SessionEnd and the checkpoint on StopFailure do not run there.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/hooks.json#L100-L128",
+          "version": "repo-lines-v1:sha256:6c62c3b634b2e6d6fa59ddcd1afe178f0c9e2df903726e705d7f5dee9f6a620f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViMjQ3ZmI4Yjg3YWM0OWM2ODllMDRmODRmOTExMWU2N2Y2ZWUwZjg0NTY5MDc0NzY2OTdjYzNhYTNkM2NhNzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2M2Q1MzVjZTM4MDYzZDZiNGM1MWQ4YzM4NmE3ZjliM2U1ODBhMTRhMTBjMDdiMTk4ZGZhZjE5YzkzYTNiZmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlYTkwN2EzMjcwMGMzMjk1YzA0NGJlN2UyZGYzZDBkOTU2YjkwNDEyMmY4ZTRkZWIxNzg1YTBiZDlmOTI0YWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljODI0MTBkOWZkYzJiNzJjN2YwYTIwOTM3MGQyZGIwYjJhYzBlZTc1OWFmMmMzZWFkZTU3NWU1YzBiOTIxYjUifQ"
         },
         {
           "resource": "repo://shared/hooks/hooks.json#L4-L12",
           "version": "repo-lines-v1:sha256:7949229f4b2fd0509e2ecf21bf340ebed842ff1f1637b3a15c25760fe2bc807d:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWJhOTM4ZTA4OWFlNGE3ZjNjMDIyYTc3MWYwZjg4YTkwMzhmNTg1ZWJjZmFhZDhkZTM2NTViN2VhNTdlNzU3YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTY3MDc1MzM0MTAxOGE3M2JiN2RhM2Y3MmMwZWIwMWIwMGQ1MjFhZGUzNmRlMmZhMDQxZTkxMGY2MGE1YzBlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjVlNTk2ZWQwZGE4NGZmOGFhMzM5YzcyNTFkNjEwM2Y2MDc0OWY1YmQxYTFhNDlmOWFmNTVlMDkzMjE1OWVmZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI5ZmVhM2FkNWY4ZDRlZGQwODY1NjM0OTFlYWZkMThlMzEzZjQzMDZlMTA2ZTUyODAyNjRjMjk5ZmZiYzdkNiJ9"
         },
         {
-          "resource": "repo://shared/hooks/hooks.json#L91-L119",
-          "version": "repo-lines-v1:sha256:7a837fa17d4458a9464d1d7a7bae9d634a6879724fbe386baea6abb478fba73a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViMjQ3ZmI4Yjg3YWM0OWM2ODllMDRmODRmOTExMWU2N2Y2ZWUwZjg0NTY5MDc0NzY2OTdjYzNhYTNkM2NhNzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlYTkwN2EzMjcwMGMzMjk1YzA0NGJlN2UyZGYzZDBkOTU2YjkwNDEyMmY4ZTRkZWIxNzg1YTBiZDlmOTI0YWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRmNzM5YTA2YzFjYmIxMjQ0ZTMzNjNkMzhiY2Y5ZmE1MGNlODRmZWQzOTljMjE5M2EzYzdmMDhkNTk5MThiMmEifQ"
+          "resource": "repo://shared/hooks/scripts/run-hook.sh#L54-L74",
+          "version": "repo-lines-v1:sha256:74c0934552f77e8de0eb8da8db0e71123c31c5b3ed706a9880b6813104f7af7f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQwZmMwZDI1ZmJiZTA3YWIxNDRlYzMyMDcyYjUxMWRlNjUyNWY1Y2Q2OGYwMDdkOGFmM2MyNGJjY2ExYTg0OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2MzA2ZTM4OWI1N2FkMTQ3YTI1NGQ4ZTlmYzIyZTI2N2FkNDFlZWRjOGRhYTY3Y2EwMDM2OWE0NDNhMTY4ODEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYzOWQxNTE0NzJhOGZiNWExNTAxNTZkOGE2N2E1NDAzOTQ0ZjAyMTM1YzdjM2E2NmVlYzZkOTI4M2YxMjNmNzYifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-11-12T09:54:42.940Z"
+    "at": "2026-11-17T23:45:26.446Z"
   }
 }
