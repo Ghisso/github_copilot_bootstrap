@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-18
 **Plan:** `.claude/plans/2026-11-17_phase-G-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -232,8 +232,21 @@ folder `.claude/explorations/2026-11-17_copilot-harness-migration-evidence/`.
 ## Verification
 
 ```text
-# filled at closeout step 4
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' AGENTS.md)" = "0"
+PASS        0.0s  test "$(grep -c -F '<!-- OPENWIKI:START -->' CLAUDE.md)" = "0"
+PASS        0.0s  grep -q -F 'SubagentStart' openwiki/architecture/hooks-and-guardrails.md
+PASS        0.0s  grep -q -F 'Copilot harness' openwiki/architecture/hooks-and-guardrails.md
+PASS        0.0s  grep -q -F 'check_copilot_runtime.py' openwiki/operations/install-ownership-and-runtime-checks.md
+PASS       44.5s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS      615.0s  uv run python .claude/scripts/verify.py phase --format text
+closeout: PASS
 ```
+
+- Phase receipt: `verify.py phase --persist` PASS (Ruff, mypy, pytest with 5927 passed and 1 skipped in 424.56 s, freshness, provenance, generation). In the dry run the item `verify.py phase` took 615.0 s of wall time, against 425 to 435 s in the earlier phases; pytest's own time was unchanged, so the extra time fell after its result line. The budget for one command is 900 s.
 
 - Findings: `.claude/quality_reports/findings-2026-11-17_phase-G-knowledge-refresh.json`
   (no surviving finding; gate PASS; six profiles; round 1 FAIL with two

@@ -1464,7 +1464,11 @@
   run pytest tests/ -q` on an idle machine before closeout and compare it
   with the constant in `shared/scripts/verify.py`. Raise the budget when
   the suite passes about two thirds of it; a late raise costs one more
-  review round and a second closeout.
+  review round and a second closeout. Compare the wall time of the whole
+  command, not pytest's own number: on 2026-11-18 pytest reported 425 s
+  while one `verify.py phase` item took 615 s and a full run by hand took
+  621 s, with the extra time after pytest's result line (cause not
+  examined; pytest removes old temporary folders at exit).
 - [LEARN:tooling] Between closeout step 4 and the commit, two things make
   `VFY-FRESH-002` stale besides a nested checkpoint: any edit to the big
   plan or a listed small plan (the phase receipt binds their bytes), and a
